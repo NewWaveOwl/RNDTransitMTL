@@ -1,18 +1,18 @@
-# TransitRandomizer Greater Montréal Design Document
+# TransitRandomizer Greater MontrГ©al Design Document
 
 **Team:** Jimmy, Caio, Artiom  
 **Project:** RNDTransitMTL  
 **Updated:** 2026-10-02
 
-TransitRandomizer generates achievable, semi-random adventures around Greater Montréal using the user's available time, location, transportation choices, interests, and previous feedback. The user chooses what kind of adventure they want; the application proposes a destination and a practical route instead of requiring a destination in advance.
+TransitRandomizer generates achievable, semi-random adventures around Greater MontrГ©al using the user's available time, location, transportation choices, interests, and previous feedback. The user chooses what kind of adventure they want; the application proposes a destination and a practical route instead of requiring a destination in advance.
 
 This document defines the product concept, screen behavior, generation algorithm, data model, and proposed delivery sequence. It combines the original Word design document with the team's additional feature ideas and the current Figma interface decisions. Planned features below are requirements and proposals, not a claim that they are already implemented.
 
 ## Product purpose
 
-The application helps people answer questions such as “Where can I explore in the next two hours?” or “What unfamiliar place can I reach using Metro and walking?” It combines local discovery, route planning, personalization, and controlled randomness.
+The application helps people answer questions such as вЂњWhere can I explore in the next two hours?вЂќ or вЂњWhat unfamiliar place can I reach using Metro and walking?вЂќ It combines local discovery, route planning, personalization, and controlled randomness.
 
-The intended users include Montréal residents, students seeking inexpensive activities, tourists, pedestrians, cyclists, public-transit users, and groups of friends. A useful adventure should fit the available time, match interests, avoid unnecessary repetition, and remain practical to complete.
+The intended users include MontrГ©al residents, students seeking inexpensive activities, tourists, pedestrians, cyclists, public-transit users, and groups of friends. A useful adventure should fit the available time, match interests, avoid unnecessary repetition, and remain practical to complete.
 
 Walking, bicycle, bus, Metro, train, and REM are planned transportation options. Car support remains an open decision. Several modes may be combined in one adventure. A **trip leg** means a section of the journey, regardless of its mode; walking is a transportation mode rather than a synonym for a leg.
 
@@ -51,7 +51,7 @@ The proposed first release prioritizes a complete single-user journey through ge
 
 The current design uses the **Figma top navigation**. Profile and History appear on the left; Settings appears on the right. A gradient GO shortcut appears between History and Settings only when the active screen is not Main. This shortcut returns to the existing main map and preserves trip selections. The GO action inside `GOBox` requests an adventure; it has a different purpose from the header shortcut.
 
-Profile provides the **about app** action, which opens About. The main page includes the map, `GOBox`, transportation choices, and the attraction-intensity control. Settings provides a shortcut back to trip settings. Platform Back returns through the navigation stack.
+Profile provides the **about app** action, which opens About. The main page includes the map, `GOBox`, transportation choices, and the attraction-intensity control. Tapping a route-based transport expands its route choices below the transport buttons inside the same panel, as in As2. Tapping it again collapses the list; selecting another route-based transport switches the expanded list. Walking and Bike toggle directly, and multiple routes can be selected. Settings provides a shortcut back to trip settings. Platform Back returns through the navigation stack.
 
 The source document proposed a bottom bar containing History, Map, and Profile. The agreed Figma top bar supersedes that layout proposal while keeping those destinations.
 
@@ -90,7 +90,7 @@ Collect the starting location, available duration, transport modes, exploration 
 
 Topographic options add target altitude, acceptable elevation gain, and terrain preferences when supported. The optional points-of-interest list can contain places the user would like the generator to include. Required stops and suggested stops should be distinguished so a suggested place does not silently become a hard constraint.
 
-Example request: “I have two hours, I am starting at John Abbott College, I can walk and use public transit, and I want to discover somewhere unusual.”
+Example request: вЂњI have two hours, I am starting at John Abbott College, I can walk and use public transit, and I want to discover somewhere unusual.вЂќ
 
 ### Generated trip preview
 
@@ -112,7 +112,7 @@ Later versions may recalculate when transit is delayed, a place is closed, the u
 
 ### Review trip
 
-Open the review page after an adventure is completed or explicitly ended. Offer an overall **1–5 star rating** and a short written review. The user may skip either. The proposed star scale should be confirmed during interface design.
+Open the review page after an adventure is completed or explicitly ended. Offer an overall **1вЂ“5 star rating** and a short written review. The user may skip either. The proposed star scale should be confirmed during interface design.
 
 Retain the source document's detailed feedback on individual route segments and attractions: single tap selects a segment and opens its information; double tap can like it; dislike is available from the information panel. Segment feedback may cover walking, cycling, transit, streets, parks, waterfronts, viewpoints, and attractions. Distinguish liked and disliked sections visually and with labels.
 
@@ -130,7 +130,7 @@ History records what happened. Favorites record routes or places that the user d
 
 ### Preferences and settings
 
-Transportation preferences include walking, bicycle, bus, Metro, train, and REM; car remains undecided. Adventure categories include popular attractions, hidden places, parks, architecture, food and cafés, historic locations, nature, street art, waterfronts, interesting streets, and random exploration.
+Transportation preferences include walking, bicycle, bus, Metro, train, and REM; car remains undecided. Adventure categories include popular attractions, hidden places, parks, architecture, food and cafГ©s, historic locations, nature, street art, waterfronts, interesting streets, and random exploration.
 
 Restrictions include maximum walking and cycling distances, maximum duration, budget, avoiding highways or stairs, wheelchair accessibility, preferred bicycle infrastructure, indoor/outdoor choices, and late-night preferences. Elevation preferences add altitude and terrain requirements.
 
@@ -140,9 +140,9 @@ General settings include language, units, notifications, location permissions, p
 
 Profile can show username, image, completed-trip count, total distance and exploration time, visited neighbourhoods, and favorite modes, categories, and places. Account details and password controls belong here when authentication is implemented.
 
-About is reached through Profile and introduces Caio, Artiom, and Jimmy using the existing photographs. Keep the provided “We make stuff” copy until the team supplies biographies.
+About is reached through Profile and introduces Caio, Artiom, and Jimmy using the existing photographs. Keep the provided вЂњWe make stuffвЂќ copy until the team supplies biographies.
 
-Optional achievements include visiting ten Montréal neighbourhoods, using every Metro line, completing 100 kilometres, visiting major parks, and completing trips with three transportation methods. Achievements are outside the initial proposed MVP.
+Optional achievements include visiting ten MontrГ©al neighbourhoods, using every Metro line, completing 100 kilometres, visiting major parks, and completing trips with three transportation methods. Achievements are outside the initial proposed MVP.
 
 ### Local group adventures
 
@@ -152,7 +152,7 @@ Joining and leaving a session should be explicit. Keep the group's route underst
 
 As a **nice-to-have extension**, give the group a shared quest pool. Quests might ask members to reach a viewpoint, find public art, or visit selected places. Support cooperative completion or a competitive game inspired by Jet Lag. Scoring, completion evidence, teams, and deadlines remain design decisions.
 
-“Local multiplayer” currently means nearby people taking an adventure together. Whether it uses a shared online service, local network, or direct device communication is undecided; offline multiplayer is not yet a requirement.
+вЂњLocal multiplayerвЂќ currently means nearby people taking an adventure together. Whether it uses a shared online service, local network, or direct device communication is undecided; offline multiplayer is not yet a requirement.
 
 ## Trip generation design
 

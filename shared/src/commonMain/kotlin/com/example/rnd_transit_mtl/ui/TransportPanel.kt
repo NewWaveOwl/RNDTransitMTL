@@ -1,5 +1,6 @@
 package com.example.rnd_transit_mtl.ui
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -13,8 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -53,6 +52,7 @@ internal fun TransportPanel(
 
     Column(
         modifier = modifier
+            .animateContentSize()
             .background(TransitMain, RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
             .padding(horizontal = 12.dp * layoutScale, vertical = 10.dp * layoutScale),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -91,39 +91,28 @@ internal fun TransportPanel(
             }
         }
 
-    }
-    // Route selection overlays the screen so opening it does not move the main panels.
-    transportTypes.firstOrNull { it.id == expandedTransportId }?.let { transport ->
-        AlertDialog(
-            onDismissRequest = { onExpandedTransportChange(transport.id) },
-            containerColor = TransitMain,
-            title = { Text("${transport.label} routes", color = TransitWhite) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    routesByTransport[transport.id].orEmpty().chunked(3).forEach { routeRow ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            routeRow.forEach { route ->
-                                RouteChoice(
-                                    route = route.label,
-                                    selected = route.id in selectedRouteIds,
-                                    onClick = { onToggleRoute(transport.id, route.id) },
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                            repeat(3 - routeRow.size) { Spacer(Modifier.weight(1f)) }
-                        }
+        // As2 behavior: route choices expand below the transport buttons inside this panel.
+        transportTypes.firstOrNull { it.id == expandedTransportId }?.let { transport ->
+            Spacer(Modifier.height(2.dp * layoutScale))
+            Text("${transport.label} routes", color = TransitWhite, fontSize = 20.sp * layoutScale)
+            routesByTransport[transport.id].orEmpty().chunked(3).forEach { routeRow ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp * layoutScale)
+                ) {
+                    routeRow.forEach { route ->
+                        RouteChoice(
+                            layoutScale = layoutScale,
+                            route = route.label,
+                            selected = route.id in selectedRouteIds,
+                            onClick = { onToggleRoute(transport.id, route.id) },
+                            modifier = Modifier.weight(1f)
+                        )
                     }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { onExpandedTransportChange(transport.id) }) {
-                    Text("Done", color = TransitWhite)
+                    repeat(3 - routeRow.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
-        )
+        }
     }
 }
 
@@ -182,6 +171,7 @@ private fun TransportChoice(
 /** Draws a selectable route chip, including its selected gradient state. */
 @Composable
 private fun RouteChoice(
+    layoutScale: Float,
     route: String,
     selected: Boolean,
     onClick: () -> Unit,
@@ -200,10 +190,10 @@ private fun RouteChoice(
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            .height(48.dp)
-            .background(brush, RoundedCornerShape(10.dp))
+            .height(36.dp * layoutScale)
+            .background(brush, RoundedCornerShape(10.dp * layoutScale))
             .clickable(onClick = onClick)
     ) {
-        Text(route, color = TransitWhite, fontSize = 20.sp, maxLines = 1)
+        Text(route, color = TransitWhite, fontSize = 20.sp * layoutScale, maxLines = 1)
     }
 }

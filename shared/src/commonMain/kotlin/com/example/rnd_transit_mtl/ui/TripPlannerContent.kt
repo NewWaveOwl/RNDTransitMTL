@@ -1,6 +1,8 @@
 package com.example.rnd_transit_mtl.ui
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -9,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -102,6 +105,8 @@ fun TripPlannerContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.BottomCenter)
+                    .heightIn(max = maxHeight)
+                    .verticalScroll(rememberScrollState())
             ) {
                 GOBox(
                     layoutScale = layoutScale,
