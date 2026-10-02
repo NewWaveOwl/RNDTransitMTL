@@ -66,10 +66,10 @@ The purpose of this AI usage log is to document how the three team members (Jimm
 
 * **What AI was primarily useful for:** Explaining Kotlin/Android concepts, formatting presentation and repository documents, documenting code, interpreting Git problems, and proposing research and coding-practice material.
 * **How AI influenced the team's work:** It accelerated the team's theoretical understanding of Kotlin syntax and asynchronous programming, directly supplying the structure for their class presentation.
-* **Important decisions or changes resulting from AI assistance:** [Not documented]
+* **Important decisions or changes resulting from AI assistance:** No major decisions were made by AI in the context of this project's architecture.
 * **Problems or limitations encountered:** Shared snapshots omit uploaded attachment contents; the original speech-revision prompt is abbreviated. Some AI drafts contained unresolved placeholders, and Git advice changed with newly supplied status. The research response called for interviews. The shared PR draft did not establish testing, linting, or review.
-* **How the team learned to use AI more effectively:** [Not documented]
-* **What the team should do differently in the next Sprint:** [Not documented]
+* **How the team learned to use AI more effectively:** We learned to use other AIs for refining the prompt of another AI. This way, the instructions are clearer.
+* **What the team should do differently in the next Sprint:** The team should centralize our AI workflows so discussions and logs are easier to track.
 
 ## 6. Key Prompts and Outputs
 
