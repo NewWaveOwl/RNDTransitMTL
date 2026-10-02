@@ -10,10 +10,10 @@ import androidx.compose.runtime.setValue
 
 import com.example.rnd_transit_mtl.model.TransportRoute
 import com.example.rnd_transit_mtl.model.TransportType
-import com.example.rnd_transit_mtl.ui.SettingsScreen
+import com.example.rnd_transit_mtl.ui.TripPlannerContent
 
 /**
- * Owns all user-editable trip state and supplies it to the stateless settings screen.
+ * Owns all user-editable trip state and supplies it to the stateless trip planner.
  * Route selections are stored independently so every route-based transport supports
  * selecting more than one route.
  */
@@ -33,7 +33,7 @@ internal fun TransitOpeningScreen(
     var showTripResults by rememberSaveable { mutableStateOf(false) }
     var validationMessage by rememberSaveable { mutableStateOf("") }
 
-    SettingsScreen(
+    TripPlannerContent(
         minutes = minutes,
         onMinutesChange = {
             minutes = it
