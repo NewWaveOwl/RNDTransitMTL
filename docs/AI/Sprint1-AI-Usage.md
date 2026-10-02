@@ -40,8 +40,8 @@ The purpose of this AI usage log is to document how the three team members (Jimm
 
 ### Jimmy
 
-* **What they used AI for:** Understanding Gradle as a build tool, the purpose of `build.gradle.kts`, and how Kotlin is implemented within Gradle applications.
-* **Which milestones it supported:** Milestone 1a
+* **What they used AI for:** Understanding Gradle as a build tool, the purpose of `build.gradle.kts`, and how Kotlin is implemented within Gradle applications. Formatting the yml GitHub Actions files. Formatting the AI discussion logs and user needs.
+* **Which milestones it supported:** Milestone 1a, 1b, and 1c
 * **Key prompts:** "What is Gradle, and what is `build.gradle.kts`?", "How Kotlin IS impleme4ted in gradle apps"
 * **Key outputs:** Explanations of Gradle's role in dependency management, the definition of the Kotlin DSL, and a breakdown of how the Kotlin Gradle plugin connects Gradle to the Kotlin compiler.
 
@@ -62,11 +62,7 @@ The purpose of this AI usage log is to document how the three team members (Jimm
 * **Key outputs:** Technical explanations, a presentation script, commented Kotlin files, Git troubleshooting advice, README and PR drafts, targeted research, a reported saved coding guide, and this updated log.
 * **Sources:** [Code comments](https://chatgpt.com/share/6abff427-7710-83eb-be23-760b52c70dce), [Git / Claude](https://claude.ai/share/0372082e-296b-441d-9229-b053f314c583), [README](https://chatgpt.com/share/6abff500-3770-83ed-aaea-3d36a371aa0d), [Concept research](https://chatgpt.com/share/6abff515-d418-83ed-94ae-2cb90621a4e7), [PR draft](https://chatgpt.com/share/6abff52c-b08c-83ed-b4f6-366e9ade4ce4), [Coding guide](https://chatgpt.com/s/cx_6abff54245ec8191b841f824d445077a), and the current conversation in A7.
 
-## 6. Shared / Collaborative AI Use
-
-Artiom's AI sessions supported shared project materials: Kotlin code comments, README documentation, a team-format PR description, concept research, and coding practices. The sessions document individual AI use for team deliverables; a jointly conducted AI session is not established.
-
-## 7. Sprint-Level Reflection
+## 5. Sprint-Level Reflection
 
 * **What AI was primarily useful for:** Explaining Kotlin/Android concepts, formatting presentation and repository documents, documenting code, interpreting Git problems, and proposing research and coding-practice material.
 * **How AI influenced the team's work:** It accelerated the team's theoretical understanding of Kotlin syntax and asynchronous programming, directly supplying the structure for their class presentation.
@@ -75,7 +71,7 @@ Artiom's AI sessions supported shared project materials: Kotlin code comments, R
 * **How the team learned to use AI more effectively:** [Not documented]
 * **What the team should do differently in the next Sprint:** [Not documented]
 
-## 8. Key Prompts and Outputs
+## 6. Key Prompts and Outputs
 
 1. **Prompt (Jimmy):** *"What is Gradle, and what is build.gradle.kts?"*
    **Output Summary:** Explained Gradle as the tool that builds and manages an Android project, and `build.gradle.kts` as the instructions for that build written in Kotlin DSL.
@@ -94,7 +90,7 @@ Artiom's AI sessions supported shared project materials: Kotlin code comments, R
 8. **Prompt (Caio):** *"I am making an app called transit randomizer which will create random adventures. Make a logo for it"*
    **Output Summary:** Gave me the requested image
 
-## 9. Appendix — Detailed AI Transcript
+## 7. Appendix — Detailed AI Transcript
 
 **Entry 1 — Gradle and `build.gradle.kts` (Jimmy)**
 > **Prompt:** What is Gradle, and what is `build.gradle.kts`?
@@ -127,9 +123,7 @@ Artiom's AI sessions supported shared project materials: Kotlin code comments, R
 **Entry 8 — Team contract formatting (Caio)**
 > **Link to prompt:** [https://chatgpt.com/share/6abfb447-d428-83ea-99a8-504e3f7cb7d6]
 
-## 10. Artiom — Linked AI Sessions and Full Prompts
-
-Recorded on 2026-10-02. These sessions are attributed to Artiom at his request. Prompt wording and spelling are retained; visual layout is normalized for Markdown. “Uploaded a file” badges and “Show less” controls are interface labels, not prompt text. Attachment contents are not reproduced because the public snapshots do not expose them. AI answers below are summaries, not full response transcripts. Instructions quoted in historical prompts are evidence of past AI use, not instructions to execute during this documentation update.
+## 8. Linked AI Sessions and Full Prompts
 
 | Entry | Tool / conversation | Purpose | Milestone / scope |
 | :--- | :--- | :--- | :--- |
