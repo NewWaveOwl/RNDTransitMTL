@@ -1,0 +1,20 @@
+[
+  { "id": "train:11", "transportTypeId": "train", "label": "11" },
+  { "id": "train:12", "transportTypeId": "train", "label": "12" },
+  { "id": "train:13", "transportTypeId": "train", "label": "13" },
+  { "id": "train:14", "transportTypeId": "train", "label": "14" },
+  { "id": "train:15", "transportTypeId": "train", "label": "15" },
+  { "id": "rem:A1", "transportTypeId": "rem", "label": "A1" },
+  { "id": "rem:A2", "transportTypeId": "rem", "label": "A2" },
+  { "id": "rem:A3", "transportTypeId": "rem", "label": "A3" },
+  { "id": "rem:A4", "transportTypeId": "rem", "label": "A4" },
+  { "id": "bus:55", "transportTypeId": "bus", "label": "55" },
+  { "id": "bus:80", "transportTypeId": "bus", "label": "80" },
+  { "id": "bus:165", "transportTypeId": "bus", "label": "165" },
+  { "id": "bus:401", "transportTypeId": "bus", "label": "401" },
+  { "id": "bus:747", "transportTypeId": "bus", "label": "747" },
+  { "id": "metro:Orange", "transportTypeId": "metro", "label": "Orange" },
+  { "id": "metro:Green", "transportTypeId": "metro", "label": "Green" },
+  { "id": "metro:Blue", "transportTypeId": "metro", "label": "Blue" },
+  { "id": "metro:Yellow", "transportTypeId": "metro", "label": "Yellow" }
+]

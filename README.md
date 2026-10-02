@@ -1,5 +1,28 @@
 This is a Kotlin Multiplatform project targeting Android, iOS, Web, Desktop (JVM).
 
+### Transit interface migrated from As2
+
+The transit interface from `As2_RNDTranzit` now lives in
+`shared/src/commonMain/kotlin/com/example/rnd_transit_mtl`:
+
+- `App.kt` loads the shared transport data and applies the transit theme.
+- `TransitOpeningScreen.kt` owns trip selections, validation, and saved trips.
+- `ui` contains settings, time controls, transport and route choices, intensity, and trip results.
+- `model` contains transport types and routes; `data` contains JSON-backed fake repositories.
+- `ui/theme` contains the transit palette and shared LINE Seed JP typography.
+
+The map, fonts, and JSON data are packaged in `shared/src/commonMain/composeResources`.
+Repositories use suspend functions to load resources across platforms. The existing
+Android, desktop, web, and iOS entry points already call `App()`.
+The original As2 project is retained as a working reference.
+
+`FakeTransportRepositoriesTest` under `shared/src/jvmTest` checks packaged JSON loading,
+transport ordering, route ownership, unique route IDs, and bus labels.
+File checks confirmed that the migrated resources match the originals and contain
+six transport types and eighteen routes. The build/test attempt in this environment
+stopped before compilation because Gradle could not establish a loopback connection;
+compilation, tests, and interactive behavior still require verification in Android Studio.
+
 * [/iosApp](./iosApp/iosApp) contains an iOS application. Even if you’re sharing your UI with Compose Multiplatform,
   you need this entry point for your iOS app. This is also where you should add SwiftUI code for your project.
 
