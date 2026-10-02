@@ -1,0 +1,8 @@
+[
+  { "id": "train", "label": "Train", "usesRoutes": true },
+  { "id": "rem", "label": "REM", "usesRoutes": true },
+  { "id": "walk", "label": "Walk", "usesRoutes": false },
+  { "id": "bus", "label": "Bus", "usesRoutes": true },
+  { "id": "metro", "label": "Metro", "usesRoutes": true },
+  { "id": "bike", "label": "Bike", "usesRoutes": false }
+]

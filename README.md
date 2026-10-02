@@ -1,46 +1,91 @@
-This is a Kotlin Multiplatform project targeting Android, iOS, Web, Desktop (JVM).
+# RNDTransitMTL
 
-* [/iosApp](./iosApp/iosApp) contains an iOS application. Even if you’re sharing your UI with Compose Multiplatform,
-  you need this entry point for your iOS app. This is also where you should add SwiftUI code for your project.
+## Goal
 
-* [/shared](./shared/src) is for code that will be shared across your Compose Multiplatform applications.
-  It contains several subfolders:
-  - [commonMain](./shared/src/commonMain/kotlin) is for code that’s common for all targets.
-  - Other folders are for Kotlin code that will be compiled for only the platform indicated in the folder name.
-    For example, if you want to use Apple’s CoreCrypto for the iOS part of your Kotlin app,
-    the [iosMain](./shared/src/iosMain/kotlin) folder would be the right place for such calls.
-    Similarly, if you want to edit the Desktop (JVM) specific part, the [jvmMain](./shared/src/jvmMain/kotlin)
-    folder is the appropriate location.
+RNDTransitMTL is a Kotlin Multiplatform discovery app for Greater Montréal. Its goal is to generate semi-random adventures based on the user's available time, transportation choices, and interests, helping them explore unfamiliar places without choosing a destination first.
 
-### Running the apps
+The current prototype includes a sample map, trip controls, transport selection, and Profile, About, Settings, and History navigation. See the [main design document](docs/MainDesignDoc.md) for the planned features.
 
-Use the run configurations provided by the run widget in your IDE's toolbar. You can also use these commands and options:
+## Quick-start
 
-- Android app: `./gradlew :androidApp:assembleDebug`
-- Desktop app:
-  - Hot reload: `./gradlew :desktopApp:hotRun --auto`
-  - Standard run: `./gradlew :desktopApp:run`
-- Web app:
-  - Wasm target (faster, modern browsers): `./gradlew :webApp:wasmJsBrowserDevelopmentRun`
-  - JS target (slower, supports older browsers): `./gradlew :webApp:jsBrowserDevelopmentRun`
-- iOS app: open the [/iosApp](./iosApp) directory in Xcode and run it from there.
+### Requirements
 
-### Running tests
+- Android Studio with support for the project's Android Gradle Plugin version, listed in `gradle/libs.versions.toml`.
+- JDK 21 selected as the Gradle JDK.
+- Android SDK Platform 37 and Android SDK Platform-Tools.
+- An Android emulator or device running Android 7.0 / API 24 or newer.
+- Internet access for the first dependency download.
 
-Use the run button in your IDE's editor gutter, or run tests using Gradle tasks:
+### Get the source
 
-- Android tests: `./gradlew :shared:testAndroidHostTest`
-- Desktop tests: `./gradlew :shared:jvmTest`
-- Web tests:
-  - Wasm target: `./gradlew :shared:wasmJsTest`
-  - JS target: `./gradlew :shared:jsTest`
-- iOS tests: `./gradlew :shared:iosSimulatorArm64Test`
+```powershell
+git clone https://github.com/NewWaveOwl/RNDTransitMTL.git
+cd RNDTransitMTL
+```
 
----
+Open this repository folder in Android Studio, let Gradle sync, and install any requested SDK components. Use the included Gradle wrapper; a separate Gradle installation is not required.
 
-Learn more about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html),
-[Compose Multiplatform](https://kotlinlang.org/compose-multiplatform/),
-[Kotlin/Wasm](https://kotl.in/wasm/)…
+### Build and launch Android
 
-We would appreciate your feedback on Compose/Web and Kotlin/Wasm in the public Slack channel [#compose-web](https://slack-chats.kotlinlang.org/c/compose-web).
-If you face any issues, please report them on [YouTrack](https://youtrack.jetbrains.com/newIssue?project=CMP).
+Select the `androidApp` run configuration and an emulator or connected device, then click **Run**. This builds and installs the debug version from source.
+
+Alternatively, from the repository root in PowerShell, with a device or emulator connected:
+
+```powershell
+.\gradlew.bat :androidApp:installDebug
+adb shell am start -n com.example.rnd_transit_mtl/.MainActivity
+```
+
+For a physical device, enable USB debugging. If `adb` is not on your PATH, run it from your Android SDK's `platform-tools` folder.
+
+### Build and launch a release
+
+Build the release variant from source:
+
+```powershell
+.\gradlew.bat :androidApp:assembleRelease
+```
+
+The output is in `androidApp/build/outputs/apk/release/`. The project currently has no release signing configuration, so this command produces an unsigned APK.
+
+To create an installable release, use Android Studio's **Build → Generate Signed Bundle / APK**, choose **APK** and the `androidApp` module, create or select a signing key, and choose the **release** variant. Install the resulting signed APK on your device, then launch RNDTransitMTL from the app launcher. You can also install and launch it using:
+
+```powershell
+adb install -r "PATH_TO_SIGNED_RELEASE_APK"
+adb shell am start -n com.example.rnd_transit_mtl/.MainActivity
+```
+
+Replace `PATH_TO_SIGNED_RELEASE_APK` with the actual signed APK path. When switching from a debug build to a release signed with a different key, uninstall the debug app first; uninstalling removes its local app data.
+
+### Other platforms
+
+From the repository root:
+
+- Desktop: `.\gradlew.bat :desktopApp:run`
+- Web with Wasm: `.\gradlew.bat :webApp:wasmJsBrowserDevelopmentRun`
+- Web with JavaScript: `.\gradlew.bat :webApp:jsBrowserDevelopmentRun`
+- iOS: on macOS, open `iosApp/iosApp.xcodeproj` in Xcode, select a simulator or device, and run the app.
+
+On macOS or Linux, use `./gradlew` in place of `.\gradlew.bat`.
+
+## Screenshots of application
+
+### Main map and trip controls
+
+![Main map with GOBox, transport selection, and attraction intensity](screenshots/MileStone_1_MainScreen.png)
+
+### User profile
+
+![User profile with account placeholders and the About app button](screenshots/MileStone_1_user.png)
+
+### About
+
+![About page introducing Caio, Artiom, and Jimmy](screenshots/MileStone_1_about.png)
+
+These are the screenshots currently available in the repository. Screenshots for the Settings and History placeholders are still to be added.
+
+## Team members
+
+- Artiom Sova
+- Caio Nunes
+- Jimmy Rashid
