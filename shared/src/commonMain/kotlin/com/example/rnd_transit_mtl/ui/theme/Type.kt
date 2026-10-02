@@ -17,28 +17,6 @@ private fun lineSeedJp() = FontFamily(
     Font(Res.font.line_seed_jp_bold, FontWeight.Bold)
 )
 
-/** Baseline Material typography whose sizing and spacing values are retained. */
-private val DefaultTypography = Typography()
-
-/** App typography model that applies LINE Seed JP to every Material text style. */
+/** Applies LINE Seed JP to all standard and emphasized Material text styles. */
 @Composable
-internal fun transitTypography(): Typography {
-    val fontFamily = lineSeedJp()
-    return Typography(
-        displayLarge = DefaultTypography.displayLarge.copy(fontFamily = fontFamily),
-        displayMedium = DefaultTypography.displayMedium.copy(fontFamily = fontFamily),
-        displaySmall = DefaultTypography.displaySmall.copy(fontFamily = fontFamily),
-        headlineLarge = DefaultTypography.headlineLarge.copy(fontFamily = fontFamily),
-        headlineMedium = DefaultTypography.headlineMedium.copy(fontFamily = fontFamily),
-        headlineSmall = DefaultTypography.headlineSmall.copy(fontFamily = fontFamily),
-        titleLarge = DefaultTypography.titleLarge.copy(fontFamily = fontFamily),
-        titleMedium = DefaultTypography.titleMedium.copy(fontFamily = fontFamily),
-        titleSmall = DefaultTypography.titleSmall.copy(fontFamily = fontFamily),
-        bodyLarge = DefaultTypography.bodyLarge.copy(fontFamily = fontFamily),
-        bodyMedium = DefaultTypography.bodyMedium.copy(fontFamily = fontFamily),
-        bodySmall = DefaultTypography.bodySmall.copy(fontFamily = fontFamily),
-        labelLarge = DefaultTypography.labelLarge.copy(fontFamily = fontFamily),
-        labelMedium = DefaultTypography.labelMedium.copy(fontFamily = fontFamily),
-        labelSmall = DefaultTypography.labelSmall.copy(fontFamily = fontFamily)
-    )
-}
+internal fun transitTypography(): Typography = Typography(fontFamily = lineSeedJp())

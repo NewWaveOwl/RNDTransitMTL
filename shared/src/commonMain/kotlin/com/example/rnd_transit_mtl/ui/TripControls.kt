@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -46,7 +47,7 @@ internal fun TripControls(
 ) {
     Row(
         modifier = modifier
-            .fillMaxWidth(0.78f)
+            .fillMaxWidth(0.92f)
             .height(90.dp * layoutScale)
             .background(
                 brush = Brush.horizontalGradient(
@@ -55,24 +56,25 @@ internal fun TripControls(
                     1.00f to TransitSelected
                 ),
                 shape = RoundedCornerShape(28.dp * layoutScale)
-            ),
+            )
+            .padding(horizontal = 12.dp * layoutScale),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("I have", color = TransitWhite, fontSize = 26.sp * layoutScale)
+        Text("I have", color = TransitWhite, fontSize = 26.sp * layoutScale, maxLines = 1, softWrap = false)
         ControlDivider(layoutScale)
         ScrollableMinutes(minutes = minutes, onMinutesChange = onMinutesChange, layoutScale = layoutScale)
         ControlDivider(layoutScale)
-        Text("minutes", color = TransitWhite, fontSize = 26.sp * layoutScale)
+        Text("minutes", color = TransitWhite, fontSize = 26.sp * layoutScale, maxLines = 1, softWrap = false)
         ControlDivider(layoutScale)
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .fillMaxHeight()
-                .width(50.dp * layoutScale)
+                .width(60.dp * layoutScale)
                 .clickable(onClick = onGo)
         ) {
-            Text("GO", color = TransitWhite, fontSize = 28.sp * layoutScale)
+            Text("GO", color = TransitWhite, fontSize = 28.sp * layoutScale, maxLines = 1, softWrap = false)
         }
     }
 }
