@@ -103,7 +103,7 @@ fun TripPlannerContent(
                     .fillMaxWidth()
                     .align(Alignment.BottomCenter)
             ) {
-                TripControls(
+                GOBox(
                     layoutScale = layoutScale,
                     minutes = minutes,
                     onMinutesChange = onMinutesChange,

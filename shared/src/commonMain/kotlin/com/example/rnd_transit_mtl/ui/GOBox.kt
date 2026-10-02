@@ -38,7 +38,7 @@ import kotlin.math.abs
 
 /** Renders the floating time picker and GO control. */
 @Composable
-internal fun TripControls(
+internal fun GOBox(
     layoutScale: Float = 1f,
     minutes: Int,
     onMinutesChange: (Int) -> Unit,
