@@ -21,9 +21,8 @@ The purpose of this AI usage log is to document how the three team members (Jimm
 * **Key prompt(s):** "What is Gradle, and what is `build.gradle.kts`?", "Compare Compose and React?", "MAke this speech nicer-> to bullets points -> SLIDE 5..."
 * **Key AI output(s):** Definitions of Gradle and Kotlin DSL, comparisons of declarative UI frameworks, explanations of Coroutines and StateFlow, and a cleanly formatted bulleted script for presentation slides 5–8.
 * **How the output was used:** The AI-generated bullet points were used directly for Slides 5–8 and the closing of the presentation. The technical explanations were used to build the team's understanding of the codebase.
-* **Decisions/actions taken:** The team structured their presentation script using the AI's formatting.
-* **Issues or limitations:** [Not documented]
-* **Lessons learned:** [Not documented]
+
+
 
 ## 4. Milestone 1b — AI Usage
 * **Task/context:** 
@@ -34,9 +33,7 @@ The purpose of this AI usage log is to document how the three team members (Jimm
 * **Key prompt(s):** [Not documented]
 * **Key AI output(s):** [Not documented]
 * **How the output was used:** [Not documented]
-* **Decisions/actions taken:** [Not documented]
-* **Issues or limitations:** [No AI use documented]
-* **Lessons learned:** [Not documented]
+
 
 ## 5. Milestone 1c — AI Usage
 * **Task/context:** 
@@ -46,9 +43,7 @@ The purpose of this AI usage log is to document how the three team members (Jimm
 * **Key prompt(s):** [Not documented]
 * **Key AI output(s):** [Not documented]
 * **How the output was used:** [Not documented]
-* **Decisions/actions taken:** [Not documented]
-* **Issues or limitations:** [No AI use documented]
-* **Lessons learned:** [Not documented]
+
 
 ## 6. Individual AI Usage
 
@@ -57,30 +52,21 @@ The purpose of this AI usage log is to document how the three team members (Jimm
 * **Which milestones it supported:** Milestone 1a
 * **Key prompts:** "What is Gradle, and what is `build.gradle.kts`?", "How Kotlin IS impleme4ted in gradle apps"
 * **Key outputs:** Explanations of Gradle's role in dependency management, the definition of the Kotlin DSL, and a breakdown of how the Kotlin Gradle plugin connects Gradle to the Kotlin compiler.
-* **Decisions/actions:** [Not documented]
-* **Issues/limitations:** [Not documented]
-* **Lessons learned:** [Not documented]
-* **Next steps:** [Not documented]
+
 
 ### Caio
 * **What they used AI for:** Comparing Jetpack Compose to React to bridge existing web development knowledge to Android development.
 * **Which milestones it supported:** Milestone 1a
-* **Key prompts:** "Was I reading Kotlin code in Now IN Android and I catch myself on a thought that React and Compose are almost the same. So Compare Compose and React? So is thre difference in fundemetals and logick in them?"
+* **Key prompts:** "What are the similarities between Kotlin compose and React in terms of structure and functionality?"
 * **Key outputs:** A conceptual map showing the similarities between React and Compose (e.g., UI as a function of state, one-way data flow) and the runtime differences (Virtual DOM vs. Compose Runtime recomposition).
-* **Decisions/actions:** [Not documented]
-* **Issues/limitations:** [Not documented]
-* **Lessons learned:** [Not documented]
-* **Next steps:** [Not documented]
+
 
 ### Artiom
 * **What they used AI for:** Clarifying Kotlin-specific asynchronous programming concepts (Suspend functions, Coroutines, Flow, StateFlow) and revising a rough speech into presentation-ready bullet points.
 * **Which milestones it supported:** Milestone 1a
 * **Key prompts:** "explain Suspend functions in Kotlin", "Expalin Coroutines", "What the diifernce betwee n StateFlow and Flow", "MAke this speech nicer-> to bullets points..."
 * **Key outputs:** Technical definitions distinguishing threads from coroutines, cold Flows from hot StateFlows, and a cleanly formatted bulleted script for presentation slides.
-* **Decisions/actions:** The AI-generated bullet points were adopted to structure the presentation script for Slides 5 through 8 and the closing.
-* **Issues/limitations:** [Not documented]
-* **Lessons learned:** [Not documented]
-* **Next steps:** [Not documented]
+
 
 ## 7. Shared / Collaborative AI Use
 [No shared/collaborative AI use is documented in the provided record.]
@@ -140,3 +126,8 @@ The purpose of this AI usage log is to document how the three team members (Jimm
 **Entry 7 — Presentation Speech Revision (Artiom)**
 > **Prompt:** MAke this speech nicer-> to bullets points -> SLIDE 5 — KOTLIN CODE STRUCTURE...
 > **AI Output:** *[Returned a fully formatted bullet-point script covering Slide 5 (Kotlin Code Structure), Slide 6 (Project Structure Around ForYouViewModel), Slide 7 (Suspend Functions), Slide 8 (Flow and StateFlow), and a Closing.]*
+
+**Entry 8 — Team contract formatting (Caio)**
+> **Link to prompt:** [https://chatgpt.com/share/6abfb447-d428-83ea-99a8-504e3f7cb7d6]
+
+
