@@ -17,3 +17,15 @@ Jobs-to-be-Done (JTBD) Framing
 Problem-Statement Framing (Design Thinking)
 
 "Travelers need an effortless, guided catalyst for spontaneous exploration because information overload turns destination planning into an exhausting chore rather than an exciting journey."
+
+## Prompt
+are there any apps that genearte random trips for random adventures either local are travel
+
+## Output
+Are there any apps that generate random trips for random adventures either local or travel?
+Yes, there are several apps that can help you generate random trips for adventures, whether local or travel-related. Here are some of the best options available:
+1. Travel Roulette: This app allows you to pick your interests and region, then roll the dice to find a random destination. It also offers a variety of other random generators for fun. 
+2. GoRandomly: An AI-powered travel adventure generator that turns your vibe, budget, and timing into a playful travel idea in under a minute. 
+3. Random Trip Generator: This tool helps you pick a destination by continent, budget, and travel style with an interactive map and cost estimates. 
+4. GoTripzi: A random country and destination generator that lets you spin the globe and land somewhere new, with options to filter by budget, climate, and more. 
+These apps can be a great way to discover new places and experiences, whether you're looking for a local adventure or a travel destination. Just remember to check the details and plan accordingly for your trip.
