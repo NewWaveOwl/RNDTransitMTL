@@ -19,7 +19,7 @@ Problem-Statement Framing (Design Thinking)
 "Travelers need an effortless, guided catalyst for spontaneous exploration because information overload turns destination planning into an exhausting chore rather than an exciting journey."
 
 ## Prompt
-are there any apps that genearte random trips for random adventures either local are travel
+are there any apps that genearte random trips for random adventures either local or travel
 
 ## Output
 Are there any apps that generate random trips for random adventures either local or travel?
