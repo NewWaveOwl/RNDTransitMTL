@@ -470,3 +470,14 @@ Fill Artiom's ai ussage with this link and content of propnt and full propnts : 
 **AI output / how it was used:** Codex read the supplied log, retrieved the six shared conversations through the browser, expanded collapsed prompts, and used the evidence to create the updated `docs/AI/Sprint1-AI-Usage.md`. The update adds Artiom's linked usage, complete visible user prompts, output summaries, and this documentation session while preserving Jimmy's and Caio's existing entries.
 
 **Limitations:** This record contains the visible human task request, not internal system instructions or tool transcripts. Previously recorded Milestone 1a prompts remain in Sections 9–10; the original presentation-revision prompt is abbreviated in the supplied file, and none of the six new sources supplies its complete text.
+
+
+### A8 — Current Conversation: Updating the AI Usage Log
+Full prompt
+~~~ text
+According to all PowerPoints, create a document for AI to how to write Kotlin/Compose code with examples from the slides. This document should include commenting practice with "**/ @param ", all the wasy how code should written Compose and Kotlin, and  structured from powerpoints. Global code for Ai's instructions/ acrhitecturre should be taken from NowInAndroid app ( https://github.com/android/nowinandroid). In the end produce md file called AI_HowToWriteCode.md
+~~~~
+
+**Source:** [Current Codex conversation](https://chatgpt.com/s/cx_6abffe83874081919f2f97c8560b3471) (opens in Codex; a public share URL was not returned during this update).
+
+Ouput : AI_HowToWriteCode.md in docs
