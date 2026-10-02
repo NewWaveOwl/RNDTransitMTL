@@ -15,6 +15,13 @@ import com.example.rnd_transit_mtl.ui.theme.TransitHighlight
 import com.example.rnd_transit_mtl.ui.theme.TransitMain
 import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 
+/**
+ * Draws the current screen title in the shared navigation area.
+ *
+ * @param title Title text provided by the active screen key.
+ * @param layoutScale Scale factor for dimensions and text relative to the 402-unit reference width.
+ * @param highlighted Whether to use the yellow surface and larger Profile/About title style.
+ */
 @Composable
 internal fun PageTitle(title: String, layoutScale: Float, highlighted: Boolean) {
     Box(

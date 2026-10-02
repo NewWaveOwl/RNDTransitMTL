@@ -5,9 +5,15 @@ import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-/** Loads canned transport types from shared JSON resources instead of a database. */
+/**
+ * Supplies sample transport types without requiring a database or network.
+ */
 class FakeTransportTypeRepository {
-    /** Returns transport types in the JSON file's display order. */
+    /**
+     * Loads sample transport types from the bundled JSON resource.
+     *
+     * @return Transport types in the display order defined by the resource.
+     */
     suspend fun getTransportTypes(): List<TransportType> = JsonAssetReader
         .readArray("files/data/transport_types.json")
         .map { element ->

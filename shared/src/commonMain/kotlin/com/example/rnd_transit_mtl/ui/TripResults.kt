@@ -32,7 +32,15 @@ import org.jetbrains.compose.resources.painterResource
 import rnd_transit_mtl.shared.generated.resources.Res
 import rnd_transit_mtl.shared.generated.resources.ic_close
 
-/** Displays every saved trip and provides an individual removal action. */
+/**
+ * Displays saved trip summaries and their removal actions.
+ *
+ * Removal is delegated to the parent using the current position in the supplied list.
+ *
+ * @param trips Saved summaries in display order.
+ * @param onRemoveTrip Receives the zero-based index of the trip to remove.
+ * @param modifier Layout and appearance modifiers supplied by the parent.
+ */
 @Composable
 internal fun TripResults(
     trips: List<String>,
@@ -44,6 +52,7 @@ internal fun TripResults(
         verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        /** Display one-based trip numbers while keeping zero-based indices for removal callbacks. */
         itemsIndexed(trips) { index, trip ->
             TripResultCard(
                 number = index + 1,
@@ -63,7 +72,14 @@ internal fun TripResults(
     }
 }
 
-/** Draws one saved trip using the shared highlight and main colours. */
+/**
+ * Displays a numbered saved-trip summary with a removal control.
+ *
+ * @param number One-based trip number displayed to the user.
+ * @param summary Saved description of the trip duration, transport choices, and intensity.
+ * @param onRemove Removes this trip through the parent-owned callback.
+ * @param modifier Layout and appearance modifiers supplied by the parent.
+ */
 @Composable
 private fun TripResultCard(
     number: Int,
@@ -99,6 +115,7 @@ private fun TripResultCard(
                 .semantics { contentDescription = "Trip $number. $summary" }
                 .padding(horizontal = 22.dp, vertical = 16.dp)
         )
+        /** The clickable container supplies the removal description, so its icon needs no separate label. */
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier

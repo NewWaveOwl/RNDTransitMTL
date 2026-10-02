@@ -16,6 +16,15 @@ import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 
+/**
+ * Displays a team photograph beside the shared About page placeholder text.
+ *
+ * The teammate name is used for accessibility; the visible text is "We make stuff".
+ *
+ * @param name Teammate name used in the photograph accessibility description.
+ * @param photo Shared drawable resource containing the teammate photograph.
+ * @param layoutScale Scale factor for dimensions and text relative to the 402-unit reference width.
+ */
 @Composable
 internal fun TeamMember(name: String, photo: DrawableResource, layoutScale: Float) {
     Row(
@@ -23,6 +32,7 @@ internal fun TeamMember(name: String, photo: DrawableResource, layoutScale: Floa
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(20.dp * layoutScale)
     ) {
+        /** Crop the photograph to fill the same square size for every team member. */
         Image(
             painter = painterResource(photo),
             contentDescription = "$name, team member",
@@ -38,4 +48,3 @@ internal fun TeamMember(name: String, photo: DrawableResource, layoutScale: Floa
         )
     }
 }
-

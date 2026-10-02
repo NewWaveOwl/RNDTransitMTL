@@ -27,7 +27,18 @@ import com.example.rnd_transit_mtl.ui.theme.TransitMain
 import com.example.rnd_transit_mtl.ui.theme.TransitSelected
 import com.example.rnd_transit_mtl.ui.theme.TransitHighlight
 
-/** Renders the intensity heading, interactive slider, and validation output. */
+/**
+ * Displays the attraction-intensity slider and trip-validation feedback.
+ *
+ * The parent owns the intensity value and validation message; slider gestures
+ * request intensity changes through the supplied callback.
+ *
+ * @param layoutScale Scale factor for dimensions and text relative to the 402-unit reference width.
+ * @param intensity Current attraction intensity on the 0 to 100 scale.
+ * @param onIntensityChange Receives the intensity chosen by tapping or dragging the slider.
+ * @param validationMessage Validation message to display, or an empty string when there is no error.
+ * @param modifier Layout and appearance modifiers supplied by the parent.
+ */
 @Composable
 internal fun IntensityPanel(
     layoutScale: Float = 1f,
@@ -53,6 +64,7 @@ internal fun IntensityPanel(
                 .height(70.dp * layoutScale)
         )
         Spacer(Modifier.height(3.dp))
+        /** Keep feedback space in the layout and show its text only when a validation message exists. */
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
@@ -75,7 +87,17 @@ internal fun IntensityPanel(
     }
 }
 
-/** Draws the custom intensity slider and places its value inside the progress fill. */
+/**
+ * Displays and updates intensity while keeping the value readable at low progress.
+ *
+ * Horizontal pointer positions map to values from 0 to 100. The numeric label
+ * moves outside the filled section when progress is too low to contain it.
+ *
+ * @param layoutScale Scale factor for dimensions and text relative to the 402-unit reference width.
+ * @param intensity Current attraction intensity on the 0 to 100 scale.
+ * @param onIntensityChange Receives the intensity chosen by tapping or dragging the slider.
+ * @param modifier Layout and appearance modifiers supplied by the parent.
+ */
 @Composable
 private fun IntensitySlider(
     layoutScale: Float,
@@ -83,6 +105,7 @@ private fun IntensitySlider(
     onIntensityChange: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    /** Convert the intensity percentage to a bounded fraction for the filled section width. */
     val progress = (intensity / 100f).coerceIn(0f, 1f)
     val sliderShape = RoundedCornerShape(32.dp * layoutScale)
 
@@ -91,8 +114,13 @@ private fun IntensitySlider(
             .background(TransitMain, sliderShape)
             .pointerInput(onIntensityChange) {
                 awaitEachGesture {
+                    /** Set intensity immediately on touch-down, so a tap also selects a value. */
                     val down = awaitFirstDown()
                     onIntensityChange((down.position.x / size.width * 100f).coerceIn(0f, 100f))
+                    /**
+                     * Continue updating from the first pointer in each event while any pointer is pressed.
+                     * Clamp positions outside the slider to 0 or 100 and consume each handled change.
+                     */
                     do {
                         val event = awaitPointerEvent()
                         val change = event.changes.first()
@@ -111,6 +139,7 @@ private fun IntensitySlider(
                 .fillMaxHeight()
                 .background(TransitSelected, sliderShape)
         ) {
+            /** At 18% or above, place the value near the end of the filled section. */
             if (progress >= 0.18f) {
                 Text(
                     text = intensity.toInt().toString(),
@@ -122,6 +151,7 @@ private fun IntensitySlider(
                 )
             }
         }
+        /** Below 18%, center the value on the full track so the narrow fill does not obscure it. */
         if (progress < 0.18f) {
             Text(
                 text = intensity.toInt().toString(),

@@ -7,7 +7,9 @@ import com.example.rnd_transit_mtl.model.TransportType
 import com.example.rnd_transit_mtl.ui.TripPlannerContent
 import com.example.rnd_transit_mtl.ui.theme.RNDTransitTheme
 
-/** Supplies sample state for the shared settings-screen preview. */
+/**
+ * Previews the trip planner with sample transport data and selected routes.
+ */
 @Preview(showBackground = true, widthDp = 350, heightDp = 580)
 @Composable
 fun TripPlannerPreview() {

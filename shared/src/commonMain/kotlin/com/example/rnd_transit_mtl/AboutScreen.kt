@@ -22,12 +22,19 @@ import rnd_transit_mtl.shared.generated.resources.artiom_profile
 import rnd_transit_mtl.shared.generated.resources.caio_profile
 import rnd_transit_mtl.shared.generated.resources.jim_profile
 
-/** Team photographs and copy follow the supplied About layout. */
+/**
+ * Displays the Caio, Artiom, and Jimmy photographs using the shared team-member layout.
+ *
+ * The team list scrolls independently of the decorative space below it.
+ */
 @Composable
 fun AboutScreen() {
     BoxWithConstraints(Modifier.fillMaxSize()) {
+        /** Scale team rows and spacing from the reference width while limiting extreme sizes. */
         val layoutScale = (maxWidth.value / 402f).coerceIn(0.7f, 1.4f)
+
         Column(Modifier.fillMaxSize().background(TransitHighlight)) {
+            /** Give the scrollable team list the remaining height above the bottom spacer. */
             Column(
                 modifier = Modifier.weight(1f).fillMaxWidth().background(TransitComplementary)
                     .verticalScroll(rememberScrollState())

@@ -4,9 +4,15 @@ import com.example.rnd_transit_mtl.model.TransportRoute
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-/** Loads canned routes and bus numbers from shared JSON resources. */
+/**
+ * Supplies sample transit routes and bus numbers from shared resources.
+ */
 class FakeTransportRouteRepository {
-    /** Returns every route with the stable ID stored in the JSON file. */
+    /**
+     * Loads sample routes from the bundled JSON resource.
+     *
+     * @return Routes with their stable IDs, owning transport IDs, and display labels.
+     */
     suspend fun getTransportRoutes(): List<TransportRoute> = JsonAssetReader
         .readArray("files/data/transport_routes.json")
         .map { element ->

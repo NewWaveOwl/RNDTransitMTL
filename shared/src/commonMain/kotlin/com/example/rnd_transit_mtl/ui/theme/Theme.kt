@@ -21,7 +21,11 @@ private val TransitColors = lightColorScheme(
     outline = TransitComplementary
 )
 
-/** Applies the transit color palette and LINE Seed JP typography to [content]. */
+/**
+ * Applies the shared transit colors and LINE Seed JP typography.
+ *
+ * @param content Application or preview content that inherits the transit theme.
+ */
 @Composable
 fun RNDTransitTheme(content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = TransitColors, typography = transitTypography(), content = content)

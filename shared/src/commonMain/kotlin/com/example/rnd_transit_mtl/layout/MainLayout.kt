@@ -10,7 +10,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.example.rnd_transit_mtl.ui.theme.TransitMain
 
-/** Day 18: one hoisted Scaffold keeps the Figma header outside route animations. */
+/**
+ * Places shared navigation above screen content and applies system and Scaffold padding.
+ *
+ * @param content Screen content rendered below the shared header.
+ */
 @Composable
 fun MainLayout(content: @Composable () -> Unit) {
     Scaffold(

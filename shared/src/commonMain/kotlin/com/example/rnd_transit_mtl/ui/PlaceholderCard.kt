@@ -14,6 +14,14 @@ import androidx.compose.ui.unit.sp
 import com.example.rnd_transit_mtl.ui.theme.TransitComplementary
 import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 
+/**
+ * Displays a labeled placeholder card in Settings or History.
+ *
+ * The card provides static placeholder content; it has no interaction or local state.
+ *
+ * @param label Text displayed inside the card.
+ * @param layoutScale Scale factor for dimensions and text relative to the 402-unit reference width.
+ */
 @Composable
 internal fun PlaceholderCard(label: String, layoutScale: Float) {
     Box(
@@ -25,4 +33,3 @@ internal fun PlaceholderCard(label: String, layoutScale: Float) {
         Text(label, color = TransitWhite, fontSize = 28.sp * layoutScale)
     }
 }
-

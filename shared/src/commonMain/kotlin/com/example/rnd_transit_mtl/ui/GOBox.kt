@@ -36,7 +36,17 @@ import rnd_transit_mtl.shared.generated.resources.ic_arrow_drop_up
 import rnd_transit_mtl.shared.generated.resources.ic_arrow_drop_down
 import kotlin.math.abs
 
-/** Renders the floating time picker and GO control. */
+/**
+ * Displays the floating duration selector and trip-generation action.
+ *
+ * Duration changes and the GO action are delegated to the parent through callbacks.
+ *
+ * @param layoutScale Scale factor for dimensions and text relative to the 402-unit reference width.
+ * @param minutes Selected trip duration in minutes.
+ * @param onMinutesChange Receives the new duration when the user taps an arrow or drags the minute selector.
+ * @param onGo Requests a trip using the current selections.
+ * @param modifier Layout and appearance modifiers supplied by the parent.
+ */
 @Composable
 internal fun GOBox(
     layoutScale: Float = 1f,
@@ -79,7 +89,16 @@ internal fun GOBox(
     }
 }
 
-/** Displays and changes minutes using vertical dragging or arrow taps. */
+/**
+ * Changes trip duration in five-minute steps through arrow taps or vertical dragging.
+ *
+ * Dragging up increases the duration; dragging down decreases it. Drag updates
+ * are clamped to 5–240 minutes, and the arrow buttons enforce their respective limits.
+ *
+ * @param minutes Selected trip duration in minutes, expected to be between 5 and 240.
+ * @param onMinutesChange Receives the updated duration after a tap or drag step.
+ * @param layoutScale Scale factor for dimensions and text relative to the 402-unit reference width.
+ */
 @Composable
 private fun ScrollableMinutes(minutes: Int, onMinutesChange: (Int) -> Unit, layoutScale: Float) {
     Column(
@@ -87,13 +106,19 @@ private fun ScrollableMinutes(minutes: Int, onMinutesChange: (Int) -> Unit, layo
         modifier = Modifier
             .width(64.dp * layoutScale)
             .pointerInput(minutes) {
+                /** Track movement since the last step and the duration used for the next drag update. */
                 var dragDistance = 0f
                 var workingMinutes = minutes
                 detectVerticalDragGestures(
                     onDragStart = { dragDistance = 0f },
                     onVerticalDrag = { change, dragAmount ->
+                        /** Consume the movement so another gesture handler does not also act on it. */
                         change.consume()
                         dragDistance += dragAmount
+                        /**
+                         * Apply one five-minute step after at least 18 pixels of movement.
+                         * Clamp the duration to 5–240 minutes, then reset the distance for the next step.
+                         */
                         if (abs(dragDistance) >= 18f) {
                             workingMinutes = (workingMinutes + if (dragDistance < 0f) 5 else -5)
                                 .coerceIn(5, 240)
@@ -134,7 +159,11 @@ private fun ScrollableMinutes(minutes: Int, onMinutesChange: (Int) -> Unit, layo
     }
 }
 
-/** Draws a short separator between parts of the trip control. */
+/**
+ * Draws a separator between sections of GOBox.
+ *
+ * @param layoutScale Scale factor for dimensions and text relative to the 402-unit reference width.
+ */
 @Composable
 private fun ControlDivider(layoutScale: Float) {
     Spacer(

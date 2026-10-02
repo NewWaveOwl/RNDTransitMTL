@@ -48,7 +48,9 @@ import rnd_transit_mtl.shared.generated.resources.ic_account_circle
 import rnd_transit_mtl.shared.generated.resources.ic_receipt_long
 import rnd_transit_mtl.shared.generated.resources.ic_settings
 
-/** The course's SharedTopBar, with the app's existing Figma navigation icons. */
+/**
+ * Displays Figma navigation icons and shows gradient GO only away from Main.
+ */
 @Composable
 fun SharedTopBar() {
     val navigator = LocalNavigator.current

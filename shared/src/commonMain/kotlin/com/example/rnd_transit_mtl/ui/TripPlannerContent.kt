@@ -31,10 +31,28 @@ import com.example.rnd_transit_mtl.model.TransportType
 import com.example.rnd_transit_mtl.ui.theme.TransitMain
 
 /**
- * Coordinates the transit settings sections over the responsive map background.
+ * Coordinates the map, GOBox, expandable transport panel, intensity, and saved trips.
  *
- * The caller owns persistent trip state. This composable owns only the temporary expanded
- * transport ID and passes display work to focused, stateless section composables.
+ * The parent owns trip selections and saved results. This composable remembers
+ * only which transport route list is expanded.
+ *
+ * @param minutes Selected trip duration in minutes.
+ * @param onMinutesChange Receives the new duration when the user taps an arrow or drags the minute selector.
+ * @param transportTypes Available transport options in display order.
+ * @param transportRoutes Available routes, each linked to its owning transport type.
+ * @param selectedTransportIds IDs of the transport modes currently included in the trip.
+ * @param selectedRouteIds IDs of all selected routes across transport modes.
+ * @param savedTrips Saved trip summaries available in the results view.
+ * @param showTripResults Whether to display saved results instead of the planner controls.
+ * @param onToggleTransport Toggles a transport ID in the parent-owned selection.
+ * @param onToggleRoute Toggles a route using its transport ID and route ID.
+ * @param intensity Current attraction intensity on the 0 to 100 scale.
+ * @param onIntensityChange Receives the intensity chosen by tapping or dragging the slider.
+ * @param validationMessage Validation message to display, or an empty string when there is no error.
+ * @param onTripResultsVisibilityChange Requests showing or hiding saved results in response to a map swipe.
+ * @param onRemoveTrip Receives the zero-based index of the saved trip to remove.
+ * @param onGo Validates the current selections and requests creation of a trip summary.
+ * @param modifier Layout and appearance modifiers supplied by the parent.
  */
 @Composable
 fun TripPlannerContent(
@@ -56,6 +74,7 @@ fun TripPlannerContent(
     onGo: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    /** Remember the open route list across recompositions; null means all lists are collapsed. */
     var expandedTransportId by remember { mutableStateOf<String?>(null) }
 
     BoxWithConstraints(
@@ -63,7 +82,7 @@ fun TripPlannerContent(
             .fillMaxSize()
             .background(TransitMain)
     ) {
-        // The reference frame is 402 units wide. Scale controls with the available width.
+        /** Scale controls from the 402-unit reference width and limit extreme size changes. */
         val layoutScale = (maxWidth.value / 402f).coerceIn(0.7f, 1.4f)
         Image(
             painter = painterResource(Res.drawable.map_sample),
@@ -72,11 +91,16 @@ fun TripPlannerContent(
             modifier = Modifier
                 .fillMaxSize()
                 .pointerInput(savedTrips, showTripResults) {
+                    /** Accumulate horizontal movement in pixels and apply navigation when the drag ends. */
                     var horizontalDrag = 0f
                     detectHorizontalDragGestures(
                         onDragStart = { horizontalDrag = 0f },
                         onHorizontalDrag = { _, dragAmount -> horizontalDrag += dragAmount },
                         onDragEnd = {
+                            /**
+                             * A left swipe of at least 80 pixels opens results when trips exist.
+                             * A right swipe of at least 80 pixels returns from results to the planner.
+                             */
                             when {
                                 horizontalDrag <= -80f && savedTrips.isNotEmpty() ->
                                     onTripResultsVisibilityChange(true)
@@ -91,6 +115,7 @@ fun TripPlannerContent(
                 }
         )
 
+        /** Switch between saved results and the planning controls using parent-owned visibility state. */
         if (showTripResults) {
             TripResults(
                 trips = savedTrips,
@@ -101,6 +126,7 @@ fun TripPlannerContent(
                     .height(maxHeight * 0.68f)
             )
         } else {
+            /** Allow the bottom controls to scroll when their content exceeds the available height. */
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -124,6 +150,7 @@ fun TripPlannerContent(
                     selectedRouteIds = selectedRouteIds,
                     expandedTransportId = expandedTransportId,
                     onExpandedTransportChange = { transportId ->
+                        /** Tapping the open transport collapses it; tapping another opens that route list. */
                         expandedTransportId = transportId.takeUnless {
                             it == expandedTransportId
                         }
@@ -145,4 +172,3 @@ fun TripPlannerContent(
         }
     }
 }
-

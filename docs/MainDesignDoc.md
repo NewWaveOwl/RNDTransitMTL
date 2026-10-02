@@ -293,6 +293,7 @@ Further possibilities from the source document include real-time replanning, wea
 - Final star scale, review-text length, and treatment of external place ratings.
 - Group connection method, group size, mixed preferences, host departure, and reconnect behavior.
 - Quest rules, scoring, teams, and evidence of completion for optional competitive play.
+- Maybe we should add sort of sorting or filter on user's type of stm pass/ticket + price maybe
 
 ## Source references
 

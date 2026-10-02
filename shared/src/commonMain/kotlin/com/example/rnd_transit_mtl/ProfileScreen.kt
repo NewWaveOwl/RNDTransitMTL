@@ -20,12 +20,20 @@ import com.example.rnd_transit_mtl.ui.theme.TransitComplementary
 import com.example.rnd_transit_mtl.ui.theme.TransitMain
 import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 
-/** Profile shell: account details are placeholders; About opens the team page. */
+/**
+ * Displays account placeholders and the action that opens About.
+ *
+ * Uses the shared navigator supplied by App. Email and password labels are static placeholders.
+ */
 @Composable
 fun ProfileScreen() {
+    /** Obtain the navigator shared by the application instead of creating a separate back stack. */
     val navigator = LocalNavigator.current
+
     BoxWithConstraints(Modifier.fillMaxSize()) {
+        /** Scale the reference layout to the available width, bounded between 0.7 and 1.4. */
         val layoutScale = (maxWidth.value / 402f).coerceIn(0.7f, 1.4f)
+
         Column(Modifier.fillMaxSize().background(TransitComplementary)) {
             Column(
                 modifier = Modifier.weight(1f).fillMaxWidth()
@@ -36,6 +44,8 @@ fun ProfileScreen() {
                 Text("Email", color = TransitWhite, fontSize = 18.sp * layoutScale)
                 Text("Change password", color = TransitWhite, fontSize = 18.sp * layoutScale)
             }
+
+            /** Keep the About action below the scrollable account content and push its destination on tap. */
             TextButton(
                 onClick = { navigator.navigate(AboutScreenKey) },
                 modifier = Modifier.fillMaxWidth().height(64.dp * layoutScale).background(TransitMain)

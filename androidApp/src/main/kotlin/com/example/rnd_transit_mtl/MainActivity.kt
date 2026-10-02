@@ -7,7 +7,15 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 
+/**
+ * Android entry activity for the shared transit application.
+ */
 class MainActivity : ComponentActivity() {
+    /**
+     * Enables edge-to-edge display and hosts the shared application.
+     *
+     * @param savedInstanceState Previously saved activity state, or null for a new activity.
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -18,6 +26,9 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/**
+ * Previews the shared application inside Android Studio.
+ */
 @Preview
 @Composable
 fun AppAndroidPreview() {

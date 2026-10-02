@@ -14,6 +14,9 @@ import com.example.rnd_transit_mtl.backStackConfig
 import com.example.rnd_transit_mtl.layout.MainLayout
 import com.example.rnd_transit_mtl.ui.theme.RNDTransitTheme
 
+/**
+ * Previews Settings with the shared theme, header, and navigator provider.
+ */
 @Preview(showBackground = true, widthDp = 402, heightDp = 716)
 @Composable
 fun SettingsScreenPreview() {

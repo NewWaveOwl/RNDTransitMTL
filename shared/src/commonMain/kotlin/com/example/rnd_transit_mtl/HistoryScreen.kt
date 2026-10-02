@@ -13,12 +13,19 @@ import androidx.compose.ui.unit.dp
 import com.example.rnd_transit_mtl.ui.PlaceholderCard
 import com.example.rnd_transit_mtl.ui.theme.TransitMain
 
-/** Static history examples match the supplied placeholder design. */
+/**
+ * Displays the sample TRIP A, TRIP C, and TRIP D history cards.
+ *
+ * These are static placeholders, separate from the planner's saved trip summaries.
+ */
 @Composable
 fun HistoryScreen() {
     BoxWithConstraints(Modifier.fillMaxSize()) {
+        /** Adapt card sizes and spacing to the available width using the reference layout. */
         val layoutScale = (maxWidth.value / 402f).coerceIn(0.7f, 1.4f)
+
         Column(Modifier.fillMaxSize().background(TransitMain)) {
+            /** Allow the placeholder list to scroll on smaller displays. */
             Column(
                 modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(20.dp * layoutScale)
