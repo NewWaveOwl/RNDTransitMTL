@@ -39,8 +39,9 @@ The purpose of this AI usage log is to document how the three team members (Jimm
 * **Task/context:** 
   * Brainstorming app concepts and investigating user needs.
   * Delivering an elevator pitch defining the project vision.
-* **Purpose of AI use:** [No AI use documented]
-* **Key prompt(s):** [Not documented]
+  * Creating images for the elevator pitch's slides
+* **Purpose of AI use:** Helping with the ideation process of the app's development
+* **Key prompt(s):** 
 * **Key AI output(s):** [Not documented]
 * **How the output was used:** [Not documented]
 
