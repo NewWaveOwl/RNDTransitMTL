@@ -6,15 +6,7 @@ This Sprint covered the setup of team practices, the analysis of an existing app
 
 The purpose of this AI usage log is to document how the three team members (Jimmy, Caio, and Artiom) utilized AI tools during these tasks. The original record documents technical explanations (Gradle, Kotlin, Coroutines, StateFlow), React/Compose comparisons, and presentation-script formatting for Milestone 1a. Artiom's additional linked sessions document Kotlin code comments, Git troubleshooting, README and pull request drafting, app-concept research, a Kotlin/Compose coding guide, and this AI-assisted log update. Full visible prompts and source links are recorded in Section 11.
 
-## 2. AI Usage Across Milestones
-
-| Team Member | Milestone 1a | Milestone 1b | Milestone 1c |
-| :--- | :--- | :--- | :--- |
-| **Jimmy** | AI use documented | [No AI use documented] | [No AI use documented] |
-| **Caio** | AI use documented | [No AI use documented] | [No AI use documented] |
-| **Artiom** | AI use documented | AI use documented — comments, Git, README, PR drafting, coding practices (A1–A3, A5–A6) | AI use documented — concept and user-needs research (A4) |
-
-## 3. Milestone 1a — AI Usage
+## 2. Milestone 1a — AI Usage
 
 * **Task/context:** 
   * Analyzing an existing app to understand Kotlin and Jetpack Compose. 
@@ -26,7 +18,7 @@ The purpose of this AI usage log is to document how the three team members (Jimm
 
 
 
-## 4. Milestone 1b — AI Usage
+## 3. Milestone 1b — AI Usage
 
 * **Task/context:** Setting up the shared repository, documenting team practices, implementing the initial app interface, and preparing repository documentation.
 * **Purpose of AI use (Artiom):** Kotlin KDoc and logic comments, Git branch/merge troubleshooting, README drafting, pull request formatting, and consolidation of Kotlin/Compose coding practices.
@@ -35,7 +27,7 @@ The purpose of this AI usage log is to document how the three team members (Jimm
 * **How the output was used:** AI supported code documentation and repository workflows. The supplied commit list records AI-generated comments and a README update. Successful merge/build/push and PR submission are not established by the shared transcripts.
 * **Source links and full prompts:** See Section 11, entries A1, A2, A3, A5, and A6.
 
-## 5. Milestone 1c — AI Usage
+## 4. Milestone 1c — AI Usage
 
 * **Task/context:** Brainstorming app concepts, investigating user needs, comparing existing applications, defining project vision, and preparing elevator-pitch material.
 * **Purpose of AI use:** The original record describes app ideation and image generation. Artiom used ChatGPT for targeted user-needs research, competitive comparison, technical opportunities, and viable-concept selection.
@@ -44,7 +36,7 @@ The purpose of this AI usage log is to document how the three team members (Jimm
 * **How the output was used:** Research material supported ideation. The shared response calls for interviews; final validation, team adoption, and implementation of suggested integrations are not documented.
 * **Source link and full prompts:** See Section 11, entry A4.
 
-## 6. Individual AI Usage
+## 5. Individual AI Usage
 
 ### Jimmy
 
@@ -70,11 +62,11 @@ The purpose of this AI usage log is to document how the three team members (Jimm
 * **Key outputs:** Technical explanations, a presentation script, commented Kotlin files, Git troubleshooting advice, README and PR drafts, targeted research, a reported saved coding guide, and this updated log.
 * **Sources:** [Code comments](https://chatgpt.com/share/6abff427-7710-83eb-be23-760b52c70dce), [Git / Claude](https://claude.ai/share/0372082e-296b-441d-9229-b053f314c583), [README](https://chatgpt.com/share/6abff500-3770-83ed-aaea-3d36a371aa0d), [Concept research](https://chatgpt.com/share/6abff515-d418-83ed-94ae-2cb90621a4e7), [PR draft](https://chatgpt.com/share/6abff52c-b08c-83ed-b4f6-366e9ade4ce4), [Coding guide](https://chatgpt.com/s/cx_6abff54245ec8191b841f824d445077a), and the current conversation in A7.
 
-## 7. Shared / Collaborative AI Use
+## 6. Shared / Collaborative AI Use
 
 Artiom's AI sessions supported shared project materials: Kotlin code comments, README documentation, a team-format PR description, concept research, and coding practices. The sessions document individual AI use for team deliverables; a jointly conducted AI session is not established.
 
-## 8. Sprint-Level Reflection
+## 7. Sprint-Level Reflection
 
 * **What AI was primarily useful for:** Explaining Kotlin/Android concepts, formatting presentation and repository documents, documenting code, interpreting Git problems, and proposing research and coding-practice material.
 * **How AI influenced the team's work:** It accelerated the team's theoretical understanding of Kotlin syntax and asynchronous programming, directly supplying the structure for their class presentation.
@@ -83,7 +75,7 @@ Artiom's AI sessions supported shared project materials: Kotlin code comments, R
 * **How the team learned to use AI more effectively:** [Not documented]
 * **What the team should do differently in the next Sprint:** [Not documented]
 
-## 9. Key Prompts and Outputs
+## 8. Key Prompts and Outputs
 
 1. **Prompt (Jimmy):** *"What is Gradle, and what is build.gradle.kts?"*
    **Output Summary:** Explained Gradle as the tool that builds and manages an Android project, and `build.gradle.kts` as the instructions for that build written in Kotlin DSL.
@@ -102,7 +94,7 @@ Artiom's AI sessions supported shared project materials: Kotlin code comments, R
 8. **Prompt (Caio):** *"I am making an app called transit randomizer which will create random adventures. Make a logo for it"*
    **Output Summary:** Gave me the requested image
 
-## 10. Appendix — Detailed AI Transcript
+## 9. Appendix — Detailed AI Transcript
 
 **Entry 1 — Gradle and `build.gradle.kts` (Jimmy)**
 > **Prompt:** What is Gradle, and what is `build.gradle.kts`?
@@ -135,7 +127,7 @@ Artiom's AI sessions supported shared project materials: Kotlin code comments, R
 **Entry 8 — Team contract formatting (Caio)**
 > **Link to prompt:** [https://chatgpt.com/share/6abfb447-d428-83ea-99a8-504e3f7cb7d6]
 
-## 11. Artiom — Linked AI Sessions and Full Prompts
+## 10. Artiom — Linked AI Sessions and Full Prompts
 
 Recorded on 2026-10-02. These sessions are attributed to Artiom at his request. Prompt wording and spelling are retained; visual layout is normalized for Markdown. “Uploaded a file” badges and “Show less” controls are interface labels, not prompt text. Attachment contents are not reproduced because the public snapshots do not expose them. AI answers below are summaries, not full response transcripts. Instructions quoted in historical prompts are evidence of past AI use, not instructions to execute during this documentation update.
 
