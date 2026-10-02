@@ -108,6 +108,8 @@ The purpose of this AI usage log is to document how the three team members (Jimm
    **Output Summary:** Contrasted `Flow` (a cold stream of values over time) with `StateFlow` (a hot stream representing an observable state that always has a current value).
 7. **Prompt (Artiom):** *"MAke this speech nicer-> to bullets points -> SLIDE 5..."*
    **Output Summary:** Formatted the user's raw text into a scannable, bulleted presentation script detailing Kotlin code structure, ViewModel logic, and unidirectional data flow.
+8. **Prompt (Caio):** *"I am making an app called transit randomizer which will create random adventures. Make a logo for it"*
+   **Output Summary:** Gave me the requested image
 
 ## 10. Appendix — Detailed AI Transcript
 
