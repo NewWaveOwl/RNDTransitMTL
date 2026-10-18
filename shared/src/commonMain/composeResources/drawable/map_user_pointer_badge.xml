@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    XML conversion of the user's map_user_pointer.svg.
+    Preserves the original 300 × 300 geometry and literal colors.
+    Used as the start badge, without applying a monochrome tint.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="300"
+    android:viewportHeight="300">
+
+    <path
+        android:fillColor="#28454C"
+        android:pathData="M150,0 A150,150 0,1 1,150,300 A150,150 0,1 1,150,0 Z" />
+
+    <path
+        android:fillColor="#FFBA00"
+        android:fillType="nonZero"
+        android:pathData="M37.1272,172.73 C37.1273,110.379 87.6728,59.8334 150.024,59.8334 C212.375,59.8334 262.92,110.379 262.92,172.73 C262.92,197.788 254.754,220.939 240.941,239.669 L59.1057,239.669 C45.2924,220.939 37.1272,197.788 37.1272,172.73 Z M229.291,219.021 L149.691,81.1478 L70.0891,219.021 L229.291,219.021 Z" />
+
+</vector>

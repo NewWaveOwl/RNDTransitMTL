@@ -2,49 +2,64 @@ package com.example.rnd_transit_mtl.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.example.rnd_transit_mtl.ui.theme.TransitWhite
+import com.example.rnd_transit_mtl.ui.theme.TransitMain
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 
 /**
- * Displays a team photograph beside the shared About page placeholder text.
+ * Displays an existing team photograph and the supplied member name.
  *
- * The teammate name is used for accessibility; the visible text is "We make stuff".
- *
- * @param name Teammate name used in the photograph accessibility description.
- * @param photo Shared drawable resource containing the teammate photograph.
- * @param layoutScale Scale factor for dimensions and text relative to the 402-unit reference width.
+ * No role, biography, contact information, or contribution is inferred.
+ * The shared About screen owns the surrounding layout.
  */
 @Composable
-internal fun TeamMember(name: String, photo: DrawableResource, layoutScale: Float) {
+internal fun TeamMember(
+    name: String,
+    photo: DrawableResource,
+    layoutScale: Float
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(20.dp * layoutScale)
     ) {
-        /** Crop the photograph to fill the same square size for every team member. */
         Image(
             painter = painterResource(photo),
-            contentDescription = "$name, team member",
+            contentDescription = "$name, RND Transit team member",
             contentScale = ContentScale.Crop,
-            modifier = Modifier.size(116.dp * layoutScale)
+            modifier = Modifier
+                .size(116.dp * layoutScale)
+                .clip(RoundedCornerShape(16.dp))
         )
-        Text(
-            text = "We make\nstuff",
-            color = TransitWhite,
-            fontSize = 44.sp * layoutScale,
-            lineHeight = 52.sp * layoutScale,
-            modifier = Modifier.weight(1f)
-        )
+
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = name,
+                color = TransitMain,
+                style = MaterialTheme.typography.headlineSmall
+            )
+
+            Text(
+                text = "RND Transit team",
+                color = TransitMain,
+                style = MaterialTheme.typography.bodyLarge
+            )
+        }
     }
 }

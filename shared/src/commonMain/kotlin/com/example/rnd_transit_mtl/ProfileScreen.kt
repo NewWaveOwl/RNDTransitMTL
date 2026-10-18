@@ -19,9 +19,10 @@ import androidx.compose.ui.unit.sp
 import com.example.rnd_transit_mtl.ui.theme.TransitComplementary
 import com.example.rnd_transit_mtl.ui.theme.TransitMain
 import com.example.rnd_transit_mtl.ui.theme.TransitWhite
+import com.example.rnd_transit_mtl.state.LocalNicknameSession
 
 /**
- * Displays account placeholders and the action that opens About.
+ * Displays the memory-only nickname, account placeholders, and About action.
  *
  * Uses the shared navigator supplied by App. Email and password labels are static placeholders.
  */
@@ -29,6 +30,7 @@ import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 fun ProfileScreen() {
     /** Obtain the navigator shared by the application instead of creating a separate back stack. */
     val navigator = LocalNavigator.current
+    val nickname = LocalNicknameSession.current.nickname.orEmpty()
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         /** Scale the reference layout to the available width, bounded between 0.7 and 1.4. */
@@ -41,6 +43,8 @@ fun ProfileScreen() {
                     .padding(horizontal = 12.dp * layoutScale, vertical = 24.dp * layoutScale),
                 verticalArrangement = Arrangement.spacedBy(16.dp * layoutScale)
             ) {
+                Text("Nickname", color = TransitWhite, fontSize = 18.sp * layoutScale)
+                Text(nickname, color = TransitWhite, fontSize = 28.sp * layoutScale)
                 Text("Email", color = TransitWhite, fontSize = 18.sp * layoutScale)
                 Text("Change password", color = TransitWhite, fontSize = 18.sp * layoutScale)
             }

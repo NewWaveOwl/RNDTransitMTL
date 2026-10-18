@@ -9,32 +9,52 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.example.rnd_transit_mtl.model.TransportRoute
 import com.example.rnd_transit_mtl.model.TransportType
+import com.example.rnd_transit_mtl.model.Trip
 import com.example.rnd_transit_mtl.ui.theme.TransitHighlight
 import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 
 /**
- * Displays the trip planner, a loading indicator, or a resource-loading error.
+ * Displays the planner once both transport resources are available.
  *
- * Available data takes priority over the error flag. The loading indicator
- * remains visible while either list is unavailable and no failure is reported.
- *
- * @param transportTypes Loaded transport options, or null while data is unavailable.
- * @param transportRoutes Loaded routes, or null while data is unavailable.
- * @param loadingError Whether transport resource loading failed.
+ * Available data retains priority over the error flag.
+ * Navigation is supplied by Router rather than owned by planner components.
  */
 @Composable
 fun MainScreen(
     transportTypes: List<TransportType>?,
     transportRoutes: List<TransportRoute>?,
-    loadingError: Boolean
+    loadingError: Boolean,
+    onOpenCurrentTrip: ((Trip) -> Boolean)? = null,
+    onOpenCompletedTrip: ((String) -> Boolean)? = null,
+    isDestinationActive: Boolean = true
 ) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        /** Open the planner only when both data lists are available; otherwise show error or loading. */
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
         when {
-            transportTypes != null && transportRoutes != null ->
-                TransitOpeningScreen(transportTypes, transportRoutes)
-            loadingError -> Text("Unable to load transport data.", color = TransitWhite)
-            else -> CircularProgressIndicator(color = TransitHighlight)
+            transportTypes != null && transportRoutes != null -> {
+                TransitOpeningScreen(
+                    transportTypes = transportTypes,
+                    transportRoutes = transportRoutes,
+                    onOpenCurrentTrip = onOpenCurrentTrip,
+                    onOpenCompletedTrip = onOpenCompletedTrip,
+                    isDestinationActive = isDestinationActive
+                )
+            }
+
+            loadingError -> {
+                Text(
+                    text = "Unable to load transport data.",
+                    color = TransitWhite
+                )
+            }
+
+            else -> {
+                CircularProgressIndicator(
+                    color = TransitHighlight
+                )
+            }
         }
     }
 }

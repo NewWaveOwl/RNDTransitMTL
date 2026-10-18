@@ -4,7 +4,19 @@
 
 RNDTransitMTL is a Kotlin Multiplatform discovery app for Greater Montréal. Its goal is to generate semi-random adventures based on the user's available time, transportation choices, and interests, helping them explore unfamiliar places without choosing a destination first.
 
-The current prototype includes a sample map, trip controls, transport selection, and Profile, About, Settings, and History navigation. See the [main design document](docs/MainDesignDoc.md) for the planned features.
+The current prototype includes a nickname introduction, a map-based trip planner, simulated trips, reviews with optional image links, and History with review editing and trip details. Profile, About, and Settings remain available. See the [main design document](docs/MainDesignDoc.md) for the planned features and [team practices](docs/TeamPractices.md) for the team's working agreements.
+
+## Trip and review flow
+
+1. Enter a nickname for the current session.
+2. Use GO to choose your time, transportation, and attraction intensity, then generate a trip. You can resume an active trip after navigating away.
+3. Follow the simulated route on the sample map. The trip information popup shows its details; the map supports pan and zoom.
+4. At completion, tap the 100% progress bar to open the review. Give an overall rating, optionally answer the other questions, add a comment or an HTTPS image link, then save or skip.
+5. Open History to filter completed trips, expand saved feedback, view details, edit a review, or remove a trip. Review photos load when saved feedback is displayed, with retry and browser fallback controls.
+
+The map and route are a simulation; this prototype does not use GPS or live street routing. Trips and review drafts support saved-state restoration, but there is no permanent database. A fresh session without restored state starts with empty History. The nickname stays only in process memory.
+
+This flow is imported from [Artiom's Assignment 3 repository](https://github.com/NewWaveOwl/As3_APPDEV2_RND_Tranzit_Sova/tree/8b1b538), including its shared state, navigation, resources, previews, and regression tests. The destination's design documents and earlier screenshots remain historical planning material.
 
 ## Quick-start
 
@@ -68,6 +80,15 @@ From the repository root:
 
 On macOS or Linux, use `./gradlew` in place of `.\gradlew.bat`.
 
+### Regression tests and compilation checks
+
+```powershell
+.\gradlew.bat :shared:jvmTest :shared:testAndroidHostTest
+.\gradlew.bat :androidApp:assembleDebug :shared:compileKotlinJs :shared:compileKotlinWasmJs
+```
+
+The imported tests cover trip generation and completion, review state, navigation and Back behavior, History presentation, simulation, and map geometry. iOS compilation requires macOS and Xcode.
+
 ## Screenshots of application
 
 ### Main map and trip controls
@@ -82,7 +103,7 @@ On macOS or Linux, use `./gradlew` in place of `.\gradlew.bat`.
 
 ![About page introducing Caio, Artiom, and Jimmy](screenshots/MileStone_1_about.png)
 
-These are the screenshots currently available in the repository. Screenshots for the Settings and History placeholders are still to be added.
+These screenshots show the earlier milestone UI. They have not been refreshed for the imported trip and review flow.
 
 ## Team members
 
