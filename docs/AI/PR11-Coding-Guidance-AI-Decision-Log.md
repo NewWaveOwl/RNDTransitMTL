@@ -44,3 +44,17 @@ Update request [**Added instruction for AI to how to write code and comment it**
 
 - Observable AI assistance: source comparison, technical guidance drafting, portability adaptation, and documentation/skill validation.
 - Student reflection on usefulness, learning, deliberate technique choices, and time: [Student reflection needed].
+
+## Follow-up - Removal requested on 2026-10-19
+
+The requester reported that the instructor forbids the repository agent setup and requested a removal PR. This supersedes the earlier request to install it. The PR11 implementation record above is retained as historical evidence, not as current setup instructions.
+
+**Full available human prompt:**
+
+```text
+Ok we need to reove AGENT.md files from the repo: [https://github.com/NewWaveOwl/RNDTransitMTL.git](https://github.com/NewWaveOwl/RNDTransitMTL.git) create a PR with removing AGENTS and .agents and , claude , -> reason  Intructor said thery are forbbiden
+```
+
+**AI output summary / implemented change:** Removed `AGENT.md`, `AGENTS.md`, `.agents/skills/ai-log/SKILL.md`, `.claude/skills/ai-log/SKILL.md`, `.github/copilot-instructions.md`, and `.github/skills/ai-log/SKILL.md`. Updated the coding guide to use its human-maintained templates instead of the removed skill. Application source and historical AI-use evidence are retained. No private conversation was shared.
+
+**Attribution and verification limits:** The prohibition is recorded as the user's report; no additional instructor statement was supplied. This is a documentation/configuration removal; no application build or runtime-test result is claimed. Human acceptance and reflection remain pending.
