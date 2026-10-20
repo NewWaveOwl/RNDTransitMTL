@@ -1555,7 +1555,7 @@ Apply SOLID, separation of concerns, DRY, and YAGNI as useful tools. Do not add 
 
 Keep decisions, techniques, and conversation evidence distinct.
 
-For AI-assisted logging in this repository, use the [ai-log skill](../.github/skills/ai-log/SKILL.md). Its canonical copy is shared by the agent entry points and retains the installed personal skill's evidence and reflection rules.
+Use the decision and technique templates below as human-maintained documentation. On October 19, 2026, the requester reported that the instructor forbids the repository agent setup and requested its removal. Agent entry points, discovery wrappers, and the repository skill configuration have therefore been removed; the coding guide and historical AI-use records remain documentation.
 
 **Decision record template:**
 
