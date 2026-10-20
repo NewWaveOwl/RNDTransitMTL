@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
@@ -111,7 +112,8 @@ private fun IntensitySlider(
 
     Box(
         modifier = modifier
-            .background(TransitMain, sliderShape)
+            .clip(sliderShape)
+            .background(TransitMain)
             .pointerInput(onIntensityChange) {
                 awaitEachGesture {
                     /** Set intensity immediately on touch-down, so a tap also selects a value. */
@@ -137,7 +139,7 @@ private fun IntensitySlider(
             modifier = Modifier
                 .fillMaxWidth(progress)
                 .fillMaxHeight()
-                .background(TransitSelected, sliderShape)
+                .background(TransitSelected)
         ) {
             /** At 18% or above, place the value near the end of the filled section. */
             if (progress >= 0.18f) {

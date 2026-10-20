@@ -1,175 +1,251 @@
 package com.example.rnd_transit_mtl.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.rnd_transit_mtl.model.Trip
 import com.example.rnd_transit_mtl.ui.theme.TransitMain
 import com.example.rnd_transit_mtl.ui.theme.TransitSelected
+import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 import org.jetbrains.compose.resources.painterResource
 import rnd_transit_mtl.shared.generated.resources.Res
-import rnd_transit_mtl.shared.generated.resources.ic_arrow_drop_up
 import rnd_transit_mtl.shared.generated.resources.ic_arrow_drop_down
+import rnd_transit_mtl.shared.generated.resources.ic_arrow_drop_up
 import kotlin.math.abs
 
 /**
- * Displays the floating duration selector and trip-generation action.
+ * Stateless planned-minutes selector and primary planner action.
  *
- * Duration changes and the GO action are delegated to the parent through callbacks.
- *
- * @param layoutScale Scale factor for dimensions and text relative to the 402-unit reference width.
- * @param minutes Selected trip duration in minutes.
- * @param onMinutesChange Receives the new duration when the user taps an arrow or drags the minute selector.
- * @param onGo Requests a trip using the current selections.
- * @param modifier Layout and appearance modifiers supplied by the parent.
+ * The parent decides whether the action starts, resumes, or opens a completed trip.
+ * Selected minutes do not determine the ten-second simulation duration.
  */
 @Composable
 internal fun GOBox(
-    layoutScale: Float = 1f,
     minutes: Int,
     onMinutesChange: (Int) -> Unit,
     onGo: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    layoutScale: Float = 1f,
+    actionLabel: String = "GO",
+    actionEnabled: Boolean = true,
+    minutesEnabled: Boolean = true
 ) {
     Row(
         modifier = modifier
-            .fillMaxWidth(0.92f)
-            .height(90.dp * layoutScale)
+            .height(96.dp * layoutScale)
             .background(
-                brush = Brush.horizontalGradient(
-                    0.00f to TransitMain,
+                Brush.horizontalGradient(
+                    0f to TransitMain,
                     0.84f to TransitMain,
-                    1.00f to TransitSelected
+                    1f to TransitSelected
                 ),
-                shape = RoundedCornerShape(28.dp * layoutScale)
+                RoundedCornerShape(28.dp * layoutScale)
             )
-            .padding(horizontal = 12.dp * layoutScale),
+            .padding(horizontal = 8.dp * layoutScale),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("I have", color = TransitWhite, fontSize = 26.sp * layoutScale, maxLines = 1, softWrap = false)
+        Text("I have", color = TransitWhite, fontSize = 20.sp * layoutScale,
+            maxLines = 1, softWrap = false)
         ControlDivider(layoutScale)
-        ScrollableMinutes(minutes = minutes, onMinutesChange = onMinutesChange, layoutScale = layoutScale)
+        ScrollableMinutes(minutes, onMinutesChange, minutesEnabled, layoutScale)
         ControlDivider(layoutScale)
-        Text("minutes", color = TransitWhite, fontSize = 26.sp * layoutScale, maxLines = 1, softWrap = false)
+        Text("minutes", color = TransitWhite, fontSize = 20.sp * layoutScale,
+            maxLines = 1, softWrap = false)
         ControlDivider(layoutScale)
         Box(
-            contentAlignment = Alignment.Center,
             modifier = Modifier
+                .width(if (actionLabel == "Resume trip") 84.dp else 60.dp)
                 .fillMaxHeight()
-                .width(60.dp * layoutScale)
-                .clickable(onClick = onGo)
+                .clickable(enabled = actionEnabled, onClick = onGo)
+                .semantics { contentDescription = actionLabel },
+            contentAlignment = Alignment.Center
         ) {
-            Text("GO", color = TransitWhite, fontSize = 28.sp * layoutScale, maxLines = 1, softWrap = false)
+            Text(
+                text = actionLabel,
+                color = TransitWhite.copy(alpha = if (actionEnabled) 1f else 0.5f),
+                fontSize = (if (actionLabel == "Resume trip") 16.sp else 22.sp) * layoutScale,
+                textAlign = TextAlign.Center,
+                maxLines = 2
+            )
         }
     }
 }
 
-/**
- * Changes trip duration in five-minute steps through arrow taps or vertical dragging.
- *
- * Dragging up increases the duration; dragging down decreases it. Drag updates
- * are clamped to 5–240 minutes, and the arrow buttons enforce their respective limits.
- *
- * @param minutes Selected trip duration in minutes, expected to be between 5 and 240.
- * @param onMinutesChange Receives the updated duration after a tap or drag step.
- * @param layoutScale Scale factor for dimensions and text relative to the 402-unit reference width.
- */
-@Composable
-private fun ScrollableMinutes(minutes: Int, onMinutesChange: (Int) -> Unit, layoutScale: Float) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .width(64.dp * layoutScale)
-            .pointerInput(minutes) {
-                /** Track movement since the last step and the duration used for the next drag update. */
-                var dragDistance = 0f
-                var workingMinutes = minutes
-                detectVerticalDragGestures(
-                    onDragStart = { dragDistance = 0f },
-                    onVerticalDrag = { change, dragAmount ->
-                        /** Consume the movement so another gesture handler does not also act on it. */
-                        change.consume()
-                        dragDistance += dragAmount
-                        /**
-                         * Apply one five-minute step after at least 18 pixels of movement.
-                         * Clamp the duration to 5–240 minutes, then reset the distance for the next step.
-                         */
-                        if (abs(dragDistance) >= 18f) {
-                            workingMinutes = (workingMinutes + if (dragDistance < 0f) 5 else -5)
-                                .coerceIn(5, 240)
-                            onMinutesChange(workingMinutes)
-                            dragDistance = 0f
-                        }
-                    }
-                )
-            }
-            .semantics { contentDescription = "Scrollable trip time: $minutes minutes" }
-    ) {
-        Icon(
-            painter = painterResource(Res.drawable.ic_arrow_drop_up),
-            contentDescription = "Increase trip time",
-            tint = TransitWhite,
-            modifier = Modifier.size(26.dp * layoutScale).clickable {
-                onMinutesChange((minutes + 5).coerceAtMost(240))
-            }
-        )
-        Text(
-            text = minutes.toString(),
-            color = TransitWhite,
-            fontSize = 28.sp * layoutScale,
-            lineHeight = 30.sp * layoutScale,
-            maxLines = 1,
-            softWrap = false,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
-        )
-        Icon(
-            painter = painterResource(Res.drawable.ic_arrow_drop_down),
-            contentDescription = "Decrease trip time",
-            tint = TransitWhite,
-            modifier = Modifier.size(26.dp * layoutScale).clickable {
-                onMinutesChange((minutes - 5).coerceAtLeast(5))
-            }
-        )
-    }
-}
-
-/**
- * Draws a separator between sections of GOBox.
- *
- * @param layoutScale Scale factor for dimensions and text relative to the 402-unit reference width.
- */
 @Composable
 private fun ControlDivider(layoutScale: Float) {
     Spacer(
-        Modifier
-            .width(2.dp * layoutScale)
-            .height(68.dp * layoutScale)
-            .background(TransitWhite)
+        Modifier.width(1.dp).height(58.dp * layoutScale)
+            .background(TransitWhite.copy(alpha = 0.8f))
     )
+}
+
+/**
+ * Arrow taps and vertical dragging change minutes in five-minute steps,
+ * bounded between 0 and 360 minutes. Empty arrow slots keep the number centred.
+ *
+ * Updated-state references let a continuous gesture keep using the latest
+ * value/callback without restarting its pointer effect after each step.
+ */
+@Composable
+private fun ScrollableMinutes(
+    minutes: Int,
+    onMinutesChange: (Int) -> Unit,
+    enabled: Boolean,
+    layoutScale: Float
+) {
+    val boundedMinutes = Trip.coercePlannedMinutes(minutes)
+    val latestMinutes by rememberUpdatedState(boundedMinutes)
+    val latestOnMinutesChange by rememberUpdatedState(onMinutesChange)
+    val density = LocalDensity.current
+    val dragThreshold = with(density) { 18.dp.toPx() }
+    val numberWidth = 76.dp * layoutScale
+    val numberText = boundedMinutes.toString()
+    val numberStyle = MaterialTheme.typography.bodyLarge.copy(
+        fontSize = 28.sp * layoutScale,
+        lineHeight = 30.sp * layoutScale,
+        textAlign = TextAlign.Center,
+        fontFeatureSettings = "tnum"
+    )
+    val textMeasurer = rememberTextMeasurer()
+    val measuredWidth = textMeasurer.measure(
+        text = numberText,
+        style = numberStyle,
+        softWrap = false,
+        maxLines = 1
+    ).size.width
+    val availableWidth = with(density) {
+        (numberWidth - 8.dp * layoutScale).toPx()
+    }
+    val fontScale = (availableWidth / measuredWidth.coerceAtLeast(1))
+        .coerceAtMost(1f)
+
+    Column(
+        modifier = Modifier.width(numberWidth),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier.size(32.dp * layoutScale),
+            contentAlignment = Alignment.Center
+        ) {
+            if (boundedMinutes < Trip.MAX_PLANNED_MINUTES) {
+                IconButton(
+                    onClick = {
+                        latestOnMinutesChange(
+                            Trip.adjustPlannedMinutes(latestMinutes, direction = 1)
+                        )
+                    },
+                    enabled = enabled,
+                    modifier = Modifier.size(32.dp * layoutScale)
+                ) {
+                    Icon(
+                        painter = painterResource(Res.drawable.ic_arrow_drop_up),
+                        contentDescription = "Increase planned time by five minutes",
+                        tint = TransitWhite,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+            }
+        }
+
+        Text(
+            text = numberText,
+            color = TransitWhite,
+            style = numberStyle.copy(fontSize = numberStyle.fontSize * fontScale),
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 0.dp)
+                .pointerInput(enabled, dragThreshold) {
+                    if (enabled) {
+                        var dragDistance = 0f
+                        var workingMinutes = latestMinutes
+
+                        detectVerticalDragGestures(
+                            onDragStart = {
+                                dragDistance = 0f
+                                workingMinutes = latestMinutes
+                            },
+                            onVerticalDrag = { change, amount ->
+                                change.consume()
+                                dragDistance += amount
+
+                                while (abs(dragDistance) >= dragThreshold) {
+                                    val direction =
+                                        if (dragDistance < 0f) 1 else -1
+
+                                    workingMinutes = Trip.adjustPlannedMinutes(
+                                        workingMinutes,
+                                        direction
+                                    )
+
+                                    latestOnMinutesChange(workingMinutes)
+                                    dragDistance += direction * dragThreshold
+                                }
+                            }
+                        )
+                    }
+                }
+                .semantics {
+                    contentDescription =
+                        "Planned time: $boundedMinutes minutes. " +
+                                "Drag up to increase or down to decrease."
+                }
+        )
+
+        Box(
+            modifier = Modifier.size(32.dp * layoutScale),
+            contentAlignment = Alignment.Center
+        ) {
+            if (boundedMinutes > Trip.MIN_PLANNED_MINUTES) {
+                IconButton(
+                    onClick = {
+                        latestOnMinutesChange(
+                            Trip.adjustPlannedMinutes(latestMinutes, direction = -1)
+                        )
+                    },
+                    enabled = enabled,
+                    modifier = Modifier.size(32.dp * layoutScale)
+                ) {
+                    Icon(
+                        painter = painterResource(Res.drawable.ic_arrow_drop_down),
+                        contentDescription = "Decrease planned time by five minutes",
+                        tint = TransitWhite,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+            }
+        }
+    }
 }

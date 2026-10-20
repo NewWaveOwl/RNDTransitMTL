@@ -6,6 +6,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.navigation3.runtime.rememberNavBackStack
 import com.example.rnd_transit_mtl.data.FakeTransportRouteRepository
@@ -13,61 +14,88 @@ import com.example.rnd_transit_mtl.data.FakeTransportTypeRepository
 import com.example.rnd_transit_mtl.layout.MainLayout
 import com.example.rnd_transit_mtl.model.TransportRoute
 import com.example.rnd_transit_mtl.model.TransportType
+import com.example.rnd_transit_mtl.state.LocalTripsStore
+import com.example.rnd_transit_mtl.state.LocalNicknameSession
+import com.example.rnd_transit_mtl.state.appNicknameSession
+import com.example.rnd_transit_mtl.state.TripsStore
 import com.example.rnd_transit_mtl.ui.theme.RNDTransitTheme
 import kotlinx.coroutines.CancellationException
 
-/**
- * Keeps successfully loaded transport types and routes together.
- *
- * Publishing one TransportData value makes both lists available to the UI together.
- *
- * @param types Available transport options in display order.
- * @param routes Available routes, each linked to its owning transport type.
- */
 private data class TransportData(
     val types: List<TransportType>,
     val routes: List<TransportRoute>
 )
 
 /**
- * Loads shared transport data and provides the navigator, theme, and common layout.
+ * Owns one saved back stack, one Navigator, and one restorable TripsStore.
  *
- * Creates one restorable navigation stack rooted at Home. Transport data is loaded
- * when the effect enters composition, and failures are passed to the main screen.
+ * TripNavigation is recreated from those restored objects. Its temporary
+ * callbacks are not part of saved state.
+ *
+ * MainLayout remains outside NavDisplay's destination transitions.
+ * The introductory nickname gate uses memory-only process state. It neither
+ * adds another back stack nor includes the nickname in restoration snapshots.
  */
 @Composable
 fun App() {
-    /** Restore or create the shared back stack, starting at Home for a new stack. */
-    val backStack = rememberNavBackStack(backStackConfig, MainScreenKey)
+    val backStack = rememberNavBackStack(
+        backStackConfig,
+        MainScreenKey
+    )
+    val navigator = remember(backStack) {
+        Navigator(backStack)
+    }
 
-    /** Reuse the navigator while it controls the same back stack. */
-    val navigator = remember(backStack) { Navigator(backStack) }
+    val tripsStore = rememberSaveable(
+        saver = TripsStore.Saver
+    ) {
+        TripsStore()
+    }
 
-    var transportData by remember { mutableStateOf<TransportData?>(null) }
-    var loadingError by remember { mutableStateOf(false) }
+    val tripNavigation = remember(navigator, tripsStore) {
+        TripNavigation(navigator, tripsStore)
+    }
 
-    /** Load both repository lists once per effect lifetime, rather than on every recomposition. */
+    var transportData by remember {
+        mutableStateOf<TransportData?>(null)
+    }
+    var loadingError by remember {
+        mutableStateOf(false)
+    }
+
     LaunchedEffect(Unit) {
         try {
-            /** Assign the data only after both repository calls complete successfully. */
             transportData = TransportData(
-                types = FakeTransportTypeRepository().getTransportTypes(),
-                routes = FakeTransportRouteRepository().getTransportRoutes()
+                types = FakeTransportTypeRepository()
+                    .getTransportTypes(),
+                routes = FakeTransportRouteRepository()
+                    .getTransportRoutes()
             )
         } catch (cancelled: CancellationException) {
-            /** Preserve coroutine cancellation instead of reporting it as a loading failure. */
             throw cancelled
         } catch (_: Exception) {
-            /** Expose ordinary loading failures so MainScreen can display its error message. */
             loadingError = true
         }
     }
 
     RNDTransitTheme {
-        /** Supply the same navigator to the common layout, router, and all descendant screens. */
-        CompositionLocalProvider(LocalNavigator provides navigator) {
-            MainLayout {
-                Router(backStack, transportData?.types, transportData?.routes, loadingError)
+        CompositionLocalProvider(
+            LocalNavigator provides navigator,
+            LocalTripsStore provides tripsStore,
+            LocalTripNavigation provides tripNavigation,
+            LocalNicknameSession provides appNicknameSession
+        ) {
+            if (appNicknameSession.nickname == null) {
+                LandingScreen(onLogin = appNicknameSession::signIn)
+            } else {
+                MainLayout {
+                    Router(
+                        backStack = backStack,
+                        transportTypes = transportData?.types,
+                        transportRoutes = transportData?.routes,
+                        loadingError = loadingError
+                    )
+                }
             }
         }
     }

@@ -6,19 +6,19 @@ on:
       - main
 
 jobs:
-  lint:
-    name: Kotlin and Android Lint
+  validate:
+    name: Trip Flow Tests, Compilation, and Android Lint
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
@@ -26,8 +26,20 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
-      - name: Run ktlint
-        run: ./gradlew ktlintCheck
+      - name: Run shared regression tests
+        run: ./gradlew :shared:jvmTest :shared:testAndroidHostTest
+
+      - name: Compile Android, Desktop, and Web
+        run: ./gradlew :androidApp:assembleDebug :desktopApp:classes :webApp:compileKotlinJs :webApp:compileKotlinWasmJs
 
       - name: Run Android lint
-        run: ./gradlew lint
+        run: ./gradlew :androidApp:lintDebug
+
+      - name: Upload validation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-reports
+          path: |
+            shared/build/reports/tests/
+            androidApp/build/reports/lint-results-debug.*
