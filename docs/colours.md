@@ -1,6 +1,9 @@
 Colours for APP
- - Main: 28454C 
- - Highlight: FFBA00
- - Text/White: F7F0E5
- - Progress/Selected: 9ACA45
- - Complementary: BC9E5C
+ - Main / Blue: 0076B3
+ - Teal / Complementary: 28454C
+ - Highlight / Gold: FFBA00
+ - Text / White: F8F8F8
+ - Progress / Selected / Lime: 98CA45
+ - Route / Orange: FF8B00
+
+Reference: https://www.figma.com/design/EBOrT92jIVwFv0mB8jeeVY/RndTransit_main?node-id=86-9
