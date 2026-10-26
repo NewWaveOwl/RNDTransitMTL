@@ -14,7 +14,7 @@ Document AI use in the style of `Sprint1-AI-Usage.md`, while keeping the AI deci
 - Use one technique entry for each significant coding or design challenge. Group related iterations; do not create an entry for every prompt or minor bug fix. Related generation/debugging can belong to the same challenge. Decision records may also cover research, learning, documentation, and other AI use.
 - Record only supported facts. Use `[Not documented]` for missing evidence, `[Student reflection needed]` for personal judgments, and `Not applicable` only when justified. Distinguish a missing record from confirmed non-use.
 - Do not invent dates, authors, model versions, exact iteration counts, elapsed time, code percentages, testing, implementation, or productivity gains. Attribute student estimates explicitly. Infer a milestone only if needed, label the inference, and explain its basis.
-- The supplied course notes describe hands-on prompting and student evaluation. When documenting this course, keep review and reflection with the student; this skill does not authorize autonomous implementation or delegation. Accurately disclose any agent use shown by the evidence.
+- The supplied course notes describe hands-on prompting and student evaluation. When documenting this course, keep review and reflection with the student; this instruction does not authorize autonomous implementation or delegation. Accurately disclose any agent use shown by the evidence.
 
 ## Working procedure
 
@@ -134,11 +134,11 @@ Record time labels if supplied; adding timestamps to prompts is an optional sugg
 
 ## Source basis and slide discrepancy
 
-This skill was prepared from the user's supplied local references:
+This instruction was prepared from the user's supplied local references:
 
 - `K:/CLASSES 26 FALL/APP_DEV/AI_rule/AI_Log_techinc.txt`: separate technique log, significant-challenge grouping, and required reflection fields.
 - `K:/CLASSES 26 FALL/APP_DEV/AI_rule/AIconversatit.txt`: instructor discussion of technique reflection, student estimates, and hands-on AI use. Its references to Assignment 2 and Assignment 3 are inconsistent; use the assignment named by the current user.
 - `K:/CLASSES 26 FALL/APP_DEV/PRJ/RNDTransitMTL/docs/AI/Sprint1-AI-Usage.md`: overview and milestone/contributor structure, linked session index, full visible prompts, output summaries, and evidence limitations.
 - `K:/CLASSES 26 FALL/APP_DEV/powerpoints/AppDev2_Day_18_SharedNavigationBars_Resources_HoistedLayout_after.pptx`, slides 10-11: slide 10 is **Icons as Kotlin ImageVector**; slide 11 is **Resources on Multiplatform**. These slides do not supply AI logging requirements. Do not attribute the technique template to them. If different logging slides are later supplied, compare them with this format before updating it.
 
-The essential requirements are included above so the skill remains usable if these local sources move. Treat the course notes' provisional remarks as source context, and consult newer assignment instructions when supplied.
+The essential requirements are included above so the instruction remains usable if these local sources move. Treat the course notes' provisional remarks as source context, and consult newer assignment instructions when supplied.
