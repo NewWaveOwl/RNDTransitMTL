@@ -4,70 +4,90 @@ import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 
 /**
- * Provides navigation operations for the shared Navigation 3 back stack.
+ * Mutates the application's single Navigation 3 back stack.
  *
- * Changes affect the same stack displayed by Router. Normal Back navigation
- * preserves the root entry, while replacement can change the current entry.
- *
- * @param backStack The stack owned by App and displayed by Router.
+ * It contains no Trip records, store operations, or simulation logic.
+ * All operations must run on the UI thread.
  */
-class Navigator(private val backStack: NavBackStack<NavKey>) {
-    /**
-     * Reads the destination at the top of the shared stack without changing it.
-     *
-     * @return The current destination, or null when the stack is empty.
-     */
-    val current: NavKey? get() = backStack.lastOrNull()
+class Navigator(
+    private val backStack: NavBackStack<NavKey>
+) {
+    val current: NavKey?
+        get() = backStack.lastOrNull()
 
-    /**
-     * Adds a destination to the shared back stack.
-     *
-     * @param key Destination key to push onto the stack.
-     */
-    fun navigate(key: NavKey) {
-        /** Append the destination so Back can return to the previously current entry. */
-        backStack += key
-    }
-
-    /**
-     * Removes the current destination only when a previous entry exists.
-     */
-    fun pop() {
-        /** Keep the root destination when there is no earlier entry to return to. */
-        if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
-    }
-
-    /**
-     * Checks whether Back can return to another destination.
-     *
-     * @return True when the stack contains more than its root entry.
-     */
     fun hasPrevious(): Boolean = backStack.size > 1
 
     /**
-     * Removes entries above the last matching key; a missing key leaves the stack unchanged.
-     *
-     * @param key Destination key to retain at the top of the stack.
+     * Repeated taps targeting the current key do not append duplicates.
      */
-    fun popUntil(key: NavKey) {
-        /** Target the most recent matching destination when the same key appears more than once. */
-        val index = backStack.indexOfLast { it == key }
+    fun navigate(key: NavKey) {
+        if (current != key) {
+            backStack += key
+        }
+    }
 
-        /** An absent destination must not remove existing stack entries. */
-        if (index == -1) return
-
-        /** Remove only entries above the target, leaving it as the current destination. */
-        while (backStack.lastIndex > index) backStack.removeAt(backStack.lastIndex)
+    fun pop() {
+        if (hasPrevious()) {
+            backStack.removeAt(backStack.lastIndex)
+        }
     }
 
     /**
-     * Replaces the current destination, or adds the first entry when the stack is empty.
+     * A missing target leaves the stack unchanged.
+     */
+    fun popUntil(key: NavKey) {
+        val index = backStack.indexOfLast { it == key }
+        if (index == -1) return
+
+        while (backStack.lastIndex > index) {
+            backStack.removeAt(backStack.lastIndex)
+        }
+    }
+
+    /**
+     * Opens one existing instance when available, otherwise pushes it.
+     */
+    fun open(key: NavKey) {
+        if (findLast { it == key } != null) {
+            popUntil(key)
+        } else {
+            navigate(key)
+        }
+    }
+
+    /**
+     * Replaces a non-root destination.
      *
-     * @param key Destination key that becomes the current entry.
+     * An empty stack can be initialized. A one-entry stack keeps its
+     * root and pushes a different destination above it.
      */
     fun replace(key: NavKey) {
-        /** Remove the current entry if present, then add its replacement even when the stack was empty. */
-        if (backStack.isNotEmpty()) backStack.removeAt(backStack.lastIndex)
-        backStack += key
+        if (current == key) return
+
+        when {
+            backStack.isEmpty() -> backStack += key
+            backStack.size == 1 -> backStack += key
+            else -> {
+                backStack.removeAt(backStack.lastIndex)
+                backStack += key
+            }
+        }
+    }
+
+    fun findLast(
+        predicate: (NavKey) -> Boolean
+    ): NavKey? = backStack.lastOrNull(predicate)
+
+    /**
+     * Removes obsolete non-root entries without exposing the mutable stack.
+     */
+    fun removeWhere(
+        predicate: (NavKey) -> Boolean
+    ) {
+        for (index in backStack.lastIndex downTo 1) {
+            if (predicate(backStack[index])) {
+                backStack.removeAt(index)
+            }
+        }
     }
 }

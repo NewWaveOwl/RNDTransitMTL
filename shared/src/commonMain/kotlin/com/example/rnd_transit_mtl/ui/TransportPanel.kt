@@ -82,9 +82,9 @@ internal fun TransportPanel(
         transportTypes.chunked(3).forEach { transportRow ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(20.dp * layoutScale)
+                horizontalArrangement = Arrangement.spacedBy(8.dp * layoutScale)
             ) {
-                transportRow.forEachIndexed { column, transport ->
+                transportRow.forEach { transport ->
                     /** Show only the selected route labels belonging to this transport. */
                     val selectedRouteLabels = routesByTransport[transport.id]
                         .orEmpty()
@@ -92,7 +92,7 @@ internal fun TransportPanel(
                         .map { it.label }
                     TransportChoice(
                         layoutScale = layoutScale,
-                        title = transport.label,
+                        title = if (transport.id == "walk") "Walk" else transport.label,
                         isRouteTransport = transport.usesRoutes,
                         selected = transport.id in selectedTransportIds,
                         selectedRoutes = selectedRouteLabels,
@@ -102,7 +102,7 @@ internal fun TransportPanel(
                             if (transport.usesRoutes) onExpandedTransportChange(transport.id)
                             else onToggleTransport(transport.id)
                         },
-                        modifier = Modifier.weight(if (column == 2) 1f else 1.6f)
+                        modifier = Modifier.weight(1f)
                     )
                 }
                 repeat(3 - transportRow.size) {
@@ -159,17 +159,10 @@ private fun TransportChoice(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    /** Use a gradient for selected route-based modes and a solid color for other states. */
-    val buttonBrush = when {
-        selected && isRouteTransport -> Brush.horizontalGradient(
-            0.00f to TransitSelected,
-            0.62f to TransitSelected,
-            1.00f to TransitHighlight
-        )
-
-        selected -> Brush.horizontalGradient(listOf(TransitSelected, TransitSelected))
-        else -> Brush.horizontalGradient(listOf(TransitHighlight, TransitHighlight))
-    }
+    val buttonBrush = Brush.horizontalGradient(
+        if (selected) listOf(TransitSelected, TransitSelected)
+        else listOf(TransitWhite, TransitWhite)
+    )
     /** Append a compact route summary only when at least one route is selected. */
     val label = if (selectedRoutes.isEmpty()) {
         title
@@ -191,8 +184,8 @@ private fun TransportChoice(
     ) {
         Text(
             text = label,
-            color = TransitWhite,
-            fontSize = 26.sp * layoutScale,
+            color = if (selected) TransitComplementary else TransitMain,
+            fontSize = 21.sp * layoutScale,
             fontWeight = FontWeight.Normal,
             textAlign = TextAlign.Center,
             maxLines = 1,
@@ -218,16 +211,10 @@ private fun RouteChoice(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    /** Highlight selected routes so their state is visible independently of the open route list. */
-    val brush = if (selected) {
-        Brush.horizontalGradient(
-            0.00f to TransitSelected,
-            0.65f to TransitSelected,
-            1.00f to TransitHighlight
-        )
-    } else {
-        Brush.horizontalGradient(listOf(TransitHighlight, TransitHighlight))
-    }
+    val brush = Brush.horizontalGradient(
+        if (selected) listOf(TransitSelected, TransitSelected)
+        else listOf(TransitWhite, TransitWhite)
+    )
 
     Box(
         contentAlignment = Alignment.Center,
@@ -236,6 +223,6 @@ private fun RouteChoice(
             .background(brush, RoundedCornerShape(10.dp * layoutScale))
             .clickable(onClick = onClick)
     ) {
-        Text(route, color = TransitWhite, fontSize = 20.sp * layoutScale, maxLines = 1)
+        Text(route, color = if (selected) TransitComplementary else TransitMain, fontSize = 20.sp * layoutScale, maxLines = 1)
     }
 }
