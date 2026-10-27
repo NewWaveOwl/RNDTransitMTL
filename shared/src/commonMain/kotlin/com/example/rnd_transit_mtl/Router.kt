@@ -16,6 +16,7 @@ import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
+import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import androidx.savedstate.serialization.SavedStateConfiguration
 import com.example.rnd_transit_mtl.model.TransportRoute
@@ -163,7 +164,8 @@ fun Router(
         modifier = Modifier.fillMaxSize(),
         backStack = backStack,
         entryDecorators = listOf(
-            rememberSaveableStateHolderNavEntryDecorator()
+            rememberSaveableStateHolderNavEntryDecorator(),
+            rememberViewModelStoreNavEntryDecorator()
         ),
         onBack = {
             navigation.back()

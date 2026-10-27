@@ -81,7 +81,9 @@ data class Trip(
     val distanceKm: Double,
     val createdAtEpochMillis: Long,
     val completedAtEpochMillis: Long? = null,
-    val review: TripReview? = null
+    val review: TripReview? = null,
+    /** Transit-zone constraints recorded when this trip was generated. */
+    val selectedZoneIds: List<String> = emptyList()
 ) {
     init {
         require(id.isNotBlank()) {

@@ -18,7 +18,13 @@ import com.example.rnd_transit_mtl.model.TransportType
 import com.example.rnd_transit_mtl.model.Trip
 import com.example.rnd_transit_mtl.state.LocalTripsStore
 import com.example.rnd_transit_mtl.state.TripActionResult
-import com.example.rnd_transit_mtl.ui.TripPlannerContent
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.rnd_transit_mtl.View.main.MainPlannerContent
+import com.example.rnd_transit_mtl.ViewModels.main.MainPlannerState
+import com.example.rnd_transit_mtl.ViewModels.main.MainPlannerViewModel
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 /** Saves planner selections and starts or resumes one generated mock trip. */
 @Composable
@@ -35,27 +41,31 @@ internal fun TransitOpeningScreen(
     // Viewport is measured again after rotation; stored trip endpoints are unchanged.
     var generationBounds by remember { mutableStateOf<TripGenerationBounds?>(null) }
 
-    var minutes by rememberSaveable { mutableStateOf(30) }
-    // The displayed choice and generated snapshot share the same bounded value.
-    val boundedMinutes = Trip.coercePlannedMinutes(minutes)
+    // This serialized value is a restoration snapshot.
+    // The ViewModel remains the authoritative runtime state owner.
+    var savedPlannerDraft by rememberSaveable {
+        mutableStateOf(Json.encodeToString(MainPlannerState()))
+    }
 
-    var selectedTransportIds by rememberSaveable {
-        mutableStateOf(
-            if (transportTypes.any { it.id == "walk" }) {
-                listOf("walk")
-            } else {
-                emptyList<String>()
-            }
+    val plannerViewModel = viewModel<MainPlannerViewModel> {
+        MainPlannerViewModel(
+            initialState = runCatching {
+                Json.decodeFromString<MainPlannerState>(savedPlannerDraft)
+            }.getOrDefault(MainPlannerState())
         )
     }
 
-    var selectedRouteIds by rememberSaveable {
-        mutableStateOf(emptyList<String>())
+    val planner by plannerViewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(plannerViewModel) {
+        plannerViewModel.uiState.collect { state ->
+            savedPlannerDraft = Json.encodeToString(state)
+        }
     }
-    var expandedTransportId by rememberSaveable {
-        mutableStateOf<String?>(null)
-    }
-    var intensity by rememberSaveable { mutableStateOf(90f) }
+
+    val boundedMinutes = Trip.coercePlannedMinutes(planner.minutes)
+    val selectedTransportIds = planner.selectedTransportIds
+    val intensity = planner.intensity
     var validationMessage by rememberSaveable {
         mutableStateOf("")
     }
@@ -190,13 +200,23 @@ internal fun TransitOpeningScreen(
             }
             validationMessage = ""
 
+            val hasTransit = transportTypes.any {
+                it.usesRoutes && it.id in planner.selectedTransportIds
+            }
+
+            if (hasTransit && planner.selectedZoneIds.isEmpty()) {
+                validationMessage = "Choose at least one transit zone."
+                return
+            }
+
             val input = TripGenerationInput(
                 title = "Trip ${tripsStore.completedTrips.size + 1}",
                 description = "Random mock route with $boundedMinutes planned minutes.",
                 imageUrl = "",
                 plannedMinutes = boundedMinutes,
                 selectedTransportIds = selectedTransportIds.toList(),
-                selectedRouteIds = selectedRouteIds.toList(),
+                selectedRouteIds = emptyList(),
+                selectedZoneIds = if (hasTransit) planner.selectedZoneIds.toList() else emptyList(),
                 attractionIntensity = intensity
             )
 
@@ -256,116 +276,77 @@ internal fun TransitOpeningScreen(
         onOpenCurrentTrip != null
     }
 
-    TripPlannerContent(
+    val navigator = LocalNavigator.current
+    val navigation = LocalTripNavigation.current
+
+    MainPlannerContent(
         minutes = boundedMinutes,
         onMinutesChange = {
             if (canChangeInputs()) {
-                minutes = Trip.coercePlannedMinutes(it)
+                plannerViewModel.setMinutes(it)
                 clearValidation()
             }
         },
         transportTypes = transportTypes,
-        transportRoutes = transportRoutes,
         selectedTransportIds = selectedTransportIds,
-        selectedRouteIds = selectedRouteIds,
-        expandedTransportId = expandedTransportId,
-        onExpandedTransportChange = { transportId ->
-            if (
-                canChangeInputs() &&
-                transportTypes.any {
-                    it.id == transportId && it.usesRoutes
-                }
-            ) {
-                expandedTransportId =
-                    if (expandedTransportId == transportId) {
-                        null
-                    } else {
-                        transportId
-                    }
-            }
-        },
-        onToggleTransport = { transportId ->
-            val transport = transportTypes.firstOrNull {
-                it.id == transportId
-            }
-
-            if (
-                canChangeInputs() &&
-                transport != null &&
-                !transport.usesRoutes
-            ) {
-                selectedTransportIds =
-                    selectedTransportIds.toggledPlannerId(transportId)
+        selectedZoneIds = planner.selectedZoneIds,
+        onToggleTransport = { id ->
+            if (canChangeInputs()) {
+                plannerViewModel.toggleTransport(
+                    id = id,
+                    availableIds = transportTypes.map { it.id }.toSet()
+                )
                 clearValidation()
             }
         },
-        onToggleRoute = { transportId, routeId ->
-            val transport = transportTypes.firstOrNull {
-                it.id == transportId && it.usesRoutes
-            }
-            val route = transportRoutes.firstOrNull {
-                it.id == routeId &&
-                        it.transportTypeId == transportId
-            }
-
-            if (
-                canChangeInputs() &&
-                transport != null &&
-                route != null
-            ) {
-                selectedRouteIds =
-                    selectedRouteIds.toggledPlannerId(routeId)
-
-                val hasSelectedRoute = transportRoutes.any {
-                    it.transportTypeId == transportId &&
-                            it.id in selectedRouteIds
-                }
-
-                selectedTransportIds = if (hasSelectedRoute) {
-                    if (transportId in selectedTransportIds) {
-                        selectedTransportIds
-                    } else {
-                        selectedTransportIds + transportId
-                    }
-                } else {
-                    selectedTransportIds.filterNot {
-                        it == transportId
-                    }
-                }
-
+        onToggleZone = { id ->
+            if (canChangeInputs()) {
+                plannerViewModel.toggleZone(id)
                 clearValidation()
             }
         },
         intensity = intensity,
         onIntensityChange = {
-            if (canChangeInputs() && it.isFinite()) {
-                intensity = it.coerceIn(
-                    Trip.MIN_ATTRACTION_INTENSITY,
-                    Trip.MAX_ATTRACTION_INTENSITY
-                )
+            if (canChangeInputs()) {
+                plannerViewModel.setIntensity(it)
                 clearValidation()
             }
         },
         validationMessage = validationMessage,
         actionLabel = pendingActionLabel ?: actionLabel,
         actionEnabled = isDestinationActive &&
-                !processingAction &&
-                pendingOpenTripId == null &&
-                actionHasCallback &&
-                (activeState != null || pendingReviewId != null || generationBounds != null),
-        activeTripSummary = if (pendingOpenTripId != null) pendingSummary else activeSummary,
-        pendingReviewSummary = if (pendingOpenTripId != null) null else completedSummary,
+            !processingAction &&
+            pendingOpenTripId == null &&
+            actionHasCallback &&
+            (
+                activeState != null ||
+                pendingReviewId != null ||
+                generationBounds != null
+            ),
+        inputsEnabled = canChangeInputs(),
+        activeTripSummary = if (pendingOpenTripId != null) {
+            pendingSummary
+        } else {
+            activeSummary
+        },
+        pendingReviewSummary = if (pendingOpenTripId != null) {
+            null
+        } else {
+            completedSummary
+        },
         onPrimaryAction = { performPrimaryAction() },
-        controlsVisible = isDestinationActive && pendingOpenTripId == null,
+        onOpenDetailedSettings = {
+            if (
+                canChangeInputs() &&
+                navigator.current == MainScreenKey
+            ) {
+                navigation.openSection(SettingsScreenKey)
+            }
+        },
+        controlsVisible =
+            isDestinationActive && pendingOpenTripId == null,
         onControlsHidden = { finishPlannerExit() },
         onMapViewportReady = { generationBounds = it },
         modifier = modifier
     )
 }
-
-private fun List<String>.toggledPlannerId(id: String): List<String> =
-    if (id in this) {
-        filterNot { it == id }
-    } else {
-        this + id
-    }

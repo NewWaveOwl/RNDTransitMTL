@@ -26,7 +26,9 @@ data class TripGenerationInput(
     val plannedMinutes: Int,
     val selectedTransportIds: List<String>,
     val selectedRouteIds: List<String>,
-    val attractionIntensity: Float
+    val attractionIntensity: Float,
+    /** Requested zones, recorded without geographic enforcement by this prototype. */
+    val selectedZoneIds: List<String> = emptyList()
 )
 
 /**
@@ -92,7 +94,8 @@ class MockTripGenerator(
             description = input.description.trim(),
             imageUrl = input.imageUrl.trim(),
             selectedTransportIds = input.selectedTransportIds.toList(),
-            selectedRouteIds = input.selectedRouteIds.toList()
+            selectedRouteIds = input.selectedRouteIds.toList(),
+            selectedZoneIds = input.selectedZoneIds.toList()
         )
 
         val snapshots = try {
@@ -103,6 +106,30 @@ class MockTripGenerator(
                 plannedMinutes = normalizedInput.plannedMinutes,
                 attractionIntensity = normalizedInput.attractionIntensity
             )
+
+            require(
+                normalizedInput.selectedZoneIds.all {
+                    it in setOf("A", "B", "C", "D")
+                }
+            ) {
+                "A selected transit zone is unavailable."
+            }
+
+            require(
+                normalizedInput.selectedZoneIds.distinct().size ==
+                    normalizedInput.selectedZoneIds.size
+            ) {
+                "Selected transit zones must be unique."
+            }
+
+            val includesTransit = transportTypes.any {
+                it.usesRoutes &&
+                    it.id in normalizedInput.selectedTransportIds
+            }
+
+            require(!includesTransit || normalizedInput.selectedZoneIds.isNotEmpty()) {
+                "Choose at least one transit zone."
+            }
 
             resolveSelections(
                 input = normalizedInput,
@@ -147,7 +174,8 @@ class MockTripGenerator(
             distanceKm = distanceKm,
             createdAtEpochMillis = createdAt,
             completedAtEpochMillis = null,
-            review = null
+            review = null,
+            selectedZoneIds = normalizedInput.selectedZoneIds.toList()
         )
 
         return TripGenerationResult.Success(trip)

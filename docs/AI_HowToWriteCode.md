@@ -28,6 +28,27 @@ Examples marked **slide adaptation** preserve the teaching pattern while improvi
 
 **Lecture basis:** S01 slides 8 and 39–45; S02 slides 3–5; S06 slides 4–14; S07 slides 3–11; S16 slides 6–25.
 
+### RNDTransitMTL mandatory architecture and organization
+
+RNDTransitMTL must use MVVM. Generate new application code with these responsibilities:
+1. Models and repositories define application data and business contracts.
+2. ViewModels own screen state, validation, and application operations. Expose immutable state through a read-only StateFlow or an equivalent observable contract.
+3. Views render state and emit callbacks. Keep business logic, trip generation, and storage operations out of composable bodies.
+4. Keep navigation execution at the destination boundary. ViewModels must not retain navigation controllers or platform UI objects.
+5. Scope ViewModels to Navigation 3 entries and preserve the application-wide trip repository/store as the single source of truth.
+6. Distinguish presentation state, restorable drafts, and persisted defaults. Do not claim that a ViewModel persists data after process termination.
+Place screen code in View/<screen_name>/, ViewModels in ViewModels/<screen_name>/, and components used by multiple screens in ui/global_ui_ellements/. Screen-specific components belong beside their screen, optionally in a local components/ folder.
+
+Keep theme code in ui/theme, application assembly and shared navigation in their existing assembly/layout locations, models in model, and repository/provider implementations in data.
+
+Use matching package declarations and update imports, previews, and tests when files move. Do not add a ViewModel to a purely static component merely to satisfy folder symmetry.
+
+For Main, users choose transport modes and transit zones. Individual bus numbers and route restrictions belong in detailed Settings. Never translate zone IDs into fabricated route IDs or claim geographic enforcement without supporting routing data.
+
+Use docs/colours.md as the palette reference. Keep complete generated declarations documented with meaningful KDoc and parameter contracts.
+
+Existing code is not yet fully MVVM. When migrating it, preserve active-trip identity, resume behavior, completion/review handling, saved drafts, and navigation guards. Report the migrated responsibilities and any remaining work explicitly.
+
 ## 2. Course structure and coverage
 
 The source IDs below are used throughout the guide. Full filenames appear in section 20.
@@ -91,25 +112,35 @@ Now in Android groups app assembly, features, and shared core functionality. Its
 | Platform data adapters | Network, database, preferences, and device capabilities |
 | Testing support | Fakes, fixtures, and shared test helpers |
 
-**Proposed small-project organization, not a literal copy of the repository:**
+**Required RNDTransitMTL organization (migrate existing files gradually):**
 
 ```text
-shared/src/commonMain/kotlin/<your package>/
-    app/App.kt
-    core/model/Person.kt
-    core/data/PeopleRepository.kt
-    core/designsystem/theme/AppTheme.kt
-    core/navigation/ScreenKey.kt
-    core/navigation/Navigator.kt
-    core/navigation/Router.kt
-    core/ui/PersonCard.kt
-    layout/MainLayout.kt
-    layout/SharedTopBar.kt
-    layout/SharedBottomBar.kt
-    feature/people/PeopleRoute.kt
-    feature/people/PeopleScreen.kt
-    feature/people/PeopleViewModel.kt
-    feature/about/AboutScreen.kt
+shared/src/commonMain/kotlin/com/example/rnd_transit_mtl/
+    View/
+        main/MainScreen.kt
+        main/MainPlannerContent.kt
+        main/components/
+        history/
+        current_trip/
+        trip_details/
+        trip_review/
+        profile/
+        settings/
+        about/
+    ViewModels/
+        main/MainPlannerViewModel.kt
+        history/
+        current_trip/
+        trip_details/
+        trip_review/
+        profile/
+        settings/
+    ui/global_ui_ellements/
+    ui/theme/
+    model/
+    data/
+    state/
+    layout/
 ```
 
 Use the actual source root in the existing project. Older CMP projects may use `composeApp/src/commonMain`; the slides also show the newer `shared` module organization.
