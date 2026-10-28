@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import com.example.rnd_transit_mtl.View.main.components.PlannerPreferenceBands
 import com.example.rnd_transit_mtl.data.TripGenerationBounds
 import com.example.rnd_transit_mtl.model.TransportType
+import com.example.rnd_transit_mtl.ui.GoBoxCompactHeight
 import com.example.rnd_transit_mtl.ui.GOBox
 import com.example.rnd_transit_mtl.ui.GO_TRIP_TRANSITION_MILLIS
 import com.example.rnd_transit_mtl.ui.plannerTripBounds
@@ -51,6 +52,29 @@ import org.jetbrains.compose.resources.painterResource
 import rnd_transit_mtl.shared.generated.resources.Res
 import rnd_transit_mtl.shared.generated.resources.map_sample
 import kotlin.math.roundToInt
+
+// Layout settings — widths/padding in dp; fractions and reference coordinates keep the sheet responsive.
+private val PlannerSheetMaxWidth = 620.dp
+private val PlannerGoBoxHorizontalPadding = 24.dp
+private val PlannerDragHandleWidth = 42.dp
+private val PlannerDragHandleHeight = 4.dp
+private val PlannerDragStripHeight = 16.dp
+private val PlannerMapTitleClearance = 128.dp
+private val PlannerReferenceWidth = 412f
+private val PlannerReferenceViewportHeight = 800f
+private val PlannerMinimumScale = 0.7f
+private val PlannerMaximumScale = 1.5f
+private val PlannerMainSheetTop = 400f
+private val PlannerRoutesSheetTop = 256f
+private val PlannerPreferencesSheetTop = 100f
+private val PlannerShortWindowTopFraction = 0.3f
+private val PlannerGoMainGap = 24f
+private val PlannerGoRoutesGap = 7f
+private val PlannerGoPreferencesGap = 12f
+
+// Animation settings — larger millisecond values make snapping and handle taps slower.
+private const val PLANNER_SHEET_ANIMATION_DURATION_MILLIS = 300
+// GO exit timing is shared with navigation/footer transitions: edit ui/TripTransition.kt.
 
 /** Three resting positions corresponding to Figma main_screen, routes, and preferences. */
 internal enum class PlannerSheetPosition { Main, Routes, Preferences }
@@ -132,7 +156,7 @@ internal fun MainPlannerContent(
     val sourceSize = validMapSourceSize(painter.intrinsicSize)
     var viewport by remember { mutableStateOf(Size.Zero) }
     val density = LocalDensity.current
-    val titleHeight = with(density) { 128.dp.toPx() }
+    val titleHeight = with(density) { PlannerMapTitleClearance.toPx() }
     val latestViewportReady by rememberUpdatedState(onMapViewportReady)
     LaunchedEffect(viewport, sourceSize, titleHeight) {
         if (viewport.width > 0f && viewport.height > 0f) {
@@ -148,8 +172,8 @@ internal fun MainPlannerContent(
     ) {
         // Reference frame: 412 x 892, with a 92 px header/status area.
         // Sheet handles sit at y=492, 348, 192; GO is 76 px tall with 24 px side margins.
-        val panelWidth = maxWidth.coerceAtMost(620.dp)
-        val scale = (panelWidth.value / 412f).coerceIn(0.7f, 1.5f)
+        val panelWidth = maxWidth.coerceAtMost(PlannerSheetMaxWidth)
+        val scale = (panelWidth.value / PlannerReferenceWidth).coerceIn(PlannerMinimumScale, PlannerMaximumScale)
         val heightPx = with(density) { maxHeight.toPx() }
         val geometry = plannerSheetGeometry(heightPx, with(density) { scale.dp.toPx() })
         val anchors = remember(geometry) {
@@ -195,14 +219,14 @@ internal fun MainPlannerContent(
                 override suspend fun onPreFling(available: Velocity): Velocity {
                     if (!currentEnabled || !movedSheet) return Velocity.Zero
                     movedSheet = false
-                    sheet.settle(tween(300))
+                    sheet.settle(tween(PLANNER_SHEET_ANIMATION_DURATION_MILLIS))
                     return available
                 }
 
                 override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
                     if (!currentEnabled || !movedSheet) return Velocity.Zero
                     movedSheet = false
-                    sheet.settle(tween(300))
+                    sheet.settle(tween(PLANNER_SHEET_ANIMATION_DURATION_MILLIS))
                     return available
                 }
             }
@@ -215,7 +239,7 @@ internal fun MainPlannerContent(
             translationY = exit.value * heightPx
         }) {
             val gapPx = geometry.goGap(sheetOffset)
-            val goHeightPx = with(density) { (76.dp * scale).toPx() }
+            val goHeightPx = with(density) { (GoBoxCompactHeight * scale).toPx() }
             val goTop = (sheetOffset - goHeightPx - gapPx).coerceAtLeast(0f)
 
             if (goTop > with(density) { 120.dp.toPx() }) {
@@ -239,7 +263,7 @@ internal fun MainPlannerContent(
                 layoutScale = scale,
                 compact = true,
                 modifier = Modifier.offset { IntOffset(0, goTop.roundToInt()) }
-                    .fillMaxWidth().padding(horizontal = 24.dp * scale)
+                    .fillMaxWidth().padding(horizontal = PlannerGoBoxHorizontalPadding * scale)
             )
             Column(
                 Modifier.offset { IntOffset(0, sheetOffset.roundToInt()) }
@@ -250,7 +274,7 @@ internal fun MainPlannerContent(
                     .anchoredDraggable(sheet, Orientation.Vertical, enabled = enabled)
             ) {
                 Box(
-                    Modifier.fillMaxWidth().height(16.dp * scale).background(TransitComplementary)
+                    Modifier.fillMaxWidth().height(PlannerDragStripHeight * scale).background(TransitComplementary)
                         .clickable(enabled = enabled, role = Role.Button,
                             onClickLabel = "Show next preference position") {
                             scope.launch {
@@ -259,12 +283,12 @@ internal fun MainPlannerContent(
                                     PlannerSheetPosition.Routes -> PlannerSheetPosition.Preferences
                                     PlannerSheetPosition.Preferences -> PlannerSheetPosition.Main
                                 }
-                                sheet.animateTo(next, tween(300))
+                                sheet.animateTo(next, tween(PLANNER_SHEET_ANIMATION_DURATION_MILLIS))
                             }
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    Box(Modifier.size(42.dp * scale, 4.dp * scale)
+                    Box(Modifier.size(PlannerDragHandleWidth * scale, PlannerDragHandleHeight * scale)
                         .background(TransitWhite, RoundedCornerShape(2.dp)))
                 }
                 LazyColumn(Modifier.fillMaxWidth().weight(1f), state = list, userScrollEnabled = enabled) {
@@ -309,10 +333,10 @@ internal data class PlannerSheetGeometry(
      */
     fun goGap(offset: Float): Float = if (offset >= routes) {
         val fraction = ((offset - routes) / (main - routes)).coerceIn(0f, 1f)
-        (7f + 17f * fraction) * scalePx
+        (PlannerGoRoutesGap + (PlannerGoMainGap - PlannerGoRoutesGap) * fraction) * scalePx
     } else {
         val fraction = ((offset - preferences) / (routes - preferences)).coerceIn(0f, 1f)
-        (12f - 5f * fraction) * scalePx
+        (PlannerGoPreferencesGap + (PlannerGoRoutesGap - PlannerGoPreferencesGap) * fraction) * scalePx
     }
 }
 
@@ -321,11 +345,11 @@ internal data class PlannerSheetGeometry(
  * @param scalePx Pixels per Figma reference unit, including density and responsive width scaling.
  */
 internal fun plannerSheetGeometry(heightPx: Float, scalePx: Float): PlannerSheetGeometry {
-    val top = (100f * scalePx).coerceAtMost(heightPx * 0.3f)
+    val top = (PlannerPreferencesSheetTop * scalePx).coerceAtMost(heightPx * PlannerShortWindowTopFraction)
     val remaining = (heightPx - top).coerceAtLeast(1f)
     return PlannerSheetGeometry(
-        main = top + remaining * (300f / 700f),
-        routes = top + remaining * (156f / 700f),
+        main = top + remaining * ((PlannerMainSheetTop - PlannerPreferencesSheetTop) / (PlannerReferenceViewportHeight - PlannerPreferencesSheetTop)),
+        routes = top + remaining * ((PlannerRoutesSheetTop - PlannerPreferencesSheetTop) / (PlannerReferenceViewportHeight - PlannerPreferencesSheetTop)),
         preferences = top,
         scalePx = scalePx
     )

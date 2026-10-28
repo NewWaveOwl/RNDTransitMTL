@@ -42,6 +42,25 @@ import rnd_transit_mtl.shared.generated.resources.ic_arrow_drop_down
 import rnd_transit_mtl.shared.generated.resources.ic_arrow_drop_up
 import kotlin.math.abs
 
+// Layout settings — dp values are scaled by layoutScale except existing unscaled action/divider widths.
+/** Compact GO height, also used by the planner to position GO above the sheet. */
+internal val GoBoxCompactHeight = 76.dp
+private val GoBoxStandardHeight = 96.dp
+private val GoBoxContentHorizontalPadding = 8.dp
+private val GoBoxActionWidth = 60.dp
+private val GoBoxResumeActionWidth = 84.dp
+private val GoBoxDividerWidth = 1.dp
+private val GoBoxCompactDividerHeight = 48.dp
+private val GoBoxStandardDividerHeight = 58.dp
+private val GoBoxCornerRadius = 28.dp
+private val MinutesSelectorWidth = 76.dp
+private val MinutesNumberHorizontalInset = 8.dp
+private val MinutesArrowSlotHeight = 22.dp
+private val MinutesArrowIconSize = 20.dp
+
+// Gesture settings — vertical distance per five-minute change; this is not animation duration.
+private val MinutesDragStepDistance = 18.dp
+
 /**
  * Stateless planned-minutes selector and primary planner action.
  *
@@ -64,16 +83,16 @@ internal fun GOBox(
 ) {
     Row(
         modifier = modifier
-            .height((if (compact) 76.dp else 96.dp) * layoutScale)
+            .height((if (compact) GoBoxCompactHeight else GoBoxStandardHeight) * layoutScale)
             .background(
                 Brush.horizontalGradient(
                     0f to TransitMain,
                     0.84f to TransitMain,
                     1f to TransitSelected
                 ),
-                RoundedCornerShape(28.dp * layoutScale)
+                RoundedCornerShape(GoBoxCornerRadius * layoutScale)
             )
-            .padding(horizontal = 8.dp * layoutScale),
+            .padding(horizontal = GoBoxContentHorizontalPadding * layoutScale),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -87,7 +106,7 @@ internal fun GOBox(
         ControlDivider(layoutScale, compact)
         Box(
             modifier = Modifier
-                .width(if (actionLabel == "Resume trip") 84.dp else 60.dp)
+                .width(if (actionLabel == "Resume trip") GoBoxResumeActionWidth else GoBoxActionWidth)
                 .fillMaxHeight()
                 .clickable(enabled = actionEnabled, onClick = onGo)
                 .semantics { contentDescription = actionLabel },
@@ -107,7 +126,7 @@ internal fun GOBox(
 @Composable
 private fun ControlDivider(layoutScale: Float, compact: Boolean) {
     Spacer(
-        Modifier.width(1.dp).height((if (compact) 48.dp else 58.dp) * layoutScale)
+        Modifier.width(GoBoxDividerWidth).height((if (compact) GoBoxCompactDividerHeight else GoBoxStandardDividerHeight) * layoutScale)
             .background(TransitWhite.copy(alpha = 0.8f))
     )
 }
@@ -130,8 +149,8 @@ private fun ScrollableMinutes(
     val latestMinutes by rememberUpdatedState(boundedMinutes)
     val latestOnMinutesChange by rememberUpdatedState(onMinutesChange)
     val density = LocalDensity.current
-    val dragThreshold = with(density) { 18.dp.toPx() }
-    val numberWidth = 76.dp * layoutScale
+    val dragThreshold = with(density) { MinutesDragStepDistance.toPx() }
+    val numberWidth = MinutesSelectorWidth * layoutScale
     val numberText = boundedMinutes.toString()
     val numberStyle = MaterialTheme.typography.bodyLarge.copy(
         fontSize = 28.sp * layoutScale,
@@ -147,7 +166,7 @@ private fun ScrollableMinutes(
         maxLines = 1
     ).size.width
     val availableWidth = with(density) {
-        (numberWidth - 8.dp * layoutScale).toPx()
+        (numberWidth - MinutesNumberHorizontalInset * layoutScale).toPx()
     }
     val fontScale = (availableWidth / measuredWidth.coerceAtLeast(1))
         .coerceAtMost(1f)
@@ -155,7 +174,7 @@ private fun ScrollableMinutes(
     // Fixed centre and equal arrow slots fit inside both the 76 dp and 96 dp GO layouts.
     Box(modifier = Modifier.width(numberWidth).fillMaxHeight()) {
         Box(
-            modifier = Modifier.align(Alignment.TopCenter).width(numberWidth).height(22.dp * layoutScale)
+            modifier = Modifier.align(Alignment.TopCenter).width(numberWidth).height(MinutesArrowSlotHeight * layoutScale)
                 .semantics { contentDescription = "Increase planned time by five minutes" }
                 .clickable(enabled = enabled && boundedMinutes < Trip.MAX_PLANNED_MINUTES,
                     role = Role.Button, onClickLabel = "Increase planned time by five minutes") {
@@ -165,7 +184,7 @@ private fun ScrollableMinutes(
         ) {
             if (boundedMinutes < Trip.MAX_PLANNED_MINUTES) {
                 Icon(painterResource(Res.drawable.ic_arrow_drop_up), contentDescription = null,
-                    tint = TransitWhite, modifier = Modifier.size(20.dp * layoutScale))
+                    tint = TransitWhite, modifier = Modifier.size(MinutesArrowIconSize * layoutScale))
             }
         }
 
@@ -216,7 +235,7 @@ private fun ScrollableMinutes(
         )
 
         Box(
-            modifier = Modifier.align(Alignment.BottomCenter).width(numberWidth).height(22.dp * layoutScale)
+            modifier = Modifier.align(Alignment.BottomCenter).width(numberWidth).height(MinutesArrowSlotHeight * layoutScale)
                 .semantics { contentDescription = "Decrease planned time by five minutes" }
                 .clickable(enabled = enabled && boundedMinutes > Trip.MIN_PLANNED_MINUTES,
                     role = Role.Button, onClickLabel = "Decrease planned time by five minutes") {
@@ -226,7 +245,7 @@ private fun ScrollableMinutes(
         ) {
             if (boundedMinutes > Trip.MIN_PLANNED_MINUTES) {
                 Icon(painterResource(Res.drawable.ic_arrow_drop_down), contentDescription = null,
-                    tint = TransitWhite, modifier = Modifier.size(20.dp * layoutScale))
+                    tint = TransitWhite, modifier = Modifier.size(MinutesArrowIconSize * layoutScale))
             }
         }
     }

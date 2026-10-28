@@ -36,6 +36,17 @@ import com.example.rnd_transit_mtl.ui.theme.TransitMain
 import com.example.rnd_transit_mtl.ui.theme.TransitSelected
 import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 
+// Layout settings — the form fills narrow screens and stops growing at LandingFormMaxWidth.
+private val LandingFormMaxWidth = 480.dp
+private val LandingPagePadding = 24.dp
+private val LandingCardPadding = 24.dp
+private val LandingCardCornerRadius = 24.dp
+private val LandingSectionSpacing = 24.dp
+private val LandingFormFieldSpacing = 18.dp
+private val LandingContinueButtonMinHeight = 52.dp
+private val LandingGuestButtonMinHeight = 48.dp
+private val LandingGuestButtonBottomPadding = 8.dp
+
 /**
  * Stateless landing form with a guest shortcut at the bottom of the page.
  *
@@ -71,9 +82,9 @@ fun LandingContent(
             contentAlignment = Alignment.Center
         ) {
             Column(
-                modifier = Modifier.widthIn(max = 480.dp).fillMaxWidth()
-                    .verticalScroll(rememberScrollState()).padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp)
+                modifier = Modifier.widthIn(max = LandingFormMaxWidth).fillMaxWidth()
+                    .verticalScroll(rememberScrollState()).padding(LandingPagePadding),
+                verticalArrangement = Arrangement.spacedBy(LandingSectionSpacing)
             ) {
                 Text(
                     "RND Transit",
@@ -83,8 +94,8 @@ fun LandingContent(
                 )
                 Column(
                     modifier = Modifier.fillMaxWidth()
-                        .background(TransitWhite, RoundedCornerShape(24.dp)).padding(24.dp),
-                    verticalArrangement = Arrangement.spacedBy(18.dp)
+                        .background(TransitWhite, RoundedCornerShape(LandingCardCornerRadius)).padding(LandingCardPadding),
+                    verticalArrangement = Arrangement.spacedBy(LandingFormFieldSpacing)
                 ) {
                     Text("Welcome", color = TransitMain,
                         style = MaterialTheme.typography.headlineMedium)
@@ -123,7 +134,7 @@ fun LandingContent(
                         colors = ButtonDefaults.buttonColors(
                             containerColor = TransitSelected, contentColor = TransitMain
                         ),
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)
+                        modifier = Modifier.fillMaxWidth().heightIn(min = LandingContinueButtonMinHeight)
                     ) { Text("Continue to GO") }
                     Text("Demo access — no password or account required.",
                         color = TransitMain, style = MaterialTheme.typography.bodySmall)
@@ -135,7 +146,7 @@ fun LandingContent(
                 focusManager.clearFocus()
                 onContinueAsGuest()
             },
-            modifier = Modifier.padding(bottom = 8.dp).heightIn(min = 48.dp)
+            modifier = Modifier.padding(bottom = LandingGuestButtonBottomPadding).heightIn(min = LandingGuestButtonMinHeight)
         ) {
             Text(
                 "Continue as guest",

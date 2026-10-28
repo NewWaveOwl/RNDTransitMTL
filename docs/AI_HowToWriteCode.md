@@ -11,7 +11,7 @@ The lecture sequence determines the learning structure. Now in Android supplies 
 Examples marked **slide adaptation** preserve the teaching pattern while improving formatting, documentation, or correctness. Examples marked **architecture adaptation** illustrate Now in Android principles using original course-sized code. They are not verbatim Now in Android source files. Short snippets omit routine imports and some repeated documentation to focus on the technique. Complete generated declarations must follow section 4. These examples have been reviewed as documentation, not compiled together as an application.
 
 ## 1. Global instructions for the coding AI
-
+0. Do not write vars and methods names with "-" use "_". Only use "-" if it grammatically required.
 1. Read the requested behavior, relevant existing code, build configuration, and project decisions before writing code.
 2. Use Kotlin and Compose. Use Material 3 for this course. For the later multiplatform/navigation work, use Navigation 3.
 3. Preserve the project's supported platforms, dependency versions, package names, and established patterns. Verify version-sensitive APIs in primary documentation.
@@ -25,6 +25,7 @@ Examples marked **slide adaptation** preserve the teaching pattern while improvi
 11. Provide appropriate verification and report what was actually checked. Treat generated code as unverified until reviewed and tested.
 12. Preserve AI contribution records where coursework requires them. Never invent authorship, contribution percentages, time worked, decisions, or test results.
 13. For ViewModels and streams, define the owner, lifetime, cancellation, state/event distinction, and delivery requirements before choosing an API. Follow section 18 for the Days 20–23 practices.
+14. In Compose files being created or edited, put the main component layout and animation settings in clearly labeled sections immediately after imports. Use names that state each value's responsibility and unit; follow the mandatory tuning practice below.
 
 **Lecture basis:** S01 slides 8 and 39–45; S02 slides 3–5; S06 slides 4–14; S07 slides 3–11; S16 slides 6–25.
 
@@ -48,6 +49,34 @@ For Main, users choose transport modes and transit zones. Individual bus numbers
 Use docs/colours.md as the palette reference. Keep complete generated declarations documented with meaningful KDoc and parameter contracts.
 
 Existing code is not yet fully MVVM. When migrating it, preserve active-trip identity, resume behavior, completion/review handling, saved drafts, and navigation guards. Report the migrated responsibilities and any remaining work explicitly.
+
+### Mandatory Compose layout and animation tuning practice
+
+This is a project requirement requested by the team, not an additional lecture requirement.
+
+- Put `// Layout settings` and, where applicable, `// Animation settings` near the top of each Compose file, immediately after imports and before composable declarations.
+- Give tunable widths, maximum widths, width fractions, row column counts, horizontal padding, spacing, major control heights, and animation durations descriptive names. Use names such as `PlannerSheetMaxWidth`, `TransportButtonWidthFraction`, `MinutesSelectorWidth`, and `PREFERENCE_DROPDOWN_ANIMATION_DURATION_MILLIS`; avoid `boxWidth`, `size1`, and `speed`.
+- Use immutable `val` properties for dp values and layout settings. Use `const val` with an explicit unit suffix for numeric durations, such as `..._DURATION_MILLIS`. Do not introduce mutable global state for design tuning.
+- Make each setting actually control its named component. In weighted rows, size the button inside its allocated cell so changing its width fraction has a visible effect; do not place an ineffective width modifier after constraints that already force the full width.
+- Keep layouts responsive. Expose maximum widths, padding, spacing, column counts, or width fractions instead of forcing desktop-sized buttons onto small screens. Document whether a value is in dp, reference-layout units, milliseconds, or a fraction. Width fractions must remain in `0..1`, column counts must be positive, and durations must be nonnegative.
+- Document scaling and dependencies. A fraction of `1f` fills a button's cell; `0.9f` makes it 90% as wide. Larger millisecond durations produce slower animation. Distinguish gesture sensitivity from animation duration.
+- Keep one authoritative definition for a setting shared by multiple components. For example, compact GO height is defined in `ui/GOBox.kt` and reused by the planner; synchronized planner/map/footer timing is defined in `ui/TripTransition.kt`. Point to the shared definition from the local tuning section instead of duplicating its literal value.
+- Keep theme colours and typography in their existing theme owners. Do not extract business rules, computed viewport sizes, live state, or every incidental numeric literal into layout settings.
+- Preserve existing values, dropdown behavior, saved choices, navigation guards, and responsiveness when extracting settings. Reuse existing relevant checks; verify small-window layout, clipping, and ellipsis when a tuning change affects them.
+
+Example at the top of a Compose file:
+
+```kotlin
+// Layout settings — dp limits and a responsive fraction; follow the component's scaling rules.
+private val PlannerSheetMaxWidth = 620.dp
+private val MinutesSelectorWidth = 76.dp
+private val TransportButtonWidthFraction = 1f // 0.9f uses 90% of its responsive cell.
+
+// Animation settings — milliseconds; higher duration means slower movement.
+private const val PREFERENCE_DROPDOWN_ANIMATION_DURATION_MILLIS = 500
+```
+
+Current tuning locations: `View/main/MainPlannerContent.kt` for sheet width, GO margins, drag-handle size and sheet motion; `View/main/components/PlannerPreferenceBands.kt` for transport/zone/walking/attraction button widths and dropdown timing; `ui/GOBox.kt` for time selector and GO button dimensions; `ui/IntensityPanel.kt` for slider width via side padding; `ui/LandingContent.kt` for landing form width; and `layout/SharedTopBar.kt` for header button widths.
 
 ## 2. Course structure and coverage
 

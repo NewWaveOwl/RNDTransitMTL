@@ -28,6 +28,13 @@ import com.example.rnd_transit_mtl.ui.theme.TransitMain
 import com.example.rnd_transit_mtl.ui.theme.TransitSelected
 import com.example.rnd_transit_mtl.ui.theme.TransitComplementary
 
+// Layout settings — horizontal padding determines slider width within the full-width panel.
+private val IntensityPanelHorizontalPadding = 24.dp
+private val IntensityPanelVerticalPadding = 16.dp
+private val IntensitySliderHeight = 64.dp
+private val IntensitySliderCornerRadius = 24.dp
+private val IntensityValueEndPadding = 24.dp
+
 /**
  * Displays the attraction-intensity slider and trip-validation feedback.
  *
@@ -51,7 +58,7 @@ internal fun IntensityPanel(
     Column(
         modifier = modifier
             .background(TransitComplementary)
-            .padding(horizontal = 24.dp * layoutScale, vertical = 16.dp * layoutScale),
+            .padding(horizontal = IntensityPanelHorizontalPadding * layoutScale, vertical = IntensityPanelVerticalPadding * layoutScale),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text("Attraction intensity", color = TransitWhite, fontSize = 24.sp * layoutScale, maxLines = 1)
@@ -62,7 +69,7 @@ internal fun IntensityPanel(
             onIntensityChange = onIntensityChange,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(64.dp * layoutScale)
+                .height(IntensitySliderHeight * layoutScale)
         )
         Spacer(Modifier.height(3.dp))
         /** Keep feedback space in the layout and show its text only when a validation message exists. */
@@ -108,7 +115,7 @@ private fun IntensitySlider(
 ) {
     /** Convert the intensity percentage to a bounded fraction for the filled section width. */
     val progress = (intensity / 100f).coerceIn(0f, 1f)
-    val sliderShape = RoundedCornerShape(24.dp * layoutScale)
+    val sliderShape = RoundedCornerShape(IntensitySliderCornerRadius * layoutScale)
 
     Box(
         modifier = modifier
@@ -149,7 +156,7 @@ private fun IntensitySlider(
                     fontSize = 28.sp * layoutScale,
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
-                        .padding(end = 24.dp * layoutScale)
+                        .padding(end = IntensityValueEndPadding * layoutScale)
                 )
             }
         }

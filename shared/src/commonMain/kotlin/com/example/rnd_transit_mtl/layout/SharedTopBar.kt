@@ -55,6 +55,16 @@ import rnd_transit_mtl.shared.generated.resources.ic_home
 import rnd_transit_mtl.shared.generated.resources.ic_receipt_long
 import rnd_transit_mtl.shared.generated.resources.ic_settings
 
+// Layout settings — button widths and spacing also control how much of the left group scrolls.
+private val HeaderButtonWidth = 64.dp
+private val HeaderButtonHeight = 68.dp
+private val HeaderIconSize = 34.dp
+private val HeaderHorizontalPadding = 8.dp
+private val HeaderVerticalPadding = 6.dp
+private val HeaderButtonSpacing = 6.dp
+private val HeaderButtonContentPadding = 4.dp
+private val HeaderButtonCornerRadius = 14.dp
+
 /**
  * Shared navigation remains above all destination transition animations.
  */
@@ -111,8 +121,8 @@ internal fun SharedTopBarContent(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                .padding(horizontal = HeaderHorizontalPadding, vertical = HeaderVerticalPadding),
+            horizontalArrangement = Arrangement.spacedBy(HeaderButtonSpacing),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Settings stays at the right edge; only the left group scrolls
@@ -120,7 +130,7 @@ internal fun SharedTopBarContent(
             Row(
                 modifier = Modifier.weight(1f)
                     .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(HeaderButtonSpacing),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 HeaderIconItem(
@@ -180,9 +190,9 @@ private fun HeaderIconItem(
 
     Column(
         modifier = Modifier
-            .width(64.dp)
-            .height(68.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .width(HeaderButtonWidth)
+            .height(HeaderButtonHeight)
+            .clip(RoundedCornerShape(HeaderButtonCornerRadius))
             .background(
                 if (isSelected) TransitSelected else TransitMain
             )
@@ -194,7 +204,7 @@ private fun HeaderIconItem(
                 selected = isSelected
                 contentDescription = label
             }
-            .padding(4.dp),
+            .padding(HeaderButtonContentPadding),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -213,7 +223,7 @@ private fun HeaderIconItem(
                 painter = painter,
                 contentDescription = null,
                 tint = foreground,
-                modifier = Modifier.size(34.dp)
+                modifier = Modifier.size(HeaderIconSize)
             )
         }
 
