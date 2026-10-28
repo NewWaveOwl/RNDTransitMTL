@@ -55,6 +55,7 @@ private val PreferenceChoiceCornerRadius = 14.dp
 private val PreferenceChoiceHorizontalPadding = 8.dp
 private val PreferenceChoiceVerticalPadding = 10.dp
 private val ZoneDropdownMinimumHeight = 203.dp
+private val IntensityBandHeight = 160.dp
 
 // Animation settings — shared by Walk and transit dropdowns. Larger duration means slower motion.
 private const val PREFERENCE_DROPDOWN_ANIMATION_DURATION_MILLIS = 500
@@ -73,6 +74,8 @@ private val PreferenceDropdownEasing = FastOutSlowInEasing
  * @param walkingPreference Selected walking style.
  * @param bikeSpeedKmh Selected cycling speed in km/h.
  * @param onBikeSpeedChange Requests a cycling-speed change.
+ * @param intensity Current attraction intensity from 0 to 100.
+ * @param onIntensityChange Requests an attraction-intensity change.
  * @param selectedAttractionIds Enabled attraction labels.
  * @param onWalkingPreferenceChange Requests a walking-style change.
  * @param onToggleAttraction Requests an attraction toggle.
@@ -97,7 +100,9 @@ internal fun LazyListScope.PlannerPreferenceBands(
     expandedTransportId: String?,
     onExpandedTransportChange: (String) -> Unit,
     bikeSpeedKmh: Int,
-    onBikeSpeedChange: (Int) -> Unit
+    onBikeSpeedChange: (Int) -> Unit,
+    intensity: Float,
+    onIntensityChange: (Float) -> Unit
 ) {
     item(key = "transport") {
         // Animate the dropdown itself so following bands move with its visible height.
@@ -174,6 +179,11 @@ internal fun LazyListScope.PlannerPreferenceBands(
             Text("Sample routes don’t yet reflect walking pace, bike speed, or attraction preferences.",
                 color = TransitWhite, style = MaterialTheme.typography.bodySmall)
         }
+    }
+    item(key = "intensity") {
+        IntensityPanel(layoutScale = scale, intensity = intensity, onIntensityChange = onIntensityChange,
+            validationMessage = "", enabled = enabled,
+            modifier = Modifier.fillMaxWidth().heightIn(min = IntensityBandHeight * scale))
     }
     item(key = "settings") {
         PreferenceBand(TransitComplementary, scale) {

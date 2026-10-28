@@ -26,6 +26,7 @@ Examples marked **slide adaptation** preserve the teaching pattern while improvi
 12. Preserve AI contribution records where coursework requires them. Never invent authorship, contribution percentages, time worked, decisions, or test results.
 13. For ViewModels and streams, define the owner, lifetime, cancellation, state/event distinction, and delivery requirements before choosing an API. Follow section 18 for the Days 20–23 practices.
 14. In Compose files being created or edited, put the main component layout and animation settings in clearly labeled sections immediately after imports. Use names that state each value's responsibility and unit; follow the mandatory tuning practice below.
+15. Reuse existing project icons. If an icon is missing, export it from the RndTransit_main Figma design (Android Design kit or Core experience) or use Google Material Symbols from fonts.google.com/icons. If neither has the needed icon, create it in Figma and export it. Do not generate replacement icons in application code. Keep the requested solution simple and preserve its proposed structure.
 
 **Lecture basis:** S01 slides 8 and 39–45; S02 slides 3–5; S06 slides 4–14; S07 slides 3–11; S16 slides 6–25.
 
@@ -160,6 +161,7 @@ rnd_transit_mtl/
 ├── layout/
 │   ├── MainLayout.kt
 │   ├── SharedTopBar.kt
+│   ├── SharedBottomBar.kt
 │   ├── PageTitle.kt
 │   └── previews/
 │       ├── NavigationHeaderPreview.kt

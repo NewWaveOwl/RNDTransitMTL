@@ -43,6 +43,7 @@ class TransportDropdownInteractionTest {
                         onToggleTransport = { vm.toggleTransport(it, setOf("walk", "bike")) },
                         onToggleZone = vm::toggleZone, walkingPreference = draft.walkingPreference,
                         bikeSpeedKmh = draft.bikeSpeedKmh, onBikeSpeedChange = vm::setBikeSpeedKmh,
+                        intensity = draft.intensity, onIntensityChange = vm::setIntensity,
                         selectedAttractionIds = draft.selectedAttractionIds, onWalkingPreferenceChange = vm::setWalkingPreference,
                         onToggleAttraction = vm::toggleAttraction, enabled = true, onOpenDetailedSettings = {},
                         expandedTransportId = expanded,

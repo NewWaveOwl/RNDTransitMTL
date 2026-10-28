@@ -314,6 +314,7 @@ internal fun MainPlannerContent(
                         onWalkingPreferenceChange, onToggleAttraction,
                         enabled, onOpenDetailedSettings, expandedTransportId,
                         bikeSpeedKmh = bikeSpeedKmh,
+                        intensity = intensity, onIntensityChange = onIntensityChange,
                         onBikeSpeedChange = onBikeSpeedChange,
                         onExpandedTransportChange = { transportId ->
                             if (enabled) {
