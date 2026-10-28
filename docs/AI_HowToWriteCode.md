@@ -186,6 +186,7 @@ rnd_transit_mtl/
 │   │       └── IntensityPanelPreview.kt
 │   │
 │   ├── current_trip/
+│   │   ├── ActiveMapContent.kt
 │   │   ├── CurrentTripScreen.kt
 │   │   ├── CurrentTripContent.kt
 │   │   ├── components/

@@ -59,7 +59,7 @@ import com.example.rnd_transit_mtl.ui.global_ui_ellements.trip.TripReviewSummary
  * The parent owns expansion and action-tray visibility by trip ID.
  * A drag only requests a presentation change; it never removes a trip.
  *
- * Tap a reviewed card to expand/collapse its saved feedback.
+ * Single-tap toggles the action tray; double-tap opens trip details.
  * Swipe left or long-press to reveal the action tray.
  * Swipe right or use Actions again to hide it.
  */
@@ -86,8 +86,9 @@ fun TripHistoryCard(
 
     val review = trip.review
 
+    Column(modifier.fillMaxWidth().animateContentSize()) {
     Card(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxWidth()
             .animateContentSize()
             .pointerInput(trip.id, swipeThreshold, actionsEnabled) {
@@ -120,21 +121,12 @@ fun TripHistoryCard(
             }
             .combinedClickable(
                 enabled = actionsEnabled,
-                onClickLabel = if (review == null) {
-                    "Show trip actions"
-                } else if (expanded) {
-                    "Collapse saved review"
-                } else {
-                    "Expand saved review"
-                },
+                onClickLabel = if (actionsVisible) "Hide trip actions" else "Show trip actions",
+                onDoubleClick = onOpenDetails,
                 onLongClickLabel = "Show edit and remove actions",
                 onLongClick = { latestShowActions() },
                 onClick = {
-                    if (review == null) {
-                        latestShowActions()
-                    } else {
-                        onToggleExpanded()
-                    }
+                    if (actionsVisible) latestHideActions() else latestShowActions()
                 }
             ),
         shape = RoundedCornerShape(24.dp),
@@ -263,15 +255,10 @@ fun TripHistoryCard(
                     )
                 }
 
-                Text(
-                    text = if (expanded) {
-                        "Tap to collapse review"
-                    } else {
-                        "Tap to read the full review"
-                    },
-                    style = MaterialTheme.typography.labelMedium,
-                    color = TransitMain.copy(alpha = 0.75f)
-                )
+                TextButton(onClick = onToggleExpanded, enabled = actionsEnabled) {
+                    Text(if (expanded) "Collapse review" else "Read full review",
+                        style = MaterialTheme.typography.labelMedium, color = TransitMain)
+                }
             }
 
             Row(
@@ -320,6 +307,8 @@ fun TripHistoryCard(
             }
         }
 
+    }
+
         AnimatedVisibility(
             visible = actionsVisible,
             enter = expandVertically() + fadeIn(),
@@ -328,7 +317,6 @@ fun TripHistoryCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(TransitMain)
                     .padding(12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
@@ -338,8 +326,8 @@ fun TripHistoryCard(
                     colors = ButtonDefaults.buttonColors(
                         containerColor = TransitSelected,
                         contentColor = TransitMain,
-                        disabledContainerColor = TransitWhite.copy(alpha = 0.15f),
-                        disabledContentColor = TransitWhite.copy(alpha = 0.5f)
+                        disabledContainerColor = TransitMain.copy(alpha = 0.08f),
+                        disabledContentColor = TransitMain.copy(alpha = 0.45f)
                     ),
                     modifier = Modifier
                         .weight(1f)
@@ -369,8 +357,8 @@ fun TripHistoryCard(
                     colors = ButtonDefaults.buttonColors(
                         containerColor = TransitHighlight,
                         contentColor = TransitMain,
-                        disabledContainerColor = TransitWhite.copy(alpha = 0.15f),
-                        disabledContentColor = TransitWhite.copy(alpha = 0.5f)
+                        disabledContainerColor = TransitMain.copy(alpha = 0.08f),
+                        disabledContentColor = TransitMain.copy(alpha = 0.45f)
                     ),
                     modifier = Modifier
                         .weight(1f)

@@ -148,6 +148,7 @@ private fun CurrentTripExample(
 
     RNDTransitTheme {
         CurrentTripContent(
+            onFinishRequested = {},
             trip = record,
             progress = progress,
             isRunning = isRunning,

@@ -360,6 +360,29 @@ fun CurrentTripScreen(
                     }
                 }
             },
+            onFinishRequested = {
+                if (latestDestinationActive &&
+                    lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+                ) {
+                    simulation.pause()
+
+                    // Explicitly finish the demo simulation and save its completed trip.
+                    when (
+                        tripsStore.updateElapsed(
+                            trip.id,
+                            TRIP_SIMULATION_DURATION_MILLIS
+                        )
+                    ) {
+                        TripActionResult.Applied,
+                        TripActionResult.AlreadyCompleted -> requestReview()
+
+                        else -> {
+                            operationMessage =
+                                "The trip could not be finished. Please try again."
+                        }
+                    }
+                }
+            },
             onRequestReview = {
                 requestReview()
             },

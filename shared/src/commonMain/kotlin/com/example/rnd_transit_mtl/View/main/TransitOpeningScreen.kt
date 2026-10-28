@@ -6,6 +6,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.example.rnd_transit_mtl.View.current_trip.ActiveMapContent
+import com.example.rnd_transit_mtl.state.trip.TRIP_SIMULATION_DURATION_MILLIS
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -348,6 +350,23 @@ internal fun TransitOpeningScreen(
                 // Return to the planner with all current choices preserved.
                 proposalJson = null
             },
+            modifier = modifier
+        )
+        return
+    }
+
+    if (activeState != null && pendingOpenTripId == null) {
+        ActiveMapContent(
+            trip = activeState.trip,
+            progress = (
+                activeState.elapsedMillis.toFloat() /
+                    TRIP_SIMULATION_DURATION_MILLIS
+            ).coerceIn(0f, 1f),
+            actionsEnabled = isDestinationActive && !processingAction,
+            mainOverview = true,
+            onResume = { performPrimaryAction() },
+            onFinish = {},
+            onConfirmCancel = {},
             modifier = modifier
         )
         return
