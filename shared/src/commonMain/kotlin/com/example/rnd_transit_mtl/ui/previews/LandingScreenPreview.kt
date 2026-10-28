@@ -30,7 +30,8 @@ private fun LandingExample(nickname: String = "Atiom", showError: Boolean = fals
             nickname = nickname,
             showError = showError,
             onNicknameChange = {},
-            onContinue = {}
+            onContinue = {},
+            onContinueAsGuest = {}
         )
     }
 }

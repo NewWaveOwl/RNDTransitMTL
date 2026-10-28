@@ -25,6 +25,7 @@ fun LandingScreen(
             showError = false
         },
         onContinue = { showError = !onLogin(nickname) },
+        onContinueAsGuest = { showError = !onLogin("Guest") },
         modifier = modifier
     )
 }

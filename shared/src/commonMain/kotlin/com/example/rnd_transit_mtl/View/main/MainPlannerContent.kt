@@ -39,6 +39,7 @@ import com.example.rnd_transit_mtl.ui.plannerTripBounds
 import com.example.rnd_transit_mtl.ui.validMapSourceSize
 import com.example.rnd_transit_mtl.ui.theme.*
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import org.jetbrains.compose.resources.painterResource
 import rnd_transit_mtl.shared.generated.resources.Res
 import rnd_transit_mtl.shared.generated.resources.map_sample
@@ -157,27 +158,32 @@ internal fun MainPlannerContent(
             modifier = Modifier.fillMaxSize()
         )
 
-        AnimatedVisibility(
-            visibleState = controlsState,
+        BottomSheetScaffold(
             modifier = Modifier.fillMaxSize(),
-            enter = EnterTransition.None,
-            exit = slideOutVertically(
-                animationSpec = tween(GO_TRIP_TRANSITION_MILLIS),
-                targetOffsetY = { it }
-            )
-        ) {
-            BottomSheetScaffold(
-                modifier = Modifier.fillMaxSize(),
-                scaffoldState = scaffoldState,
-                sheetPeekHeight = peekHeight,
-                sheetMaxWidth = 620.dp,
-                sheetShape = RectangleShape,
-                sheetContainerColor = Color.Transparent,
-                sheetContentColor = TransitWhite,
-                sheetTonalElevation = 0.dp,
-                sheetShadowElevation = 0.dp,
-                sheetDragHandle = null,
-                sheetContent = {
+            scaffoldState = scaffoldState,
+            sheetPeekHeight = peekHeight,
+            sheetMaxWidth = 620.dp,
+            sheetShape = RectangleShape,
+            sheetContainerColor = Color.Transparent,
+            sheetContentColor = TransitWhite,
+            sheetTonalElevation = 0.dp,
+            sheetShadowElevation = 0.dp,
+            sheetDragHandle = null,
+            sheetSwipeEnabled = inputsEnabled && controlsVisible,
+            sheetContent = {
+                // Slide only the visible sheet distance, keeping the map stationary.
+                val sheetHeightPx = with(LocalDensity.current) { availableHeight.toPx() }
+                AnimatedVisibility(
+                    visibleState = controlsState,
+                    enter = EnterTransition.None,
+                    exit = slideOutVertically(
+                        animationSpec = tween(GO_TRIP_TRANSITION_MILLIS),
+                        targetOffsetY = { height ->
+                            (sheetHeightPx - sheetState.requireOffset())
+                                .roundToInt().coerceIn(0, height)
+                        }
+                    )
+                ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -202,9 +208,10 @@ internal fun MainPlannerContent(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(48.dp)
+                                .height(16.dp)
                                 .background(TransitComplementary)
                                 .clickable(
+                                    enabled = inputsEnabled && controlsVisible,
                                     role = Role.Button,
                                     onClickLabel = "Expand or collapse preferences"
                                 ) {
@@ -307,12 +314,19 @@ internal fun MainPlannerContent(
                                         ) {
                                             row.forEach { transport ->
                                                 PlannerChoice(
-                                                    label = if (
-                                                        transport.id == "walk"
-                                                    ) {
-                                                        "Walk"
-                                                    } else {
-                                                        transport.label
+                                                    label = buildString {
+                                                        append(
+                                                            if (transport.id == "walk") "Walk"
+                                                            else transport.label
+                                                        )
+                                                        if (
+                                                            transport.usesRoutes &&
+                                                            transport.id in selectedTransportIds &&
+                                                            selectedZoneIds.isNotEmpty()
+                                                        ) {
+                                                            append(" ")
+                                                            append(selectedZoneIds.sorted().joinToString(", "))
+                                                        }
                                                     },
                                                     selected =
                                                         transport.id in
@@ -357,11 +371,6 @@ internal fun MainPlannerContent(
                                             style = MaterialTheme.typography
                                                 .headlineSmall,
                                             fontWeight = FontWeight.Bold
-                                        )
-
-                                        Text(
-                                            "Choose the zones to include. Sample routes record these choices; geographic filtering is not yet available.",
-                                            color = TransitComplementary
                                         )
 
                                         MainPlannerViewModel.zoneIds
@@ -451,25 +460,25 @@ internal fun MainPlannerContent(
                             }
                         }
                     }
-                },
-                containerColor = Color.Transparent
-            ) {
-                // Keep the map stationary beneath the moving sheet.
-                Box(Modifier.fillMaxSize()) {
-                    Surface(
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(12.dp),
-                        color = TransitWhite,
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text(
-                            "© OpenStreetMap contributors · Sample map",
-                            color = TransitComplementary,
-                            style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.padding(6.dp)
-                        )
-                    }
+                }
+            },
+            containerColor = Color.Transparent
+        ) {
+            // Keep the map stationary beneath the moving sheet.
+            Box(Modifier.fillMaxSize()) {
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(12.dp),
+                    color = TransitWhite,
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        "© OpenStreetMap contributors · Sample map",
+                        color = TransitComplementary,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(6.dp)
+                    )
                 }
             }
         }
