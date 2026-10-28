@@ -1,16 +1,16 @@
 package com.example.rnd_transit_mtl
 
 import androidx.navigation3.runtime.NavKey
-import com.example.rnd_transit_mtl.data.MockTripGenerator
-import com.example.rnd_transit_mtl.data.TripGenerationInput
-import com.example.rnd_transit_mtl.data.TripGenerationResult
-import com.example.rnd_transit_mtl.model.TransportRoute
-import com.example.rnd_transit_mtl.model.TransportType
-import com.example.rnd_transit_mtl.model.Trip
-import com.example.rnd_transit_mtl.model.TripReviewMode
-import com.example.rnd_transit_mtl.state.TRIP_SIMULATION_DURATION_MILLIS
-import com.example.rnd_transit_mtl.state.TripActionResult
-import com.example.rnd_transit_mtl.state.TripsStore
+import com.example.rnd_transit_mtl.data.generation.MockTripGenerator
+import com.example.rnd_transit_mtl.data.generation.TripGenerationInput
+import com.example.rnd_transit_mtl.data.generation.TripGenerationResult
+import com.example.rnd_transit_mtl.model.transport.TransportRoute
+import com.example.rnd_transit_mtl.model.transport.TransportType
+import com.example.rnd_transit_mtl.model.trip.Trip
+import com.example.rnd_transit_mtl.model.review.TripReviewMode
+import com.example.rnd_transit_mtl.state.trip.TRIP_SIMULATION_DURATION_MILLIS
+import com.example.rnd_transit_mtl.state.trip.TripActionResult
+import com.example.rnd_transit_mtl.state.trip.TripsStore
 import kotlinx.serialization.PolymorphicSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
@@ -20,6 +20,15 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import com.example.rnd_transit_mtl.navigation.AboutScreenKey
+import com.example.rnd_transit_mtl.navigation.CurrentTripScreenKey
+import com.example.rnd_transit_mtl.navigation.HistoryScreenKey
+import com.example.rnd_transit_mtl.navigation.MainScreenKey
+import com.example.rnd_transit_mtl.navigation.ProfileScreenKey
+import com.example.rnd_transit_mtl.navigation.SettingsScreenKey
+import com.example.rnd_transit_mtl.navigation.TripReviewScreenKey
+import com.example.rnd_transit_mtl.navigation.ReviewOrigin
+import com.example.rnd_transit_mtl.navigation.backStackConfig
 
 class TripFlowIntegrationTest {
     private val types = listOf(
@@ -52,6 +61,24 @@ class TripFlowIntegrationTest {
     }
 
     @Test
+    fun navigationSavedBeforeTheFolderMigrationRestoresWithTheSameDiscriminators() {
+        val legacy = """[
+            {"type":"com.example.rnd_transit_mtl.MainScreenKey"},
+            {"type":"com.example.rnd_transit_mtl.HistoryScreenKey"},
+            {"type":"com.example.rnd_transit_mtl.TripReviewScreenKey","tripId":"legacy-trip","mode":"EDIT",
+             "origin":{"type":"com.example.rnd_transit_mtl.ReviewOrigin.Details","tripId":"legacy-trip"}}
+        ]"""
+        val restored = navigationJson.decodeFromString(stackSerializer, legacy)
+        assertEquals(listOf(
+            MainScreenKey, HistoryScreenKey,
+            TripReviewScreenKey("legacy-trip", TripReviewMode.EDIT, ReviewOrigin.Details("legacy-trip"))
+        ), restored)
+        val encoded = navigationJson.encodeToString(stackSerializer, restored)
+        kotlin.test.assertTrue(encoded.contains("com.example.rnd_transit_mtl.MainScreenKey"))
+        kotlin.test.assertTrue(encoded.contains("com.example.rnd_transit_mtl.ReviewOrigin.Details"))
+    }
+
+    @Test
     fun restoredActiveTripRetainsPlannerSnapshotAndElapsedProgress() {
         val trip = generatedTrip()
         val store = TripsStore(nowEpochMillis = { 12_000L })
@@ -73,6 +100,8 @@ class TripFlowIntegrationTest {
         assertEquals(trip.start, restored.completedTrips.single().start)
         assertEquals(trip.destination, restored.completedTrips.single().destination)
         assertEquals(trip.selectedRoutes, restored.completedTrips.single().selectedRoutes)
+        assertEquals(trip.selectedZoneIds, restored.completedTrips.single().selectedZoneIds)
+        assertEquals(trip.selectedZonesByTransport, restored.completedTrips.single().selectedZonesByTransport)
         assertEquals(TripActionResult.AlreadyCompleted, restored.updateElapsed(
             trip.id, TRIP_SIMULATION_DURATION_MILLIS
         ))
@@ -137,6 +166,8 @@ class TripFlowIntegrationTest {
         plannedMinutes = 30,
         selectedTransportIds = listOf("walk", "bus"),
         selectedRouteIds = listOf("bus:401"),
-        attractionIntensity = 65f
+        attractionIntensity = 65f,
+        selectedZoneIds = listOf("A"),
+        selectedZonesByTransport = mapOf("bus" to listOf("A"))
     )
 }

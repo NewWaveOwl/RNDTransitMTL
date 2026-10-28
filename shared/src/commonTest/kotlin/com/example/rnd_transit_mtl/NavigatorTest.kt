@@ -2,14 +2,14 @@ package com.example.rnd_transit_mtl
 
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
-import com.example.rnd_transit_mtl.model.Trip
-import com.example.rnd_transit_mtl.model.TripPoint
-import com.example.rnd_transit_mtl.model.TripReview
-import com.example.rnd_transit_mtl.model.TripReviewMode
-import com.example.rnd_transit_mtl.model.TripTransportSnapshot
-import com.example.rnd_transit_mtl.state.ReviewDraft
-import com.example.rnd_transit_mtl.state.TripActionResult
-import com.example.rnd_transit_mtl.state.TripsStore
+import com.example.rnd_transit_mtl.model.trip.Trip
+import com.example.rnd_transit_mtl.model.trip.TripPoint
+import com.example.rnd_transit_mtl.model.review.TripReview
+import com.example.rnd_transit_mtl.model.review.TripReviewMode
+import com.example.rnd_transit_mtl.model.trip.TripTransportSnapshot
+import com.example.rnd_transit_mtl.state.review.ReviewDraft
+import com.example.rnd_transit_mtl.state.trip.TripActionResult
+import com.example.rnd_transit_mtl.state.trip.TripsStore
 import kotlinx.serialization.PolymorphicSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
@@ -19,6 +19,18 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import com.example.rnd_transit_mtl.navigation.AboutScreenKey
+import com.example.rnd_transit_mtl.navigation.CurrentTripScreenKey
+import com.example.rnd_transit_mtl.navigation.HistoryScreenKey
+import com.example.rnd_transit_mtl.navigation.MainScreenKey
+import com.example.rnd_transit_mtl.navigation.Navigator
+import com.example.rnd_transit_mtl.navigation.ProfileScreenKey
+import com.example.rnd_transit_mtl.navigation.ReviewOrigin
+import com.example.rnd_transit_mtl.navigation.SettingsScreenKey
+import com.example.rnd_transit_mtl.navigation.TripDetailsScreenKey
+import com.example.rnd_transit_mtl.navigation.TripNavigation
+import com.example.rnd_transit_mtl.navigation.TripReviewScreenKey
+import com.example.rnd_transit_mtl.navigation.backStackConfig
 
 class NavigatorTest {
     @Test

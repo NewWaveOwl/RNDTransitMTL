@@ -2,7 +2,7 @@
 
 **Team:** Jimmy, Caio, Artiom  
 **Project:** RNDTransitMTL  
-**Updated:** 2026-10-02
+**Updated:** 2026-10-27
 
 TransitRandomizer generates achievable, semi-random adventures around Greater MontrГ©al using the user's available time, location, transportation choices, interests, and previous feedback. The user chooses what kind of adventure they want; the application proposes a destination and a practical route instead of requiring a destination in advance.
 
@@ -21,14 +21,14 @@ Walking, bicycle, bus, Metro, train, and REM are planned transportation options.
 | Feature | Intended behavior | Scope |
 | --- | --- | --- |
 | Random trip generator | Select reachable candidate places, compare them with time, interests, and transport preferences, and return a destination with a route | Core |
-| Adventure categories | Let users decide what the adventure is about before generation | Core |
-| User preferences | Store interests, transport choices, exploration level, and restrictions; use changes in subsequent generation | Core |
+| Adventure categories | Optional rich interests used in future recommendations | Nice to have |
+| User preferences | Store transport choices and basic constraints; richer personalization follows later | Basic settings core; rich preferences Nice to Have |
 | Trip history | Save generated and completed trips, display their routes on the map, and allow an editable version of a past trip | Core |
 | Post-trip review | Offer a star rating and short written review, plus feedback on individual places and route sections | Core |
-| Map and compass views | Offer full map navigation or a minimal direction-only adventure view | Planned adventure feature |
-| Shake to open compass | Open the compass when the user shakes the phone during an active adventure | Planned adventure feature |
-| Topographic main map | Show terrain and elevation; let users target altitude ranges or viewpoints during hikes | Planned map feature |
-| Local group adventures | Let nearby participants share an adventure and see group members on the map | Planned multiplayer feature |
+| Map and compass views | Offer full map navigation or minimal compass guidance | Must Have |
+| Shake to open compass | Open the compass when the user shakes the phone during an active adventure | AI Level-Up |
+| Topographic main map | Show terrain and elevation; let users target altitude ranges or viewpoints during hikes | Nice to Have |
+| Local group adventures | Create/join a session with shared constraints and participant locations | AI Level-Up |
 | User-selected points of interest | Accept a list of places that influences the generated adventure path | Nice to have |
 | Shared quests and competition | Give groups a shared quest pool for cooperative or competitive games inspired by Jet Lag | Nice to have |
 
@@ -37,7 +37,7 @@ The proposed first release prioritizes a complete single-user journey through ge
 ## Main user journey
 
 1. The user launches the application. The entry flow supports a guest path; login and registration can be added when account services are available.
-2. The user arrives at the main map and chooses their available time, transport modes, and adventure categories.
+2. The user arrives at the main map and chooses their available time, transport modes, and transit zones when using transit.
 3. The user adjusts trip-specific settings or accepts their saved preferences.
 4. GO requests a generated adventure using the current settings and location.
 5. The preview shows a destination or sequence of stops, route, duration, distance, and transportation methods.
@@ -51,24 +51,76 @@ The proposed first release prioritizes a complete single-user journey through ge
 
 The current design uses the **Figma top navigation**. Profile and History appear on the left; Settings appears on the right. A gradient GO shortcut appears between History and Settings only when the active screen is not Main. This shortcut returns to the existing main map and preserves trip selections. The GO action inside `GOBox` requests an adventure; it has a different purpose from the header shortcut.
 
-Profile provides the **about app** action, which opens About. The main page includes the map, `GOBox`, transportation choices, and the attraction-intensity control. Tapping a route-based transport expands its route choices below the transport buttons inside the same panel, as in As2. Tapping it again collapses the list; selecting another route-based transport switches the expanded list. Walking and Bike toggle directly, and multiple routes can be selected. Settings provides a shortcut back to trip settings. Platform Back returns through the navigation stack.
+Profile provides the **about app** action, which opens About. Transport modes toggle independently on Main; exact bus numbers and route restrictions belong in detailed Settings. Platform Back returns through the navigation stack.
 
-The source document proposed a bottom bar containing History, Map, and Profile. The agreed Figma top bar supersedes that layout proposal while keeping those destinations.
+The target bottom navigation contains Map, Compass, and Together. These destinations share one active trip. Compass and Together destinations remain to be implemented.
 
-| Design element | Specification |
-| --- | --- |
-| Main color | `#28454C` |
-| Highlight | `#FFBA00` |
-| Text and icons | `#F7F0E5` |
-| Progress and selected states | `#9ACA45` |
-| Complementary surfaces | `#BC9E5C` |
-| Header GO letters | Horizontal gradient from `#F7F0E5` to `#9ACA45` |
-| Typeface | LINE Seed JP Regular and Bold across standard and emphasized text styles |
-| Icons | Material Symbols resources stored in shared Compose drawables |
-| Floating trip control | `GOBox`: available minutes, increase/decrease arrows, and GO; labels stay on one line with space inside the rounded edges |
-| About photographs | Caio, Artiom, and Jimmy, using the existing drawable images |
+Use [the colour system](colours.md) for all palette tokens, semantic roles, the blue-to-lime GO gradient, and LINE Seed JP Regular/Bold typography. Shared Material Symbols drawables and the existing team photographs remain in use.
 
 The attraction-intensity control represents how strongly the user wants exploration and attraction discovery to influence the route. Its precise relationship to low, medium, and high exploration remains to be finalized.
+
+## Main-screen interaction
+The main screen presents the map, available minutes, GO, transport-mode toggles, and a draggable preferences sheet. Pulling the sheet upward moves through three resting positions matching the Figma main_screen, routes, and preferences frames; expanded content scrolls independently. GO moves above the sheet, while the attraction-intensity slider remains the final preference band. Walking style and attraction selections are restorable draft values; the sample generator does not yet apply them to routes. A tappable handle provides an alternative to dragging. The map remains stationary beneath the sheet.
+
+Transport modes appear in this order: Walk, Bike, Bus, Metro, Train, REM. Each mode toggles independently. Main does not require users to select bus numbers or individual transit routes.
+
+When a transit mode is enabled, show Transit zones with Zone A, Zone B, Zone C, and Zone D. Require at least one zone before generating a transit request. Click a transit type to open its zone dropdown, click it again to close, and click another type to switch the open dropdown, as in As3. Closing a dropdown preserves its selections. Only one dropdown is open at a time; the dropdown uses a 500 ms eased vertical slide in each direction. Switching modes finishes collapsing the old menu before expanding the next, with the latest click taking priority. Transport summaries stay on one line and use an ellipsis when selected zones exceed the button width, as in As3. Choosing a mode's first zone includes that mode, and clearing its last zone removes it. Bus, Metro, Train, and REM retain independent zone choices. Require at least one zone for every enabled transit mode. Preserve each mode's zone choices when the sheet moves or that mode is temporarily disabled. Restore older shared-zone drafts as the initial choice for each mode, then edit them independently. Generation snapshots retain the per-mode map and a combined zone list for legacy consumers. Zone restrictions apply to the transit journey, including transfers and intermediate travel, when supported by routing data.
+
+Optional exact bus or route restrictions belong in detailed Settings. They are additional constraints, not a prerequisite for selecting a transit mode. Unsupported restrictions must be identified clearly rather than silently ignored.
+
+The current sample-map generator can record zone selections but cannot validate geographic zone coverage. Geographic enforcement remains part of routing integration.
+
+The shared top navigation contains Profile, History, and Settings. The target bottom navigation contains Map, Compass, and Together. These views share one active trip; switching views must not create another trip.
+
+Use the palette and semantic roles in colours.md.
+## Trip configuration and proposal alignment
+The initial delivery generates one-way adventures. Required inputs are a valid starting location, positive whole minutes, and at least one supported transport mode. Transit requests additionally include selected zones under the updated main-screen design.
+
+GO requests a proposal. The target preview offers Start Trip, Generate Another, and Edit Trip Settings. Generating a proposal must not itself mark the trip active. The existing sample flow currently starts a trip directly; introducing the preview boundary remains required implementation work.
+
+Travel, waiting, transfers, planned visits, and an explicit allowance must fit the available duration. Return journeys and round-trip controls are outside the initial delivery.
+
+The Milestone 2 Must-Haves include configuration, generation, preview, active-trip handling, persistent history, accounts and information screens, general settings, minimal compass guidance, and shared trip constraints. The AI Level-Ups are live map movement, shake-to-open compass, and group-session creation/joining.
+
+Rich attraction preferences, personalization, favorites, terrain/elevation targets, selected points of interest, quests, and competition remain Nice-to-Have features. Showing a concept in Figma does not make its underlying service implemented.
+
+The new zone-based Main interaction and foundations palette supersede the proposal's older route-expansion and colour descriptions. Record these as design changes in the next proposal revision.
+## Required architecture: MVVM
+The application must use Model–View–ViewModel with unidirectional data flow.
+- Model: domain records, repository contracts, persistence, providers, and reusable business rules.
+- View: composables render supplied state and send user actions through callbacks. Views own presentation details such as sheet position, scrolling, and animations.
+- ViewModel: owns screen state, validates input, coordinates repository/use-case operations, and exposes read-only observable state.
+Views must not generate trips, access storage, or own business decisions. ViewModels must not retain composables, platform views, activities, or navigation controllers. Navigation wiring belongs at the destination boundary.
+
+Scope each ViewModel to its Navigation 3 entry. Keep application-wide trip state in one shared repository/store. A ViewModel must not create a second authoritative copy of the active trip.
+
+Save planner drafts through a restoration mechanism and persist user defaults through a settings repository. A ViewModel alone does not provide persistence after process termination.
+## Screen and component organization
+Use the following structure under the existing shared Kotlin package:
+```text
+navigation/                  Router, Navigator, TripNavigation
+layout/                      Shared scaffold, header, title; layout/previews/
+View/<screen_name>/          Screen, content, components/, previews/
+ViewModels/<screen_name>/    Screen state owners; MainPlannerState stays with its ViewModel
+model/{trip,transport,review,planning,preferences,user,group}/
+data/{repository,fake,generation,assets,local/entity,remote/dto}/
+state/{trip,review,user}/
+simulation/
+ui/global_ui_ellements/{cards,ratings,media,trip,map,transitions,previews}/
+ui/theme/
+```
+
+Each screen/view and its private components belong in the corresponding named screen folder. Components reused by multiple screens belong in ui/global_ui_ellements. Keep the spelling consistent with this project convention.
+
+Theme definitions remain in ui/theme. Shared scaffold and navigation bars remain in layout; navigation state and destination wiring live in navigation.
+
+The folder migration is implemented, including package/import updates across previews, tests, and target entry points. The complete filename tree is in [the coding guide](AI_HowToWriteCode.md#32-module-and-package-boundaries). Empty future-feature directories contain no implementations. Legacy planner files remain for their previews; shared review media lives in `ui/global_ui_ellements/media/`. Moving a file into ViewModels does not make it a ViewModel; responsibilities must also change.
+## Implementation status
+The main-screen update introduces a draggable sheet, independent transport toggles, zone selection, and a ViewModel for planner selections.
+
+Trip generation, validation feedback, and trip-opening coordination still require extraction from TransitOpeningScreen to complete the planner's MVVM migration.
+
+The bundled map, normalized sample coordinates, and accelerated trip simulation remain prototype behavior. They do not demonstrate live geographic routing, live location tracking, geographic zone enforcement, or durable history storage.
 
 ## Screen requirements
 
@@ -80,13 +132,13 @@ Show the application name and logo, a brief loading state, and location permissi
 
 Display the user location or chosen starting point, nearby transit stops, lines, bicycle paths, interesting places, and the generated or active route. Completed routes can be shown when enabled. Keep trip generation and settings accessible from this screen.
 
-The target main-map style is **topographic**, with terrain and elevation information. Users should be able to select a desired altitude range, elevation target, or viewpoint for hiking adventures. Distinguish an absolute altitude target from total elevation gain. Both depend on elevation data and route coverage.
+A Nice-to-Have main-map style is **topographic**, with terrain and elevation information. Users should be able to select a desired altitude range, elevation target, or viewpoint for hiking adventures. Distinguish an absolute altitude target from total elevation gain. Both depend on elevation data and route coverage.
 
 The first map prototype may use sample routes and markers before live location, topographic tiles, and routing are integrated. Group mode adds consenting members' locations to this map.
 
 ### Trip configuration
 
-Collect the starting location, available duration, transport modes, exploration level, and adventure categories. Advanced options include an ending location, round trip or one-way travel, required return time, maximum walking and cycling distances, budget, indoor/outdoor preference, and accessibility restrictions.
+Collect a valid starting location, positive whole minutes, and at least one supported transport mode for a one-way adventure. Transit requests also require selected zones. Optional exact route restrictions belong in detailed Settings; rich attraction preferences and personalization remain backlog features. Return journeys and round-trip controls are future possibilities outside the initial delivery.
 
 Topographic options add target altitude, acceptable elevation gain, and terrain preferences when supported. The optional points-of-interest list can contain places the user would like the generator to include. Required stops and suggested stops should be distinguished so a suggested place does not silently become a hard constraint.
 
@@ -94,7 +146,7 @@ Example request: вЂњI have two hours, I am starting at John Abbott College, I
 
 ### Generated trip preview
 
-Show the route, destination and intermediate stops, estimated duration and distance, transportation methods, visit time at each stop, and arrival or return time. When elevation is used, show the altitude target and estimated elevation gain.
+Show the route, destination and intermediate stops, estimated duration and distance, transportation methods, visit time at each stop, and arrival time. When elevation is used, show the altitude target and estimated elevation gain.
 
 Provide **Start Trip**, **Generate Another Trip**, **Edit Trip Settings**, and **Save for Later**. Explain which selected constraints prevented generation if no valid route is available.
 
@@ -158,7 +210,7 @@ As a **nice-to-have extension**, give the group a shared quest pool. Quests migh
 
 ### Inputs
 
-The generator receives a starting location, optional ending location, available time, return requirement, enabled transport modes, interests, exploration intensity, accessibility constraints, walking/cycling limits, and budget.
+The generator receives a starting location, available one-way time, enabled transport modes, selectedZoneIds for transit, optional allowedRouteIds from detailed Settings, and applicable shared constraints. Rich interests, personalization, walking/cycling limits, and budget preferences are future extensions.
 
 Supporting inputs include transit schedules and service conditions, place opening hours, typical visit durations, previous visits, personal and community reviews, and route data. Future inputs include weather, terrain/elevation, the optional points-of-interest list, and group preferences.
 
@@ -166,16 +218,16 @@ Supporting inputs include transit schedules and service conditions, place openin
 
 The team's starting idea is to randomly select points near the user within a distance roughly walkable during the available minutes. The generator then compares those points with attraction preferences, time, and transportation choices to produce a final destination and path.
 
-Use that walking-distance estimate as an initial candidate-search area, not as proof that a route fits. Roads, paths, barriers, visits, waiting, transfers, and a return journey affect actual travel time. When transit or cycling is enabled, reachable-area calculations can extend candidate search beyond the initial walking radius.
+Use that walking-distance estimate as an initial candidate-search area, not as proof that a route fits. Roads, paths, barriers, visits, waiting, transfers, and an explicit timing allowance affect actual one-way travel time. When transit or cycling is enabled, reachable-area calculations can extend candidate search beyond the initial walking radius.
 
 The proposed generation process is:
 
 1. Validate time, origin, transport choices, and required restrictions.
 2. Estimate a reachable area using the enabled modes and available time.
-3. Select candidate destinations, attractions, and interesting route sections, including eligible user-listed points of interest.
+3. Select candidate destinations, attractions, and interesting route sections, using core routing data; user-listed points of interest are a later extension.
 4. Remove closed, unavailable, inaccessible, over-budget, or otherwise incompatible places.
 5. Reduce the priority of recently visited or disliked places and sections.
-6. Calculate routes to one or more candidates, including return travel when requested.
+6. Calculate one-way routes to one or more candidates.
 7. Include travel, waiting, transfers, visits, and a timing buffer in the total estimate.
 8. Score valid routes for preference match, novelty, interestingness, and diversity.
 9. Randomly choose among high-scoring valid routes so the result still feels surprising.
@@ -212,9 +264,9 @@ These are proposed product entities. They describe required information without 
 | Entity | Suggested fields |
 | --- | --- |
 | User | `userId`, `username`, `email`, `profileImage`, `createdAt`, `preferencesId`, `privacySettings` |
-| UserPreferences | `preferencesId`, `userId`, `enabledTransportModes`, `interestCategories`, `explorationLevel`, `maximumWalkingDistance`, `maximumCyclingDistance`, `budgetPreference`, `accessibilityRequirements`, `indoorOutdoorPreference`, `language`; proposed elevation preferences |
+| UserPreferences | `preferencesId`, `userId`, `enabledTransportModes`, `selectedZoneIds`, optional `allowedRouteIds` for detailed Settings, `interestCategories`, `explorationLevel`, `maximumWalkingDistance`, `maximumCyclingDistance`, `budgetPreference`, `accessibilityRequirements`, `indoorOutdoorPreference`, `language`; proposed elevation preferences |
 | TransportationMode | `transportModeId`, `type`, `category`, `routeName`, `stopOrStation`, `scheduledTime`, `estimatedTravelTime`, `availability` |
-| Trip | `tripId`, `userId`, `status`, `startLocation`, `endLocation`, `startedAt`, `completedAt`, `estimatedDuration`, `actualDuration`, `estimatedDistance`, `actualDistance`, `transportModes`, `routeSegments`, `attractions`, `isRoundTrip`, `isFavorite`; proposed origin/revision link for editable copies |
+| Trip | `tripId`, `userId`, `status`, `startLocation`, `endLocation`, `startedAt`, `completedAt`, `estimatedDuration`, `actualDuration`, `estimatedDistance`, `actualDistance`, `transportModes`, `routeSegments`, `attractions`, `selectedZoneIds` (generation-time snapshot), `isFavorite`; proposed origin/revision link for editable copies |
 | RouteSegment | `segmentId`, `tripId`, `orderNumber`, `transportMode`, `startCoordinates`, `endCoordinates`, `geometry`, `estimatedDuration`, `actualDuration`, `distance`, `relatedAttractionId`; proposed elevation measurements |
 | Attraction or InterestingSpot | `attractionId`, `name`, `coordinates`, `category`, `description`, `rating`, `popularity`, `interestingnessScore`, `typicalVisitDuration`, `openingHours`, `priceLevel`, `accessibilityInformation`, `source`; proposed altitude |
 | TripReview | `reviewId`, `tripId`, `userId`, `overallRating`, `createdAt`, `routeSegmentRatings`, `attractionRatings`; add `reviewText` for the short review |
@@ -229,7 +281,7 @@ Proposed extension entities are:
 
 | Entity | Purpose and suggested information |
 | --- | --- |
-| AdventureRequest | Capture the settings used for generation, including time, categories, transport, return requirement, and optional altitude or place constraints |
+| AdventureRequest | Capture the settings used for generation, including positive whole minutes, starting location, transport, `selectedZoneIds`, optional `allowedRouteIds`, and one-way timing for the initial delivery; rich categories, altitude and place constraints are future extensions |
 | SelectedPointOfInterest | Record a user-selected attraction or coordinate and whether it is required or preferred |
 | GroupSession | Session identifier, host, members, agreed constraints, shared trip, and session status |
 | GroupMember | Session membership, display name, sharing consent, current location, last update time, and connection state |
@@ -258,23 +310,21 @@ Live feeds and exact provider integrations are not required to demonstrate the i
 
 ## Proposed delivery sequence
 
-### Phase 1 Interface and sample adventure loop
+### Sprint 3: Foundations
 
-Use the shared multiplatform interface, map/sample markers, `GOBox`, transport choices, categories, and preferences. Generate valid sample adventures from controlled data, show a preview, support completion, save history, display past routes, allow editable copies, and collect stars plus a short review. Include Profile, About, Settings, and History navigation.
+Establish shared navigation, MVVM responsibilities, basic configuration, model/repository contracts, and the design foundations. Keep terrain and rich attraction categories in the backlog.
 
-The current code already provides the shared Navigation 3 structure, Figma palette and fonts, `GOBox`, transport selection, a sample map, trip-summary handling, and Profile/About/Settings/History screens. Settings and History are currently placeholders. Live geographic routing, durable structured history, reviews, motion detection, topographic targeting, and group sessions are planned work.
+### Sprint 4: Core flow
 
-### Phase 2 Live single-user discovery
+Implement generation, a proposal preview with Start Trip / Generate Another / Edit Trip Settings, active-trip handling, durable history, accounts and information screens, and general settings. Generating a proposal must not activate it.
 
-Integrate location, maps, routing, transit schedules, attractions, opening hours, persistence, and preference-aware scoring. Add route and attraction feedback, repeat avoidance, favorites, and external navigation where appropriate.
+### Sprint 5: Tracking, groups, and Level-Ups
 
-### Phase 3 Compass and terrain adventures
+Integrate tracking, minimal compass guidance and shared trip constraints. Add live map movement, shake-to-open compass, and group-session creation/joining as the proposal's AI Level-Ups.
 
-Add active-trip map/compass switching, shake detection, direction prompts, topographic maps, altitude constraints, and elevation-aware generation. Add the optional place list when the core generator can validate routes through requested stops.
+### Sprint 6: Testing and final delivery
 
-### Phase 4 Local group adventures
-
-Add session creation/joining, shared constraints, shared adventures, and participant map locations. Cooperative quest pools and Jet Lag-inspired competition are optional extensions after basic group sessions work.
+Verify the complete journey, navigation, restoration, persistence, target-platform behavior, accessibility, and failure handling. Resolve defects and prepare the final delivery and supporting documentation.
 
 Further possibilities from the source document include real-time replanning, weather-aware recommendations, community route discovery, achievements, social sharing, offline trip access, advanced safety controls, automatic detection of the travelled route, and push notifications.
 
@@ -284,7 +334,6 @@ Further possibilities from the source document include real-time replanning, wea
 - Whether the first complete MVP uses live data or a controlled dataset.
 - Local persistence, remote backend, account services, and guest-data behavior.
 - Car support and how many transport combinations are practical for a given time budget.
-- Default one-way versus round-trip behavior and the return-time buffer.
 - In-app versus external detailed navigation and reliable selection of map segments.
 - How attraction intensity maps to scoring and exploration levels.
 - Altitude-range versus elevation-gain controls and provider coverage for hikes.
@@ -296,6 +345,8 @@ Further possibilities from the source document include real-time replanning, wea
 - Maybe we should add sort of sorting or filter on user's type of stm pass/ticket + price maybe
 
 ## Source references
+
+Proposal alignment source supplied for this revision: `E:/CLouD MAIL/RNDTransitMTL_Milestone2_Proposal_Final (1).pdf`. The October 27 main-screen and foundations decisions supersede its older route-expansion and palette descriptions.
 
 The base concept, original screen requirements, generator design, and nine core entities come from `TransitRandomizer_MTL_ed (3).docx`, supplied from `E:/CLouD MAIL/TransitRandomizer_MTL_ed (3).docx`. The shake compass, direction-only view, category-led adventures, optional place list, topographic altitude targeting, local group adventures, optional quests, editable history, and stars with a short review incorporate the team's added feature ideas.
 

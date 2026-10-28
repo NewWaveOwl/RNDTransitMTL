@@ -66,6 +66,7 @@ kotlin {
             implementation(libs.compose.components.resources)
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
+            implementation(libs.androidx.lifecycle.viewmodelNavigation3)
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(libs.kotlinx.coroutinesCore)
             implementation(libs.kotlinx.serializationJson)
@@ -95,6 +96,11 @@ kotlin {
 
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+        }
+
+        jvmTest.dependencies {
+            // Native graphics runtime for interaction and animation regression checks on this host.
+            runtimeOnly(compose.desktop.currentOs)
         }
     }
 }

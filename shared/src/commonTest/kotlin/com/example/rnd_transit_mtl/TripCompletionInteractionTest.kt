@@ -2,14 +2,14 @@ package com.example.rnd_transit_mtl
 
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
-import com.example.rnd_transit_mtl.data.MockTripGenerator
-import com.example.rnd_transit_mtl.data.TripGenerationInput
-import com.example.rnd_transit_mtl.data.TripGenerationResult
-import com.example.rnd_transit_mtl.model.TransportType
-import com.example.rnd_transit_mtl.model.Trip
-import com.example.rnd_transit_mtl.model.TripReviewMode
-import com.example.rnd_transit_mtl.state.TripActionResult
-import com.example.rnd_transit_mtl.state.TripsStore
+import com.example.rnd_transit_mtl.data.generation.MockTripGenerator
+import com.example.rnd_transit_mtl.data.generation.TripGenerationInput
+import com.example.rnd_transit_mtl.data.generation.TripGenerationResult
+import com.example.rnd_transit_mtl.model.transport.TransportType
+import com.example.rnd_transit_mtl.model.trip.Trip
+import com.example.rnd_transit_mtl.model.review.TripReviewMode
+import com.example.rnd_transit_mtl.state.trip.TripActionResult
+import com.example.rnd_transit_mtl.state.trip.TripsStore
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -18,6 +18,12 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import com.example.rnd_transit_mtl.navigation.CurrentTripScreenKey
+import com.example.rnd_transit_mtl.navigation.HistoryScreenKey
+import com.example.rnd_transit_mtl.navigation.MainScreenKey
+import com.example.rnd_transit_mtl.navigation.Navigator
+import com.example.rnd_transit_mtl.navigation.TripNavigation
+import com.example.rnd_transit_mtl.navigation.TripReviewScreenKey
 
 class TripCompletionInteractionTest {
     @Test

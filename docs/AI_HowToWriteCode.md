@@ -11,7 +11,7 @@ The lecture sequence determines the learning structure. Now in Android supplies 
 Examples marked **slide adaptation** preserve the teaching pattern while improving formatting, documentation, or correctness. Examples marked **architecture adaptation** illustrate Now in Android principles using original course-sized code. They are not verbatim Now in Android source files. Short snippets omit routine imports and some repeated documentation to focus on the technique. Complete generated declarations must follow section 4. These examples have been reviewed as documentation, not compiled together as an application.
 
 ## 1. Global instructions for the coding AI
-
+0. Do not write vars and methods names with "-" use "_". Only use "-" if it grammatically required.
 1. Read the requested behavior, relevant existing code, build configuration, and project decisions before writing code.
 2. Use Kotlin and Compose. Use Material 3 for this course. For the later multiplatform/navigation work, use Navigation 3.
 3. Preserve the project's supported platforms, dependency versions, package names, and established patterns. Verify version-sensitive APIs in primary documentation.
@@ -25,8 +25,58 @@ Examples marked **slide adaptation** preserve the teaching pattern while improvi
 11. Provide appropriate verification and report what was actually checked. Treat generated code as unverified until reviewed and tested.
 12. Preserve AI contribution records where coursework requires them. Never invent authorship, contribution percentages, time worked, decisions, or test results.
 13. For ViewModels and streams, define the owner, lifetime, cancellation, state/event distinction, and delivery requirements before choosing an API. Follow section 18 for the Days 20–23 practices.
+14. In Compose files being created or edited, put the main component layout and animation settings in clearly labeled sections immediately after imports. Use names that state each value's responsibility and unit; follow the mandatory tuning practice below.
 
 **Lecture basis:** S01 slides 8 and 39–45; S02 slides 3–5; S06 slides 4–14; S07 slides 3–11; S16 slides 6–25.
+
+### RNDTransitMTL mandatory architecture and organization
+
+RNDTransitMTL must use MVVM. Generate new application code with these responsibilities:
+1. Models and repositories define application data and business contracts.
+2. ViewModels own screen state, validation, and application operations. Expose immutable state through a read-only StateFlow or an equivalent observable contract.
+3. Views render state and emit callbacks. Keep business logic, trip generation, and storage operations out of composable bodies.
+4. Keep navigation execution at the destination boundary. ViewModels must not retain navigation controllers or platform UI objects.
+5. Scope ViewModels to Navigation 3 entries and preserve the application-wide trip repository/store as the single source of truth.
+6. Distinguish presentation state, restorable drafts, and persisted defaults. Do not claim that a ViewModel persists data after process termination.
+Place screen code in View/<screen_name>/, ViewModels in ViewModels/<screen_name>/, and components used by multiple screens in ui/global_ui_ellements/. Screen-specific components belong beside their screen, optionally in a local components/ folder.
+
+Keep theme code in ui/theme, application assembly in App.kt, shared scaffold and navigation bars in layout/, navigation state and destinations in navigation/, models in the corresponding model/<domain> folder, and repository/provider implementations in the named data subfolders.
+
+Use matching package declarations and update imports, previews, and tests when files move. Do not add a ViewModel to a purely static component merely to satisfy folder symmetry.
+
+For Main, users choose transport modes and transit zones. Individual bus numbers and route restrictions belong in detailed Settings. Never translate zone IDs into fabricated route IDs or claim geographic enforcement without supporting routing data.
+
+Use docs/colours.md as the palette reference. Keep complete generated declarations documented with meaningful KDoc and parameter contracts.
+
+Existing code is not yet fully MVVM. When migrating it, preserve active-trip identity, resume behavior, completion/review handling, saved drafts, and navigation guards. Report the migrated responsibilities and any remaining work explicitly.
+
+### Mandatory Compose layout and animation tuning practice
+
+This is a project requirement requested by the team, not an additional lecture requirement.
+
+- Put `// Layout settings` and, where applicable, `// Animation settings` near the top of each Compose file, immediately after imports and before composable declarations.
+- Give tunable widths, maximum widths, width fractions, row column counts, horizontal padding, spacing, major control heights, and animation durations descriptive names. Use names such as `PlannerSheetMaxWidth`, `TransportButtonWidthFraction`, `MinutesSelectorWidth`, and `PREFERENCE_DROPDOWN_ANIMATION_DURATION_MILLIS`; avoid `boxWidth`, `size1`, and `speed`.
+- Use immutable `val` properties for dp values and layout settings. Use `const val` with an explicit unit suffix for numeric durations, such as `..._DURATION_MILLIS`. Do not introduce mutable global state for design tuning.
+- Make each setting actually control its named component. In weighted rows, size the button inside its allocated cell so changing its width fraction has a visible effect; do not place an ineffective width modifier after constraints that already force the full width.
+- Keep layouts responsive. Expose maximum widths, padding, spacing, column counts, or width fractions instead of forcing desktop-sized buttons onto small screens. Document whether a value is in dp, reference-layout units, milliseconds, or a fraction. Width fractions must remain in `0..1`, column counts must be positive, and durations must be nonnegative.
+- Document scaling and dependencies. A fraction of `1f` fills a button's cell; `0.9f` makes it 90% as wide. Larger millisecond durations produce slower animation. Distinguish gesture sensitivity from animation duration.
+- Keep one authoritative definition for a setting shared by multiple components. For example, compact GO height is defined in `View/main/components/GOBox.kt` and reused by the planner; synchronized planner/map/footer timing is defined in `ui/global_ui_ellements/transitions/TripTransition.kt`. Point to the shared definition from the local tuning section instead of duplicating its literal value.
+- Keep theme colours and typography in their existing theme owners. Do not extract business rules, computed viewport sizes, live state, or every incidental numeric literal into layout settings.
+- Preserve existing values, dropdown behavior, saved choices, navigation guards, and responsiveness when extracting settings. Reuse existing relevant checks; verify small-window layout, clipping, and ellipsis when a tuning change affects them.
+
+Example at the top of a Compose file:
+
+```kotlin
+// Layout settings — dp limits and a responsive fraction; follow the component's scaling rules.
+private val PlannerSheetMaxWidth = 620.dp
+private val MinutesSelectorWidth = 76.dp
+private val TransportButtonWidthFraction = 1f // 0.9f uses 90% of its responsive cell.
+
+// Animation settings — milliseconds; higher duration means slower movement.
+private const val PREFERENCE_DROPDOWN_ANIMATION_DURATION_MILLIS = 500
+```
+
+Current tuning locations: `View/main/MainPlannerContent.kt` for sheet width, GO margins, drag-handle size and sheet motion; `View/main/components/PlannerPreferenceBands.kt` for transport/zone/walking/attraction button widths and dropdown timing; `View/main/components/GOBox.kt` for time selector and GO button dimensions; `View/main/components/IntensityPanel.kt` for slider width via side padding; `View/landing/LandingContent.kt` for landing form width; and `layout/SharedTopBar.kt` for header button widths.
 
 ## 2. Course structure and coverage
 
@@ -91,26 +141,218 @@ Now in Android groups app assembly, features, and shared core functionality. Its
 | Platform data adapters | Network, database, preferences, and device capabilities |
 | Testing support | Fakes, fixtures, and shared test helpers |
 
-**Proposed small-project organization, not a literal copy of the repository:**
+**Required RNDTransitMTL organization (implemented folder migration):**
+
+Source root: `shared/src/commonMain/kotlin/com/example/rnd_transit_mtl/`.
+Screen-specific components and previews belong with their screen. Shared components belong in the named `ui/global_ui_ellements/` subfolders; preserve that spelling. Future areas contain empty directories only, without placeholder services or artificial ViewModels.
 
 ```text
-shared/src/commonMain/kotlin/<your package>/
-    app/App.kt
-    core/model/Person.kt
-    core/data/PeopleRepository.kt
-    core/designsystem/theme/AppTheme.kt
-    core/navigation/ScreenKey.kt
-    core/navigation/Navigator.kt
-    core/navigation/Router.kt
-    core/ui/PersonCard.kt
-    layout/MainLayout.kt
-    layout/SharedTopBar.kt
-    layout/SharedBottomBar.kt
-    feature/people/PeopleRoute.kt
-    feature/people/PeopleScreen.kt
-    feature/people/PeopleViewModel.kt
-    feature/about/AboutScreen.kt
+rnd_transit_mtl/
+│
+├── App.kt
+├── Platform.kt
+│
+├── navigation/
+│   ├── Router.kt
+│   ├── Navigator.kt
+│   └── TripNavigation.kt
+│
+├── layout/
+│   ├── MainLayout.kt
+│   ├── SharedTopBar.kt
+│   ├── PageTitle.kt
+│   └── previews/
+│       ├── NavigationHeaderPreview.kt
+│       └── NavigationPreviewHost.kt
+│
+├── View/
+│   ├── main/
+│   │   ├── MainScreen.kt
+│   │   ├── MainPlannerContent.kt
+│   │   ├── TransitOpeningScreen.kt
+│   │   ├── TripPlannerContent.kt
+│   │   ├── components/
+│   │   │   ├── PlannerPreferenceBands.kt
+│   │   │   ├── GOBox.kt
+│   │   │   ├── TransportPanel.kt
+│   │   │   └── IntensityPanel.kt
+│   │   └── previews/
+│   │       ├── MainPlannerFlowPreview.kt
+│   │       ├── TripPlannerPreview.kt
+│   │       └── IntensityPanelPreview.kt
+│   │
+│   ├── current_trip/
+│   │   ├── CurrentTripScreen.kt
+│   │   ├── CurrentTripContent.kt
+│   │   ├── components/
+│   │   │   └── TripProgressPanel.kt
+│   │   └── previews/
+│   │       └── CurrentTripScreenPreview.kt
+│   │
+│   ├── trip_details/
+│   │   ├── TripDetailsScreen.kt
+│   │   ├── TripDetailsContent.kt
+│   │   ├── components/
+│   │   └── previews/
+│   │       └── TripDetailsPreview.kt
+│   │
+│   ├── trip_review/
+│   │   ├── TripReviewScreen.kt
+│   │   ├── TripReviewContent.kt
+│   │   ├── components/
+│   │   │   └── ReviewQuestionCard.kt
+│   │   └── previews/
+│   │       └── TripReviewPreview.kt
+│   │
+│   ├── history/
+│   │   ├── HistoryScreen.kt
+│   │   ├── HistoryContent.kt
+│   │   ├── HistoryPresentation.kt
+│   │   ├── components/
+│   │   │   └── TripHistoryCard.kt
+│   │   └── previews/
+│   │       ├── HistoryScreenPreview.kt
+│   │       └── TripHistoryPreviewData.kt
+│   │
+│   ├── settings/
+│   │   ├── SettingsScreen.kt
+│   │   ├── components/
+│   │   └── previews/
+│   │       └── SettingsScreenPreview.kt
+│   │
+│   ├── profile/
+│   │   ├── ProfileScreen.kt
+│   │   ├── components/
+│   │   └── previews/
+│   │       └── ProfileScreenPreview.kt
+│   │
+│   ├── landing/
+│   │   ├── LandingScreen.kt
+│   │   ├── LandingContent.kt
+│   │   ├── components/
+│   │   └── previews/
+│   │       └── LandingScreenPreview.kt
+│   │
+│   ├── about/
+│   │   ├── AboutScreen.kt
+│   │   ├── components/
+│   │   │   └── TeamMember.kt
+│   │   └── previews/
+│   │       └── AboutScreenPreview.kt
+│   │
+│   ├── compass/
+│   └── together/
+│
+├── ViewModels/
+│   ├── main/
+│   │   └── MainPlannerViewModel.kt
+│   ├── current_trip/
+│   ├── trip_details/
+│   ├── trip_review/
+│   ├── history/
+│   ├── settings/
+│   ├── profile/
+│   ├── landing/
+│   ├── compass/
+│   └── together/
+│
+├── model/
+│   ├── trip/
+│   │   ├── Trip.kt
+│   │   └── TripPoint.kt
+│   │
+│   ├── transport/
+│   │   ├── TransportType.kt
+│   │   └── TransportRoute.kt
+│   │
+│   ├── review/
+│   │   ├── TripReview.kt
+│   │   └── TripReviewMode.kt
+│   │
+│   ├── planning/
+│   ├── preferences/
+│   ├── user/
+│   └── group/
+│
+├── data/
+│   ├── repository/
+│   │
+│   ├── fake/
+│   │   ├── FakeTransportTypeRepository.kt
+│   │   └── FakeTransportRouteRepository.kt
+│   │
+│   ├── generation/
+│   │   ├── MockTripGenerator.kt
+│   │   └── TripGenerationBounds.kt
+│   │
+│   ├── assets/
+│   │   └── JsonAssetReader.kt
+│   │
+│   ├── local/
+│   │   └── entity/
+│   │
+│   └── remote/
+│       └── dto/
+│
+├── state/
+│   ├── trip/
+│   │   ├── TripsStore.kt
+│   │   ├── TripState.kt
+│   │   ├── TripActionResult.kt
+│   │   └── LocalTripsStore.kt
+│   │
+│   ├── review/
+│   │   ├── ReviewDraft.kt
+│   │   └── ReviewStep.kt
+│   │
+│   └── user/
+│       └── NicknameSession.kt
+│
+├── simulation/
+│   └── ActiveTripSimulation.kt
+│
+└── ui/
+    ├── global_ui_ellements/
+    │   ├── cards/
+    │   │   └── PlaceholderCard.kt
+    │   │
+    │   ├── ratings/
+    │   │   ├── StarRatingRow.kt
+    │   │   └── RatingStarsDisplay.kt
+    │   │
+    │   ├── media/
+    │   │   ├── ReviewImage.kt
+    │   │   └── ReviewImageLink.kt
+    │   │
+    │   ├── trip/
+    │   │   ├── TripInformationPanel.kt
+    │   │   ├── TripReviewSummary.kt
+    │   │   └── TripReferenceImage.kt
+    │   │
+    │   ├── map/
+    │   │   ├── MockTripMap.kt
+    │   │   ├── TripMapGeometry.kt
+    │   │   ├── TripMapMarkers.kt
+    │   │   ├── TripVisualMath.kt
+    │   │   └── OrangePersonMarker.kt
+    │   │
+    │   ├── transitions/
+    │   │   └── TripTransition.kt
+    │   │
+    │   └── previews/
+    │       ├── TripVisualsPreview.kt
+    │       ├── TripReferenceImagePreview.kt
+    │       └── ReviewImagePreview.kt
+    │
+    └── theme/
+        ├── Color.kt
+        ├── Theme.kt
+        └── Type.kt
 ```
+
+Keep `MainPlannerState` with `MainPlannerViewModel`, and generation input/result contracts in `data/generation/MockTripGenerator.kt` until a separate responsibility migration is requested. Keep the legacy planner and transport panel while their previews still reference them. Keep `ReviewImage` and `ReviewImageLink` in shared media because entry screens and saved-review summaries both use them.
+
+A folder move must preserve independent per-mode zones, walking/attraction choices, the legacy `selectedZoneIds` draft fallback, active-trip identity, and review/resume behavior. Preserve serialized route discriminators when navigation packages move. Moving files does not complete the remaining business-logic migration from `TransitOpeningScreen` into a ViewModel/repository boundary.
 
 Use the actual source root in the existing project. Older CMP projects may use `composeApp/src/commonMain`; the slides also show the newer `shared` module organization.
 

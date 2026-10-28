@@ -1,15 +1,20 @@
 package com.example.rnd_transit_mtl.state
 
-import com.example.rnd_transit_mtl.model.Trip
-import com.example.rnd_transit_mtl.model.TripPoint
-import com.example.rnd_transit_mtl.model.TripReview
-import com.example.rnd_transit_mtl.model.TripTransportSnapshot
+import com.example.rnd_transit_mtl.model.trip.Trip
+import com.example.rnd_transit_mtl.model.trip.TripPoint
+import com.example.rnd_transit_mtl.model.review.TripReview
+import com.example.rnd_transit_mtl.model.trip.TripTransportSnapshot
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import com.example.rnd_transit_mtl.state.review.ReviewDraft
+import com.example.rnd_transit_mtl.state.review.ReviewStep
+import com.example.rnd_transit_mtl.state.trip.TRIP_SIMULATION_DURATION_MILLIS
+import com.example.rnd_transit_mtl.state.trip.TripActionResult
+import com.example.rnd_transit_mtl.state.trip.TripsStore
 
 class TripReviewStateTest {
     @Test

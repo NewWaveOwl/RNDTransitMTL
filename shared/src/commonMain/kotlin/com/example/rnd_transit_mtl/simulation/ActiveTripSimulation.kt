@@ -1,8 +1,8 @@
 package com.example.rnd_transit_mtl.simulation
 
-import com.example.rnd_transit_mtl.state.TRIP_SIMULATION_DURATION_MILLIS
-import com.example.rnd_transit_mtl.state.TripActionResult
-import com.example.rnd_transit_mtl.state.TripsStore
+import com.example.rnd_transit_mtl.state.trip.TRIP_SIMULATION_DURATION_MILLIS
+import com.example.rnd_transit_mtl.state.trip.TripActionResult
+import com.example.rnd_transit_mtl.state.trip.TripsStore
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
