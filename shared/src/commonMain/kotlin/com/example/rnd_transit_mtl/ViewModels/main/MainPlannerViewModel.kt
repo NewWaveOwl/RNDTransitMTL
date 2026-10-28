@@ -14,13 +14,17 @@ import kotlinx.serialization.Serializable
  * @property selectedTransportIds Enabled transport-mode IDs.
  * @property selectedZoneIds Allowed transit-zone IDs.
  * @property intensity Attraction intensity from 0 to 100.
+ * @property walkingPreference Scenic or direct walking preference, retained for future routing.
+ * @property selectedAttractionIds Attraction preferences retained for future routing.
  */
 @Serializable
 data class MainPlannerState(
     val minutes: Int = 30,
     val selectedTransportIds: List<String> = listOf("walk"),
     val selectedZoneIds: List<String> = listOf("A"),
-    val intensity: Float = 90f
+    val intensity: Float = 90f,
+    val walkingPreference: String = "Scenic",
+    val selectedAttractionIds: List<String> = listOf("Nature", "Surprise")
 )
 
 /**
@@ -98,9 +102,29 @@ class MainPlannerViewModel(
         }
     }
 
+    /** Selects a supported walking preference without changing transport or zones.
+     * @param value Scenic or Direct; unavailable choices are ignored.
+     */
+    fun setWalkingPreference(value: String) {
+        if (value !in walkingPreferences) return
+        mutableUiState.update { it.copy(walkingPreference = value) }
+    }
+
+    /** Toggles one attraction preference in the restorable draft.
+     * @param id A supported attraction label; unavailable choices are ignored.
+     */
+    fun toggleAttraction(id: String) {
+        if (id !in attractionIds) return
+        mutableUiState.update { it.copy(selectedAttractionIds = it.selectedAttractionIds.toggled(id)) }
+    }
+
     companion object {
         /** Supported zone identifiers for the planner interface. */
         val zoneIds = listOf("A", "B", "C", "D")
+        /** Walking styles displayed when walking is enabled. */
+        val walkingPreferences = listOf("Scenic", "Direct")
+        /** Multi-select attraction labels from the Figma preferences band. */
+        val attractionIds = listOf("Nature", "Culture", "Food", "Surprise", "Free places", "Outdoors")
     }
 }
 

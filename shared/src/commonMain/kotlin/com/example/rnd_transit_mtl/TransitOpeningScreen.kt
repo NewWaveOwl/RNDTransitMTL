@@ -306,6 +306,14 @@ internal fun TransitOpeningScreen(
             }
         },
         intensity = intensity,
+        walkingPreference = planner.walkingPreference,
+        selectedAttractionIds = planner.selectedAttractionIds,
+        onWalkingPreferenceChange = {
+            if (canChangeInputs()) plannerViewModel.setWalkingPreference(it)
+        },
+        onToggleAttraction = {
+            if (canChangeInputs()) plannerViewModel.toggleAttraction(it)
+        },
         onIntensityChange = {
             if (canChangeInputs()) {
                 plannerViewModel.setIntensity(it)

@@ -53,6 +53,35 @@ class MainPlannerTest {
     }
 
     @Test
+    fun walkingAndAttractionChoicesRestoreWithoutChangingOtherPlannerValues() {
+        val planner = MainPlannerViewModel()
+        planner.setWalkingPreference("Direct")
+        planner.toggleAttraction("Culture")
+        planner.toggleAttraction("Nature")
+        planner.setWalkingPreference("unsupported")
+        planner.toggleAttraction("unsupported")
+        val restored = MainPlannerViewModel(Json.decodeFromString<MainPlannerState>(
+            Json.encodeToString(planner.uiState.value)
+        ))
+        assertEquals("Direct", restored.uiState.value.walkingPreference)
+        assertEquals(listOf("Surprise", "Culture"), restored.uiState.value.selectedAttractionIds)
+        assertEquals(listOf("walk"), restored.uiState.value.selectedTransportIds)
+        assertEquals(listOf("A"), restored.uiState.value.selectedZoneIds)
+        assertEquals(30, restored.uiState.value.minutes)
+    }
+
+    @Test
+    fun earlierDraftsReceiveTheNewPreferenceDefaults() {
+        val restored = Json.decodeFromString<MainPlannerState>(
+            """{"minutes":45,"selectedTransportIds":["bus"],"selectedZoneIds":["B"],"intensity":60.0}"""
+        )
+        assertEquals("Scenic", restored.walkingPreference)
+        assertEquals(listOf("Nature", "Surprise"), restored.selectedAttractionIds)
+        assertEquals(listOf("B"), restored.selectedZoneIds)
+        assertEquals(45, restored.minutes)
+    }
+
+    @Test
     fun transitRequiresUniqueSupportedZonesBeforeAllocatingAnId() {
         var idsAllocated = 0
         val generator = MockTripGenerator(idFactory = { idsAllocated++; "trip" })

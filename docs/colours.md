@@ -19,3 +19,5 @@ The GO background transitions horizontally from blue to lime. Use LINE Seed JP R
 The foundations palette supersedes the older cream #F7F0E5, lime #9ACA45, and accent #BC9E5C values in previous documentation. Existing Kotlin constants already match this palette.
 
 Semantic error colours remain defined by the Material theme; yellow and orange are not substitutes for error feedback.
+
+The attraction-intensity band uses teal with white text. Its slider reverses the earlier blue-track/lime-fill pairing: lime track, blue filled amount, and a white value on blue (teal on the unfilled lime area).

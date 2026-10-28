@@ -60,7 +60,7 @@ Use [the colour system](colours.md) for all palette tokens, semantic roles, the 
 The attraction-intensity control represents how strongly the user wants exploration and attraction discovery to influence the route. Its precise relationship to low, medium, and high exploration remains to be finalized.
 
 ## Main-screen interaction
-The main screen presents the map, available minutes, GO, transport-mode toggles, and a draggable preferences sheet. Pulling the sheet upward reveals additional controls; expanded content scrolls independently. A tappable handle provides an alternative to dragging. The map remains stationary beneath the sheet.
+The main screen presents the map, available minutes, GO, transport-mode toggles, and a draggable preferences sheet. Pulling the sheet upward moves through three resting positions matching the Figma main_screen, routes, and preferences frames; expanded content scrolls independently. GO moves above the sheet, while the attraction-intensity slider remains the final preference band. Walking style and attraction selections are restorable draft values; the sample generator does not yet apply them to routes. A tappable handle provides an alternative to dragging. The map remains stationary beneath the sheet.
 
 Transport modes appear in this order: Walk, Bike, Bus, Metro, Train, REM. Each mode toggles independently. Main does not require users to select bus numbers or individual transit routes.
 

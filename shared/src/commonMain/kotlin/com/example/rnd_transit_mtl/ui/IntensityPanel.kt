@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.rnd_transit_mtl.ui.theme.TransitMain
 import com.example.rnd_transit_mtl.ui.theme.TransitSelected
-import com.example.rnd_transit_mtl.ui.theme.TransitHighlight
+import com.example.rnd_transit_mtl.ui.theme.TransitComplementary
 
 /**
  * Displays the attraction-intensity slider and trip-validation feedback.
@@ -50,11 +50,11 @@ internal fun IntensityPanel(
 ) {
     Column(
         modifier = modifier
-            .background(TransitHighlight)
-            .padding(start = 30.dp * layoutScale, end = 40.dp * layoutScale, top = 4.dp * layoutScale, bottom = 8.dp * layoutScale),
+            .background(TransitComplementary)
+            .padding(horizontal = 24.dp * layoutScale, vertical = 16.dp * layoutScale),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("The attraction intensity", color = TransitWhite, fontSize = 26.sp * layoutScale, maxLines = 1)
+        Text("Attraction intensity", color = TransitWhite, fontSize = 24.sp * layoutScale, maxLines = 1)
         Spacer(Modifier.height(5.dp * layoutScale))
         IntensitySlider(
             layoutScale = layoutScale,
@@ -62,7 +62,7 @@ internal fun IntensityPanel(
             onIntensityChange = onIntensityChange,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(70.dp * layoutScale)
+                .height(64.dp * layoutScale)
         )
         Spacer(Modifier.height(3.dp))
         /** Keep feedback space in the layout and show its text only when a validation message exists. */
@@ -108,12 +108,12 @@ private fun IntensitySlider(
 ) {
     /** Convert the intensity percentage to a bounded fraction for the filled section width. */
     val progress = (intensity / 100f).coerceIn(0f, 1f)
-    val sliderShape = RoundedCornerShape(32.dp * layoutScale)
+    val sliderShape = RoundedCornerShape(24.dp * layoutScale)
 
     Box(
         modifier = modifier
             .clip(sliderShape)
-            .background(TransitMain)
+            .background(TransitSelected)
             .pointerInput(onIntensityChange) {
                 awaitEachGesture {
                     /** Set intensity immediately on touch-down, so a tap also selects a value. */
@@ -139,7 +139,7 @@ private fun IntensitySlider(
             modifier = Modifier
                 .fillMaxWidth(progress)
                 .fillMaxHeight()
-                .background(TransitSelected)
+                .background(TransitMain)
         ) {
             /** At 18% or above, place the value near the end of the filled section. */
             if (progress >= 0.18f) {
@@ -157,7 +157,7 @@ private fun IntensitySlider(
         if (progress < 0.18f) {
             Text(
                 text = intensity.toInt().toString(),
-                color = TransitWhite,
+                color = TransitComplementary,
                 fontSize = 28.sp * layoutScale,
                 modifier = Modifier.align(Alignment.Center)
             )

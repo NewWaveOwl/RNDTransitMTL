@@ -48,6 +48,8 @@ import kotlin.math.abs
  *
  * The parent decides whether the action starts, resumes, or opens a completed trip.
  * Selected minutes do not determine the ten-second simulation duration.
+ *
+ * @param compact Uses the Figma planner's 76 dp height and two separators instead of the legacy layout.
  */
 @Composable
 internal fun GOBox(
@@ -58,11 +60,12 @@ internal fun GOBox(
     layoutScale: Float = 1f,
     actionLabel: String = "GO",
     actionEnabled: Boolean = true,
-    minutesEnabled: Boolean = true
+    minutesEnabled: Boolean = true,
+    compact: Boolean = false
 ) {
     Row(
         modifier = modifier
-            .height(96.dp * layoutScale)
+            .height((if (compact) 76.dp else 96.dp) * layoutScale)
             .background(
                 Brush.horizontalGradient(
                     0f to TransitMain,
@@ -79,7 +82,7 @@ internal fun GOBox(
             maxLines = 1, softWrap = false)
         ControlDivider(layoutScale)
         ScrollableMinutes(minutes, onMinutesChange, minutesEnabled, layoutScale)
-        ControlDivider(layoutScale)
+        if (!compact) ControlDivider(layoutScale)
         Text("minutes", color = TransitWhite, fontSize = 20.sp * layoutScale,
             maxLines = 1, softWrap = false)
         ControlDivider(layoutScale)
