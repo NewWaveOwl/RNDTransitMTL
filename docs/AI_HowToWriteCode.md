@@ -40,7 +40,7 @@ RNDTransitMTL must use MVVM. Generate new application code with these responsibi
 6. Distinguish presentation state, restorable drafts, and persisted defaults. Do not claim that a ViewModel persists data after process termination.
 Place screen code in View/<screen_name>/, ViewModels in ViewModels/<screen_name>/, and components used by multiple screens in ui/global_ui_ellements/. Screen-specific components belong beside their screen, optionally in a local components/ folder.
 
-Keep theme code in ui/theme, application assembly and shared navigation in their existing assembly/layout locations, models in model, and repository/provider implementations in data.
+Keep theme code in ui/theme, application assembly in App.kt, shared scaffold and navigation bars in layout/, navigation state and destinations in navigation/, models in the corresponding model/<domain> folder, and repository/provider implementations in the named data subfolders.
 
 Use matching package declarations and update imports, previews, and tests when files move. Do not add a ViewModel to a purely static component merely to satisfy folder symmetry.
 
@@ -60,7 +60,7 @@ This is a project requirement requested by the team, not an additional lecture r
 - Make each setting actually control its named component. In weighted rows, size the button inside its allocated cell so changing its width fraction has a visible effect; do not place an ineffective width modifier after constraints that already force the full width.
 - Keep layouts responsive. Expose maximum widths, padding, spacing, column counts, or width fractions instead of forcing desktop-sized buttons onto small screens. Document whether a value is in dp, reference-layout units, milliseconds, or a fraction. Width fractions must remain in `0..1`, column counts must be positive, and durations must be nonnegative.
 - Document scaling and dependencies. A fraction of `1f` fills a button's cell; `0.9f` makes it 90% as wide. Larger millisecond durations produce slower animation. Distinguish gesture sensitivity from animation duration.
-- Keep one authoritative definition for a setting shared by multiple components. For example, compact GO height is defined in `ui/GOBox.kt` and reused by the planner; synchronized planner/map/footer timing is defined in `ui/TripTransition.kt`. Point to the shared definition from the local tuning section instead of duplicating its literal value.
+- Keep one authoritative definition for a setting shared by multiple components. For example, compact GO height is defined in `View/main/components/GOBox.kt` and reused by the planner; synchronized planner/map/footer timing is defined in `ui/global_ui_ellements/transitions/TripTransition.kt`. Point to the shared definition from the local tuning section instead of duplicating its literal value.
 - Keep theme colours and typography in their existing theme owners. Do not extract business rules, computed viewport sizes, live state, or every incidental numeric literal into layout settings.
 - Preserve existing values, dropdown behavior, saved choices, navigation guards, and responsiveness when extracting settings. Reuse existing relevant checks; verify small-window layout, clipping, and ellipsis when a tuning change affects them.
 
@@ -76,7 +76,7 @@ private val TransportButtonWidthFraction = 1f // 0.9f uses 90% of its responsive
 private const val PREFERENCE_DROPDOWN_ANIMATION_DURATION_MILLIS = 500
 ```
 
-Current tuning locations: `View/main/MainPlannerContent.kt` for sheet width, GO margins, drag-handle size and sheet motion; `View/main/components/PlannerPreferenceBands.kt` for transport/zone/walking/attraction button widths and dropdown timing; `ui/GOBox.kt` for time selector and GO button dimensions; `ui/IntensityPanel.kt` for slider width via side padding; `ui/LandingContent.kt` for landing form width; and `layout/SharedTopBar.kt` for header button widths.
+Current tuning locations: `View/main/MainPlannerContent.kt` for sheet width, GO margins, drag-handle size and sheet motion; `View/main/components/PlannerPreferenceBands.kt` for transport/zone/walking/attraction button widths and dropdown timing; `View/main/components/GOBox.kt` for time selector and GO button dimensions; `View/main/components/IntensityPanel.kt` for slider width via side padding; `View/landing/LandingContent.kt` for landing form width; and `layout/SharedTopBar.kt` for header button widths.
 
 ## 2. Course structure and coverage
 
@@ -141,36 +141,218 @@ Now in Android groups app assembly, features, and shared core functionality. Its
 | Platform data adapters | Network, database, preferences, and device capabilities |
 | Testing support | Fakes, fixtures, and shared test helpers |
 
-**Required RNDTransitMTL organization (migrate existing files gradually):**
+**Required RNDTransitMTL organization (implemented folder migration):**
+
+Source root: `shared/src/commonMain/kotlin/com/example/rnd_transit_mtl/`.
+Screen-specific components and previews belong with their screen. Shared components belong in the named `ui/global_ui_ellements/` subfolders; preserve that spelling. Future areas contain empty directories only, without placeholder services or artificial ViewModels.
 
 ```text
-shared/src/commonMain/kotlin/com/example/rnd_transit_mtl/
-    View/
-        main/MainScreen.kt
-        main/MainPlannerContent.kt
-        main/components/
-        history/
-        current_trip/
-        trip_details/
-        trip_review/
-        profile/
-        settings/
-        about/
-    ViewModels/
-        main/MainPlannerViewModel.kt
-        history/
-        current_trip/
-        trip_details/
-        trip_review/
-        profile/
-        settings/
-    ui/global_ui_ellements/
-    ui/theme/
-    model/
-    data/
-    state/
-    layout/
+rnd_transit_mtl/
+│
+├── App.kt
+├── Platform.kt
+│
+├── navigation/
+│   ├── Router.kt
+│   ├── Navigator.kt
+│   └── TripNavigation.kt
+│
+├── layout/
+│   ├── MainLayout.kt
+│   ├── SharedTopBar.kt
+│   ├── PageTitle.kt
+│   └── previews/
+│       ├── NavigationHeaderPreview.kt
+│       └── NavigationPreviewHost.kt
+│
+├── View/
+│   ├── main/
+│   │   ├── MainScreen.kt
+│   │   ├── MainPlannerContent.kt
+│   │   ├── TransitOpeningScreen.kt
+│   │   ├── TripPlannerContent.kt
+│   │   ├── components/
+│   │   │   ├── PlannerPreferenceBands.kt
+│   │   │   ├── GOBox.kt
+│   │   │   ├── TransportPanel.kt
+│   │   │   └── IntensityPanel.kt
+│   │   └── previews/
+│   │       ├── MainPlannerFlowPreview.kt
+│   │       ├── TripPlannerPreview.kt
+│   │       └── IntensityPanelPreview.kt
+│   │
+│   ├── current_trip/
+│   │   ├── CurrentTripScreen.kt
+│   │   ├── CurrentTripContent.kt
+│   │   ├── components/
+│   │   │   └── TripProgressPanel.kt
+│   │   └── previews/
+│   │       └── CurrentTripScreenPreview.kt
+│   │
+│   ├── trip_details/
+│   │   ├── TripDetailsScreen.kt
+│   │   ├── TripDetailsContent.kt
+│   │   ├── components/
+│   │   └── previews/
+│   │       └── TripDetailsPreview.kt
+│   │
+│   ├── trip_review/
+│   │   ├── TripReviewScreen.kt
+│   │   ├── TripReviewContent.kt
+│   │   ├── components/
+│   │   │   └── ReviewQuestionCard.kt
+│   │   └── previews/
+│   │       └── TripReviewPreview.kt
+│   │
+│   ├── history/
+│   │   ├── HistoryScreen.kt
+│   │   ├── HistoryContent.kt
+│   │   ├── HistoryPresentation.kt
+│   │   ├── components/
+│   │   │   └── TripHistoryCard.kt
+│   │   └── previews/
+│   │       ├── HistoryScreenPreview.kt
+│   │       └── TripHistoryPreviewData.kt
+│   │
+│   ├── settings/
+│   │   ├── SettingsScreen.kt
+│   │   ├── components/
+│   │   └── previews/
+│   │       └── SettingsScreenPreview.kt
+│   │
+│   ├── profile/
+│   │   ├── ProfileScreen.kt
+│   │   ├── components/
+│   │   └── previews/
+│   │       └── ProfileScreenPreview.kt
+│   │
+│   ├── landing/
+│   │   ├── LandingScreen.kt
+│   │   ├── LandingContent.kt
+│   │   ├── components/
+│   │   └── previews/
+│   │       └── LandingScreenPreview.kt
+│   │
+│   ├── about/
+│   │   ├── AboutScreen.kt
+│   │   ├── components/
+│   │   │   └── TeamMember.kt
+│   │   └── previews/
+│   │       └── AboutScreenPreview.kt
+│   │
+│   ├── compass/
+│   └── together/
+│
+├── ViewModels/
+│   ├── main/
+│   │   └── MainPlannerViewModel.kt
+│   ├── current_trip/
+│   ├── trip_details/
+│   ├── trip_review/
+│   ├── history/
+│   ├── settings/
+│   ├── profile/
+│   ├── landing/
+│   ├── compass/
+│   └── together/
+│
+├── model/
+│   ├── trip/
+│   │   ├── Trip.kt
+│   │   └── TripPoint.kt
+│   │
+│   ├── transport/
+│   │   ├── TransportType.kt
+│   │   └── TransportRoute.kt
+│   │
+│   ├── review/
+│   │   ├── TripReview.kt
+│   │   └── TripReviewMode.kt
+│   │
+│   ├── planning/
+│   ├── preferences/
+│   ├── user/
+│   └── group/
+│
+├── data/
+│   ├── repository/
+│   │
+│   ├── fake/
+│   │   ├── FakeTransportTypeRepository.kt
+│   │   └── FakeTransportRouteRepository.kt
+│   │
+│   ├── generation/
+│   │   ├── MockTripGenerator.kt
+│   │   └── TripGenerationBounds.kt
+│   │
+│   ├── assets/
+│   │   └── JsonAssetReader.kt
+│   │
+│   ├── local/
+│   │   └── entity/
+│   │
+│   └── remote/
+│       └── dto/
+│
+├── state/
+│   ├── trip/
+│   │   ├── TripsStore.kt
+│   │   ├── TripState.kt
+│   │   ├── TripActionResult.kt
+│   │   └── LocalTripsStore.kt
+│   │
+│   ├── review/
+│   │   ├── ReviewDraft.kt
+│   │   └── ReviewStep.kt
+│   │
+│   └── user/
+│       └── NicknameSession.kt
+│
+├── simulation/
+│   └── ActiveTripSimulation.kt
+│
+└── ui/
+    ├── global_ui_ellements/
+    │   ├── cards/
+    │   │   └── PlaceholderCard.kt
+    │   │
+    │   ├── ratings/
+    │   │   ├── StarRatingRow.kt
+    │   │   └── RatingStarsDisplay.kt
+    │   │
+    │   ├── media/
+    │   │   ├── ReviewImage.kt
+    │   │   └── ReviewImageLink.kt
+    │   │
+    │   ├── trip/
+    │   │   ├── TripInformationPanel.kt
+    │   │   ├── TripReviewSummary.kt
+    │   │   └── TripReferenceImage.kt
+    │   │
+    │   ├── map/
+    │   │   ├── MockTripMap.kt
+    │   │   ├── TripMapGeometry.kt
+    │   │   ├── TripMapMarkers.kt
+    │   │   ├── TripVisualMath.kt
+    │   │   └── OrangePersonMarker.kt
+    │   │
+    │   ├── transitions/
+    │   │   └── TripTransition.kt
+    │   │
+    │   └── previews/
+    │       ├── TripVisualsPreview.kt
+    │       ├── TripReferenceImagePreview.kt
+    │       └── ReviewImagePreview.kt
+    │
+    └── theme/
+        ├── Color.kt
+        ├── Theme.kt
+        └── Type.kt
 ```
+
+Keep `MainPlannerState` with `MainPlannerViewModel`, and generation input/result contracts in `data/generation/MockTripGenerator.kt` until a separate responsibility migration is requested. Keep the legacy planner and transport panel while their previews still reference them. Keep `ReviewImage` and `ReviewImageLink` in shared media because entry screens and saved-review summaries both use them.
+
+A folder move must preserve independent per-mode zones, walking/attraction choices, the legacy `selectedZoneIds` draft fallback, active-trip identity, and review/resume behavior. Preserve serialized route discriminators when navigation packages move. Moving files does not complete the remaining business-logic migration from `TransitOpeningScreen` into a ViewModel/repository boundary.
 
 Use the actual source root in the existing project. Older CMP projects may use `composeApp/src/commonMain`; the slides also show the newer `shared` module organization.
 

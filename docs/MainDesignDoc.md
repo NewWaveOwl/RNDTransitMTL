@@ -98,44 +98,23 @@ Save planner drafts through a restoration mechanism and persist user defaults th
 ## Screen and component organization
 Use the following structure under the existing shared Kotlin package:
 ```text
-View/
-    main/
-        MainScreen.kt
-        MainPlannerContent.kt
-        components/
-    history/
-    current_trip/
-    trip_details/
-    trip_review/
-    profile/
-    settings/
-    about/
-
-ViewModels/
-    main/
-        MainPlannerViewModel.kt
-    history/
-    current_trip/
-    trip_details/
-    trip_review/
-    profile/
-    settings/
-
-ui/
-    global_ui_ellements/
-    theme/
-
-model/
-data/
-state/
-layout/
+navigation/                  Router, Navigator, TripNavigation
+layout/                      Shared scaffold, header, title; layout/previews/
+View/<screen_name>/          Screen, content, components/, previews/
+ViewModels/<screen_name>/    Screen state owners; MainPlannerState stays with its ViewModel
+model/{trip,transport,review,planning,preferences,user,group}/
+data/{repository,fake,generation,assets,local/entity,remote/dto}/
+state/{trip,review,user}/
+simulation/
+ui/global_ui_ellements/{cards,ratings,media,trip,map,transitions,previews}/
+ui/theme/
 ```
 
 Each screen/view and its private components belong in the corresponding named screen folder. Components reused by multiple screens belong in ui/global_ui_ellements. Keep the spelling consistent with this project convention.
 
-Theme definitions remain in ui/theme. Shared navigation and scaffold assembly remain in layout.
+Theme definitions remain in ui/theme. Shared scaffold and navigation bars remain in layout; navigation state and destination wiring live in navigation.
 
-Move existing files gradually, preserving package/import consistency and updating previews and tests. Moving a file into ViewModels does not make it a ViewModel; responsibilities must also change.
+The folder migration is implemented, including package/import updates across previews, tests, and target entry points. The complete filename tree is in [the coding guide](AI_HowToWriteCode.md#32-module-and-package-boundaries). Empty future-feature directories contain no implementations. Legacy planner files remain for their previews; shared review media lives in `ui/global_ui_ellements/media/`. Moving a file into ViewModels does not make it a ViewModel; responsibilities must also change.
 ## Implementation status
 The main-screen update introduces a draggable sheet, independent transport toggles, zone selection, and a ViewModel for planner selections.
 

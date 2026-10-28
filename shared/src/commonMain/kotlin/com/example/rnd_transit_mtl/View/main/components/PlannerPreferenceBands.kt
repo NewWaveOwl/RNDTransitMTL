@@ -31,8 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.rnd_transit_mtl.ViewModels.main.MainPlannerViewModel
-import com.example.rnd_transit_mtl.model.TransportType
-import com.example.rnd_transit_mtl.ui.IntensityPanel
+import com.example.rnd_transit_mtl.model.transport.TransportType
 import com.example.rnd_transit_mtl.ui.theme.*
 
 // Layout settings — padding/spacing determine responsive cell widths; fractions (0..1) size buttons within cells.

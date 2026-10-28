@@ -1,15 +1,18 @@
 package com.example.rnd_transit_mtl.ui
 
-import com.example.rnd_transit_mtl.model.Trip
-import com.example.rnd_transit_mtl.model.TripPoint
-import com.example.rnd_transit_mtl.model.TripReview
-import com.example.rnd_transit_mtl.model.TripTransportSnapshot
-import com.example.rnd_transit_mtl.state.TRIP_SIMULATION_DURATION_MILLIS
-import com.example.rnd_transit_mtl.state.TripActionResult
-import com.example.rnd_transit_mtl.state.TripsStore
+import com.example.rnd_transit_mtl.model.trip.Trip
+import com.example.rnd_transit_mtl.model.trip.TripPoint
+import com.example.rnd_transit_mtl.model.review.TripReview
+import com.example.rnd_transit_mtl.model.trip.TripTransportSnapshot
+import com.example.rnd_transit_mtl.state.trip.TRIP_SIMULATION_DURATION_MILLIS
+import com.example.rnd_transit_mtl.state.trip.TripActionResult
+import com.example.rnd_transit_mtl.state.trip.TripsStore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import com.example.rnd_transit_mtl.View.history.TripHistoryFilter
+import com.example.rnd_transit_mtl.View.history.firstReviewSentence
+import com.example.rnd_transit_mtl.View.history.historyTrips
 
 class HistoryPresentationTest {
     @Test

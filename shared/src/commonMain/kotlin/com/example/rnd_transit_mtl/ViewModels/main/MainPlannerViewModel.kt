@@ -1,7 +1,7 @@
 package com.example.rnd_transit_mtl.ViewModels.main
 
 import androidx.lifecycle.ViewModel
-import com.example.rnd_transit_mtl.model.Trip
+import com.example.rnd_transit_mtl.model.trip.Trip
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update

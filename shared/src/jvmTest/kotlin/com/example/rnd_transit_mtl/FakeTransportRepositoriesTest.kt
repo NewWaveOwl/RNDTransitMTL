@@ -1,7 +1,7 @@
 package com.example.rnd_transit_mtl
 
-import com.example.rnd_transit_mtl.data.FakeTransportRouteRepository
-import com.example.rnd_transit_mtl.data.FakeTransportTypeRepository
+import com.example.rnd_transit_mtl.data.fake.FakeTransportRouteRepository
+import com.example.rnd_transit_mtl.data.fake.FakeTransportTypeRepository
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals

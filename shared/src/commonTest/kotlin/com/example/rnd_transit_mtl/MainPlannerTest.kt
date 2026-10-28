@@ -2,11 +2,11 @@ package com.example.rnd_transit_mtl
 
 import com.example.rnd_transit_mtl.ViewModels.main.MainPlannerState
 import com.example.rnd_transit_mtl.ViewModels.main.MainPlannerViewModel
-import com.example.rnd_transit_mtl.data.MockTripGenerator
-import com.example.rnd_transit_mtl.data.TripGenerationInput
-import com.example.rnd_transit_mtl.data.TripGenerationResult
-import com.example.rnd_transit_mtl.model.TransportType
-import com.example.rnd_transit_mtl.model.Trip
+import com.example.rnd_transit_mtl.data.generation.MockTripGenerator
+import com.example.rnd_transit_mtl.data.generation.TripGenerationInput
+import com.example.rnd_transit_mtl.data.generation.TripGenerationResult
+import com.example.rnd_transit_mtl.model.transport.TransportType
+import com.example.rnd_transit_mtl.model.trip.Trip
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.random.Random

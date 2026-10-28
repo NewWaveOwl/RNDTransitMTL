@@ -9,17 +9,25 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.navigation3.runtime.rememberNavBackStack
-import com.example.rnd_transit_mtl.data.FakeTransportRouteRepository
-import com.example.rnd_transit_mtl.data.FakeTransportTypeRepository
+import com.example.rnd_transit_mtl.data.fake.FakeTransportRouteRepository
+import com.example.rnd_transit_mtl.data.fake.FakeTransportTypeRepository
 import com.example.rnd_transit_mtl.layout.MainLayout
-import com.example.rnd_transit_mtl.model.TransportRoute
-import com.example.rnd_transit_mtl.model.TransportType
-import com.example.rnd_transit_mtl.state.LocalTripsStore
-import com.example.rnd_transit_mtl.state.LocalNicknameSession
-import com.example.rnd_transit_mtl.state.appNicknameSession
-import com.example.rnd_transit_mtl.state.TripsStore
+import com.example.rnd_transit_mtl.model.transport.TransportRoute
+import com.example.rnd_transit_mtl.model.transport.TransportType
+import com.example.rnd_transit_mtl.state.trip.LocalTripsStore
+import com.example.rnd_transit_mtl.state.user.LocalNicknameSession
+import com.example.rnd_transit_mtl.state.user.appNicknameSession
+import com.example.rnd_transit_mtl.state.trip.TripsStore
 import com.example.rnd_transit_mtl.ui.theme.RNDTransitTheme
 import kotlinx.coroutines.CancellationException
+import com.example.rnd_transit_mtl.View.landing.LandingScreen
+import com.example.rnd_transit_mtl.navigation.LocalNavigator
+import com.example.rnd_transit_mtl.navigation.LocalTripNavigation
+import com.example.rnd_transit_mtl.navigation.MainScreenKey
+import com.example.rnd_transit_mtl.navigation.Navigator
+import com.example.rnd_transit_mtl.navigation.Router
+import com.example.rnd_transit_mtl.navigation.TripNavigation
+import com.example.rnd_transit_mtl.navigation.backStackConfig
 
 private data class TransportData(
     val types: List<TransportType>,

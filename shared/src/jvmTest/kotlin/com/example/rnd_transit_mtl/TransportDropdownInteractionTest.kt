@@ -17,7 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Constraints
 import com.example.rnd_transit_mtl.View.main.components.PlannerPreferenceBands
 import com.example.rnd_transit_mtl.ViewModels.main.MainPlannerViewModel
-import com.example.rnd_transit_mtl.model.TransportType
+import com.example.rnd_transit_mtl.model.transport.TransportType
 import com.example.rnd_transit_mtl.ui.theme.RNDTransitTheme
 import java.io.File
 import kotlin.test.*

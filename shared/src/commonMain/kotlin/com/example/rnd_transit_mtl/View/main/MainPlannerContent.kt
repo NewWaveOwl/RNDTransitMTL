@@ -39,13 +39,13 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import com.example.rnd_transit_mtl.View.main.components.PlannerPreferenceBands
-import com.example.rnd_transit_mtl.data.TripGenerationBounds
-import com.example.rnd_transit_mtl.model.TransportType
-import com.example.rnd_transit_mtl.ui.GoBoxCompactHeight
-import com.example.rnd_transit_mtl.ui.GOBox
-import com.example.rnd_transit_mtl.ui.GO_TRIP_TRANSITION_MILLIS
-import com.example.rnd_transit_mtl.ui.plannerTripBounds
-import com.example.rnd_transit_mtl.ui.validMapSourceSize
+import com.example.rnd_transit_mtl.data.generation.TripGenerationBounds
+import com.example.rnd_transit_mtl.model.transport.TransportType
+import com.example.rnd_transit_mtl.View.main.components.GoBoxCompactHeight
+import com.example.rnd_transit_mtl.View.main.components.GOBox
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.transitions.GO_TRIP_TRANSITION_MILLIS
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.plannerTripBounds
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.validMapSourceSize
 import com.example.rnd_transit_mtl.ui.theme.*
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
@@ -74,7 +74,7 @@ private val PlannerGoPreferencesGap = 12f
 
 // Animation settings — larger millisecond values make snapping and handle taps slower.
 private const val PLANNER_SHEET_ANIMATION_DURATION_MILLIS = 300
-// GO exit timing is shared with navigation/footer transitions: edit ui/TripTransition.kt.
+// GO exit timing is shared with navigation/footer transitions: edit ui/global_ui_ellements/transitions/TripTransition.kt.
 
 /** Three resting positions corresponding to Figma main_screen, routes, and preferences. */
 internal enum class PlannerSheetPosition { Main, Routes, Preferences }
