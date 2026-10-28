@@ -95,6 +95,8 @@ internal enum class PlannerSheetPosition { Main, Routes, Preferences }
  * @param intensity Attraction intensity from 0 to 100.
  * @param onIntensityChange Requests an intensity change.
  * @param walkingPreference Selected walking style, retained for future routing.
+ * @param bikeSpeedKmh Selected cycling speed in km/h, retained for future routing.
+ * @param onBikeSpeedChange Requests a cycling-speed change.
  * @param selectedAttractionIds Selected attraction labels, retained for future routing.
  * @param onWalkingPreferenceChange Requests a walking-style change.
  * @param onToggleAttraction Requests an attraction toggle.
@@ -124,6 +126,8 @@ internal fun MainPlannerContent(
     intensity: Float,
     onIntensityChange: (Float) -> Unit,
     walkingPreference: String,
+    bikeSpeedKmh: Int,
+    onBikeSpeedChange: (Int) -> Unit,
     selectedAttractionIds: List<String>,
     onWalkingPreferenceChange: (String) -> Unit,
     onToggleAttraction: (String) -> Unit,
@@ -307,8 +311,10 @@ internal fun MainPlannerContent(
                     PlannerPreferenceBands(
                         scale, transportTypes, selectedTransportIds, selectedZonesByTransport,
                         onToggleTransport, onToggleZone, walkingPreference, selectedAttractionIds,
-                        onWalkingPreferenceChange, onToggleAttraction, intensity, onIntensityChange,
+                        onWalkingPreferenceChange, onToggleAttraction,
                         enabled, onOpenDetailedSettings, expandedTransportId,
+                        bikeSpeedKmh = bikeSpeedKmh,
+                        onBikeSpeedChange = onBikeSpeedChange,
                         onExpandedTransportChange = { transportId ->
                             if (enabled) {
                                 expandedTransportId = if (expandedTransportId == transportId) null else transportId

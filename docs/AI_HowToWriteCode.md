@@ -173,6 +173,7 @@ rnd_transit_mtl/
 │   │   ├── TripPlannerContent.kt
 │   │   ├── components/
 │   │   │   ├── PlannerPreferenceBands.kt
+│   │   │   ├── BikeSpeedPanel.kt
 │   │   │   ├── GOBox.kt
 │   │   │   ├── TransportPanel.kt
 │   │   │   └── IntensityPanel.kt

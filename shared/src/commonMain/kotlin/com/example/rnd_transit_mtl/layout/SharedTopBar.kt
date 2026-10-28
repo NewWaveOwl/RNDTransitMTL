@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -25,8 +26,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -51,7 +53,6 @@ import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 import org.jetbrains.compose.resources.painterResource
 import rnd_transit_mtl.shared.generated.resources.Res
 import rnd_transit_mtl.shared.generated.resources.ic_account_circle
-import rnd_transit_mtl.shared.generated.resources.ic_home
 import rnd_transit_mtl.shared.generated.resources.ic_receipt_long
 import rnd_transit_mtl.shared.generated.resources.ic_settings
 
@@ -64,6 +65,15 @@ private val HeaderVerticalPadding = 6.dp
 private val HeaderButtonSpacing = 6.dp
 private val HeaderButtonContentPadding = 4.dp
 private val HeaderButtonCornerRadius = 14.dp
+private val HeaderReturnToMainButtonWidth = 80.dp
+private val HeaderReturnToMainControlWidth = 72.dp
+private val HeaderReturnToMainControlHeight = 44.dp
+private val HeaderReturnToMainControlCornerRadius = 18.dp
+
+// Appearance settings — Figma Return to Main_v3_updated: blue until 16.8%, then a gentle blend to green.
+private val HeaderReturnToMainGradient = Brush.horizontalGradient(
+    0.16826923f to TransitMain, 1f to TransitSelected
+)
 
 /**
  * Shared navigation remains above all destination transition animations.
@@ -133,11 +143,8 @@ internal fun SharedTopBarContent(
                 horizontalArrangement = Arrangement.spacedBy(HeaderButtonSpacing),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                HeaderIconItem(
-                    label = "Home",
-                    painter = painterResource(Res.drawable.ic_home),
+                HeaderReturnToMain(
                     isSelected = currentKey == MainScreenKey,
-                    showGo = currentKey != MainScreenKey,
                     onClick = { onOpenSection(MainScreenKey) }
                 )
                 HeaderIconItem(
@@ -178,13 +185,32 @@ internal fun SharedTopBarContent(
     }
 }
 
+/** Displays a native Compose GO button as the existing return-to-Main navigation action.
+ * @param isSelected Whether Main is the currently selected destination.
+ * @param onClick Opens Main through the destination's existing navigation guard.
+ */
+@Composable
+internal fun HeaderReturnToMain(isSelected: Boolean, onClick: () -> Unit) {
+    Box(Modifier.width(HeaderReturnToMainButtonWidth).height(HeaderButtonHeight)
+        .clip(RoundedCornerShape(HeaderButtonCornerRadius))
+        .clickable(role = Role.Button, onClick = onClick)
+        .semantics { selected = isSelected; contentDescription = "Return to Main" },
+        contentAlignment = Alignment.Center) {
+        val shape = RoundedCornerShape(HeaderReturnToMainControlCornerRadius)
+        Box(Modifier.width(HeaderReturnToMainControlWidth).height(HeaderReturnToMainControlHeight)
+            .clip(shape).background(HeaderReturnToMainGradient),
+            contentAlignment = Alignment.Center) {
+            Text("GO", color = TransitWhite, fontSize = 20.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
 @Composable
 private fun HeaderIconItem(
     label: String,
     painter: Painter,
     isSelected: Boolean,
-    onClick: () -> Unit,
-    showGo: Boolean = false
+    onClick: () -> Unit
 ) {
     val foreground = if (isSelected) TransitMain else TransitWhite
 
@@ -208,24 +234,12 @@ private fun HeaderIconItem(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        if (showGo) {
-            Text(
-                text = "GO",
-                style = MaterialTheme.typography.titleLarge.copy(
-                    brush = Brush.horizontalGradient(
-                        listOf(TransitWhite, TransitSelected)
-                    ),
-                    fontSize = 30.sp
-                )
-            )
-        } else {
-            Icon(
-                painter = painter,
-                contentDescription = null,
-                tint = foreground,
-                modifier = Modifier.size(HeaderIconSize)
-            )
-        }
+        Icon(
+            painter = painter,
+            contentDescription = null,
+            tint = foreground,
+            modifier = Modifier.size(HeaderIconSize)
+        )
 
         Text(
             text = label,

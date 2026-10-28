@@ -13,13 +13,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -98,34 +104,52 @@ internal fun IntensityPanel(
 /**
  * Displays and updates intensity while keeping the value readable at low progress.
  *
- * Horizontal pointer positions map to values from 0 to 100. The numeric label
+ * Horizontal pointer positions map to the supplied value range. The numeric label
  * moves outside the filled section when progress is too low to contain it.
  *
  * @param layoutScale Scale factor for dimensions and text relative to the 402-unit reference width.
- * @param intensity Current attraction intensity on the 0 to 100 scale.
- * @param onIntensityChange Receives the intensity chosen by tapping or dragging the slider.
+ * @param intensity Current value within valueRange.
+ * @param onIntensityChange Receives the value chosen by tapping or dragging the slider.
  * @param modifier Layout and appearance modifiers supplied by the parent.
+ * @param valueRange Inclusive range used by the shared filled slider.
+ * @param label Accessible control name.
+ * @param valueText Text displayed within the slider.
+ * @param enabled Whether pointer and accessibility actions can change the value.
+ * @param valueFontSizeSp Numeric label font size before responsive scaling.
+ * @param roundFilledEnd Whether the blue fill has rounded ends like the bike design.
+ * @param trackColor Background colour of the unfilled slider track.
  */
 @Composable
-private fun IntensitySlider(
+internal fun IntensitySlider(
     layoutScale: Float,
     intensity: Float,
     onIntensityChange: (Float) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    valueRange: ClosedFloatingPointRange<Float> = 0f..100f,
+    label: String = "Attraction intensity",
+    valueText: String = intensity.toInt().toString(),
+    enabled: Boolean = true,
+    valueFontSizeSp: Float = 28f,
+    roundFilledEnd: Boolean = false,
+    trackColor: Color = TransitSelected
 ) {
-    /** Convert the intensity percentage to a bounded fraction for the filled section width. */
-    val progress = (intensity / 100f).coerceIn(0f, 1f)
+    val onValueChange by rememberUpdatedState(onIntensityChange)
+    /** Convert the supplied range to a bounded fraction for the filled section width. */
+    val rangeSize = valueRange.endInclusive - valueRange.start
+    val progress = ((intensity - valueRange.start) / rangeSize).coerceIn(0f, 1f)
     val sliderShape = RoundedCornerShape(IntensitySliderCornerRadius * layoutScale)
 
     Box(
         modifier = modifier
             .clip(sliderShape)
-            .background(TransitSelected)
-            .pointerInput(onIntensityChange) {
+            .background(trackColor)
+            .pointerInput(enabled, valueRange) {
+                if (!enabled) return@pointerInput
+                fun valueAt(x: Float) = valueRange.start + (x / size.width).coerceIn(0f, 1f) * rangeSize
                 awaitEachGesture {
                     /** Set intensity immediately on touch-down, so a tap also selects a value. */
                     val down = awaitFirstDown()
-                    onIntensityChange((down.position.x / size.width * 100f).coerceIn(0f, 100f))
+                    onValueChange(valueAt(down.position.x))
                     /**
                      * Continue updating from the first pointer in each event while any pointer is pressed.
                      * Clamp positions outside the slider to 0 or 100 and consume each handled change.
@@ -133,29 +157,36 @@ private fun IntensitySlider(
                     do {
                         val event = awaitPointerEvent()
                         val change = event.changes.first()
-                        onIntensityChange(
-                            (change.position.x / size.width * 100f).coerceIn(0f, 100f)
+                        onValueChange(
+                            valueAt(change.position.x)
                         )
                         change.consume()
                     } while (event.changes.any { it.pressed })
                 }
             }
-            .semantics { contentDescription = "Attraction intensity" }
+            .semantics {
+                contentDescription = label
+                progressBarRangeInfo = ProgressBarRangeInfo(intensity.coerceIn(valueRange), valueRange)
+                if (enabled) setProgress { value ->
+                    if (value.isFinite()) onIntensityChange(value.coerceIn(valueRange))
+                    value.isFinite()
+                }
+            }
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth(progress)
                 .fillMaxHeight()
+                .then(if (roundFilledEnd) Modifier.clip(sliderShape) else Modifier)
                 .background(TransitMain)
         ) {
             /** At 18% or above, place the value near the end of the filled section. */
             if (progress >= 0.18f) {
                 Text(
-                    text = intensity.toInt().toString(),
+                    text = valueText,
                     color = TransitWhite,
-                    fontSize = 28.sp * layoutScale,
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
+                    fontSize = valueFontSizeSp.sp * layoutScale,
+                    modifier = Modifier.align(Alignment.CenterEnd)
                         .padding(end = IntensityValueEndPadding * layoutScale)
                 )
             }
@@ -163,9 +194,9 @@ private fun IntensitySlider(
         /** Below 18%, center the value on the full track so the narrow fill does not obscure it. */
         if (progress < 0.18f) {
             Text(
-                text = intensity.toInt().toString(),
+                text = valueText,
                 color = TransitComplementary,
-                fontSize = 28.sp * layoutScale,
+                fontSize = valueFontSizeSp.sp * layoutScale,
                 modifier = Modifier.align(Alignment.Center)
             )
         }

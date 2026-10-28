@@ -14,7 +14,8 @@ import kotlinx.serialization.Serializable
  * @property selectedTransportIds Enabled transport-mode IDs.
  * @property selectedZoneIds Legacy shared zones used to restore older drafts.
  * @property intensity Attraction intensity from 0 to 100.
- * @property walkingPreference Scenic or direct walking preference, retained for future routing.
+ * @property walkingPreference Walking pace (Amble, Walk, or Dash), retained for future routing.
+ * @property bikeSpeedKmh Preferred cycling speed in km/h, retained for future routing.
  * @property selectedAttractionIds Attraction preferences retained for future routing.
  * @property selectedZonesByTransport Independent zones for each transit mode, including disabled modes.
  */
@@ -24,9 +25,10 @@ data class MainPlannerState(
     val selectedTransportIds: List<String> = listOf("walk"),
     val selectedZoneIds: List<String> = listOf("A"),
     val intensity: Float = 90f,
-    val walkingPreference: String = "Scenic",
+    val walkingPreference: String = "Amble",
     val selectedAttractionIds: List<String> = listOf("Nature", "Surprise"),
-    val selectedZonesByTransport: Map<String, List<String>> = emptyMap()
+    val selectedZonesByTransport: Map<String, List<String>> = emptyMap(),
+    val bikeSpeedKmh: Int = 18
 ) {
     /** Returns this mode's saved zones, falling back to the shared choice from older drafts.
      * @param transportId Transit mode whose zones are requested.
@@ -47,7 +49,15 @@ class MainPlannerViewModel(
     initialState: MainPlannerState = MainPlannerState()
 ) : ViewModel() {
 
-    private val mutableUiState = MutableStateFlow(initialState)
+    private val mutableUiState = MutableStateFlow(
+        initialState.copy(walkingPreference = when (initialState.walkingPreference) {
+            "Scenic" -> "Amble"
+            "Direct", "Normal", "Stroll" -> "Walk"
+            "Fast" -> "Dash"
+            in walkingPreferences -> initialState.walkingPreference
+            else -> "Amble"
+        }, bikeSpeedKmh = initialState.bikeSpeedKmh.coerceIn(MIN_BIKE_SPEED_KMH, MAX_BIKE_SPEED_KMH))
+    )
 
     /** Read-only planner state observed by the view. */
     val uiState = mutableUiState.asStateFlow()
@@ -121,11 +131,18 @@ class MainPlannerViewModel(
     }
 
     /** Selects a supported walking preference without changing transport or zones.
-     * @param value Scenic or Direct; unavailable choices are ignored.
+     * @param value Amble (slow), Walk, or Dash; unavailable choices are ignored.
      */
     fun setWalkingPreference(value: String) {
         if (value !in walkingPreferences) return
         mutableUiState.update { it.copy(walkingPreference = value) }
+    }
+
+    /** Updates cycling pace without enabling Bike or changing other selections.
+     * @param value Requested speed in km/h, clamped to the supported 8–32 range.
+     */
+    fun setBikeSpeedKmh(value: Int) {
+        mutableUiState.update { it.copy(bikeSpeedKmh = value.coerceIn(MIN_BIKE_SPEED_KMH, MAX_BIKE_SPEED_KMH)) }
     }
 
     /** Toggles one attraction preference in the restorable draft.
@@ -141,8 +158,20 @@ class MainPlannerViewModel(
         val zoneIds = listOf("A", "B", "C", "D")
         /** Modes offering their own transit-zone constraints. */
         val transitIds = setOf("bus", "metro", "train", "rem")
-        /** Walking styles displayed when walking is enabled. */
-        val walkingPreferences = listOf("Scenic", "Direct")
+        /** Walking paces displayed from slowest to fastest when walking is enabled. */
+        val walkingPreferences = listOf("Amble", "Walk", "Dash")
+        const val MIN_BIKE_SPEED_KMH = 8
+        const val MAX_BIKE_SPEED_KMH = 32
+
+        /** Shared endpoints belong to the faster band: 14 Normal, 20 Steady, 26 Fast.
+         * @param speedKmh Cycling speed whose display band is requested.
+         */
+        fun bikePaceLabel(speedKmh: Int): String = when {
+            speedKmh < 14 -> "Slow"
+            speedKmh < 20 -> "Normal"
+            speedKmh < 26 -> "Steady"
+            else -> "Fast"
+        }
         /** Multi-select attraction labels from the Figma preferences band. */
         val attractionIds = listOf("Nature", "Culture", "Food", "Surprise", "Free places", "Outdoors")
     }

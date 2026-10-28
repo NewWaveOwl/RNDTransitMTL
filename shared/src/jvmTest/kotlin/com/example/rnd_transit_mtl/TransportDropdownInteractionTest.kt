@@ -42,9 +42,9 @@ class TransportDropdownInteractionTest {
                         selectedZonesByTransport = MainPlannerViewModel.transitIds.associateWith { draft.zonesForTransport(it) },
                         onToggleTransport = { vm.toggleTransport(it, setOf("walk", "bike")) },
                         onToggleZone = vm::toggleZone, walkingPreference = draft.walkingPreference,
+                        bikeSpeedKmh = draft.bikeSpeedKmh, onBikeSpeedChange = vm::setBikeSpeedKmh,
                         selectedAttractionIds = draft.selectedAttractionIds, onWalkingPreferenceChange = vm::setWalkingPreference,
-                        onToggleAttraction = vm::toggleAttraction, intensity = draft.intensity,
-                        onIntensityChange = vm::setIntensity, enabled = true, onOpenDetailedSettings = {},
+                        onToggleAttraction = vm::toggleAttraction, enabled = true, onOpenDetailedSettings = {},
                         expandedTransportId = expanded,
                         onExpandedTransportChange = { expanded = if (expanded == it) null else it })
                 }
@@ -67,6 +67,15 @@ class TransportDropdownInteractionTest {
         }
         try {
             frames(20)
+            listOf("Amble", "Walk", "Dash").forEach { pace ->
+                val bounds = scene.semanticsOwners.flatMap { all(it.rootSemanticsNode) }.first {
+                    it.config.getOrNull(SemanticsProperties.Text)?.any { text -> text.text == pace } == true &&
+                        it.boundsInRoot.top > headingY()
+                }.boundsInRoot
+                click(bounds.center.x, bounds.center.y)
+                frames(2)
+                assertEquals(pace, vm.uiState.value.walkingPreference)
+            }
             val closed = headingY()
             click(330f, 74f)
             frames(5)
@@ -83,6 +92,9 @@ class TransportDropdownInteractionTest {
             assertTrue(opening > closed && opening < open, "Opening must pass smoothly through an intermediate height")
             click(206f, 270f)
             frames(5)
+            save("Zone-selection-filling-inward.png")
+            frames(25)
+            save("Zone-selection-filled.png")
             assertEquals(listOf("B"), vm.uiState.value.zonesForTransport("bus"))
             click(330f, 74f)
             frames(5)
@@ -132,7 +144,7 @@ class TransportDropdownInteractionTest {
             assertEquals(listOf("B"), vm.uiState.value.zonesForTransport("bus"))
 
             // Walking uses the exact same 500 ms motion in both directions.
-            vm.setWalkingPreference("Direct")
+            vm.setWalkingPreference("Dash")
             frames(2)
             fun attractionsY(): Float = assertNotNull(textNode("Make it your kind of random.")).boundsInRoot.top
             val withWalking = attractionsY()
@@ -156,10 +168,54 @@ class TransportDropdownInteractionTest {
             assertTrue(walkingOpening > withoutWalking && walkingOpening < attractionsY())
             assertTrue(walkingOpeningAfter240ms > walkingOpening && walkingOpeningAfter240ms < attractionsY())
             assertEquals(withWalking, attractionsY())
-            assertEquals("Direct", vm.uiState.value.walkingPreference)
+            assertEquals("Dash", vm.uiState.value.walkingPreference)
             assertEquals(listOf("B"), vm.uiState.value.zonesForTransport("bus"))
 
             val originalRowY = assertNotNull(textNode("Walk")).boundsInRoot.top
+            // Bike uses the same opening motion, accepts taps and continuous drags, and keeps its value when hidden.
+            expanded = null
+            frames(40)
+            val withoutBike = headingY()
+            click(206f, 74f)
+            frames(5)
+            val bikeOpening = headingY()
+            frames(10)
+            val bikeOpeningAfter240ms = headingY()
+            frames(30)
+            assertTrue(bikeOpening > withoutBike && bikeOpening < headingY())
+            assertTrue(bikeOpeningAfter240ms > bikeOpening && bikeOpeningAfter240ms < headingY())
+            fun bikeSlider() = scene.semanticsOwners.flatMap { all(it.rootSemanticsNode) }.first {
+                it.config.getOrNull(SemanticsProperties.ContentDescription)?.contains("Biking speed in kilometres per hour") == true
+            }
+            val track = bikeSlider().boundsInRoot
+            click(track.left + 1, track.center.y)
+            frames(2)
+            assertEquals(8, vm.uiState.value.bikeSpeedKmh)
+            scene.sendPointerEvent(PointerEventType.Press, Offset(track.left + 1, track.center.y), timeMillis = time / 1_000_000L)
+            frames(2)
+            scene.sendPointerEvent(PointerEventType.Move, Offset(track.center.x, track.center.y), timeMillis = time / 1_000_000L)
+            frames(2)
+            assertEquals(20, vm.uiState.value.bikeSpeedKmh)
+            scene.sendPointerEvent(PointerEventType.Move, Offset(track.right - 1, track.center.y), timeMillis = time / 1_000_000L)
+            frames(2)
+            scene.sendPointerEvent(PointerEventType.Release, Offset(track.right - 1, track.center.y), timeMillis = time / 1_000_000L)
+            frames(2)
+            assertEquals(32, vm.uiState.value.bikeSpeedKmh)
+            save("Bike-speed-32.png")
+            vm.setBikeSpeedKmh(26)
+            frames(2)
+            assertNotNull(textNode("speedy"))
+            save("Bike-speed-26-design.png")
+            vm.setBikeSpeedKmh(32)
+            frames(2)
+            val withBike = headingY()
+            click(206f, 74f)
+            frames(5)
+            val bikeClosing = headingY()
+            frames(40)
+            assertTrue(bikeClosing < withBike && bikeClosing > headingY())
+            assertNull(textNode("Biking speed"))
+            assertEquals(32, vm.uiState.value.bikeSpeedKmh)
             MainPlannerViewModel.transitIds.forEach { mode ->
                 MainPlannerViewModel.zoneIds.forEach { zone ->
                     if (zone !in vm.uiState.value.zonesForTransport(mode)) vm.toggleZone(mode, zone)

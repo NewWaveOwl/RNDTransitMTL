@@ -314,6 +314,8 @@ internal fun TransitOpeningScreen(
         },
         intensity = intensity,
         walkingPreference = planner.walkingPreference,
+        bikeSpeedKmh = planner.bikeSpeedKmh,
+        onBikeSpeedChange = { if (canChangeInputs()) plannerViewModel.setBikeSpeedKmh(it) },
         selectedAttractionIds = planner.selectedAttractionIds,
         onWalkingPreferenceChange = {
             if (canChangeInputs()) plannerViewModel.setWalkingPreference(it)

@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
@@ -22,6 +23,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.center
+import kotlin.math.hypot
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -49,19 +55,14 @@ private val PreferenceChoiceCornerRadius = 14.dp
 private val PreferenceChoiceHorizontalPadding = 8.dp
 private val PreferenceChoiceVerticalPadding = 10.dp
 private val ZoneDropdownMinimumHeight = 203.dp
-private val IntensityBandHeight = 160.dp
 
 // Animation settings — shared by Walk and transit dropdowns. Larger duration means slower motion.
 private const val PREFERENCE_DROPDOWN_ANIMATION_DURATION_MILLIS = 500
+private const val TRANSPORT_SELECTION_FILL_ANIMATION_DURATION_MILLIS = 400
 private val PreferenceDropdownEasing = FastOutSlowInEasing
 
-// Appearance settings — opening a menu highlights it without changing its saved selection.
-private val ExpandedTransportChoiceGradient = Brush.horizontalGradient(
-    listOf(TransitSelected, TransitSelectionGradientEnd)
-)
-
 /**
- * Adds the Figma preference bands in scroll order; intensity is always the final band.
+ * Adds the main planner preference bands in scroll order.
  *
  * @param scale Responsive size multiplier relative to the 412 px Figma width.
  * @param transportTypes Loaded transport catalogue.
@@ -70,11 +71,11 @@ private val ExpandedTransportChoiceGradient = Brush.horizontalGradient(
  * @param onToggleTransport Requests a transport toggle.
  * @param onToggleZone Requests a zone toggle for the supplied transport ID and zone ID.
  * @param walkingPreference Selected walking style.
+ * @param bikeSpeedKmh Selected cycling speed in km/h.
+ * @param onBikeSpeedChange Requests a cycling-speed change.
  * @param selectedAttractionIds Enabled attraction labels.
  * @param onWalkingPreferenceChange Requests a walking-style change.
  * @param onToggleAttraction Requests an attraction toggle.
- * @param intensity Attraction intensity from 0 to 100.
- * @param onIntensityChange Requests an intensity change.
  * @param enabled Whether choices can change.
  * @param onOpenDetailedSettings Opens the existing Settings destination.
  * @param expandedTransportId Mode whose zone dropdown is open, independently of selection.
@@ -91,12 +92,12 @@ internal fun LazyListScope.PlannerPreferenceBands(
     selectedAttractionIds: List<String>,
     onWalkingPreferenceChange: (String) -> Unit,
     onToggleAttraction: (String) -> Unit,
-    intensity: Float,
-    onIntensityChange: (Float) -> Unit,
     enabled: Boolean,
     onOpenDetailedSettings: () -> Unit,
     expandedTransportId: String?,
-    onExpandedTransportChange: (String) -> Unit
+    onExpandedTransportChange: (String) -> Unit,
+    bikeSpeedKmh: Int,
+    onBikeSpeedChange: (Int) -> Unit
 ) {
     item(key = "transport") {
         // Animate the dropdown itself so following bands move with its visible height.
@@ -137,6 +138,12 @@ internal fun LazyListScope.PlannerPreferenceBands(
         }
     }
     // Keep the lazy item mounted until the closing animation has finished.
+    item(key = "bike") {
+        AnimatedVisibility(visible = "bike" in selectedTransportIds,
+            enter = preferenceDropdownEnter(), exit = preferenceDropdownExit()) {
+            BikeSpeedPanel(bikeSpeedKmh, onBikeSpeedChange, scale, enabled && "bike" in selectedTransportIds)
+        }
+    }
     item(key = "walking") {
         AnimatedVisibility(
             visible = "walk" in selectedTransportIds,
@@ -145,7 +152,7 @@ internal fun LazyListScope.PlannerPreferenceBands(
         ) {
             PreferenceBand(TransitComplementary, scale) {
                 BandTitle("Walking preferences", TransitWhite, scale)
-                Text("Choose the type of walk.", color = TransitWhite, fontSize = 13.sp * scale,
+                Text("Choose your pace.", color = TransitWhite, fontSize = 13.sp * scale,
                     lineHeight = 18.sp * scale)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(PreferenceChoiceSpacing * scale)) {
                     MainPlannerViewModel.walkingPreferences.forEach { preference ->
@@ -164,7 +171,7 @@ internal fun LazyListScope.PlannerPreferenceBands(
                 lineHeight = 31.sp * scale, fontWeight = FontWeight.Bold)
             Text("Attractions", color = TransitWhite, fontSize = 14.sp * scale, fontWeight = FontWeight.Bold)
             ChoiceGrid(MainPlannerViewModel.attractionIds, selectedAttractionIds, enabled, onToggleAttraction, scale)
-            Text("Sample routes don’t yet reflect walking or attraction preferences.",
+            Text("Sample routes don’t yet reflect walking pace, bike speed, or attraction preferences.",
                 color = TransitWhite, style = MaterialTheme.typography.bodySmall)
         }
     }
@@ -175,15 +182,6 @@ internal fun LazyListScope.PlannerPreferenceBands(
                 Text("More preferences in Settings", color = TransitWhite)
             }
         }
-    }
-    item(key = "intensity") {
-        IntensityPanel(
-            layoutScale = scale,
-            intensity = intensity,
-            onIntensityChange = { if (enabled) onIntensityChange(it) },
-            validationMessage = "",
-            modifier = Modifier.fillMaxWidth().height(IntensityBandHeight * scale)
-        )
     }
 }
 
@@ -318,6 +316,13 @@ private fun PlannerChoice(label: String, selected: Boolean, enabled: Boolean, on
     scale: Float, modifier: Modifier = Modifier, role: Role = Role.Checkbox,
     dropdownExpanded: Boolean? = null) {
     val expanded = dropdownExpanded == true
+    val animateTransportFill = dropdownExpanded != null
+    val selectionFill by animateFloatAsState(
+        targetValue = if (selected) 1f else 0f,
+        animationSpec = tween(if (animateTransportFill) TRANSPORT_SELECTION_FILL_ANIMATION_DURATION_MILLIS else 0,
+            easing = FastOutSlowInEasing),
+        label = "Transport selection radial fill"
+    )
     Surface(
         modifier = modifier.height(PreferenceChoiceHeight * scale)
             .then(if (dropdownExpanded == null) {
@@ -331,12 +336,33 @@ private fun PlannerChoice(label: String, selected: Boolean, enabled: Boolean, on
                             (if (dropdownExpanded) ", zones expanded" else ", zones collapsed")
                     }
             }),
-        color = if (selected || expanded) TransitSelected else TransitWhite,
+        color = if (animateTransportFill) TransitWhite else if (selected) TransitSelected else TransitWhite,
         contentColor = if (selected || expanded) TransitComplementary else TransitMain,
         shape = RoundedCornerShape(PreferenceChoiceCornerRadius * scale)
     ) {
         Box(Modifier.fillMaxSize()
-            .then(if (expanded) Modifier.background(ExpandedTransportChoiceGradient) else Modifier)
+            .then(if (animateTransportFill) Modifier.drawBehind {
+                // Shrink the white centre so lime advances inward from the borders.
+                drawRect(TransitSelected)
+                if (selectionFill < 1f) {
+                    drawCircle(TransitWhite,
+                        radius = hypot(size.width, size.height) / 2f * (1f - selectionFill),
+                        center = size.center)
+                }
+            } else Modifier)
+            .then(if (expanded && !selected) Modifier.drawWithCache {
+                val highlight = Brush.radialGradient(
+                    *TransitOpenChoiceGradientStops,
+                    center = size.center,
+                    radius = size.height / 2f
+                )
+                // Figma uses a centred ellipse spanning the entire chip, rather than a small spot.
+                onDrawBehind {
+                    withTransform({ scale(size.width / size.height, 1f, size.center) }) {
+                        drawRect(highlight)
+                    }
+                }
+            } else Modifier)
             .padding(horizontal = PreferenceChoiceHorizontalPadding * scale, vertical = PreferenceChoiceVerticalPadding * scale),
             contentAlignment = Alignment.Center) {
             Text(label, fontSize = 14.sp * scale, lineHeight = 20.sp * scale,

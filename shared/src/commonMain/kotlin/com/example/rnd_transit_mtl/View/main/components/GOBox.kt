@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
@@ -114,6 +115,7 @@ internal fun GOBox(
         ) {
             Text(
                 text = actionLabel,
+                fontWeight = FontWeight.Bold,
                 color = TransitWhite.copy(alpha = if (actionEnabled) 1f else 0.5f),
                 fontSize = (if (actionLabel == "Resume trip") 16.sp else 22.sp) * layoutScale,
                 textAlign = TextAlign.Center,
