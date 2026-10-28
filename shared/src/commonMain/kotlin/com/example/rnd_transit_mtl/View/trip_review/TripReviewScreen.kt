@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.trip.ReviewV3
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -53,7 +54,9 @@ fun TripReviewScreen(
     onOpenHistory: () -> Boolean,
     onReturnToOrigin: () -> Boolean,
     modifier: Modifier = Modifier,
-    registerBackHandler: RegisterReviewBackHandler? = null
+    registerBackHandler: RegisterReviewBackHandler? = null,
+    onOpenFeedback: () -> Unit = {},
+    feedbackAvailable: Boolean = false
 ) {
     val tripsStore = LocalTripsStore.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -363,59 +366,24 @@ fun TripReviewScreen(
         }
 
         else -> {
-            TripReviewContent(
-                tripTitle = trip.title,
-                mode = mode,
-                draft = draft,
-                controlsEnabled = isDestinationActive && isAppResumed,
-                errorMessage = errorMessage,
-                onRatingChange = { question, rating ->
-                    updateDraft { latest ->
-                        if (latest.step == question) {
-                            latest.withRating(question, rating)
-                        } else {
-                            latest
-                        }
-                    }
+            ReviewV3(
+                title = trip.title,
+                reference = trip.id.takeLast(3),
+                rating = draft.overall,
+                comment = draft.comment,
+                onRatingChange = { rating ->
+                    updateDraft { it.copy(overall = rating) }
                 },
                 onCommentChange = { comment ->
-                    updateDraft { latest ->
-                        if (latest.step == ReviewStep.OVERALL) {
-                            latest.copy(comment = comment)
-                        } else {
-                            latest
-                        }
-                    }
-                },
-                onImageUrlChange = { imageUrl ->
-                    updateDraft { latest ->
-                        if (latest.step == ReviewStep.OVERALL) {
-                            latest.copy(imageUrl = imageUrl)
-                        } else {
-                            latest
-                        }
-                    }
-                },
-                onStepChange = { requested ->
-                    updateDraft { latest ->
-                        val adjacent =
-                            requested == latest.step.previousOrNull() ||
-                                    requested == latest.step.nextOrNull()
-                        val forward =
-                            requested.ordinal > latest.step.ordinal
-
-                        if (
-                            adjacent &&
-                            (!forward || latest.overall != null)
-                        ) {
-                            latest.copy(step = requested)
-                        } else {
-                            latest
-                        }
-                    }
+                    updateDraft { it.copy(comment = comment) }
                 },
                 onSave = { saveAndExit() },
-                onDiscard = { discardAndExit() },
+                onSkip = { discardAndExit() },
+                onFeedback = onOpenFeedback,
+                onGo = { discardAndExit() },
+                feedbackEnabled = feedbackAvailable,
+                enabled = canEdit(),
+                errorMessage = errorMessage,
                 modifier = modifier
             )
         }

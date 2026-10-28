@@ -27,6 +27,23 @@ class TripNavigation(
     private val navigator: Navigator,
     private val tripsStore: TripsStore
 ) {
+    /** A completed record to copy into the planner; true requests a fresh proposal. */
+    var plannerCopyRequest by mutableStateOf<Pair<String, Boolean>?>(null)
+        private set
+
+    /** Opens a copy of saved preferences without changing the completed record.
+     * @param tripId Saved record to resolve from the store.
+     * @param generate Whether to generate a fresh proposal once the planner is ready.
+     */
+    fun openPlannerCopy(tripId: String, generate: Boolean): Boolean {
+        if (tripsStore.findCompleted(tripId) == null) return false
+        if (!returnToPlanner()) return false
+        plannerCopyRequest = tripId to generate
+        return true
+    }
+
+    fun consumePlannerCopy() { plannerCopyRequest = null }
+
     /** Transient popup request; trip records still come only from TripsStore. */
     var informationTripId by mutableStateOf<String?>(null)
         private set

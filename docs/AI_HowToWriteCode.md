@@ -41,6 +41,8 @@ RNDTransitMTL must use MVVM. Generate new application code with these responsibi
 6. Distinguish presentation state, restorable drafts, and persisted defaults. Do not claim that a ViewModel persists data after process termination.
 Place screen code in View/<screen_name>/, ViewModels in ViewModels/<screen_name>/, and components used by multiple screens in ui/global_ui_ellements/. Screen-specific components belong beside their screen, optionally in a local components/ folder.
 
+`ui/global_ui_ellements/trip/TripScreensV3.kt` contains the shared completion, overall review, feedback, history, and saved-details presentations. Their callbacks delegate to the existing coordinators. Segment/place feedback stays disabled until target-based persistence and navigation exist. Repeat generates a fresh proposal; Edit copy restores recorded planner preferences without modifying the completed trip.
+
 Keep theme code in ui/theme, application assembly in App.kt, shared scaffold and navigation bars in layout/, navigation state and destinations in navigation/, models in the corresponding model/<domain> folder, and repository/provider implementations in the named data subfolders.
 
 Use matching package declarations and update imports, previews, and tests when files move. Do not add a ViewModel to a purely static component merely to satisfy folder symmetry.

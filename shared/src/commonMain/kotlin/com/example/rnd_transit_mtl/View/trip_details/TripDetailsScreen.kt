@@ -9,6 +9,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import com.example.rnd_transit_mtl.state.trip.LocalTripsStore
+import com.example.rnd_transit_mtl.navigation.LocalTripNavigation
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.trip.TripDetailsV3
+import com.example.rnd_transit_mtl.View.history.formatTripTimestampUtc
 
 /**
  * Resolves the latest completed record by stable ID.
@@ -57,6 +60,15 @@ fun TripDetailsScreen(
         }
     }
 
+    val navigation = LocalTripNavigation.current
+    if (trip != null) {
+        TripDetailsV3(trip,
+            completedLabel = formatTripTimestampUtc(trip.completedAtEpochMillis ?: trip.createdAtEpochMillis),
+            onRepeat = { if (latestDestinationActive) navigation.openPlannerCopy(tripId, true) },
+            onEditCopy = { if (latestDestinationActive) navigation.openPlannerCopy(tripId, false) },
+            enabled = isDestinationActive, errorMessage = errorMessage, modifier = modifier)
+        return
+    }
     TripDetailsContent(
         trip = trip,
         onReturnToHistory = {

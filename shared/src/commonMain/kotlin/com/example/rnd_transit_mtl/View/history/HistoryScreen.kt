@@ -1,16 +1,17 @@
 package com.example.rnd_transit_mtl.View.history
 
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.trip.HistoryV3
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.trip.HistoryRowV3
+import com.example.rnd_transit_mtl.navigation.LocalTripNavigation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.example.rnd_transit_mtl.state.trip.LocalTripsStore
 import com.example.rnd_transit_mtl.state.trip.TripActionResult
-import com.example.rnd_transit_mtl.navigation.Router
 
 /**
  * Coordinates completed History from the one shared TripsStore.
@@ -29,29 +30,22 @@ fun HistoryScreen(
     isDestinationActive: Boolean = true,
     modifier: Modifier = Modifier
 ) {
+    val navigation = LocalTripNavigation.current
     val tripsStore = LocalTripsStore.current
     val latestDestinationActive by rememberUpdatedState(
         isDestinationActive
     )
 
-    var filterName by rememberSaveable {
-        mutableStateOf(TripHistoryFilter.ALL.name)
-    }
-
     var errorMessage by remember {
         mutableStateOf<String?>(null)
     }
 
-    val filter = TripHistoryFilter.entries.firstOrNull {
-        it.name == filterName
-    } ?: TripHistoryFilter.ALL
 
     /*
      * The getter reads observable store state during composition.
      * No separate History collection is stored here.
      */
     val completedTrips = tripsStore.completedTrips
-    val displayedTrips = historyTrips(completedTrips, filter)
 
     fun openExistingTrip(
         tripId: String,
@@ -77,32 +71,33 @@ fun HistoryScreen(
             { tripId -> openExistingTrip(tripId, callback) }
         }
 
-    HistoryContent(
-        trips = displayedTrips,
-        filter = filter,
-        totalCount = completedTrips.size,
-        onFilterChange = { selected ->
-            if (latestDestinationActive) {
-                filterName = selected.name
-                errorMessage = null
-            }
+    val onPlanNew = { if (latestDestinationActive) navigation.returnToPlanner(); Unit }
+    HistoryV3(
+        rows = historyTrips(completedTrips, TripHistoryFilter.ALL).map { trip ->
+            HistoryRowV3(
+                id = trip.id,
+                title = trip.title,
+                summary = formatTripTimestampUtc(
+                    trip.completedAtEpochMillis ?: trip.createdAtEpochMillis
+                ) + " · " + tripTransportSummary(trip),
+                status = "Completed",
+                completed = true
+            )
         },
-        onOpenDetails = detailsCallback,
-        onReview = reviewCallback,
-        onRemove = { tripId ->
+        onOpenTrip = { id -> detailsCallback?.invoke(id) },
+        onReviewTrip = reviewCallback,
+        onRemoveTrip = { id ->
             if (latestDestinationActive) {
-                errorMessage = when (
-                    val result = tripsStore.removeCompleted(tripId)
-                ) {
+                errorMessage = when (val result = tripsStore.removeCompleted(id)) {
                     TripActionResult.Applied -> null
-                    is TripActionResult.MissingTrip ->
-                        "This trip has already been removed."
                     is TripActionResult.InvalidInput -> result.message
-                    else -> "The trip could not be removed."
+                    else -> "This trip could not be removed."
                 }
             }
         },
-        actionsEnabled = isDestinationActive,
+        onPlanNew = onPlanNew,
+        onGo = onPlanNew,
+        enabled = isDestinationActive && detailsCallback != null,
         errorMessage = errorMessage,
         modifier = modifier
     )

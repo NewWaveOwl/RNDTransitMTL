@@ -33,6 +33,8 @@ import com.example.rnd_transit_mtl.ui.theme.TransitMain
 import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 import kotlinx.coroutines.isActive
 import com.example.rnd_transit_mtl.navigation.LocalTripNavigation
+import com.example.rnd_transit_mtl.navigation.HistoryScreenKey
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.trip.CompleteV3
 
 /**
  * Coordinates one trip's active simulation.
@@ -265,7 +267,24 @@ fun CurrentTripScreen(
     // Completion stays visible at 100%. Review navigation is a user action.
     // The saved pending ID survives rotation until navigation or Skip handles it.
 
-    if (storedTrip == null) {
+    fun skipCompletion(toHistory: Boolean) {
+        if (!latestDestinationActive || !lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return
+        when (val result = tripsStore.skipReview(trip.id)) {
+            TripActionResult.Applied -> {
+                val handled = if (toHistory) navigation.openSection(HistoryScreenKey) else navigation.returnToPlanner()
+                if (!handled) operationMessage = "Your trip is saved. Please try navigating again."
+            }
+            is TripActionResult.InvalidInput -> operationMessage = result.message
+            else -> operationMessage = "The completed trip could not be closed. Please try again."
+        }
+    }
+
+    if (completedTrip != null) {
+        CompleteV3(completedTrip, onReview = { requestReview() },
+            onSkipToHistory = { skipCompletion(true) }, onPlanAnother = { skipCompletion(false) },
+            onGo = { skipCompletion(false) }, enabled = isDestinationActive && isAppResumed,
+            errorMessage = operationMessage, modifier = modifier)
+    } else if (storedTrip == null) {
         Column(
             modifier = modifier
                 .fillMaxSize()

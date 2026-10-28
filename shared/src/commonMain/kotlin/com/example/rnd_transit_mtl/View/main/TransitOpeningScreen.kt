@@ -291,6 +291,31 @@ internal fun TransitOpeningScreen(
 
     val navigator = LocalNavigator.current
     val navigation = LocalTripNavigation.current
+    val copyRequest = navigation.plannerCopyRequest
+    var copiedTripToGenerate by remember { mutableStateOf<Trip?>(null) }
+    LaunchedEffect(copyRequest, generationBounds, isDestinationActive) {
+        if (copyRequest != null && isDestinationActive && generationBounds != null) {
+            val saved = tripsStore.findCompleted(copyRequest.first)
+            navigation.consumePlannerCopy()
+            if (saved != null) {
+                proposalJson = null
+                plannerViewModel.copyTripPreferences(saved)
+                if (copyRequest.second) copiedTripToGenerate = saved
+            }
+        }
+    }
+    LaunchedEffect(planner, copiedTripToGenerate, isDestinationActive) {
+        val saved = copiedTripToGenerate
+        if (saved != null && isDestinationActive &&
+            planner.minutes == saved.plannedMinutes &&
+            planner.selectedTransportIds == saved.selectedTransports.map { it.id } &&
+            planner.selectedZoneIds == saved.selectedZoneIds &&
+            planner.selectedZonesByTransport == saved.selectedZonesByTransport &&
+            planner.intensity == saved.attractionIntensity) {
+            copiedTripToGenerate = null
+            performPrimaryAction()
+        }
+    }
 
     if (processingAction &&
         activeState == null &&

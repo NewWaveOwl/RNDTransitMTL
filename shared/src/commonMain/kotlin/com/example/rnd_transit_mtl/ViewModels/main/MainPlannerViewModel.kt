@@ -62,6 +62,17 @@ class MainPlannerViewModel(
     /** Read-only planner state observed by the view. */
     val uiState = mutableUiState.asStateFlow()
 
+    /** Copies only the preferences actually recorded in a completed trip.
+     * @param trip Saved trip; its identity, endpoints, and review are never changed.
+     */
+    fun copyTripPreferences(trip: Trip) {
+        mutableUiState.update { it.copy(minutes = trip.plannedMinutes,
+            selectedTransportIds = trip.selectedTransports.map { mode -> mode.id },
+            selectedZoneIds = trip.selectedZoneIds.toList(),
+            selectedZonesByTransport = trip.selectedZonesByTransport.mapValues { entry -> entry.value.toList() },
+            intensity = trip.attractionIntensity) }
+    }
+
     /**
      * Updates the time using the existing five-minute bounds.
      *
