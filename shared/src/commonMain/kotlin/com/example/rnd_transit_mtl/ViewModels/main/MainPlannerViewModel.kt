@@ -50,7 +50,8 @@ class MainPlannerViewModel(
 ) : ViewModel() {
 
     private val mutableUiState = MutableStateFlow(
-        initialState.copy(walkingPreference = when (initialState.walkingPreference) {
+        initialState.copy(minutes = Trip.coercePlannedMinutes(initialState.minutes),
+            walkingPreference = when (initialState.walkingPreference) {
             "Scenic" -> "Amble"
             "Direct", "Normal", "Stroll" -> "Walk"
             "Fast" -> "Dash"

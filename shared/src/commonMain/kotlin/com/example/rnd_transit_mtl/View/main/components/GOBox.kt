@@ -135,7 +135,7 @@ private fun ControlDivider(layoutScale: Float, compact: Boolean) {
 
 /**
  * Arrow taps and vertical dragging change minutes in five-minute steps,
- * bounded between 0 and 360 minutes. Empty arrow slots keep the number centred.
+ * bounded between 5 and 360 minutes. Empty arrow slots keep the number centred.
  *
  * Updated-state references let a continuous gesture keep using the latest
  * value/callback without restarting its pointer effect after each step.

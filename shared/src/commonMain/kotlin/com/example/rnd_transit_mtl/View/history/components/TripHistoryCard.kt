@@ -129,7 +129,7 @@ fun TripHistoryCard(
                     if (actionsVisible) latestHideActions() else latestShowActions()
                 }
             ),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(0.dp),
         colors = CardDefaults.cardColors(
             containerColor = TransitWhite,
             contentColor = TransitMain

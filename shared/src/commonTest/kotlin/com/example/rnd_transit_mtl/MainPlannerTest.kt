@@ -16,6 +16,14 @@ import kotlin.test.assertIs
 
 /** Checks draft restoration and zone requests without geographic-routing assumptions. */
 class MainPlannerTest {
+    @Test
+    fun restoredZeroMinuteDraftUsesFiveMinuteMinimum() {
+        val planner = MainPlannerViewModel(MainPlannerState(minutes = 0))
+        assertEquals(5, planner.uiState.value.minutes)
+        planner.setMinutes(Int.MIN_VALUE)
+        assertEquals(5, planner.uiState.value.minutes)
+    }
+
     private val types = listOf(
         TransportType("walk", "Walk", false),
         TransportType("bus", "Bus", true)

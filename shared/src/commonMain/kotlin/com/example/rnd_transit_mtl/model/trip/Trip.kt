@@ -178,24 +178,43 @@ data class Trip(
             }
         }
 
-        const val MIN_PLANNED_MINUTES: Int = 0
+        const val MIN_PLANNED_MINUTES: Int = 5
         const val MAX_PLANNED_MINUTES: Int = 360
         const val PLANNED_MINUTES_STEP: Int = 5
 
-        /** Keep planner selections in the supported five-minute range. */
+        /**
+         * Normalizes selector values into the supported 5–360 minute range.
+         *
+         * Used by arrows, dragging and restored planner selections.
+         * Submitted generation requests are validated separately.
+         */
         fun coercePlannedMinutes(value: Int): Int {
-            val bounded = value.coerceIn(MIN_PLANNED_MINUTES, MAX_PLANNED_MINUTES)
+            val bounded = value.coerceIn(
+                MIN_PLANNED_MINUTES,
+                MAX_PLANNED_MINUTES
+            )
+
             return bounded - bounded % PLANNED_MINUTES_STEP
         }
 
-        /** Clamp arrow/drag movement at 0 and 360 minutes. */
-        fun adjustPlannedMinutes(value: Int, direction: Int): Int {
+        /** Moves one five-minute step without crossing either boundary. */
+        fun adjustPlannedMinutes(
+            value: Int,
+            direction: Int
+        ): Int {
             val current = coercePlannedMinutes(value)
+
             return when {
-                direction > 0 ->
-                    (current + PLANNED_MINUTES_STEP).coerceAtMost(MAX_PLANNED_MINUTES)
-                direction < 0 ->
-                    (current - PLANNED_MINUTES_STEP).coerceAtLeast(MIN_PLANNED_MINUTES)
+                direction > 0 -> {
+                    (current + PLANNED_MINUTES_STEP)
+                        .coerceAtMost(MAX_PLANNED_MINUTES)
+                }
+
+                direction < 0 -> {
+                    (current - PLANNED_MINUTES_STEP)
+                        .coerceAtLeast(MIN_PLANNED_MINUTES)
+                }
+
                 else -> current
             }
         }
@@ -204,10 +223,10 @@ data class Trip(
         const val MAX_ATTRACTION_INTENSITY: Float = 100f
 
         /**
-         * Shared record-level validation for planner-derived values.
+         * Rejects invalid record and generation-request values.
          *
-         * Throws IllegalArgumentException for invalid values.
-         * The generator translates these failures into InvalidInput.
+         * Zero, negative minutes and values outside the supported five-minute
+         * steps fail validation rather than being silently accepted.
          */
         fun validatePlannerValues(
             title: String,
@@ -219,21 +238,25 @@ data class Trip(
             require(title.isNotBlank()) {
                 "Enter a trip title."
             }
+
             require(description.isNotBlank()) {
                 "Enter a trip description."
             }
+
             require(imageUrl.isEmpty() || isSupportedImageUrl(imageUrl)) {
                 "An optional image reference must be a valid HTTPS URL."
             }
+
             require(
                 plannedMinutes in MIN_PLANNED_MINUTES..MAX_PLANNED_MINUTES &&
-                        plannedMinutes % PLANNED_MINUTES_STEP == 0
+                    plannedMinutes % PLANNED_MINUTES_STEP == 0
             ) {
-                "Planned minutes must be 0–360 in five-minute steps."
+                "Choose 5–360 minutes in five-minute steps."
             }
+
             require(
                 attractionIntensity.isFinite() &&
-                        attractionIntensity in
+                    attractionIntensity in
                         MIN_ATTRACTION_INTENSITY..MAX_ATTRACTION_INTENSITY
             ) {
                 "Attraction intensity must be finite and between 0 and 100."

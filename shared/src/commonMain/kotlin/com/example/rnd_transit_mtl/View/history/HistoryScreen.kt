@@ -1,27 +1,29 @@
 package com.example.rnd_transit_mtl.View.history
 
-import com.example.rnd_transit_mtl.ui.global_ui_ellements.trip.HistoryV3
-import com.example.rnd_transit_mtl.ui.global_ui_ellements.trip.HistoryRowV3
-import com.example.rnd_transit_mtl.navigation.LocalTripNavigation
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.example.rnd_transit_mtl.state.trip.LocalTripsStore
 import com.example.rnd_transit_mtl.state.trip.TripActionResult
+import com.example.rnd_transit_mtl.ui.theme.TransitComplementary
+import com.example.rnd_transit_mtl.ui.theme.TransitMain
+import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 
 /**
- * Coordinates completed History from the one shared TripsStore.
+ * Displays completed trips from the shared store.
  *
- * Navigation callbacks receive stable IDs. Review navigation should
- * open TripReviewMode.EDIT with History as its origin, including when
- * adding feedback to a previously skipped trip.
- *
- * Nullable callbacks keep the current Router call valid until final
- * route integration. Unavailable navigation actions are disabled.
+ * Remove requests confirmation. Only the dialog's explicit confirmation
+ * calls removeCompleted. Cancel, Back and outside dismissal keep the trip.
  */
 @Composable
 fun HistoryScreen(
@@ -30,8 +32,8 @@ fun HistoryScreen(
     isDestinationActive: Boolean = true,
     modifier: Modifier = Modifier
 ) {
-    val navigation = LocalTripNavigation.current
     val tripsStore = LocalTripsStore.current
+
     val latestDestinationActive by rememberUpdatedState(
         isDestinationActive
     )
@@ -40,12 +42,36 @@ fun HistoryScreen(
         mutableStateOf<String?>(null)
     }
 
+    // Store only the ID. Resolve the latest record from TripsStore.
+    var pendingRemovalId by rememberSaveable {
+        mutableStateOf<String?>(null)
+    }
 
-    /*
-     * The getter reads observable store state during composition.
-     * No separate History collection is stored here.
-     */
+    var filterName by rememberSaveable { mutableStateOf(TripHistoryFilter.ALL.name) }
+    val filter = TripHistoryFilter.entries.firstOrNull { it.name == filterName } ?: TripHistoryFilter.ALL
+
     val completedTrips = tripsStore.completedTrips
+    val pendingRemovalTrip = completedTrips.firstOrNull {
+        it.id == pendingRemovalId
+    }
+
+    // Do not leave a confirmation pending after navigating away.
+    // Also recover if another action removes the selected record.
+    LaunchedEffect(
+        isDestinationActive,
+        pendingRemovalId,
+        pendingRemovalTrip?.id
+    ) {
+        if (!isDestinationActive) {
+            pendingRemovalId = null
+        } else if (
+            pendingRemovalId != null &&
+            pendingRemovalTrip == null
+        ) {
+            pendingRemovalId = null
+            errorMessage = "This trip is no longer available."
+        }
+    }
 
     fun openExistingTrip(
         tripId: String,
@@ -61,6 +87,52 @@ fun HistoryScreen(
         }
     }
 
+    fun requestRemoval(tripId: String) {
+        if (!latestDestinationActive) return
+
+        if (tripsStore.findCompleted(tripId) == null) {
+            errorMessage = "This trip is no longer available."
+            return
+        }
+
+        errorMessage = null
+        pendingRemovalId = tripId
+    }
+
+    fun confirmRemoval() {
+        if (!latestDestinationActive) return
+        val tripId = pendingRemovalId ?: return
+
+        // Check again at confirmation time, rather than using an old record.
+        if (tripsStore.findCompleted(tripId) == null) {
+            pendingRemovalId = null
+            errorMessage = "This trip has already been removed."
+            return
+        }
+
+        when (val result = tripsStore.removeCompleted(tripId)) {
+            TripActionResult.Applied -> {
+                pendingRemovalId = null
+                errorMessage = null
+            }
+
+            is TripActionResult.MissingTrip -> {
+                pendingRemovalId = null
+                errorMessage = "This trip has already been removed."
+            }
+
+            is TripActionResult.InvalidInput -> {
+                pendingRemovalId = null
+                errorMessage = result.message
+            }
+
+            else -> {
+                pendingRemovalId = null
+                errorMessage = "This trip could not be removed."
+            }
+        }
+    }
+
     val detailsCallback: ((String) -> Unit)? =
         onOpenDetails?.let { callback ->
             { tripId -> openExistingTrip(tripId, callback) }
@@ -71,34 +143,60 @@ fun HistoryScreen(
             { tripId -> openExistingTrip(tripId, callback) }
         }
 
-    val onPlanNew = { if (latestDestinationActive) navigation.returnToPlanner(); Unit }
-    HistoryV3(
-        rows = historyTrips(completedTrips, TripHistoryFilter.ALL).map { trip ->
-            HistoryRowV3(
-                id = trip.id,
-                title = trip.title,
-                summary = formatTripTimestampUtc(
-                    trip.completedAtEpochMillis ?: trip.createdAtEpochMillis
-                ) + " · " + tripTransportSummary(trip),
-                status = "Completed",
-                completed = true
-            )
-        },
-        onOpenTrip = { id -> detailsCallback?.invoke(id) },
-        onReviewTrip = reviewCallback,
-        onRemoveTrip = { id ->
+    HistoryContent(
+        trips = historyTrips(completedTrips, filter),
+        filter = filter,
+        totalCount = completedTrips.size,
+        onFilterChange = { selected ->
             if (latestDestinationActive) {
-                errorMessage = when (val result = tripsStore.removeCompleted(id)) {
-                    TripActionResult.Applied -> null
-                    is TripActionResult.InvalidInput -> result.message
-                    else -> "This trip could not be removed."
-                }
+                filterName = selected.name
+                errorMessage = null
             }
         },
-        onPlanNew = onPlanNew,
-        onGo = onPlanNew,
-        enabled = isDestinationActive && detailsCallback != null,
+        onOpenDetails = detailsCallback,
+        onReview = reviewCallback,
+        onRemove = { requestRemoval(it) },
+        actionsEnabled = isDestinationActive,
         errorMessage = errorMessage,
         modifier = modifier
     )
+    if (isDestinationActive && pendingRemovalTrip != null) {
+        AlertDialog(
+            onDismissRequest = {
+                pendingRemovalId = null
+            },
+            containerColor = TransitWhite,
+            titleContentColor = TransitComplementary,
+            textContentColor = TransitComplementary,
+            title = {
+                Text("Remove this adventure?")
+            },
+            text = {
+                Text(
+                    "Remove “${pendingRemovalTrip.title}” from History? " +
+                        "Its saved review will also be removed. " +
+                        "This cannot be undone."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { confirmRemoval() }
+                ) {
+                    Text(
+                        "Remove trip",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        pendingRemovalId = null
+                    }
+                ) {
+                    Text("Keep trip", color = TransitMain)
+                }
+            }
+        )
+    }
 }
