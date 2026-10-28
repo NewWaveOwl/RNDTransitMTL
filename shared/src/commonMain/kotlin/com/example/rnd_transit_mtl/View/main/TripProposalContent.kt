@@ -11,7 +11,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -20,12 +19,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.rnd_transit_mtl.model.trip.Trip
+import com.example.rnd_transit_mtl.model.trip.TripPoint
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.MockTripMap
 import com.example.rnd_transit_mtl.ui.theme.*
 import org.jetbrains.compose.resources.painterResource
 import rnd_transit_mtl.shared.generated.resources.Res
-import rnd_transit_mtl.shared.generated.resources.map_sample
-import rnd_transit_mtl.shared.generated.resources.map_user_pointer_badge
 import rnd_transit_mtl.shared.generated.resources.rnd_field_location
 import rnd_transit_mtl.shared.generated.resources.rnd_field_chevron
 
@@ -112,6 +110,7 @@ internal fun TripLabelValueField(
  * @param minutes Requested trip duration.
  * @param transportSummary Selected transport labels.
  * @param onCancel Cancels the pending search.
+ * @param origin Selected sample-map point shown during loading.
  * @param modifier Parent layout constraints.
  */
 @Composable
@@ -119,28 +118,24 @@ internal fun TripLoadingContent(
     minutes: Int,
     transportSummary: String,
     onCancel: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    origin: TripPoint? =
+        TripPoint(
+            "Current location",
+            0.5f,
+            0.35f
+        )
 ) {
     Box(modifier.fillMaxSize()) {
-        Image(
-            painter = painterResource(Res.drawable.map_sample),
-            contentDescription = "Sample transit map",
-            contentScale = ContentScale.Crop,
+        FigmaOriginMap(
+            origin = origin,
+            enabled = false,
             modifier = Modifier.fillMaxSize()
-        )
-
-        Image(
-            painter = painterResource(Res.drawable.map_user_pointer_badge),
-            contentDescription = "Starting location",
-            modifier = Modifier
-                .align(Alignment.Center)
-                .offset(y = (-90).dp)
-                .size(40.dp)
         )
 
         TripLabelValueField(
             label = "Starting point",
-            value = "Current location",
+            value = origin?.label ?: "Search a place or address",
             showLocationIcon = true,
             modifier = Modifier
                 .align(Alignment.TopCenter)

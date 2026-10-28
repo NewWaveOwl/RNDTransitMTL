@@ -15,6 +15,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import com.example.rnd_transit_mtl.model.trip.TripPoint
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.example.rnd_transit_mtl.data.generation.MockTripGenerator
@@ -67,6 +69,42 @@ internal fun TransitOpeningScreen(
     }
 
     val planner by plannerViewModel.uiState.collectAsStateWithLifecycle()
+
+    val plannerPresentationState = rememberSaveableStateHolder()
+
+    var originMode by rememberSaveable {
+        mutableStateOf("planner")
+    }
+    var originDraftX by rememberSaveable {
+        mutableStateOf<Float?>(null)
+    }
+    var originDraftY by rememberSaveable {
+        mutableStateOf<Float?>(null)
+    }
+    var originMessage by rememberSaveable {
+        mutableStateOf<String?>(null)
+    }
+
+    LaunchedEffect(isDestinationActive) {
+        if (!isDestinationActive) {
+            originMode = "planner"
+            originMessage = null
+        }
+    }
+
+    LaunchedEffect(
+        isDestinationActive,
+        planner.origin == null,
+        planner.locationAccessOff
+    ) {
+        if (isDestinationActive &&
+            planner.origin == null &&
+            planner.locationAccessOff
+        ) {
+            originMode = "options"
+        }
+    }
+
 
     LaunchedEffect(plannerViewModel) {
         plannerViewModel.uiState.collect { state ->
@@ -232,7 +270,16 @@ internal fun TransitOpeningScreen(
                     return@launch
                 }
 
+                val selectedOrigin = planner.origin
+                if (selectedOrigin == null) {
+                    validationMessage = "Choose a starting point."
+                    originMode = "options"
+                    return@launch
+                }
+
                 val input = TripGenerationInput(
+                    origin = selectedOrigin.copy(),
+
                     title = "Trip ${tripsStore.completedTrips.size + 1}",
                     description = "Random mock route with $boundedMinutes planned minutes.",
                     imageUrl = "",
@@ -311,6 +358,7 @@ internal fun TransitOpeningScreen(
             planner.selectedTransportIds == saved.selectedTransports.map { it.id } &&
             planner.selectedZoneIds == saved.selectedZoneIds &&
             planner.selectedZonesByTransport == saved.selectedZonesByTransport &&
+            planner.origin == saved.start &&
             planner.intensity == saved.attractionIntensity) {
             copiedTripToGenerate = null
             performPrimaryAction()
@@ -322,6 +370,7 @@ internal fun TransitOpeningScreen(
         pendingReviewId == null
     ) {
         TripLoadingContent(
+            origin = planner.origin,
             minutes = boundedMinutes,
             transportSummary = transportTypes
                 .filter { it.id in selectedTransportIds }
@@ -397,86 +446,160 @@ internal fun TransitOpeningScreen(
         return
     }
 
-    MainPlannerContent(
-        minutes = boundedMinutes,
-        onMinutesChange = {
-            if (canChangeInputs()) {
-                plannerViewModel.setMinutes(it)
-                clearValidation()
-            }
-        },
-        transportTypes = transportTypes,
-        selectedTransportIds = selectedTransportIds,
-        selectedZonesByTransport = transportTypes.filter { it.usesRoutes }.associate {
-            it.id to planner.zonesForTransport(it.id)
-        },
-        onToggleTransport = { id ->
-            if (canChangeInputs()) {
-                plannerViewModel.toggleTransport(
-                    id = id,
-                    availableIds = transportTypes.map { it.id }.toSet()
-                )
-                clearValidation()
-            }
-        },
-        onToggleZone = { transportId, id ->
-            if (canChangeInputs()) {
-                plannerViewModel.toggleZone(transportId, id)
-                clearValidation()
-            }
-        },
-        intensity = intensity,
-        walkingPreference = planner.walkingPreference,
-        bikeSpeedKmh = planner.bikeSpeedKmh,
-        onBikeSpeedChange = { if (canChangeInputs()) plannerViewModel.setBikeSpeedKmh(it) },
-        selectedAttractionIds = planner.selectedAttractionIds,
-        onWalkingPreferenceChange = {
-            if (canChangeInputs()) plannerViewModel.setWalkingPreference(it)
-        },
-        onToggleAttraction = {
-            if (canChangeInputs()) plannerViewModel.toggleAttraction(it)
-        },
-        onIntensityChange = {
-            if (canChangeInputs()) {
-                plannerViewModel.setIntensity(it)
-                clearValidation()
-            }
-        },
-        validationMessage = validationMessage,
-        actionLabel = pendingActionLabel ?: actionLabel,
-        actionEnabled = isDestinationActive &&
-            !processingAction &&
-            pendingOpenTripId == null &&
-            actionHasCallback &&
-            (
-                activeState != null ||
-                pendingReviewId != null ||
-                generationBounds != null
-            ),
-        inputsEnabled = canChangeInputs(),
-        activeTripSummary = if (pendingOpenTripId != null) {
-            pendingSummary
+    if (originMode != "planner" &&
+        isDestinationActive &&
+        activeState == null &&
+        pendingOpenTripId == null
+    ) {
+        val draftOrigin = if (
+            originDraftX != null && originDraftY != null
+        ) {
+            TripPoint(
+                "Selected point on map",
+                originDraftX!!,
+                originDraftY!!
+            )
         } else {
-            activeSummary
-        },
-        pendingReviewSummary = if (pendingOpenTripId != null) {
             null
-        } else {
-            completedSummary
-        },
-        onPrimaryAction = { performPrimaryAction() },
-        onOpenDetailedSettings = {
-            if (
-                canChangeInputs() &&
-                navigator.current == MainScreenKey
-            ) {
-                navigation.openSection(SettingsScreenKey)
-            }
-        },
-        controlsVisible =
-            isDestinationActive && pendingOpenTripId == null,
-        onControlsHidden = { finishPlannerExit() },
-        onMapViewportReady = { generationBounds = it },
-        modifier = modifier
-    )
+        }
+
+        OriginSelectionContent(
+            origin = if (originMode == "pick") draftOrigin else planner.origin,
+            minutes = boundedMinutes,
+            locationAccessOff = planner.locationAccessOff,
+            picking = originMode == "pick",
+            enabled = canChangeInputs(),
+            message = originMessage,
+            onPick = { point ->
+                if (canChangeInputs()) {
+                    originDraftX = point.x
+                    originDraftY = point.y
+                }
+            },
+            onChooseMap = {
+                originDraftX = null
+                originDraftY = null
+                originMessage = null
+                originMode = "pick"
+            },
+            onConfirm = {
+                if (canChangeInputs() && draftOrigin != null) {
+                    plannerViewModel.setOrigin(draftOrigin)
+                    proposalJson = null
+                    clearValidation()
+                    originMode = "planner"
+                    originMessage = null
+                }
+            },
+            onSearch = {
+                originMessage =
+                    "Place and address search is not connected in this sample. " +
+                        "Choose a point on the map."
+            },
+            onRetryLocation = {
+                originMessage =
+                    "Live location is not connected in this sample. " +
+                        "Your choices are kept."
+            },
+            onBack = {
+                originMessage = null
+                originMode = if (originMode == "pick") "options" else "planner"
+            },
+            modifier = modifier
+        )
+        return
+    }
+
+    plannerPresentationState.SaveableStateProvider("main-planner") {
+        MainPlannerContent(
+            minutes = boundedMinutes,
+            onMinutesChange = {
+                if (canChangeInputs()) {
+                    plannerViewModel.setMinutes(it)
+                    clearValidation()
+                }
+            },
+            transportTypes = transportTypes,
+            selectedTransportIds = selectedTransportIds,
+            selectedZonesByTransport = transportTypes
+                .filter { it.usesRoutes }
+                .associate { it.id to planner.zonesForTransport(it.id) },
+            onToggleTransport = { id ->
+                if (canChangeInputs()) {
+                    plannerViewModel.toggleTransport(
+                        id,
+                        transportTypes.map { it.id }.toSet()
+                    )
+                    clearValidation()
+                }
+            },
+            onToggleZone = { transportId, id ->
+                if (canChangeInputs()) {
+                    plannerViewModel.toggleZone(transportId, id)
+                    clearValidation()
+                }
+            },
+            intensity = intensity,
+            onIntensityChange = {
+                if (canChangeInputs()) {
+                    plannerViewModel.setIntensity(it)
+                    clearValidation()
+                }
+            },
+            walkingPreference = planner.walkingPreference,
+            bikeSpeedKmh = planner.bikeSpeedKmh,
+            onBikeSpeedChange = {
+                if (canChangeInputs()) plannerViewModel.setBikeSpeedKmh(it)
+            },
+            selectedAttractionIds = planner.selectedAttractionIds,
+            onWalkingPreferenceChange = {
+                if (canChangeInputs()) {
+                    plannerViewModel.setWalkingPreference(it)
+                }
+            },
+            onToggleAttraction = {
+                if (canChangeInputs()) plannerViewModel.toggleAttraction(it)
+            },
+            validationMessage = validationMessage,
+            actionLabel = pendingActionLabel ?: actionLabel,
+            actionEnabled = isDestinationActive &&
+                !processingAction &&
+                pendingOpenTripId == null &&
+                actionHasCallback &&
+                (
+                    activeState != null ||
+                        pendingReviewId != null ||
+                        (generationBounds != null && planner.origin != null)
+                ),
+            inputsEnabled = canChangeInputs(),
+            activeTripSummary = if (pendingOpenTripId != null) {
+                pendingSummary
+            } else {
+                activeSummary
+            },
+            pendingReviewSummary = if (pendingOpenTripId != null) {
+                null
+            } else {
+                completedSummary
+            },
+            onPrimaryAction = { performPrimaryAction() },
+            onOpenDetailedSettings = {
+                if (canChangeInputs() && navigator.current == MainScreenKey) {
+                    navigation.openSection(SettingsScreenKey)
+                }
+            },
+            controlsVisible = isDestinationActive && pendingOpenTripId == null,
+            onControlsHidden = { finishPlannerExit() },
+            onMapViewportReady = { generationBounds = it },
+            origin = planner.origin,
+            onEditOrigin = {
+                if (canChangeInputs()) {
+                    originMessage = null
+                    originMode = "options"
+                }
+            },
+            modifier = modifier
+        )
+    }
+
 }

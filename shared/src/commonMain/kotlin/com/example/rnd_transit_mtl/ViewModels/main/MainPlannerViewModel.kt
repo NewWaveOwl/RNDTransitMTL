@@ -1,5 +1,6 @@
 package com.example.rnd_transit_mtl.ViewModels.main
 
+import com.example.rnd_transit_mtl.model.trip.TripPoint
 import androidx.lifecycle.ViewModel
 import com.example.rnd_transit_mtl.model.trip.Trip
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,6 +19,8 @@ import kotlinx.serialization.Serializable
  * @property bikeSpeedKmh Preferred cycling speed in km/h, retained for future routing.
  * @property selectedAttractionIds Attraction preferences retained for future routing.
  * @property selectedZonesByTransport Independent zones for each transit mode, including disabled modes.
+ * @property origin Selected source-image point; default coordinates are labelled sample data.
+ * @property locationAccessOff Explicit adapter or preview permission state; no GPS is queried.
  */
 @Serializable
 data class MainPlannerState(
@@ -28,13 +31,24 @@ data class MainPlannerState(
     val walkingPreference: String = "Amble",
     val selectedAttractionIds: List<String> = listOf("Nature", "Surprise"),
     val selectedZonesByTransport: Map<String, List<String>> = emptyMap(),
-    val bikeSpeedKmh: Int = 18
+    val bikeSpeedKmh: Int = 18,
+
+    // Labelled sample data; these are PNG coordinates, not GPS.
+    val origin: TripPoint? = TripPoint("Current location", 0.5f, 0.35f),
+
+    // Supplied by a future permission adapter, or a labelled preview fixture.
+    val locationAccessOff: Boolean = false
 ) {
-    /** Returns this mode's saved zones, falling back to the shared choice from older drafts.
+    /** Returns independently saved zones, with legacy shared-zone fallback.
      * @param transportId Transit mode whose zones are requested.
      */
     fun zonesForTransport(transportId: String): List<String> =
-        selectedZonesByTransport[transportId] ?: if (transportId in selectedTransportIds) selectedZoneIds else emptyList()
+        selectedZonesByTransport[transportId]
+            ?: if (transportId in selectedTransportIds) {
+                selectedZoneIds
+            } else {
+                emptyList()
+            }
 }
 
 /**
@@ -67,11 +81,33 @@ class MainPlannerViewModel(
      * @param trip Saved trip; its identity, endpoints, and review are never changed.
      */
     fun copyTripPreferences(trip: Trip) {
-        mutableUiState.update { it.copy(minutes = trip.plannedMinutes,
-            selectedTransportIds = trip.selectedTransports.map { mode -> mode.id },
-            selectedZoneIds = trip.selectedZoneIds.toList(),
-            selectedZonesByTransport = trip.selectedZonesByTransport.mapValues { entry -> entry.value.toList() },
-            intensity = trip.attractionIntensity) }
+        mutableUiState.update {
+            it.copy(
+                minutes = Trip.coercePlannedMinutes(trip.plannedMinutes),
+                selectedTransportIds = trip.selectedTransports.map { mode ->
+                    mode.id
+                },
+                selectedZoneIds = trip.selectedZoneIds.toList(),
+                selectedZonesByTransport =
+                    trip.selectedZonesByTransport.mapValues { entry ->
+                        entry.value.toList()
+                    },
+                intensity = trip.attractionIntensity,
+                origin = trip.start.copy()
+            )
+        }
+    }
+
+    /** Updates the selected sample-map origin.
+     * @param point Source-image coordinates and a nonblank display label.
+     */
+    fun setOrigin(point: TripPoint) {
+        val label = point.label.trim()
+        if (label.isBlank()) return
+
+        mutableUiState.update {
+            it.copy(origin = point.copy(label = label))
+        }
     }
 
     /**

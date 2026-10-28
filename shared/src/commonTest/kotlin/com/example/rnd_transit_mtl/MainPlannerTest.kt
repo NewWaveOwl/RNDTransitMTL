@@ -7,6 +7,9 @@ import com.example.rnd_transit_mtl.data.generation.TripGenerationInput
 import com.example.rnd_transit_mtl.data.generation.TripGenerationResult
 import com.example.rnd_transit_mtl.model.transport.TransportType
 import com.example.rnd_transit_mtl.model.trip.Trip
+import com.example.rnd_transit_mtl.model.trip.TripPoint
+import com.example.rnd_transit_mtl.data.generation.TripGenerationBounds
+import kotlin.test.assertTrue
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.random.Random
@@ -249,6 +252,55 @@ class MainPlannerTest {
         // Default-valued fields are omitted, matching records saved before zone support.
         val oldRecord = Json.encodeToString(trip)
         assertEquals(emptyList(), Json.decodeFromString<Trip>(oldRecord).selectedZoneIds)
+    }
+
+    @Test
+    fun originRestoresAndEditingItKeepsAllOtherChoices() {
+        val legacy = Json.decodeFromString<MainPlannerState>("""{"minutes":45}""")
+        assertEquals(TripPoint("Current location", 0.5f, 0.35f), legacy.origin)
+        val initial = MainPlannerState(minutes = 45, walkingPreference = "Dash",
+            bikeSpeedKmh = 26, selectedZonesByTransport = mapOf("bus" to listOf("C")),
+            origin = null, locationAccessOff = true)
+        val planner = MainPlannerViewModel(initial)
+        val point = TripPoint("  Selected point  ", 0.23f, 0.67f)
+        planner.setOrigin(point)
+        val expected = initial.copy(origin = point.copy(label = "Selected point"))
+        assertEquals(expected, planner.uiState.value)
+        assertEquals(expected, Json.decodeFromString<MainPlannerState>(Json.encodeToString(expected)))
+        assertEquals(initial, Json.decodeFromString<MainPlannerState>(Json.encodeToString(initial)))
+    }
+
+    @Test
+    fun selectedOriginIsNotTransformedAgainAndDestinationStaysInBounds() {
+        val bounds = TripGenerationBounds(0.3f, 0.2f, 0.7f, 0.6f)
+        val generator = MockTripGenerator(random = Random(41), idFactory = { "origin-trip" },
+            nowEpochMillis = { 1_000L })
+        listOf(TripPoint("Selected point", 0.43f, 0.31f),
+            TripPoint("Outside visible crop", 0f, 1f)).forEach { origin ->
+            repeat(20) {
+                val trip = assertIs<TripGenerationResult.Success>(generator.generate(
+                    input(emptyList()).copy(selectedTransportIds = listOf("walk"), origin = origin),
+                    types, emptyList(), emptySet(), bounds)).trip
+                assertEquals(origin, trip.start)
+                assertTrue(trip.destination.x in bounds.left..bounds.right)
+                assertTrue(trip.destination.y in bounds.top..bounds.bottom)
+                assertTrue(origin.normalizedDistanceTo(trip.destination) >= 0.099999)
+                assertTrue(trip.distanceKm > 0)
+            }
+        }
+    }
+
+    @Test
+    fun repeatedRandomPointFallsBackToAFarCorner() {
+        val constantRandom = object : Random() { override fun nextBits(bitCount: Int): Int = 0 }
+        val origin = TripPoint("Selected point", MockTripGenerator.SAFE_MIN, MockTripGenerator.SAFE_MIN)
+        val trip = assertIs<TripGenerationResult.Success>(MockTripGenerator(
+            random = constantRandom, idFactory = { "fallback" }, nowEpochMillis = { 1_000L }
+        ).generate(input(emptyList()).copy(selectedTransportIds = listOf("walk"), origin = origin),
+            types, emptyList(), emptySet())).trip
+        assertEquals(origin, trip.start)
+        assertEquals(TripPoint("Destination", MockTripGenerator.SAFE_MAX, MockTripGenerator.SAFE_MAX),
+            trip.destination)
     }
 
     private fun input(zones: List<String>) = TripGenerationInput(
