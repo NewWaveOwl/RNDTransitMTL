@@ -1,24 +1,25 @@
 package com.example.rnd_transit_mtl.View.main
 
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import com.example.rnd_transit_mtl.View.current_trip.ActiveMapContent
-import com.example.rnd_transit_mtl.state.trip.TRIP_SIMULATION_DURATION_MILLIS
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
-import com.example.rnd_transit_mtl.model.trip.TripPoint
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigationevent.NavigationEventInfo
+import androidx.navigationevent.compose.NavigationBackHandler
+import androidx.navigationevent.compose.rememberNavigationEventState
+import com.example.rnd_transit_mtl.View.current_trip.ActiveMapContent
+import com.example.rnd_transit_mtl.ViewModels.main.MainPlannerState
+import com.example.rnd_transit_mtl.ViewModels.main.MainPlannerViewModel
 import com.example.rnd_transit_mtl.data.generation.MockTripGenerator
 import com.example.rnd_transit_mtl.data.generation.TripGenerationBounds
 import com.example.rnd_transit_mtl.data.generation.TripGenerationInput
@@ -26,20 +27,31 @@ import com.example.rnd_transit_mtl.data.generation.TripGenerationResult
 import com.example.rnd_transit_mtl.model.transport.TransportRoute
 import com.example.rnd_transit_mtl.model.transport.TransportType
 import com.example.rnd_transit_mtl.model.trip.Trip
-import com.example.rnd_transit_mtl.state.trip.LocalTripsStore
-import com.example.rnd_transit_mtl.state.trip.TripActionResult
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.rnd_transit_mtl.ViewModels.main.MainPlannerState
-import com.example.rnd_transit_mtl.ViewModels.main.MainPlannerViewModel
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import com.example.rnd_transit_mtl.model.trip.TripPoint
 import com.example.rnd_transit_mtl.navigation.LocalNavigator
 import com.example.rnd_transit_mtl.navigation.LocalTripNavigation
 import com.example.rnd_transit_mtl.navigation.MainScreenKey
 import com.example.rnd_transit_mtl.navigation.SettingsScreenKey
+import com.example.rnd_transit_mtl.state.trip.LocalTripsStore
+import com.example.rnd_transit_mtl.state.trip.TRIP_SIMULATION_DURATION_MILLIS
+import com.example.rnd_transit_mtl.state.trip.TripActionResult
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
-/** Saves planner selections and starts or resumes one generated mock trip. */
+/** Saves planner selections and starts or resumes one generated mock trip.
+ * @param transportTypes Supported mode catalogue.
+ * @param transportRoutes Supported route catalogue.
+ * @param onOpenCurrentTrip Requests active-trip navigation after the planner exit.
+ * @param onOpenCompletedTrip Requests saved completion navigation.
+ * @param isDestinationActive Whether this destination accepts actions.
+ * @param modifier Parent layout constraints.
+ * @param sampleOutcome Explicit preview/test fixture; Normal is used by the application.
+ */
 @Composable
 internal fun TransitOpeningScreen(
     transportTypes: List<TransportType>,
@@ -47,7 +59,8 @@ internal fun TransitOpeningScreen(
     onOpenCurrentTrip: ((Trip) -> Boolean)? = null,
     onOpenCompletedTrip: ((String) -> Boolean)? = null,
     isDestinationActive: Boolean = true,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    sampleOutcome: Trip33Sample = Trip33Sample.Normal
 ) {
     val tripsStore = LocalTripsStore.current
     val generator = remember { MockTripGenerator() }
@@ -129,6 +142,42 @@ internal fun TransitOpeningScreen(
     val proposal = remember(proposalJson) {
         proposalJson?.let { Json.decodeFromString<Trip>(it) }
     }
+    var failureName by rememberSaveable {
+        mutableStateOf<String?>(null)
+    }
+    var failureMessage by rememberSaveable {
+        mutableStateOf("")
+    }
+    var requestSummary by rememberSaveable {
+        mutableStateOf("")
+    }
+    var pickingOrigin by rememberSaveable {
+        mutableStateOf(false)
+    }
+
+    val failure = Trip33Failure.entries.firstOrNull {
+        it.name == failureName
+    }
+
+    val proposalGuard = remember {
+        ProposalGuard(
+            initialProposalId = if (failureName == null) proposal?.id else null
+        )
+    }
+
+    fun closeProposalFlow() {
+        proposalGuard.cancel()
+        generationJob?.cancel()
+        generationJob = null
+        processingAction = false
+        proposalJson = null
+        failureName = null
+        failureMessage = ""
+        pickingOrigin = false
+        originMode = "planner"
+        originMessage = null
+    }
+
     // Save only the opening intent and temporary labels, not a second Trip.
     var pendingOpenTripId by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingActionLabel by rememberSaveable { mutableStateOf<String?>(null) }
@@ -168,8 +217,7 @@ internal fun TransitOpeningScreen(
     // Choosing another section cancels the opening intent, keeping the trip.
     LaunchedEffect(isDestinationActive) {
         if (!isDestinationActive) {
-            generationJob?.cancel()
-            proposalJson = null
+            closeProposalFlow()
             pendingOpenTripId = null
             pendingActionLabel = null
             pendingSummary = null
@@ -215,117 +263,171 @@ internal fun TransitOpeningScreen(
     }
 
     fun performPrimaryAction() {
-        if (!latestDestinationActive || processingAction || pendingOpenTripId != null) return
+        if (!latestDestinationActive ||
+            processingAction ||
+            pendingOpenTripId != null
+        ) return
 
+        tripsStore.activeTrip?.let { active ->
+            if (latestOpenCurrentTrip != null) {
+                queueTripOpening(active.id)
+            } else {
+                validationMessage = "Current Trip navigation is unavailable."
+            }
+            return
+        }
+
+        tripsStore.pendingReviewTripId?.let { completedId ->
+            if (latestOpenCompletedTrip != null) {
+                queueTripOpening(completedId)
+            } else {
+                validationMessage = "Completed Trip navigation is unavailable."
+            }
+            return
+        }
+
+        val token = proposalGuard.begin()
+        proposalJson = null
+        failureName = null
+        failureMessage = ""
+        validationMessage = ""
         processingAction = true
 
+        val modes = transportTypes
+            .filter { it.id in planner.selectedTransportIds }
+            .joinToString(" + ") { it.label }
+
+        requestSummary =
+            "$boundedMinutes minutes · $modes · " +
+                (planner.origin?.label ?: "Choose starting point")
+
         generationJob = generationScope.launch {
+            fun fail(kind: Trip33Failure, message: String = "") {
+                if (proposalGuard.complete(token, null)) {
+                    proposalJson = null
+                    failureName = kind.name
+                    failureMessage = message
+                }
+            }
+
             try {
-                // Re-read the store at click time, including before generation.
-                val existingActive = tripsStore.activeTrip
-                if (existingActive != null) {
-                    val openTrip = latestOpenCurrentTrip
-                    if (openTrip == null) {
-                        validationMessage = "Current Trip navigation is unavailable."
-                        return@launch
-                    }
-                    validationMessage = ""
-
-                    queueTripOpening(existingActive.id)
-                    return@launch
-                }
-
-                val pendingId = tripsStore.pendingReviewTripId
-                if (pendingId != null) {
-                    val openCompleted = latestOpenCompletedTrip
-                    if (openCompleted == null) {
-                        validationMessage = "Your completed trip is saved. Try opening it again."
-                    } else {
-                        validationMessage = ""
-                        queueTripOpening(pendingId)
-                    }
-                    return@launch
-                }
-
-                val openTrip = latestOpenCurrentTrip
-                if (openTrip == null) {
-                    validationMessage = "Current Trip navigation is unavailable."
-                    return@launch
-                }
-
                 val bounds = generationBounds
                 if (bounds == null) {
-                    validationMessage = "The map is preparing. Please try GO again."
+                    fail(
+                        Trip33Failure.InvalidInput,
+                        "The map is preparing. Please try again."
+                    )
                     return@launch
                 }
-                validationMessage = ""
+
+                val origin = planner.origin
+                if (origin == null ||
+                    (sampleOutcome == Trip33Sample.PermissionDenied &&
+                        !planner.originIsManual)
+                ) {
+                    fail(Trip33Failure.PermissionDenied)
+                    return@launch
+                }
 
                 val transitModes = transportTypes.filter {
                     it.usesRoutes && it.id in planner.selectedTransportIds
                 }
-                val zonesByTransport = transitModes.associate { it.id to planner.zonesForTransport(it.id).toList() }
-                val missingZones = transitModes.firstOrNull { zonesByTransport[it.id].isNullOrEmpty() }
-                if (missingZones != null) {
-                    validationMessage = "Choose at least one transit zone for ${missingZones.label}."
-                    return@launch
+
+                val zones = transitModes.associate {
+                    it.id to planner.zonesForTransport(it.id).toList()
                 }
 
-                val selectedOrigin = planner.origin
-                if (selectedOrigin == null) {
-                    validationMessage = "Choose a starting point."
-                    originMode = "options"
+                val missingZones = transitModes.firstOrNull {
+                    zones[it.id].isNullOrEmpty()
+                }
+
+                if (missingZones != null) {
+                    fail(
+                        Trip33Failure.InvalidInput,
+                        "Choose at least one transit zone for ${missingZones.label}."
+                    )
                     return@launch
                 }
 
                 val input = TripGenerationInput(
-                    origin = selectedOrigin.copy(),
-
                     title = "Trip ${tripsStore.completedTrips.size + 1}",
                     description = "Random mock route with $boundedMinutes planned minutes.",
                     imageUrl = "",
                     plannedMinutes = boundedMinutes,
-                    selectedTransportIds = selectedTransportIds.toList(),
+                    selectedTransportIds = planner.selectedTransportIds.toList(),
                     selectedRouteIds = emptyList(),
-                    selectedZoneIds = zonesByTransport.values.flatten().distinct().sorted(),
-                    selectedZonesByTransport = zonesByTransport,
-                    attractionIntensity = intensity
+                    attractionIntensity = planner.intensity,
+                    selectedZoneIds = zones.values.flatten().distinct().sorted(),
+                    selectedZonesByTransport = zones,
+                    origin = origin.copy()
                 )
+
+                // Explicit samples are distinct from validation failures.
+                when (sampleOutcome) {
+                    Trip33Sample.NoRoute -> {
+                        fail(Trip33Failure.NoRoute)
+                        return@launch
+                    }
+                    Trip33Sample.ProviderError -> {
+                        fail(Trip33Failure.ProviderUnavailable)
+                        return@launch
+                    }
+                    else -> Unit
+                }
 
                 val existingIds = buildSet {
                     addAll(tripsStore.completedTrips.map { it.id })
                     tripsStore.activeTrip?.let { add(it.id) }
                 }
 
-                when (
-                    val generated = withContext(Dispatchers.Default) {
-                        generator.generate(
+                val generated = withContext(Dispatchers.Default) {
+                    generator.generate(
                         input = input,
                         transportTypes = transportTypes,
                         transportRoutes = transportRoutes,
                         existingTripIds = existingIds,
                         bounds = bounds
-                        )
+                    )
+                }
+
+                when (generated) {
+                    is TripGenerationResult.Success -> {
+                        val encoded = Json.encodeToString(generated.trip)
+
+                        if (latestDestinationActive &&
+                            proposalGuard.complete(token, generated.trip.id)
+                        ) {
+                            proposalJson = encoded
+                        }
                     }
-                ) {
+
                     is TripGenerationResult.InvalidInput -> {
-                        validationMessage = generated.message
+                        fail(
+                            Trip33Failure.InvalidInput,
+                            generated.message
+                        )
                     }
 
                     TripGenerationResult.IdUnavailable -> {
-                        validationMessage =
-                            "A unique trip ID could not be created. Please try again."
-                    }
-
-                    is TripGenerationResult.Success -> {
-                        proposalJson = Json.encodeToString(generated.trip)
+                        fail(
+                            Trip33Failure.InvalidInput,
+                            "A unique trip ID could not be created. Try again."
+                        )
                     }
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (error: Exception) {
-                validationMessage = "Unable to generate a trip. Please try again."
+            } catch (_: Exception) {
+                // An unexpected mock-generation exception is not evidence
+                // that a real routing provider is unavailable.
+                fail(
+                    Trip33Failure.InvalidInput,
+                    "The sample request could not finish. Please try again."
+                )
             } finally {
-                processingAction = false
+                if (proposalGuard.isCurrent(token)) {
+                    processingAction = false
+                }
             }
         }
     }
@@ -345,7 +447,7 @@ internal fun TransitOpeningScreen(
             val saved = tripsStore.findCompleted(copyRequest.first)
             navigation.consumePlannerCopy()
             if (saved != null) {
-                proposalJson = null
+                closeProposalFlow()
                 plannerViewModel.copyTripPreferences(saved)
                 if (copyRequest.second) copiedTripToGenerate = saved
             }
@@ -365,6 +467,81 @@ internal fun TransitOpeningScreen(
         }
     }
 
+    fun closeCurrentProposalScreen() {
+        if (pickingOrigin) {
+            pickingOrigin = false
+        } else {
+            closeProposalFlow()
+        }
+    }
+
+    val proposalScreenVisible =
+        processingAction || proposal != null || failure != null
+
+    val proposalBackState = rememberNavigationEventState(
+        currentInfo = NavigationEventInfo.None
+    )
+
+    NavigationBackHandler(
+        state = proposalBackState,
+        isBackEnabled = isDestinationActive && proposalScreenVisible,
+        onBackCompleted = { closeCurrentProposalScreen() }
+    )
+
+    val proposalModifier = modifier.onPreviewKeyEvent {
+        if (isDestinationActive &&
+            proposalScreenVisible &&
+            it.type == KeyEventType.KeyDown &&
+            it.key == Key.Escape
+        ) {
+            closeCurrentProposalScreen()
+            true
+        } else {
+            false
+        }
+    }
+
+    if (failure != null && isDestinationActive) {
+        Trip33FallbackContent(
+            failure = failure,
+            detail = failureMessage,
+            requestSummary = requestSummary,
+            originLabel = planner.origin?.label ?: "Choose starting point",
+            pickingOrigin = pickingOrigin,
+            enabled = !processingAction,
+            onChooseMap = {
+                pickingOrigin = true
+                failureMessage = ""
+            },
+            onConfirmOrigin = { point ->
+                plannerViewModel.setManualOrigin(point)
+                closeProposalFlow()
+            },
+            onRetry = {
+                closeProposalFlow()
+                performPrimaryAction()
+            },
+            onEditSettings = {
+                closeProposalFlow()
+            },
+            onUnavailableAction = {
+                failureMessage =
+                    "Address search and live location are not connected " +
+                        "in this sample. Choose a point on the map."
+            },
+            onCancelPicking = {
+                pickingOrigin = false
+            },
+            sampleLabel = if (sampleOutcome != Trip33Sample.Normal) {
+                "Sample · ${sampleOutcome.name}"
+            } else {
+                null
+            },
+            modifier = proposalModifier
+        )
+        return
+    }
+
     if (processingAction &&
         activeState == null &&
         pendingReviewId == null
@@ -375,10 +552,8 @@ internal fun TransitOpeningScreen(
             transportSummary = transportTypes
                 .filter { it.id in selectedTransportIds }
                 .joinToString(" and ") { it.label },
-            onCancel = {
-                generationJob?.cancel()
-            },
-            modifier = modifier
+            onCancel = { closeProposalFlow() },
+            modifier = proposalModifier
         )
         return
     }
@@ -389,9 +564,11 @@ internal fun TransitOpeningScreen(
             onStart = {
                 if (latestDestinationActive &&
                     !processingAction &&
+                    failure == null &&
+                    proposalGuard.canStart(proposal.id) &&
                     pendingOpenTripId == null
                 ) {
-                    when (val result = tripsStore.start(proposal)) {
+                    when (val result = proposalGuard.start(tripsStore, proposal)) {
                         TripActionResult.Applied -> {
                             proposalJson = null
                             queueTripOpening(proposal.id)
@@ -417,14 +594,11 @@ internal fun TransitOpeningScreen(
                 }
             },
             onGenerateAnother = {
-                proposalJson = null
-                performPrimaryAction()
-            },
-            onEditSettings = {
-                // Return to the planner with all current choices preserved.
-                proposalJson = null
-            },
-            modifier = modifier
+    closeProposalFlow()
+    performPrimaryAction()
+},
+            onEditSettings = { closeProposalFlow() },
+            modifier = proposalModifier
         )
         return
     }
@@ -484,7 +658,7 @@ internal fun TransitOpeningScreen(
             },
             onConfirm = {
                 if (canChangeInputs() && draftOrigin != null) {
-                    plannerViewModel.setOrigin(draftOrigin)
+                    plannerViewModel.setManualOrigin(draftOrigin)
                     proposalJson = null
                     clearValidation()
                     originMode = "planner"

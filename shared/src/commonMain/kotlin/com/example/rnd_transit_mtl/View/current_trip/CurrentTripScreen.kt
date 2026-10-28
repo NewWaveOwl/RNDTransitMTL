@@ -393,7 +393,9 @@ fun CurrentTripScreen(
                         )
                     ) {
                         TripActionResult.Applied,
-                        TripActionResult.AlreadyCompleted -> requestReview()
+                        TripActionResult.AlreadyCompleted -> {
+                            operationMessage = null
+                        }
 
                         else -> {
                             operationMessage =

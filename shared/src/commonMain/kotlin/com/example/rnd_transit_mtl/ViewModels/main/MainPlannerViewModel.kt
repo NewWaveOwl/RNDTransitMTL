@@ -21,6 +21,7 @@ import kotlinx.serialization.Serializable
  * @property selectedZonesByTransport Independent zones for each transit mode, including disabled modes.
  * @property origin Selected source-image point; default coordinates are labelled sample data.
  * @property locationAccessOff Explicit adapter or preview permission state; no GPS is queried.
+ * @property originIsManual Whether an origin was explicitly confirmed rather than inferred from GPS.
  */
 @Serializable
 data class MainPlannerState(
@@ -37,7 +38,8 @@ data class MainPlannerState(
     val origin: TripPoint? = TripPoint("Current location", 0.5f, 0.35f),
 
     // Supplied by a future permission adapter, or a labelled preview fixture.
-    val locationAccessOff: Boolean = false
+    val locationAccessOff: Boolean = false,
+    val originIsManual: Boolean = false
 ) {
     /** Returns independently saved zones, with legacy shared-zone fallback.
      * @param transportId Transit mode whose zones are requested.
@@ -93,7 +95,8 @@ class MainPlannerViewModel(
                         entry.value.toList()
                     },
                 intensity = trip.attractionIntensity,
-                origin = trip.start.copy()
+                origin = trip.start.copy(),
+                originIsManual = true
             )
         }
     }
@@ -106,9 +109,14 @@ class MainPlannerViewModel(
         if (label.isBlank()) return
 
         mutableUiState.update {
-            it.copy(origin = point.copy(label = label))
+            it.copy(origin = point.copy(label = label), originIsManual = true)
         }
     }
+
+    /** Saves a confirmed map origin without changing other planner preferences.
+     * @param point Normalized source-image point chosen by the user.
+     */
+    fun setManualOrigin(point: TripPoint) = setOrigin(point)
 
     /**
      * Updates the time using the existing five-minute bounds.

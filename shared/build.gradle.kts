@@ -101,6 +101,8 @@ kotlin {
         jvmTest.dependencies {
             // Native graphics runtime for interaction and animation regression checks on this host.
             runtimeOnly(compose.desktop.currentOs)
+            // Match the desktop app's UI dispatcher for lifecycle-aware coordinator tests.
+            runtimeOnly(libs.kotlinx.coroutinesSwing)
         }
     }
 }

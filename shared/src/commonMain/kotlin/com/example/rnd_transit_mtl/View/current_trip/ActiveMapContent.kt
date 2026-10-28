@@ -1,7 +1,9 @@
 package com.example.rnd_transit_mtl.View.current_trip
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
@@ -27,6 +30,11 @@ import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.MockTripMap
 import com.example.rnd_transit_mtl.ui.theme.*
 import kotlin.math.ceil
 import kotlin.math.roundToInt
+import org.jetbrains.compose.resources.painterResource
+import rnd_transit_mtl.shared.generated.resources.Res
+import rnd_transit_mtl.shared.generated.resources.rnd_recenter
+import rnd_transit_mtl.shared.generated.resources.rnd_turn_left
+import rnd_transit_mtl.shared.generated.resources.rnd_warning
 
 // Layout settings — dimensions in dp; the panel fraction keeps part of the route visible.
 private const val ActiveMapPanelMaximumHeightFraction = 0.56f
@@ -39,17 +47,30 @@ private val ActiveMapProgressCornerRadius = 24.dp
 private val ActiveMapPercentageWidth = 64.dp
 private val ActiveMapPercentageInset = 8.dp
 private val ActiveMapButtonMinimumHeight = 52.dp
+private val ActiveMapRecenterSize = 48.dp
+private val ActiveMapInstructionIconSize = 32.dp
+private val ActiveMapWarningIconSize = 26.dp
+private val ActiveMapWarningMinimumHeight = 88.dp
 
 /**
  * Supply instructions from routing data.
  * Leave null when using the current mock generator.
  * @param title Routing instruction heading.
  * @param detail Routing instruction details.
+ * @param showLeftTurnIcon Whether to use the exported instruction icon.
  */
 data class ActiveMapInstruction(
     val title: String,
-    val detail: String
+    val detail: String,
+    val showLeftTurnIcon: Boolean = false
 )
+
+/** Explicit location availability; sample progress is not a GPS reading. */
+enum class TripLocationState {
+    Sample,
+    Stale,
+    Missing
+}
 
 /** Shared active-trip/overview map with explicit completion and confirmed cancellation.
  * @param trip Stored trip whose identity and route remain unchanged.
@@ -64,6 +85,8 @@ data class ActiveMapInstruction(
  * @param mainOverview Whether to show the Main resume presentation.
  * @param onResume Opens the same stored trip.
  * @param onShowInformation Opens the existing information dialog.
+ * @param locationState Explicit sample, stale, or missing location state.
+ * @param sampleStateLabel Optional fixture label, never inferred from provider errors.
  */
 @Composable
 fun ActiveMapContent(
@@ -78,7 +101,9 @@ fun ActiveMapContent(
     operationMessage: String? = null,
     mainOverview: Boolean = false,
     onResume: () -> Unit = {},
-    onShowInformation: () -> Unit = {}
+    onShowInformation: () -> Unit = {},
+    locationState: TripLocationState = TripLocationState.Sample,
+    sampleStateLabel: String? = null
 ) {
     val fraction = if (progress.isFinite()) {
         progress.coerceIn(0f, 1f)
@@ -87,6 +112,27 @@ fun ActiveMapContent(
     }
     val completed = fraction >= 1f
     val reference = trip.id.takeLast(3)
+
+    var recenterRequest by rememberSaveable(trip.id) {
+        mutableStateOf(0)
+    }
+    var retainedMapProgress by rememberSaveable(trip.id) {
+        mutableStateOf(fraction)
+    }
+
+    LaunchedEffect(fraction, locationState) {
+        if (locationState == TripLocationState.Sample) {
+            retainedMapProgress = fraction
+        }
+    }
+
+    var confirmingFinish by rememberSaveable(trip.id) {
+        mutableStateOf(false)
+    }
+
+    LaunchedEffect(completed) {
+        if (completed) confirmingFinish = false
+    }
 
     var confirmingCancel by rememberSaveable(trip.id) {
         mutableStateOf(false)
@@ -105,34 +151,59 @@ fun ActiveMapContent(
                 MockTripMap(
                     start = trip.start,
                     destination = trip.destination,
-                    progress = fraction,
-                    interactive = actionsEnabled && !confirmingCancel,
+                    progress = retainedMapProgress,
+                    interactive = actionsEnabled && !confirmingCancel && !confirmingFinish,
                     matchPlannerBackground = true,
+                    recenterRequest = recenterRequest,
+                    showControls = false,
+                    showPosition = locationState != TripLocationState.Missing,
                     modifier = Modifier.fillMaxSize()
                 )
 
                 Column(
                     Modifier.align(Alignment.TopCenter).fillMaxWidth()
                 ) {
-                    if (!mainOverview && instruction != null) {
-                        Column(
+                    if (!mainOverview) {
+                        Row(
                             Modifier
+                                .padding(top = 16.dp)
                                 .fillMaxWidth()
                                 .background(TransitMain)
+                                .clickable(
+                                    enabled = actionsEnabled,
+                                    role = Role.Button,
+                                    onClickLabel = "Open current section information",
+                                    onClick = onShowInformation
+                                )
                                 .padding(horizontal = ActiveMapHorizontalPadding, vertical = ActiveMapPanelPadding),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Text(
-                                instruction.title,
-                                color = TransitWhite,
-                                fontSize = 19.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                instruction.detail,
-                                color = TransitWhite,
-                                fontSize = 13.sp
-                            )
+                            if (instruction?.showLeftTurnIcon == true) {
+                                Image(
+                                    painterResource(Res.drawable.rnd_turn_left),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(ActiveMapInstructionIconSize)
+                                )
+                            }
+
+                            Column(
+                                Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    instruction?.title ?: "Current section",
+                                    color = TransitWhite,
+                                    fontSize = 19.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    instruction?.detail
+                                        ?: trip.selectedRoutes.firstOrNull()?.label
+                                        ?: "Following the sample route",
+                                    color = TransitWhite,
+                                    fontSize = 13.sp
+                                )
+                            }
                         }
                     }
 
@@ -142,7 +213,8 @@ fun ActiveMapContent(
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Text(
-                            "Sample trip · #$reference",
+                            "Sample trip · #$reference" +
+                                sampleStateLabel?.let { " · $it" }.orEmpty(),
                             color = TransitMain,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
@@ -153,13 +225,43 @@ fun ActiveMapContent(
                         )
                     }
 
-                    if (!mainOverview && staleMessage != null) {
-                        TripWarning(
-                            title = "Location not updating",
-                            detail = staleMessage
-                        )
+                    if (!mainOverview) {
+                        when (locationState) {
+                            TripLocationState.Stale -> TripWarning(
+                                title = "Location not updating",
+                                detail = staleMessage
+                                    ?: "No recent reading. Route remains available."
+                            )
+
+                            TripLocationState.Missing -> TripWarning(
+                                title = "Location unavailable",
+                                detail = "Your saved route remains available."
+                            )
+
+                            TripLocationState.Sample -> {
+                                if (staleMessage != null) {
+                                    TripWarning("Location not updating", staleMessage)
+                                }
+                            }
+                        }
                     }
                 }
+
+                Image(
+                    painterResource(Res.drawable.rnd_recenter),
+                    contentDescription = "Recenter on current position",
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = 12.dp)
+                        .size(ActiveMapRecenterSize)
+                        .clickable(
+                            enabled = actionsEnabled && !confirmingCancel && !confirmingFinish &&
+                                locationState != TripLocationState.Missing,
+                            role = Role.Button
+                        ) {
+                            recenterRequest += 1
+                        }
+                )
 
                 Text(
                     "© OpenStreetMap contributors · Sample map",
@@ -230,7 +332,10 @@ fun ActiveMapContent(
                         TripActionButton(
                             label = if (completed) "Review trip" else "Finish trip",
                             enabled = actionsEnabled,
-                            onClick = onFinish,
+                            onClick = {
+                                if (completed) onFinish()
+                                else { confirmingCancel = false; confirmingFinish = true }
+                            },
                             modifier = Modifier.weight(1f)
                         )
 
@@ -238,7 +343,7 @@ fun ActiveMapContent(
                             label = "Cancel",
                             secondary = true,
                             enabled = actionsEnabled && !completed,
-                            onClick = { confirmingCancel = true },
+                            onClick = { confirmingFinish = false; confirmingCancel = true },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -297,6 +402,47 @@ fun ActiveMapContent(
                     label = "Keep travelling",
                     secondary = true,
                     onClick = { confirmingCancel = false }
+                )
+            }
+        }
+    }
+
+    if (confirmingFinish && !completed) {
+        Dialog(
+            onDismissRequest = { confirmingFinish = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Column(
+                Modifier
+                    .widthIn(max = ActiveMapDialogMaximumWidth)
+                    .fillMaxWidth()
+                    .background(TransitWhite)
+                    .verticalScroll(rememberScrollState())
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    "Finish this adventure?",
+                    color = TransitComplementary,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "This marks the sample trip as completed.",
+                    color = TransitComplementary
+                )
+                TripActionButton(
+                    "Yes, finish trip",
+                    onClick = {
+                        confirmingFinish = false
+                        onFinish()
+                    },
+                    enabled = actionsEnabled
+                )
+                TripActionButton(
+                    "Keep travelling",
+                    onClick = { confirmingFinish = false },
+                    secondary = true
                 )
             }
         }
@@ -399,25 +545,42 @@ internal fun TripWarning(
     detail: String,
     modifier: Modifier = Modifier
 ) {
-    Column(
+    Row(
         modifier
             .fillMaxWidth()
+            .heightIn(min = ActiveMapWarningMinimumHeight)
             .background(TransitOrange)
-            .padding(horizontal = 16.dp, vertical = 14.dp)
+            .padding(
+                start = 14.dp, end = 16.dp,
+                top = 12.dp, bottom = 14.dp
+            )
             .semantics { liveRegion = LiveRegionMode.Polite },
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text(
-            title,
-            color = TransitComplementary,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold
+        Image(
+            painterResource(Res.drawable.rnd_warning),
+            contentDescription = null,
+            modifier = Modifier
+                .padding(top = 4.dp)
+                .size(ActiveMapWarningIconSize)
         )
-        Text(
-            detail,
-            color = TransitComplementary,
-            fontSize = 14.sp
-        )
+
+        Column(
+            Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                title,
+                color = TransitComplementary,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                detail,
+                color = TransitComplementary,
+                fontSize = 14.sp
+            )
+        }
     }
 }
 

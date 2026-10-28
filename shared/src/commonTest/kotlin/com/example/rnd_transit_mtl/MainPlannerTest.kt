@@ -264,7 +264,7 @@ class MainPlannerTest {
         val planner = MainPlannerViewModel(initial)
         val point = TripPoint("  Selected point  ", 0.23f, 0.67f)
         planner.setOrigin(point)
-        val expected = initial.copy(origin = point.copy(label = "Selected point"))
+        val expected = initial.copy(origin = point.copy(label = "Selected point"), originIsManual = true)
         assertEquals(expected, planner.uiState.value)
         assertEquals(expected, Json.decodeFromString<MainPlannerState>(Json.encodeToString(expected)))
         assertEquals(initial, Json.decodeFromString<MainPlannerState>(Json.encodeToString(initial)))

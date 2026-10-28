@@ -55,7 +55,6 @@ private val PreferenceChoiceCornerRadius = 14.dp
 private val PreferenceChoiceHorizontalPadding = 8.dp
 private val PreferenceChoiceVerticalPadding = 10.dp
 private val ZoneDropdownMinimumHeight = 203.dp
-private val IntensityBandHeight = 160.dp
 
 // Animation settings — shared by Walk and transit dropdowns. Larger duration means slower motion.
 private const val PREFERENCE_DROPDOWN_ANIMATION_DURATION_MILLIS = 500
@@ -179,11 +178,6 @@ internal fun LazyListScope.PlannerPreferenceBands(
             Text("Sample routes don’t yet reflect walking pace, bike speed, or attraction preferences.",
                 color = TransitWhite, style = MaterialTheme.typography.bodySmall)
         }
-    }
-    item(key = "intensity") {
-        IntensityPanel(layoutScale = scale, intensity = intensity, onIntensityChange = onIntensityChange,
-            validationMessage = "", enabled = enabled,
-            modifier = Modifier.fillMaxWidth().heightIn(min = IntensityBandHeight * scale))
     }
     item(key = "settings") {
         PreferenceBand(TransitComplementary, scale) {

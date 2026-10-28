@@ -20,7 +20,11 @@ import com.example.rnd_transit_mtl.ui.global_ui_ellements.trip.TripInformationPa
 
 // Layout settings — maximum fraction of the viewport used by scrollable trip information.
 private const val TripInformationMaximumHeightFraction = 0.6f
-/** Map and compact progress footer; trip information appears only in a popup. */
+/** Map and compact progress footer; trip information appears only in a popup.
+ * @param instruction Optional routing or explicitly labelled sample instruction.
+ * @param locationState Explicit sample, stale, or missing reading state.
+ * @param staleMessage Optional explanation for a stale reading.
+ */
 @Composable
 fun CurrentTripContent(
     trip: Trip,
@@ -38,7 +42,10 @@ fun CurrentTripContent(
     onDismissInformation: () -> Unit = {},
     mapInteractive: Boolean = false,
     onShowInformation: () -> Unit = {},
-    animateEntrance: Boolean = false
+    animateEntrance: Boolean = false,
+    instruction: ActiveMapInstruction? = null,
+    locationState: TripLocationState = TripLocationState.Sample,
+    staleMessage: String? = null
 ) {
     val boundedProgress = boundedTripProgress(progress)
     val completed = boundedProgress == 1f
@@ -49,6 +56,9 @@ fun CurrentTripContent(
             progress = boundedProgress,
             actionsEnabled = actionsEnabled,
             operationMessage = message,
+            instruction = instruction,
+            locationState = locationState,
+            staleMessage = staleMessage,
             onFinish = { if (completed) onRequestReview() else onFinishRequested() },
             onConfirmCancel = onCancel,
             onShowInformation = onShowInformation,

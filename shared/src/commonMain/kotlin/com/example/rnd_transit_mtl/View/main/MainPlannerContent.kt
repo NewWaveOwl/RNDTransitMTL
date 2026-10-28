@@ -1,5 +1,10 @@
 package com.example.rnd_transit_mtl.View.main
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -80,6 +85,7 @@ private val PlannerGoPreferencesGap = 12f
 
 // Animation settings — larger millisecond values make snapping and handle taps slower.
 private const val PLANNER_SHEET_ANIMATION_DURATION_MILLIS = 300
+private const val PLANNER_ORIGIN_FIELD_ANIMATION_DURATION_MILLIS = 300
 // GO exit timing is shared with navigation/footer transitions: edit ui/global_ui_ellements/transitions/TripTransition.kt.
 
 /** Three resting positions corresponding to Figma main_screen, routes, and preferences. */
@@ -272,22 +278,36 @@ internal fun MainPlannerContent(
             val showMapControls =
                 controlsVisible && goTop >= 100f * unitPx
 
-            if (showMapControls) {
+            // Keep the field in the shared moving layer during GO's slide-down exit.
+            // Sheet expansion hides it upward; pulling the sheet down reveals it smoothly.
+            AnimatedVisibility(
+                visible = goTop >= 100f * unitPx,
+                enter = slideInVertically(
+                    animationSpec = tween(PLANNER_ORIGIN_FIELD_ANIMATION_DURATION_MILLIS),
+                    initialOffsetY = { -it }
+                ) + fadeIn(tween(PLANNER_ORIGIN_FIELD_ANIMATION_DURATION_MILLIS)),
+                exit = slideOutVertically(
+                    animationSpec = tween(PLANNER_ORIGIN_FIELD_ANIMATION_DURATION_MILLIS),
+                    targetOffsetY = { -it }
+                ) + fadeOut(tween(PLANNER_ORIGIN_FIELD_ANIMATION_DURATION_MILLIS)),
+                modifier = Modifier
+                    .padding(horizontal = PlannerOriginFieldHorizontalPadding * scale)
+                    .offset(y = PlannerOriginFieldTopPadding * scale)
+            ) {
                 TripLabelValueField(
                     label = "Starting point",
                     value = origin?.label ?: "Search a place or address",
                     showLocationIcon = true,
-                    modifier = Modifier
-                        .padding(horizontal = PlannerOriginFieldHorizontalPadding * scale)
-                        .offset(y = PlannerOriginFieldTopPadding * scale)
-                        .clickable(
-                            enabled = enabled,
-                            role = Role.Button,
-                            onClickLabel = "Choose starting point",
-                            onClick = onEditOrigin
-                        )
+                    modifier = Modifier.clickable(
+                        enabled = enabled && showMapControls,
+                        role = Role.Button,
+                        onClickLabel = "Choose starting point",
+                        onClick = onEditOrigin
+                    )
                 )
+            }
 
+            if (showMapControls) {
                 val fraction = (
                     (sheetOffset - geometry.routes) /
                         (geometry.main - geometry.routes)

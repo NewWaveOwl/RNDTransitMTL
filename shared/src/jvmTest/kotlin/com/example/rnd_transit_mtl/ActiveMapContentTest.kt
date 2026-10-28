@@ -17,6 +17,56 @@ import kotlin.test.*
 class ActiveMapContentTest {
     @OptIn(ExperimentalComposeUiApi::class)
     @Test
+    fun staleAndMissingLocationsKeepTheRouteWithoutAdvancingTheMarker() {
+        var progress by mutableStateOf(0.4f)
+        var location by mutableStateOf(TripLocationState.Sample)
+        var informationRequests = 0
+        val scene = ImageComposeScene(412, 720) {
+            RNDTransitTheme {
+                ActiveMapContent(reviewedHistoryPreviewTrip, progress, true, {}, {},
+                    instruction = ActiveMapInstruction("Sample turn", "Sample section", true),
+                    locationState = location, onShowInformation = { informationRequests++ })
+            }
+        }
+        var time = 0L
+        fun render() { repeat(8) { time += 16_000_000; scene.render(time).close() } }
+        fun all(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::all)
+        fun nodes() = scene.semanticsOwners.flatMap { all(it.rootSemanticsNode) }
+        fun map() = nodes().first {
+            it.config.getOrNull(SemanticsProperties.ContentDescription)?.any { text ->
+                text.startsWith("Mock transit map")
+            } == true
+        }
+        try {
+            render()
+            assertEquals("40 percent complete", map().config[SemanticsProperties.StateDescription])
+            location = TripLocationState.Stale
+            progress = 0.7f
+            render()
+            assertEquals("40 percent complete", map().config[SemanticsProperties.StateDescription])
+            location = TripLocationState.Missing
+            progress = 0.8f
+            render()
+            assertEquals("40 percent complete", map().config[SemanticsProperties.StateDescription])
+            assertTrue(map().config[SemanticsProperties.ContentDescription].any { "Position unavailable" in it })
+            val recenter = nodes().first {
+                it.config.getOrNull(SemanticsProperties.ContentDescription)?.contains("Recenter on current position") == true
+            }
+            assertTrue(recenter.config.contains(SemanticsProperties.Disabled))
+            val section = nodes().first {
+                it.config.getOrNull(androidx.compose.ui.semantics.SemanticsActions.OnClick)?.label ==
+                    "Open current section information"
+            }
+            section.config[androidx.compose.ui.semantics.SemanticsActions.OnClick].action!!.invoke()
+            assertEquals(1, informationRequests)
+            location = TripLocationState.Sample
+            render()
+            assertEquals("80 percent complete", map().config[SemanticsProperties.StateDescription])
+        } finally { scene.close() }
+    }
+
+    @OptIn(ExperimentalComposeUiApi::class)
+    @Test
     fun sharedPanelsKeepTheirActionsAndProgressSeparate() {
         var mode by mutableStateOf(0)
         var progress by mutableStateOf(0.4f)
@@ -40,7 +90,7 @@ class ActiveMapContentTest {
         }
         var time = 0L
         fun render(name: String) {
-            repeat(4) { time += 16_000_000; scene.render(time).close() }
+            repeat(16) { time += 16_000_000; scene.render(time).close() }
             scene.render(time).use { image ->
                 val folder = File("build/planner-previews").apply { mkdirs() }
                 image.encodeToData()!!.use { File(folder, name).writeBytes(it.bytes) }
@@ -58,6 +108,9 @@ class ActiveMapContentTest {
         try {
             render("Active-trip.png")
             click("Finish trip")
+            render("Finish-confirmation.png")
+            assertFalse("finish" in events)
+            click("Yes, finish trip")
             render("Active-trip-completed.png")
             click("Review trip")
             mode = 1

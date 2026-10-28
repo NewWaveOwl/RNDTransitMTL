@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,10 +46,24 @@ import rnd_transit_mtl.shared.generated.resources.map_sample
 import rnd_transit_mtl.shared.generated.resources.map_user_pointer_marker
 import rnd_transit_mtl.shared.generated.resources.start_point_marker
 
+// Layout settings — dp marker clearance and camera-control touch size.
+private val TripMapMarkerInset = 40.dp
+private val TripMapControlSize = 48.dp
+
 /**
  * The PNG, route, endpoints and directed pointer share one uniform transform.
  * Current trip starts with exactly the planner's centered Crop; static details
  * use Fit. Pinch/drag changes only the camera, never stored endpoints or time.
+ * @param start Immutable source-image start point.
+ * @param destination Immutable source-image destination.
+ * @param progress Position along the simulated route, bounded to 0..1.
+ * @param modifier Parent viewport constraints.
+ * @param interactive Whether pinch and drag gestures are enabled.
+ * @param matchPlannerBackground Whether the initial image uses Crop rather than Fit.
+ * @param controlsTopPadding Top inset of the optional zoom controls.
+ * @param recenterRequest Increment to center the camera on the current position.
+ * @param showControls Whether to render the legacy zoom/reset row.
+ * @param showPosition Whether to draw the current position pointer.
  */
 @Composable
 fun MockTripMap(
@@ -58,7 +73,10 @@ fun MockTripMap(
     modifier: Modifier = Modifier,
     interactive: Boolean = false,
     matchPlannerBackground: Boolean = false,
-    controlsTopPadding: Dp = 10.dp
+    controlsTopPadding: Dp = 10.dp,
+    recenterRequest: Int = 0,
+    showControls: Boolean = true,
+    showPosition: Boolean = true
 ) {
     val mapPainter = painterResource(Res.drawable.map_sample)
     val startPainter = painterResource(Res.drawable.start_point_marker)
@@ -68,7 +86,7 @@ fun MockTripMap(
     val sourceSize = validMapSourceSize(mapPainter.intrinsicSize)
     val boundedProgress = boundedTripProgress(progress)
     val percentage = tripProgressPercentage(boundedProgress)
-    val markerInset = with(LocalDensity.current) { 40.dp.toPx() }
+    val markerInset = with(LocalDensity.current) { TripMapMarkerInset.toPx() }
     var viewport by remember { mutableStateOf(Size.Zero) }
     var zoom by rememberSaveable(start, destination) { mutableStateOf(1f) }
     var panX by rememberSaveable(start, destination) { mutableStateOf(0f) }
@@ -99,12 +117,39 @@ fun MockTripMap(
         panY = boundedPan.y / viewport.height
     }
 
+    LaunchedEffect(recenterRequest, viewport, start, destination) {
+        if (recenterRequest > 0 &&
+            viewport.width > 0f &&
+            viewport.height > 0f &&
+            baseRect.width > 0f
+        ) {
+            val startPosition = start.toMapPosition(baseRect)
+            val endPosition = destination.toMapPosition(baseRect)
+            val point = Offset(
+                startPosition.x +
+                    (endPosition.x - startPosition.x) * boundedProgress,
+                startPosition.y +
+                    (endPosition.y - startPosition.y) * boundedProgress
+            )
+            val center = Offset(
+                viewport.width / 2f,
+                viewport.height / 2f
+            )
+            val currentZoom = zoom.coerceIn(minimumZoom, 4f)
+            setCamera(
+                currentZoom,
+                (center - point) * currentZoom
+            )
+        }
+    }
+
     Box(
         modifier = modifier.fillMaxSize().clipToBounds().background(TransitMain)
             .onSizeChanged { viewport = Size(it.width.toFloat(), it.height.toFloat()) }
             .semantics {
                 contentDescription = "Mock transit map. Yellow start triangle, " +
-                    "green destination triangle, and a directed yellow pointer. " +
+                    "green destination triangle. " +
+                    (if (showPosition) "Directed yellow position pointer. " else "Position unavailable. ") +
                     if (interactive) "Pinch to zoom and drag to move the picture." else ""
                 stateDescription = "$percentage percent complete"
             }
@@ -163,15 +208,17 @@ fun MockTripMap(
                     strokeWidth = routeWidth * 0.65f, cap = StrokeCap.Round
                 )
             }
-            drawDirectedTripPointer(
-                pointerPainter, currentPosition, pointerSize,
-                tripPointerRotation(startPosition, endPosition)
-            )
+            if (showPosition) {
+                drawDirectedTripPointer(
+                    pointerPainter, currentPosition, pointerSize,
+                    tripPointerRotation(startPosition, endPosition)
+                )
+            }
             drawAnchoredTripEndpoint(startPainter, startPosition, endpointSize)
             drawAnchoredTripEndpoint(endPainter, endPosition, endpointSize)
         }
 
-        if (interactive) {
+        if (interactive && showControls) {
             Row(
                 modifier = Modifier.align(Alignment.TopEnd)
                     .padding(start = 10.dp, end = 10.dp, top = controlsTopPadding)
@@ -183,7 +230,7 @@ fun MockTripMap(
                         setCamera(zoom / 1.25f, Offset(panX * viewport.width, panY * viewport.height))
                     },
                     enabled = zoom > minimumZoom,
-                    modifier = Modifier.size(48.dp)
+                    modifier = Modifier.size(TripMapControlSize)
                         .semantics { contentDescription = "Zoom out" }
                 ) { Text("−", color = TransitWhite) }
                 TextButton(
@@ -191,7 +238,7 @@ fun MockTripMap(
                         setCamera(zoom * 1.25f, Offset(panX * viewport.width, panY * viewport.height))
                     },
                     enabled = zoom < 4f,
-                    modifier = Modifier.size(48.dp)
+                    modifier = Modifier.size(TripMapControlSize)
                         .semantics { contentDescription = "Zoom in" }
                 ) { Text("+", color = TransitWhite) }
                 TextButton(onClick = { setCamera(1f, Offset.Zero) }) {

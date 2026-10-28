@@ -51,7 +51,6 @@ import org.jetbrains.compose.resources.painterResource
 import rnd_transit_mtl.shared.generated.resources.Res
 import rnd_transit_mtl.shared.generated.resources.map_sample
 import com.example.rnd_transit_mtl.View.main.components.GOBox
-import com.example.rnd_transit_mtl.View.main.components.IntensityPanel
 import com.example.rnd_transit_mtl.View.main.components.TransportPanel
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.plannerTripBounds
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.validMapSourceSize
@@ -211,13 +210,6 @@ fun TripPlannerContent(
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    IntensityPanel(
-                        layoutScale = layoutScale,
-                        intensity = intensity,
-                        onIntensityChange = onIntensityChange,
-                        validationMessage = "",
-                        modifier = Modifier.fillMaxWidth().height(120.dp * layoutScale)
-                    )
                 }
             }
         }

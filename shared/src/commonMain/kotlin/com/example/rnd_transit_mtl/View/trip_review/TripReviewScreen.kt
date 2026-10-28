@@ -12,7 +12,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import com.example.rnd_transit_mtl.ui.global_ui_ellements.trip.ReviewV3
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -366,24 +365,26 @@ fun TripReviewScreen(
         }
 
         else -> {
-            ReviewV3(
-                title = trip.title,
-                reference = trip.id.takeLast(3),
-                rating = draft.overall,
-                comment = draft.comment,
-                onRatingChange = { rating ->
-                    updateDraft { it.copy(overall = rating) }
+            TripReviewContent(
+                tripTitle = trip.title,
+                mode = mode,
+                draft = draft,
+                controlsEnabled = canEdit(),
+                errorMessage = errorMessage,
+                onRatingChange = { question, rating ->
+                    updateDraft { it.withRating(question, rating) }
                 },
                 onCommentChange = { comment ->
                     updateDraft { it.copy(comment = comment) }
                 },
+                onImageUrlChange = { imageUrl ->
+                    updateDraft { it.copy(imageUrl = imageUrl) }
+                },
+                onStepChange = { step ->
+                    updateDraft { it.copy(step = step) }
+                },
                 onSave = { saveAndExit() },
-                onSkip = { discardAndExit() },
-                onFeedback = onOpenFeedback,
-                onGo = { discardAndExit() },
-                feedbackEnabled = feedbackAvailable,
-                enabled = canEdit(),
-                errorMessage = errorMessage,
+                onDiscard = { discardAndExit() },
                 modifier = modifier
             )
         }
