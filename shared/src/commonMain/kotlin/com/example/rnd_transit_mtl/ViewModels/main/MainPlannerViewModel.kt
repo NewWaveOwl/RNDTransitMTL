@@ -12,10 +12,11 @@ import kotlinx.serialization.Serializable
  *
  * @property minutes Available trip time in minutes.
  * @property selectedTransportIds Enabled transport-mode IDs.
- * @property selectedZoneIds Allowed transit-zone IDs.
+ * @property selectedZoneIds Legacy shared zones used to restore older drafts.
  * @property intensity Attraction intensity from 0 to 100.
  * @property walkingPreference Scenic or direct walking preference, retained for future routing.
  * @property selectedAttractionIds Attraction preferences retained for future routing.
+ * @property selectedZonesByTransport Independent zones for each transit mode, including disabled modes.
  */
 @Serializable
 data class MainPlannerState(
@@ -24,8 +25,15 @@ data class MainPlannerState(
     val selectedZoneIds: List<String> = listOf("A"),
     val intensity: Float = 90f,
     val walkingPreference: String = "Scenic",
-    val selectedAttractionIds: List<String> = listOf("Nature", "Surprise")
-)
+    val selectedAttractionIds: List<String> = listOf("Nature", "Surprise"),
+    val selectedZonesByTransport: Map<String, List<String>> = emptyMap()
+) {
+    /** Returns this mode's saved zones, falling back to the shared choice from older drafts.
+     * @param transportId Transit mode whose zones are requested.
+     */
+    fun zonesForTransport(transportId: String): List<String> =
+        selectedZonesByTransport[transportId] ?: if (transportId in selectedTransportIds) selectedZoneIds else emptyList()
+}
 
 /**
  * Owns planner selections and exposes immutable state.
@@ -72,15 +80,25 @@ class MainPlannerViewModel(
     }
 
     /**
-     * Toggles one transit zone.
+     * Toggles a zone only for the requested transit mode. As in As3, choosing a zone includes
+     * the mode and clearing its last zone removes it; opening or closing a dropdown does neither.
      *
-     * @param id Zone A, B, C, or D.
+     * @param transportId Bus, Metro, Train, or REM catalogue ID.
+     * @param id Zone A, B, C, or D; unsupported identifiers are ignored.
      */
-    fun toggleZone(id: String) {
-        if (id !in zoneIds) return
-
-        mutableUiState.update {
-            it.copy(selectedZoneIds = it.selectedZoneIds.toggled(id))
+    fun toggleZone(transportId: String, id: String) {
+        if (transportId !in transitIds || id !in zoneIds) return
+        mutableUiState.update { state ->
+            val zones = state.zonesForTransport(transportId).toggled(id)
+            val transports = if (zones.isEmpty()) {
+                state.selectedTransportIds.filterNot { it == transportId }
+            } else {
+                (state.selectedTransportIds + transportId).distinct()
+            }
+            state.copy(
+                selectedTransportIds = transports,
+                selectedZonesByTransport = state.selectedZonesByTransport + (transportId to zones)
+            )
         }
     }
 
@@ -121,6 +139,8 @@ class MainPlannerViewModel(
     companion object {
         /** Supported zone identifiers for the planner interface. */
         val zoneIds = listOf("A", "B", "C", "D")
+        /** Modes offering their own transit-zone constraints. */
+        val transitIds = setOf("bus", "metro", "train", "rem")
         /** Walking styles displayed when walking is enabled. */
         val walkingPreferences = listOf("Scenic", "Direct")
         /** Multi-select attraction labels from the Figma preferences band. */

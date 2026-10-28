@@ -74,6 +74,7 @@ class TripFlowIntegrationTest {
         assertEquals(trip.destination, restored.completedTrips.single().destination)
         assertEquals(trip.selectedRoutes, restored.completedTrips.single().selectedRoutes)
         assertEquals(trip.selectedZoneIds, restored.completedTrips.single().selectedZoneIds)
+        assertEquals(trip.selectedZonesByTransport, restored.completedTrips.single().selectedZonesByTransport)
         assertEquals(TripActionResult.AlreadyCompleted, restored.updateElapsed(
             trip.id, TRIP_SIMULATION_DURATION_MILLIS
         ))
@@ -139,6 +140,7 @@ class TripFlowIntegrationTest {
         selectedTransportIds = listOf("walk", "bus"),
         selectedRouteIds = listOf("bus:401"),
         attractionIntensity = 65f,
-        selectedZoneIds = listOf("A")
+        selectedZoneIds = listOf("A"),
+        selectedZonesByTransport = mapOf("bus" to listOf("A"))
     )
 }

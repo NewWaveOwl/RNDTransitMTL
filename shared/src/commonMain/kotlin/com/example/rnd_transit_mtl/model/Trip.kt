@@ -83,7 +83,9 @@ data class Trip(
     val completedAtEpochMillis: Long? = null,
     val review: TripReview? = null,
     /** Transit-zone constraints recorded when this trip was generated. */
-    val selectedZoneIds: List<String> = emptyList()
+    val selectedZoneIds: List<String> = emptyList(),
+    /** Independent zone constraints recorded for each selected transit mode; empty on older trips. */
+    val selectedZonesByTransport: Map<String, List<String>> = emptyMap()
 ) {
     init {
         require(id.isNotBlank()) {
@@ -133,6 +135,10 @@ data class Trip(
             "Selected route IDs must be unique."
         }
 
+        validateTransportZones(
+            selectedTransports.filter { it.usesRoutes }.map { it.id }.toSet(),
+            selectedZoneIds, selectedZonesByTransport
+        )
         val transportsById = selectedTransports.associateBy { it.id }
         selectedRoutes.forEach { route ->
             val transport = transportsById[route.transportTypeId]
@@ -143,6 +149,34 @@ data class Trip(
     }
 
     companion object {
+        /** Checks new per-mode zone snapshots; an empty map remains valid for legacy records.
+         * @param transitIds IDs of selected route-based modes.
+         * @param zoneIds Combined zone snapshot, retained for older consumers.
+         * @param zonesByTransport Independent zones for every selected transit mode.
+         */
+        internal fun validateTransportZones(
+            transitIds: Set<String>,
+            zoneIds: List<String>,
+            zonesByTransport: Map<String, List<String>>
+        ) {
+            if (zonesByTransport.isEmpty()) return
+            require(zonesByTransport.keys == transitIds) {
+                "Zone choices must match the selected transit modes."
+            }
+            zonesByTransport.forEach { (transportId, zones) ->
+                require(zones.isNotEmpty()) { "Choose at least one transit zone for $transportId." }
+                require(zones.all { it in setOf("A", "B", "C", "D") }) {
+                    "A selected transit zone is unavailable for $transportId."
+                }
+                require(zones.distinct().size == zones.size) {
+                    "Selected transit zones must be unique for $transportId."
+                }
+            }
+            require(zonesByTransport.values.flatten().toSet() == zoneIds.toSet()) {
+                "Combined zones must match the individual transport choices."
+            }
+        }
+
         const val MIN_PLANNED_MINUTES: Int = 0
         const val MAX_PLANNED_MINUTES: Int = 360
         const val PLANNED_MINUTES_STEP: Int = 5

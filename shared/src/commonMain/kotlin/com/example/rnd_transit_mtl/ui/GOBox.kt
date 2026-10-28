@@ -3,7 +3,6 @@ package com.example.rnd_transit_mtl.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -16,7 +15,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -80,12 +79,12 @@ internal fun GOBox(
     ) {
         Text("I have", color = TransitWhite, fontSize = 20.sp * layoutScale,
             maxLines = 1, softWrap = false)
-        ControlDivider(layoutScale)
+        ControlDivider(layoutScale, compact)
         ScrollableMinutes(minutes, onMinutesChange, minutesEnabled, layoutScale)
-        if (!compact) ControlDivider(layoutScale)
+        if (!compact) ControlDivider(layoutScale, compact)
         Text("minutes", color = TransitWhite, fontSize = 20.sp * layoutScale,
             maxLines = 1, softWrap = false)
-        ControlDivider(layoutScale)
+        ControlDivider(layoutScale, compact)
         Box(
             modifier = Modifier
                 .width(if (actionLabel == "Resume trip") 84.dp else 60.dp)
@@ -106,9 +105,9 @@ internal fun GOBox(
 }
 
 @Composable
-private fun ControlDivider(layoutScale: Float) {
+private fun ControlDivider(layoutScale: Float, compact: Boolean) {
     Spacer(
-        Modifier.width(1.dp).height(58.dp * layoutScale)
+        Modifier.width(1.dp).height((if (compact) 48.dp else 58.dp) * layoutScale)
             .background(TransitWhite.copy(alpha = 0.8f))
     )
 }
@@ -153,31 +152,20 @@ private fun ScrollableMinutes(
     val fontScale = (availableWidth / measuredWidth.coerceAtLeast(1))
         .coerceAtMost(1f)
 
-    Column(
-        modifier = Modifier.width(numberWidth),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
+    // Fixed centre and equal arrow slots fit inside both the 76 dp and 96 dp GO layouts.
+    Box(modifier = Modifier.width(numberWidth).fillMaxHeight()) {
         Box(
-            modifier = Modifier.size(32.dp * layoutScale),
+            modifier = Modifier.align(Alignment.TopCenter).width(numberWidth).height(22.dp * layoutScale)
+                .semantics { contentDescription = "Increase planned time by five minutes" }
+                .clickable(enabled = enabled && boundedMinutes < Trip.MAX_PLANNED_MINUTES,
+                    role = Role.Button, onClickLabel = "Increase planned time by five minutes") {
+                    latestOnMinutesChange(Trip.adjustPlannedMinutes(latestMinutes, direction = 1))
+                },
             contentAlignment = Alignment.Center
         ) {
             if (boundedMinutes < Trip.MAX_PLANNED_MINUTES) {
-                IconButton(
-                    onClick = {
-                        latestOnMinutesChange(
-                            Trip.adjustPlannedMinutes(latestMinutes, direction = 1)
-                        )
-                    },
-                    enabled = enabled,
-                    modifier = Modifier.size(32.dp * layoutScale)
-                ) {
-                    Icon(
-                        painter = painterResource(Res.drawable.ic_arrow_drop_up),
-                        contentDescription = "Increase planned time by five minutes",
-                        tint = TransitWhite,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
+                Icon(painterResource(Res.drawable.ic_arrow_drop_up), contentDescription = null,
+                    tint = TransitWhite, modifier = Modifier.size(20.dp * layoutScale))
             }
         }
 
@@ -188,8 +176,8 @@ private fun ScrollableMinutes(
             maxLines = 1,
             softWrap = false,
             modifier = Modifier
+                .align(Alignment.Center)
                 .fillMaxWidth()
-                .padding(vertical = 0.dp)
                 .pointerInput(enabled, dragThreshold) {
                     if (enabled) {
                         var dragDistance = 0f
@@ -228,26 +216,17 @@ private fun ScrollableMinutes(
         )
 
         Box(
-            modifier = Modifier.size(32.dp * layoutScale),
+            modifier = Modifier.align(Alignment.BottomCenter).width(numberWidth).height(22.dp * layoutScale)
+                .semantics { contentDescription = "Decrease planned time by five minutes" }
+                .clickable(enabled = enabled && boundedMinutes > Trip.MIN_PLANNED_MINUTES,
+                    role = Role.Button, onClickLabel = "Decrease planned time by five minutes") {
+                    latestOnMinutesChange(Trip.adjustPlannedMinutes(latestMinutes, direction = -1))
+                },
             contentAlignment = Alignment.Center
         ) {
             if (boundedMinutes > Trip.MIN_PLANNED_MINUTES) {
-                IconButton(
-                    onClick = {
-                        latestOnMinutesChange(
-                            Trip.adjustPlannedMinutes(latestMinutes, direction = -1)
-                        )
-                    },
-                    enabled = enabled,
-                    modifier = Modifier.size(32.dp * layoutScale)
-                ) {
-                    Icon(
-                        painter = painterResource(Res.drawable.ic_arrow_drop_down),
-                        contentDescription = "Decrease planned time by five minutes",
-                        tint = TransitWhite,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
+                Icon(painterResource(Res.drawable.ic_arrow_drop_down), contentDescription = null,
+                    tint = TransitWhite, modifier = Modifier.size(20.dp * layoutScale))
             }
         }
     }

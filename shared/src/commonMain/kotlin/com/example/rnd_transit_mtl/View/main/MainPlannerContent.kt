@@ -65,9 +65,9 @@ internal enum class PlannerSheetPosition { Main, Routes, Preferences }
  * @param onMinutesChange Requests a bounded time change.
  * @param transportTypes Supported transport catalogue.
  * @param selectedTransportIds Enabled transport IDs.
- * @param selectedZoneIds Selected transit zone IDs shared by transit modes.
+ * @param selectedZonesByTransport Independently selected zone IDs for each transit mode.
  * @param onToggleTransport Requests an independent transport toggle.
- * @param onToggleZone Requests a zone toggle.
+ * @param onToggleZone Requests a zone toggle for the supplied transport ID and zone ID.
  * @param intensity Attraction intensity from 0 to 100.
  * @param onIntensityChange Requests an intensity change.
  * @param walkingPreference Selected walking style, retained for future routing.
@@ -94,9 +94,9 @@ internal fun MainPlannerContent(
     onMinutesChange: (Int) -> Unit,
     transportTypes: List<TransportType>,
     selectedTransportIds: List<String>,
-    selectedZoneIds: List<String>,
+    selectedZonesByTransport: Map<String, List<String>>,
     onToggleTransport: (String) -> Unit,
-    onToggleZone: (String) -> Unit,
+    onToggleZone: (String, String) -> Unit,
     intensity: Float,
     onIntensityChange: (Float) -> Unit,
     walkingPreference: String,
@@ -117,6 +117,8 @@ internal fun MainPlannerContent(
     onControlsHidden: () -> Unit = {},
     initialSheetPosition: PlannerSheetPosition = PlannerSheetPosition.Main
 ) {
+    // Expansion is presentation state, separate from transport and zone selections.
+    var expandedTransportId by rememberSaveable { mutableStateOf<String?>(null) }
     val exit = remember { Animatable(if (controlsVisible) 0f else 1f) }
     val latestControlsHidden by rememberUpdatedState(onControlsHidden)
     LaunchedEffect(controlsVisible) {
@@ -279,10 +281,15 @@ internal fun MainPlannerContent(
                         }
                     }
                     PlannerPreferenceBands(
-                        scale, transportTypes, selectedTransportIds, selectedZoneIds,
+                        scale, transportTypes, selectedTransportIds, selectedZonesByTransport,
                         onToggleTransport, onToggleZone, walkingPreference, selectedAttractionIds,
                         onWalkingPreferenceChange, onToggleAttraction, intensity, onIntensityChange,
-                        enabled, onOpenDetailedSettings
+                        enabled, onOpenDetailedSettings, expandedTransportId,
+                        onExpandedTransportChange = { transportId ->
+                            if (enabled) {
+                                expandedTransportId = if (expandedTransportId == transportId) null else transportId
+                            }
+                        }
                     )
                 }
             }

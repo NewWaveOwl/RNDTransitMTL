@@ -200,12 +200,13 @@ internal fun TransitOpeningScreen(
             }
             validationMessage = ""
 
-            val hasTransit = transportTypes.any {
+            val transitModes = transportTypes.filter {
                 it.usesRoutes && it.id in planner.selectedTransportIds
             }
-
-            if (hasTransit && planner.selectedZoneIds.isEmpty()) {
-                validationMessage = "Choose at least one transit zone."
+            val zonesByTransport = transitModes.associate { it.id to planner.zonesForTransport(it.id).toList() }
+            val missingZones = transitModes.firstOrNull { zonesByTransport[it.id].isNullOrEmpty() }
+            if (missingZones != null) {
+                validationMessage = "Choose at least one transit zone for ${missingZones.label}."
                 return
             }
 
@@ -216,7 +217,8 @@ internal fun TransitOpeningScreen(
                 plannedMinutes = boundedMinutes,
                 selectedTransportIds = selectedTransportIds.toList(),
                 selectedRouteIds = emptyList(),
-                selectedZoneIds = if (hasTransit) planner.selectedZoneIds.toList() else emptyList(),
+                selectedZoneIds = zonesByTransport.values.flatten().distinct().sorted(),
+                selectedZonesByTransport = zonesByTransport,
                 attractionIntensity = intensity
             )
 
@@ -289,7 +291,9 @@ internal fun TransitOpeningScreen(
         },
         transportTypes = transportTypes,
         selectedTransportIds = selectedTransportIds,
-        selectedZoneIds = planner.selectedZoneIds,
+        selectedZonesByTransport = transportTypes.filter { it.usesRoutes }.associate {
+            it.id to planner.zonesForTransport(it.id)
+        },
         onToggleTransport = { id ->
             if (canChangeInputs()) {
                 plannerViewModel.toggleTransport(
@@ -299,9 +303,9 @@ internal fun TransitOpeningScreen(
                 clearValidation()
             }
         },
-        onToggleZone = { id ->
+        onToggleZone = { transportId, id ->
             if (canChangeInputs()) {
-                plannerViewModel.toggleZone(id)
+                plannerViewModel.toggleZone(transportId, id)
                 clearValidation()
             }
         },

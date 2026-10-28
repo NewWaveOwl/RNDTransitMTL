@@ -25,16 +25,16 @@ class MainPlannerTest {
     fun transportModesToggleIndependentlyAndRetainHiddenZoneChoices() {
         val planner = MainPlannerViewModel()
         val available = types.map { it.id }.toSet()
-        planner.toggleZone("B")
         planner.toggleTransport("bus", available)
+        planner.toggleZone("bus", "B")
         assertEquals(listOf("walk", "bus"), planner.uiState.value.selectedTransportIds)
         planner.toggleTransport("bus", available)
         planner.toggleTransport("missing", available)
-        planner.toggleZone("missing")
+        planner.toggleZone("bus", "missing")
         assertEquals(listOf("walk"), planner.uiState.value.selectedTransportIds)
-        assertEquals(listOf("A", "B"), planner.uiState.value.selectedZoneIds)
+        assertEquals(listOf("A", "B"), planner.uiState.value.zonesForTransport("bus"))
         planner.toggleTransport("bus", available)
-        assertEquals(listOf("A", "B"), planner.uiState.value.selectedZoneIds)
+        assertEquals(listOf("A", "B"), planner.uiState.value.zonesForTransport("bus"))
     }
 
     @Test
@@ -43,7 +43,7 @@ class MainPlannerTest {
         planner.setMinutes(37)
         planner.setIntensity(150f)
         planner.setIntensity(Float.NaN)
-        planner.toggleZone("D")
+        planner.toggleZone("bus", "D")
         val restored = MainPlannerViewModel(Json.decodeFromString<MainPlannerState>(
             Json.encodeToString(planner.uiState.value)
         ))
@@ -79,6 +79,93 @@ class MainPlannerTest {
         assertEquals(listOf("Nature", "Surprise"), restored.selectedAttractionIds)
         assertEquals(listOf("B"), restored.selectedZoneIds)
         assertEquals(45, restored.minutes)
+    }
+
+    @Test
+    fun transitZonesStayIndependentAcrossTogglingAndDraftRestoration() {
+        val planner = MainPlannerViewModel()
+        val available = setOf("walk", "bus", "metro", "train", "rem")
+        planner.toggleTransport("bus", available)
+        planner.toggleTransport("metro", available)
+        planner.toggleZone("bus", "B")
+        planner.toggleZone("metro", "A")
+        planner.toggleZone("metro", "C")
+        planner.toggleZone("train", "D")
+        planner.toggleZone("rem", "B")
+        planner.toggleTransport("metro", available)
+        planner.toggleTransport("metro", available)
+        planner.toggleZone("walk", "D")
+        val restored = MainPlannerViewModel(Json.decodeFromString<MainPlannerState>(
+            Json.encodeToString(planner.uiState.value)
+        )).uiState.value
+        assertEquals(listOf("A", "B"), restored.zonesForTransport("bus"))
+        assertEquals(listOf("C"), restored.zonesForTransport("metro"))
+        assertEquals(listOf("D"), restored.zonesForTransport("train"))
+        assertEquals(listOf("B"), restored.zonesForTransport("rem"))
+        assertEquals(false, restored.selectedZonesByTransport.containsKey("walk"))
+    }
+
+    @Test
+    fun choosingTheFirstZoneIncludesTheModeAndClearingItsLastZoneRemovesOnlyThatMode() {
+        val planner = MainPlannerViewModel()
+        assertEquals(emptyList(), planner.uiState.value.zonesForTransport("bus"))
+        planner.toggleZone("bus", "B")
+        planner.toggleZone("metro", "C")
+        assertEquals(listOf("walk", "bus", "metro"), planner.uiState.value.selectedTransportIds)
+        planner.toggleZone("bus", "B")
+        assertEquals(listOf("walk", "metro"), planner.uiState.value.selectedTransportIds)
+        assertEquals(emptyList(), planner.uiState.value.zonesForTransport("bus"))
+        assertEquals(listOf("C"), planner.uiState.value.zonesForTransport("metro"))
+        planner.toggleZone("bus", "D")
+        assertEquals(listOf("D"), planner.uiState.value.zonesForTransport("bus"))
+    }
+
+    @Test
+    fun oldSharedZonesSeedEachModeUntilItIsEditedIndependently() {
+        val oldDraft = Json.decodeFromString<MainPlannerState>(
+            """{"selectedTransportIds":["bus","metro"],"selectedZoneIds":["B"]}"""
+        )
+        val planner = MainPlannerViewModel(oldDraft)
+        planner.toggleZone("bus", "C")
+        assertEquals(listOf("B", "C"), planner.uiState.value.zonesForTransport("bus"))
+        assertEquals(listOf("B"), planner.uiState.value.zonesForTransport("metro"))
+        planner.toggleZone("bus", "B")
+        planner.toggleZone("bus", "C")
+        assertEquals(emptyList(), planner.uiState.value.zonesForTransport("bus"))
+        assertEquals(listOf("B"), planner.uiState.value.zonesForTransport("metro"))
+    }
+
+    @Test
+    fun generatedTripPreservesIndependentZonesAndRejectsIncompleteOrInvalidMaps() {
+        val types = types + TransportType("metro", "Metro", true)
+        val busZones = mutableListOf("A", "B")
+        val metroZones = mutableListOf("C")
+        val zones = mutableMapOf("bus" to busZones, "metro" to metroZones)
+        val request = input(listOf("A", "B", "C")).copy(
+            selectedTransportIds = listOf("bus", "metro"), selectedZonesByTransport = zones
+        )
+        var ids = 0
+        val generator = MockTripGenerator(idFactory = { "trip-${++ids}" }, nowEpochMillis = { 1_000L })
+        val trip = assertIs<TripGenerationResult.Success>(
+            generator.generate(request, types, emptyList(), emptySet())
+        ).trip
+        listOf(
+            mapOf("bus" to listOf("A")),
+            mapOf("bus" to emptyList(), "metro" to listOf("C")),
+            mapOf("bus" to listOf("A", "A"), "metro" to listOf("C")),
+            mapOf("bus" to listOf("E"), "metro" to listOf("C")),
+            mapOf("bus" to listOf("A"), "walk" to listOf("C"))
+        ).forEach { invalid ->
+            assertIs<TripGenerationResult.InvalidInput>(generator.generate(
+                request.copy(selectedZonesByTransport = invalid), types, emptyList(), emptySet()
+            ))
+        }
+        assertEquals(1, ids)
+        busZones.clear()
+        metroZones.clear()
+        zones.clear()
+        assertEquals(mapOf("bus" to listOf("A", "B"), "metro" to listOf("C")), trip.selectedZonesByTransport)
+        assertEquals(trip, Json.decodeFromString<Trip>(Json.encodeToString(trip)))
     }
 
     @Test

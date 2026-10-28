@@ -1,5 +1,13 @@
 package com.example.rnd_transit_mtl.View.main.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyListScope
@@ -9,12 +17,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import kotlinx.coroutines.flow.first
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.rnd_transit_mtl.ViewModels.main.MainPlannerViewModel
@@ -28,9 +41,9 @@ import com.example.rnd_transit_mtl.ui.theme.*
  * @param scale Responsive size multiplier relative to the 412 px Figma width.
  * @param transportTypes Loaded transport catalogue.
  * @param selectedTransportIds Enabled transport IDs.
- * @param selectedZoneIds Selected transit zones shared by transit modes.
+ * @param selectedZonesByTransport Independently selected zone IDs for each transit mode.
  * @param onToggleTransport Requests a transport toggle.
- * @param onToggleZone Requests a zone toggle.
+ * @param onToggleZone Requests a zone toggle for the supplied transport ID and zone ID.
  * @param walkingPreference Selected walking style.
  * @param selectedAttractionIds Enabled attraction labels.
  * @param onWalkingPreferenceChange Requests a walking-style change.
@@ -39,14 +52,16 @@ import com.example.rnd_transit_mtl.ui.theme.*
  * @param onIntensityChange Requests an intensity change.
  * @param enabled Whether choices can change.
  * @param onOpenDetailedSettings Opens the existing Settings destination.
+ * @param expandedTransportId Mode whose zone dropdown is open, independently of selection.
+ * @param onExpandedTransportChange Opens, closes, or switches the transit dropdown.
  */
 internal fun LazyListScope.PlannerPreferenceBands(
     scale: Float,
     transportTypes: List<TransportType>,
     selectedTransportIds: List<String>,
-    selectedZoneIds: List<String>,
+    selectedZonesByTransport: Map<String, List<String>>,
     onToggleTransport: (String) -> Unit,
-    onToggleZone: (String) -> Unit,
+    onToggleZone: (String, String) -> Unit,
     walkingPreference: String,
     selectedAttractionIds: List<String>,
     onWalkingPreferenceChange: (String) -> Unit,
@@ -54,48 +69,60 @@ internal fun LazyListScope.PlannerPreferenceBands(
     intensity: Float,
     onIntensityChange: (Float) -> Unit,
     enabled: Boolean,
-    onOpenDetailedSettings: () -> Unit
+    onOpenDetailedSettings: () -> Unit,
+    expandedTransportId: String?,
+    onExpandedTransportChange: (String) -> Unit
 ) {
     item(key = "transport") {
-        PreferenceBand(TransitMain, scale) {
-            Text("Types of transport", color = TransitWhite, fontSize = 20.sp * scale,
-                lineHeight = 28.sp * scale, fontWeight = FontWeight.Bold)
-            val order = listOf("walk", "bike", "bus", "metro", "train", "rem")
-            val ordered = transportTypes.sortedBy { order.indexOf(it.id).takeIf { index -> index >= 0 } ?: Int.MAX_VALUE }
-            ordered.chunked(3).forEach { row ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp * scale)) {
-                    row.forEach { transport ->
-                        val selected = transport.id in selectedTransportIds
-                        val title = if (transport.id == "walk") "Walk" else transport.label
-                        val zones = if (selected && transport.usesRoutes && selectedZoneIds.isNotEmpty())
-                            " " + selectedZoneIds.sorted().joinToString(", ") else ""
-                        PlannerChoice(title + zones, selected, enabled, { onToggleTransport(transport.id) },
-                            scale, Modifier.weight(1f))
+        // Animate the dropdown itself so following bands move with its visible height.
+        Column(Modifier.fillMaxWidth().background(TransitMain)) {
+            PreferenceBand(TransitMain, scale) {
+                Text("Types of transport", color = TransitWhite, fontSize = 20.sp * scale,
+                    lineHeight = 28.sp * scale, fontWeight = FontWeight.Bold)
+                val order = listOf("walk", "bike", "bus", "metro", "train", "rem")
+                val ordered = transportTypes.sortedBy { order.indexOf(it.id).takeIf { index -> index >= 0 } ?: Int.MAX_VALUE }
+                ordered.chunked(3).forEach { row ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp * scale)) {
+                        row.forEach { transport ->
+                            val selected = transport.id in selectedTransportIds
+                            val title = if (transport.id == "walk") "Walk" else transport.label
+                            val selectedZoneIds = selectedZonesByTransport[transport.id].orEmpty()
+                            val zones = if (selected && transport.usesRoutes && selectedZoneIds.isNotEmpty())
+                                " " + selectedZoneIds.sorted().joinToString(", ") else ""
+                            PlannerChoice(title + zones, selected, enabled, {
+                                if (transport.usesRoutes) onExpandedTransportChange(transport.id)
+                                else onToggleTransport(transport.id)
+                            }, scale, Modifier.weight(1f),
+                                dropdownExpanded = if (transport.usesRoutes) expandedTransportId == transport.id else null)
+                        }
+                        repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
                     }
-                    repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
+            TransitZoneDropdown(
+                transportTypes = transportTypes,
+                requestedTransportId = expandedTransportId,
+                selectedZonesByTransport = selectedZonesByTransport,
+                onToggleZone = onToggleZone,
+                scale = scale,
+                enabled = enabled
+            )
         }
     }
-    if (transportTypes.any { it.usesRoutes && it.id in selectedTransportIds }) {
-        item(key = "zones") {
-            PreferenceBand(TransitHighlight, scale, Modifier.heightIn(min = 203.dp * scale)) {
-                BandTitle("Transit zones", TransitComplementary, scale)
-                Text("Choose the zones you want to include.", color = TransitComplementary,
-                    fontSize = 13.sp * scale, lineHeight = 18.sp * scale)
-                ChoiceGrid(MainPlannerViewModel.zoneIds, selectedZoneIds, enabled, onToggleZone, scale) { "ZONE $it" }
-            }
-        }
-    }
-    if ("walk" in selectedTransportIds) {
-        item(key = "walking") {
+    // Keep the lazy item mounted until the closing animation has finished.
+    item(key = "walking") {
+        AnimatedVisibility(
+            visible = "walk" in selectedTransportIds,
+            enter = preferenceDropdownEnter(),
+            exit = preferenceDropdownExit()
+        ) {
             PreferenceBand(TransitComplementary, scale) {
                 BandTitle("Walking preferences", TransitWhite, scale)
                 Text("Choose the type of walk.", color = TransitWhite, fontSize = 13.sp * scale,
                     lineHeight = 18.sp * scale)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp * scale)) {
                     MainPlannerViewModel.walkingPreferences.forEach { preference ->
-                        PlannerChoice(preference, preference == walkingPreference, enabled,
+                        PlannerChoice(preference, preference == walkingPreference, enabled && "walk" in selectedTransportIds,
                             { onWalkingPreferenceChange(preference) }, scale, Modifier.weight(1f), Role.RadioButton)
                     }
                 }
@@ -128,6 +155,74 @@ internal fun LazyListScope.PlannerPreferenceBands(
             validationMessage = "",
             modifier = Modifier.fillMaxWidth().height(160.dp * scale)
         )
+    }
+}
+
+/** Duration of each opening or closing slide. Switching menus completes both phases. */
+internal const val TRANSPORT_DROPDOWN_ANIMATION_MILLIS = 500
+
+/** Shared opening motion for walking preferences and transit-zone dropdowns. */
+private fun preferenceDropdownEnter() = expandVertically(
+    animationSpec = tween(TRANSPORT_DROPDOWN_ANIMATION_MILLIS, easing = FastOutSlowInEasing),
+    expandFrom = Alignment.Top
+)
+
+/** Shared closing motion; content remains mounted and clipped while its height shrinks. */
+private fun preferenceDropdownExit() = shrinkVertically(
+    animationSpec = tween(TRANSPORT_DROPDOWN_ANIMATION_MILLIS, easing = FastOutSlowInEasing),
+    shrinkTowards = Alignment.Top
+)
+
+/**
+ * Retains the current menu during collapse, then opens the most recently requested mode.
+ *
+ * A new request cancels the pending switch, so rapid clicks never open a stale menu.
+ * The transition owns layout height and clipping; no second parent size animation competes with it.
+ *
+ * @param transportTypes Catalogue used to resolve the dropdown title.
+ * @param requestedTransportId Requested open mode, or null to close all menus.
+ * @param selectedZonesByTransport Independent zone selections, unchanged by expansion.
+ * @param onToggleZone Requests a selection change for a transport and zone ID.
+ * @param scale Responsive size multiplier.
+ * @param enabled Whether zone choices can change.
+ */
+@Composable
+private fun TransitZoneDropdown(
+    transportTypes: List<TransportType>,
+    requestedTransportId: String?,
+    selectedZonesByTransport: Map<String, List<String>>,
+    onToggleZone: (String, String) -> Unit,
+    scale: Float,
+    enabled: Boolean
+) {
+    val requestedMode = transportTypes.firstOrNull { it.usesRoutes && it.id == requestedTransportId }
+    var displayedTransportId by remember { mutableStateOf<String?>(null) }
+    val visibility = remember { MutableTransitionState(false) }
+
+    LaunchedEffect(requestedMode?.id) {
+        if (displayedTransportId != requestedMode?.id) {
+            visibility.targetState = false
+            snapshotFlow { visibility.isIdle && !visibility.currentState }.first { it }
+            displayedTransportId = requestedMode?.id
+        }
+        visibility.targetState = requestedMode != null
+    }
+
+    AnimatedVisibility(
+        visibleState = visibility,
+        enter = preferenceDropdownEnter(),
+        exit = preferenceDropdownExit()
+    ) {
+        transportTypes.firstOrNull { it.usesRoutes && it.id == displayedTransportId }?.let { transport ->
+            PreferenceBand(TransitHighlight, scale, Modifier.heightIn(min = 203.dp * scale)) {
+                BandTitle("${transport.label} zones", TransitComplementary, scale)
+                Text("Choose the zones for ${transport.label}.", color = TransitComplementary,
+                    fontSize = 13.sp * scale, lineHeight = 18.sp * scale)
+                ChoiceGrid(MainPlannerViewModel.zoneIds, selectedZonesByTransport[transport.id].orEmpty(),
+                    enabled && requestedMode?.id == transport.id && visibility.targetState,
+                    { onToggleZone(transport.id, it) }, scale) { "ZONE $it" }
+            }
+        }
     }
 }
 
@@ -185,20 +280,36 @@ private fun ChoiceGrid(ids: List<String>, selected: List<String>, enabled: Boole
  * @param scale Responsive size multiplier.
  * @param modifier Layout supplied by the row.
  * @param role Checkbox for multi-select choices, radio button for walking style.
+ * @param dropdownExpanded Null for ordinary choices; otherwise controls the transit expansion indicator.
  */
 @Composable
 private fun PlannerChoice(label: String, selected: Boolean, enabled: Boolean, onClick: () -> Unit,
-    scale: Float, modifier: Modifier = Modifier, role: Role = Role.Checkbox) {
+    scale: Float, modifier: Modifier = Modifier, role: Role = Role.Checkbox,
+    dropdownExpanded: Boolean? = null) {
     Surface(
-        modifier = modifier.heightIn(min = 44.dp * scale)
-            .toggleable(selected, enabled = enabled, role = role, onValueChange = { onClick() }),
+        modifier = modifier.height(44.dp * scale)
+            .then(if (dropdownExpanded == null) {
+                Modifier.toggleable(selected, enabled = enabled, role = role, onValueChange = { onClick() })
+            } else {
+                Modifier.clickable(enabled = enabled, role = Role.Button,
+                    onClickLabel = if (dropdownExpanded) "Close zone choices" else "Open zone choices",
+                    onClick = onClick)
+                    .semantics {
+                        stateDescription = (if (selected) "Included" else "Not included") +
+                            (if (dropdownExpanded) ", zones expanded" else ", zones collapsed")
+                    }
+                    .then(if (dropdownExpanded) Modifier.border(1.dp, TransitComplementary,
+                        RoundedCornerShape(14.dp * scale)) else Modifier)
+            }),
         color = if (selected) TransitSelected else TransitWhite,
         contentColor = if (selected) TransitComplementary else TransitMain,
         shape = RoundedCornerShape(14.dp * scale)
     ) {
         Box(Modifier.padding(horizontal = 8.dp * scale, vertical = 10.dp * scale),
             contentAlignment = Alignment.Center) {
-            Text(label, fontSize = 14.sp * scale, lineHeight = 20.sp * scale, fontWeight = FontWeight.Bold)
+            Text(label, fontSize = 14.sp * scale, lineHeight = 20.sp * scale,
+                fontWeight = FontWeight.Bold, textAlign = TextAlign.Center,
+                maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
         }
     }
 }

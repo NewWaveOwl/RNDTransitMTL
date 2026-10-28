@@ -28,7 +28,9 @@ data class TripGenerationInput(
     val selectedRouteIds: List<String>,
     val attractionIntensity: Float,
     /** Requested zones, recorded without geographic enforcement by this prototype. */
-    val selectedZoneIds: List<String> = emptyList()
+    val selectedZoneIds: List<String> = emptyList(),
+    /** Per-mode zone constraints. Empty retains the legacy shared-zone request contract. */
+    val selectedZonesByTransport: Map<String, List<String>> = emptyMap()
 )
 
 /**
@@ -95,7 +97,8 @@ class MockTripGenerator(
             imageUrl = input.imageUrl.trim(),
             selectedTransportIds = input.selectedTransportIds.toList(),
             selectedRouteIds = input.selectedRouteIds.toList(),
-            selectedZoneIds = input.selectedZoneIds.toList()
+            selectedZoneIds = input.selectedZoneIds.toList(),
+            selectedZonesByTransport = input.selectedZonesByTransport.mapValues { (_, zones) -> zones.toList() }
         )
 
         val snapshots = try {
@@ -130,6 +133,13 @@ class MockTripGenerator(
             require(!includesTransit || normalizedInput.selectedZoneIds.isNotEmpty()) {
                 "Choose at least one transit zone."
             }
+
+            Trip.validateTransportZones(
+                transportTypes.filter { it.usesRoutes && it.id in normalizedInput.selectedTransportIds }
+                    .map { it.id }.toSet(),
+                normalizedInput.selectedZoneIds,
+                normalizedInput.selectedZonesByTransport
+            )
 
             resolveSelections(
                 input = normalizedInput,
@@ -175,7 +185,8 @@ class MockTripGenerator(
             createdAtEpochMillis = createdAt,
             completedAtEpochMillis = null,
             review = null,
-            selectedZoneIds = normalizedInput.selectedZoneIds.toList()
+            selectedZoneIds = normalizedInput.selectedZoneIds.toList(),
+            selectedZonesByTransport = normalizedInput.selectedZonesByTransport.mapValues { (_, zones) -> zones.toList() }
         )
 
         return TripGenerationResult.Success(trip)

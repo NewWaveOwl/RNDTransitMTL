@@ -97,6 +97,11 @@ kotlin {
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }
+
+        jvmTest.dependencies {
+            // Native graphics runtime for interaction and animation regression checks on this host.
+            runtimeOnly(compose.desktop.currentOs)
+        }
     }
 }
 
