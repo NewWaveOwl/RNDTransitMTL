@@ -1,5 +1,11 @@
 package com.example.rnd_transit_mtl.View.main
 
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -75,6 +81,14 @@ internal fun TransitOpeningScreen(
 
     // Blocks overlapping GO actions; the store also prevents another active trip.
     var processingAction by remember { mutableStateOf(false) }
+    val generationScope = rememberCoroutineScope()
+    var generationJob by remember { mutableStateOf<Job?>(null) }
+
+    // Store a proposal separately. It becomes an active trip only after Start Trip.
+    var proposalJson by rememberSaveable { mutableStateOf<String?>(null) }
+    val proposal = remember(proposalJson) {
+        proposalJson?.let { Json.decodeFromString<Trip>(it) }
+    }
     // Save only the opening intent and temporary labels, not a second Trip.
     var pendingOpenTripId by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingActionLabel by rememberSaveable { mutableStateOf<String?>(null) }
@@ -114,6 +128,8 @@ internal fun TransitOpeningScreen(
     // Choosing another section cancels the opening intent, keeping the trip.
     LaunchedEffect(isDestinationActive) {
         if (!isDestinationActive) {
+            generationJob?.cancel()
+            proposalJson = null
             pendingOpenTripId = null
             pendingActionLabel = null
             pendingSummary = null
@@ -163,115 +179,105 @@ internal fun TransitOpeningScreen(
 
         processingAction = true
 
-        try {
-            // Re-read the store at click time, including before generation.
-            val existingActive = tripsStore.activeTrip
-            if (existingActive != null) {
+        generationJob = generationScope.launch {
+            try {
+                // Re-read the store at click time, including before generation.
+                val existingActive = tripsStore.activeTrip
+                if (existingActive != null) {
+                    val openTrip = latestOpenCurrentTrip
+                    if (openTrip == null) {
+                        validationMessage = "Current Trip navigation is unavailable."
+                        return@launch
+                    }
+                    validationMessage = ""
+
+                    queueTripOpening(existingActive.id)
+                    return@launch
+                }
+
+                val pendingId = tripsStore.pendingReviewTripId
+                if (pendingId != null) {
+                    val openCompleted = latestOpenCompletedTrip
+                    if (openCompleted == null) {
+                        validationMessage = "Your completed trip is saved. Try opening it again."
+                    } else {
+                        validationMessage = ""
+                        queueTripOpening(pendingId)
+                    }
+                    return@launch
+                }
+
                 val openTrip = latestOpenCurrentTrip
                 if (openTrip == null) {
                     validationMessage = "Current Trip navigation is unavailable."
-                    return
+                    return@launch
+                }
+
+                val bounds = generationBounds
+                if (bounds == null) {
+                    validationMessage = "The map is preparing. Please try GO again."
+                    return@launch
                 }
                 validationMessage = ""
 
-                queueTripOpening(existingActive.id)
-                return
-            }
-
-            val pendingId = tripsStore.pendingReviewTripId
-            if (pendingId != null) {
-                val openCompleted = latestOpenCompletedTrip
-                if (openCompleted == null) {
-                    validationMessage = "Your completed trip is saved. Try opening it again."
-                } else {
-                    validationMessage = ""
-                    queueTripOpening(pendingId)
+                val transitModes = transportTypes.filter {
+                    it.usesRoutes && it.id in planner.selectedTransportIds
                 }
-                return
-            }
+                val zonesByTransport = transitModes.associate { it.id to planner.zonesForTransport(it.id).toList() }
+                val missingZones = transitModes.firstOrNull { zonesByTransport[it.id].isNullOrEmpty() }
+                if (missingZones != null) {
+                    validationMessage = "Choose at least one transit zone for ${missingZones.label}."
+                    return@launch
+                }
 
-            val openTrip = latestOpenCurrentTrip
-            if (openTrip == null) {
-                validationMessage = "Current Trip navigation is unavailable."
-                return
-            }
-
-            val bounds = generationBounds
-            if (bounds == null) {
-                validationMessage = "The map is preparing. Please try GO again."
-                return
-            }
-            validationMessage = ""
-
-            val transitModes = transportTypes.filter {
-                it.usesRoutes && it.id in planner.selectedTransportIds
-            }
-            val zonesByTransport = transitModes.associate { it.id to planner.zonesForTransport(it.id).toList() }
-            val missingZones = transitModes.firstOrNull { zonesByTransport[it.id].isNullOrEmpty() }
-            if (missingZones != null) {
-                validationMessage = "Choose at least one transit zone for ${missingZones.label}."
-                return
-            }
-
-            val input = TripGenerationInput(
-                title = "Trip ${tripsStore.completedTrips.size + 1}",
-                description = "Random mock route with $boundedMinutes planned minutes.",
-                imageUrl = "",
-                plannedMinutes = boundedMinutes,
-                selectedTransportIds = selectedTransportIds.toList(),
-                selectedRouteIds = emptyList(),
-                selectedZoneIds = zonesByTransport.values.flatten().distinct().sorted(),
-                selectedZonesByTransport = zonesByTransport,
-                attractionIntensity = intensity
-            )
-
-            val existingIds = buildSet {
-                addAll(tripsStore.completedTrips.map { it.id })
-                tripsStore.activeTrip?.let { add(it.id) }
-            }
-
-            when (
-                val generated = generator.generate(
-                    input = input,
-                    transportTypes = transportTypes,
-                    transportRoutes = transportRoutes,
-                    existingTripIds = existingIds,
-                    bounds = bounds
+                val input = TripGenerationInput(
+                    title = "Trip ${tripsStore.completedTrips.size + 1}",
+                    description = "Random mock route with $boundedMinutes planned minutes.",
+                    imageUrl = "",
+                    plannedMinutes = boundedMinutes,
+                    selectedTransportIds = selectedTransportIds.toList(),
+                    selectedRouteIds = emptyList(),
+                    selectedZoneIds = zonesByTransport.values.flatten().distinct().sorted(),
+                    selectedZonesByTransport = zonesByTransport,
+                    attractionIntensity = intensity
                 )
-            ) {
-                is TripGenerationResult.InvalidInput -> {
-                    validationMessage = generated.message
+
+                val existingIds = buildSet {
+                    addAll(tripsStore.completedTrips.map { it.id })
+                    tripsStore.activeTrip?.let { add(it.id) }
                 }
 
-                TripGenerationResult.IdUnavailable -> {
-                    validationMessage =
-                        "A unique trip ID could not be created. Please try again."
-                }
+                when (
+                    val generated = withContext(Dispatchers.Default) {
+                        generator.generate(
+                        input = input,
+                        transportTypes = transportTypes,
+                        transportRoutes = transportRoutes,
+                        existingTripIds = existingIds,
+                        bounds = bounds
+                        )
+                    }
+                ) {
+                    is TripGenerationResult.InvalidInput -> {
+                        validationMessage = generated.message
+                    }
 
-                is TripGenerationResult.Success -> {
-                    when (val started = tripsStore.start(generated.trip)) {
-                        TripActionResult.Applied -> {
-                            queueTripOpening(generated.trip.id)
-                        }
+                    TripGenerationResult.IdUnavailable -> {
+                        validationMessage =
+                            "A unique trip ID could not be created. Please try again."
+                    }
 
-                        is TripActionResult.ActiveTripExists -> {
-                            validationMessage =
-                                "An unfinished trip already exists. Use Resume trip."
-                        }
-
-                        is TripActionResult.InvalidInput -> {
-                            validationMessage = started.message
-                        }
-
-                        else -> {
-                            validationMessage =
-                                "The trip could not be started. Please try again."
-                        }
+                    is TripGenerationResult.Success -> {
+                        proposalJson = Json.encodeToString(generated.trip)
                     }
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                validationMessage = "Unable to generate a trip. Please try again."
+            } finally {
+                processingAction = false
             }
-        } finally {
-            processingAction = false
         }
     }
 
@@ -283,6 +289,69 @@ internal fun TransitOpeningScreen(
 
     val navigator = LocalNavigator.current
     val navigation = LocalTripNavigation.current
+
+    if (processingAction &&
+        activeState == null &&
+        pendingReviewId == null
+    ) {
+        TripLoadingContent(
+            minutes = boundedMinutes,
+            transportSummary = transportTypes
+                .filter { it.id in selectedTransportIds }
+                .joinToString(" and ") { it.label },
+            onCancel = {
+                generationJob?.cancel()
+            },
+            modifier = modifier
+        )
+        return
+    }
+
+    if (proposal != null) {
+        TripProposalContent(
+            trip = proposal,
+            onStart = {
+                if (latestDestinationActive &&
+                    !processingAction &&
+                    pendingOpenTripId == null
+                ) {
+                    when (val result = tripsStore.start(proposal)) {
+                        TripActionResult.Applied -> {
+                            proposalJson = null
+                            queueTripOpening(proposal.id)
+                        }
+
+                        is TripActionResult.ActiveTripExists -> {
+                            proposalJson = null
+                            validationMessage =
+                                "An unfinished trip already exists. Use Resume trip."
+                        }
+
+                        is TripActionResult.InvalidInput -> {
+                            proposalJson = null
+                            validationMessage = result.message
+                        }
+
+                        else -> {
+                            proposalJson = null
+                            validationMessage =
+                                "The trip could not be started. Please try again."
+                        }
+                    }
+                }
+            },
+            onGenerateAnother = {
+                proposalJson = null
+                performPrimaryAction()
+            },
+            onEditSettings = {
+                // Return to the planner with all current choices preserved.
+                proposalJson = null
+            },
+            modifier = modifier
+        )
+        return
+    }
 
     MainPlannerContent(
         minutes = boundedMinutes,

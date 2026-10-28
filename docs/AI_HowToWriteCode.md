@@ -171,6 +171,7 @@ rnd_transit_mtl/
 │   ├── main/
 │   │   ├── MainScreen.kt
 │   │   ├── MainPlannerContent.kt
+│   │   ├── TripProposalContent.kt
 │   │   ├── TransitOpeningScreen.kt
 │   │   ├── TripPlannerContent.kt
 │   │   ├── components/
