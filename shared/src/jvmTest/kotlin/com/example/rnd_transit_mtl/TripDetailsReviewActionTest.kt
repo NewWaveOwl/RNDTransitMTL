@@ -3,11 +3,16 @@ package com.example.rnd_transit_mtl
 import androidx.compose.runtime.*
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
+import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.semantics.*
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import com.example.rnd_transit_mtl.View.history.previews.reviewedHistoryPreviewTrip
 import com.example.rnd_transit_mtl.View.trip_details.TripDetailsScreen
+import com.example.rnd_transit_mtl.model.review.TripReview
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.trip.TripDetailsV3
 import com.example.rnd_transit_mtl.navigation.*
 import com.example.rnd_transit_mtl.state.trip.*
 import com.example.rnd_transit_mtl.ui.theme.RNDTransitTheme
@@ -18,6 +23,66 @@ import kotlin.test.*
 /** Guards the live V3 details path, which previously dropped the review navigation callback. */
 @OptIn(ExperimentalComposeUiApi::class)
 class TripDetailsReviewActionTest {
+    @Test
+    fun detailsRetainAllSavedFeedbackAndThePhotoLink() {
+        val photo = "https://example.com/saved-review.jpg"
+        val review = TripReview(overall = 5, quality = 4, interesting = 3, `fun` = 2,
+            comment = "A memorable trip", imageUrl = photo)
+        var trip by mutableStateOf(reviewedHistoryPreviewTrip.copy(review = review))
+        var enabled by mutableStateOf(true)
+        val opened = mutableListOf<String>()
+        val scene = ImageComposeScene(412, 720) {
+            CompositionLocalProvider(LocalInspectionMode provides true,
+                LocalUriHandler provides object : UriHandler {
+                    override fun openUri(uri: String) { opened += uri }
+                }) {
+                RNDTransitTheme { TripDetailsV3(trip, "2026-10-29", {}, {}, enabled = enabled) }
+            }
+        }
+        var time = 0L
+        fun render() { repeat(5) { time += 16_000_000; scene.render(time).close() } }
+        fun all(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::all)
+        fun nodes() = scene.semanticsOwners.flatMap { all(it.rootSemanticsNode) }
+        fun hasDescription(text: String) = nodes().any {
+            it.config.getOrNull(SemanticsProperties.ContentDescription)?.contains(text) == true
+        }
+        fun textNode(text: String) = nodes().firstOrNull {
+            it.config.getOrNull(SemanticsProperties.Text)?.any { value -> value.text == text } == true
+        }
+        fun link() = nodes().first {
+            it.config.getOrNull(SemanticsProperties.Text)?.any { text -> text.text == "Open review image" } == true &&
+                it.config.contains(SemanticsActions.OnClick)
+        }
+        try {
+            render()
+            listOf("Overall experience: 5 out of 5", "Quality: 4 out of 5",
+                "How interesting: 3 out of 5", "Fun: 2 out of 5").forEach { assertTrue(hasDescription(it), it) }
+            assertNotNull(textNode("Review photo"))
+            assertNotNull(textNode("Saved review photo preview"))
+            assertNotNull(textNode(photo))
+            assertTrue(nodes().any {
+                it.config.getOrNull(SemanticsProperties.Text)?.any { text -> "A memorable trip" in text.text } == true
+            })
+            link().config[SemanticsActions.OnClick].action!!.invoke()
+            assertEquals(listOf(photo), opened)
+            enabled = false
+            render()
+            assertTrue(link().config.contains(SemanticsProperties.Disabled))
+
+            trip = trip.copy(review = TripReview(overall = 3))
+            render()
+            listOf("Quality: not rated", "How interesting: not rated", "Fun: not rated")
+                .forEach { assertTrue(hasDescription(it), it) }
+            assertNotNull(textNode("No written comment."))
+            assertNull(textNode("Review photo"))
+            assertNull(textNode("Open review image"))
+
+            trip = trip.copy(review = null)
+            render()
+            assertNotNull(textNode("Not reviewed"))
+        } finally { scene.close() }
+    }
+
     @Test
     fun savedDetailsExposeReviewOrEditReviewAndRespectDestinationActivity() {
         for (reviewed in listOf(false, true)) {

@@ -33,7 +33,6 @@ import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.MockTripMap
 import com.example.rnd_transit_mtl.ui.theme.*
 import kotlin.math.roundToInt
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.ratings.StarRatingRow
-import com.example.rnd_transit_mtl.ui.global_ui_ellements.ratings.RatingStarsDisplay
 
 // Layout settings — dp dimensions shared by the supplied V3 screens.
 private val V3SectionPadding = 16.dp
@@ -610,10 +609,7 @@ fun TripDetailsV3(
             )
 
             val review = trip.review
-            if (review != null) {
-                RatingStarsDisplay("Overall experience", review.overall, textColor = TransitWhite)
-                if (review.comment.isNotBlank()) Text(review.comment, color = TransitWhite)
-            }
+            TripReviewSummary(review = review, linksEnabled = enabled)
 
             V3Error(errorMessage)
             if (onReview != null) {

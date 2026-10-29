@@ -63,11 +63,12 @@ class TripScreensV3Test {
             assertEquals(FeedbackChoice.LIKED, choice)
             click("Clear"); assertEquals(FeedbackChoice.NONE, choice)
             mode = 3; render("History-v3.png"); click("Details")
-            mode = 4; render("Details-v3.png"); click("Repeat as a new trip")
+            mode = 4; render("Details-v3.png")
             scene.semanticsOwners.flatMap { all(it.rootSemanticsNode) }.first {
                 it.config.getOrNull(SemanticsActions.ScrollBy) != null
-            }.config[SemanticsActions.ScrollBy].action?.invoke(0f, 250f)
+            }.config[SemanticsActions.ScrollBy].action?.invoke(0f, 10_000f)
             render("Details-v3-scrolled.png")
+            click("Repeat as a new trip")
             click("Edit a copy of these settings")
             assertEquals(listOf("review", "skip", "save", "details", "repeat", "copy"), events)
         } finally { scene.close() }
