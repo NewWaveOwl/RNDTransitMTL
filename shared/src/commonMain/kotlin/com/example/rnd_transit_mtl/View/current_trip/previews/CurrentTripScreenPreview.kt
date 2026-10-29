@@ -72,20 +72,6 @@ fun CurrentTripHalfwayPreview() {
 }
 
 @Preview(
-    name = "Current trip — paused at 50 percent",
-    showBackground = true,
-    widthDp = 320,
-    heightDp = 850
-)
-@Composable
-fun CurrentTripPausedPreview() {
-    CurrentTripExample(
-        progress = 0.5f,
-        isRunning = false
-    )
-}
-
-@Preview(
     name = "Current trip — 100 percent",
     showBackground = true,
     widthDp = 390,
@@ -94,8 +80,7 @@ fun CurrentTripPausedPreview() {
 @Composable
 fun CurrentTripCompletedPreview() {
     CurrentTripExample(
-        progress = 1f,
-        isRunning = false
+        progress = 1f
     )
 }
 
@@ -129,13 +114,12 @@ fun CurrentTripInformationPopupPreview() {
 )
 @Composable
 fun CompletedTripInformationPopupPreview() {
-    CurrentTripExample(progress = 1f, isRunning = false, showInformation = true)
+    CurrentTripExample(progress = 1f, showInformation = true)
 }
 
 @Composable
 private fun CurrentTripExample(
     progress: Float,
-    isRunning: Boolean = true,
     showInformation: Boolean = false
 ) {
     val record = currentTripPreviewRecord.copy(
@@ -148,9 +132,9 @@ private fun CurrentTripExample(
 
     RNDTransitTheme {
         CurrentTripContent(
+            onFinishRequested = {},
             trip = record,
             progress = progress,
-            isRunning = isRunning,
             actionsEnabled = true,
             message = null,
             onLeave = {},

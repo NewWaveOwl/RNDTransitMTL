@@ -26,6 +26,7 @@ Examples marked **slide adaptation** preserve the teaching pattern while improvi
 12. Preserve AI contribution records where coursework requires them. Never invent authorship, contribution percentages, time worked, decisions, or test results.
 13. For ViewModels and streams, define the owner, lifetime, cancellation, state/event distinction, and delivery requirements before choosing an API. Follow section 18 for the Days 20–23 practices.
 14. In Compose files being created or edited, put the main component layout and animation settings in clearly labeled sections immediately after imports. Use names that state each value's responsibility and unit; follow the mandatory tuning practice below.
+15. Reuse existing project icons. If an icon is missing, export it from the RndTransit_main Figma design (Android Design kit or Core experience) or use Google Material Symbols from fonts.google.com/icons. If neither has the needed icon, create it in Figma and export it. Do not generate replacement icons in application code. Keep the requested solution simple and preserve its proposed structure.
 
 **Lecture basis:** S01 slides 8 and 39–45; S02 slides 3–5; S06 slides 4–14; S07 slides 3–11; S16 slides 6–25.
 
@@ -39,6 +40,8 @@ RNDTransitMTL must use MVVM. Generate new application code with these responsibi
 5. Scope ViewModels to Navigation 3 entries and preserve the application-wide trip repository/store as the single source of truth.
 6. Distinguish presentation state, restorable drafts, and persisted defaults. Do not claim that a ViewModel persists data after process termination.
 Place screen code in View/<screen_name>/, ViewModels in ViewModels/<screen_name>/, and components used by multiple screens in ui/global_ui_ellements/. Screen-specific components belong beside their screen, optionally in a local components/ folder.
+
+`ui/global_ui_ellements/trip/TripScreensV3.kt` contains the shared completion, overall review, feedback, history, and saved-details presentations. Their callbacks delegate to the existing coordinators. Segment/place feedback stays disabled until target-based persistence and navigation exist. Repeat generates a fresh proposal; Edit copy restores recorded planner preferences without modifying the completed trip.
 
 Keep theme code in ui/theme, application assembly in App.kt, shared scaffold and navigation bars in layout/, navigation state and destinations in navigation/, models in the corresponding model/<domain> folder, and repository/provider implementations in the named data subfolders.
 
@@ -160,6 +163,7 @@ rnd_transit_mtl/
 ├── layout/
 │   ├── MainLayout.kt
 │   ├── SharedTopBar.kt
+│   ├── SharedBottomBar.kt
 │   ├── PageTitle.kt
 │   └── previews/
 │       ├── NavigationHeaderPreview.kt
@@ -169,10 +173,12 @@ rnd_transit_mtl/
 │   ├── main/
 │   │   ├── MainScreen.kt
 │   │   ├── MainPlannerContent.kt
+│   │   ├── TripProposalContent.kt
 │   │   ├── TransitOpeningScreen.kt
 │   │   ├── TripPlannerContent.kt
 │   │   ├── components/
 │   │   │   ├── PlannerPreferenceBands.kt
+│   │   │   ├── BikeSpeedPanel.kt
 │   │   │   ├── GOBox.kt
 │   │   │   ├── TransportPanel.kt
 │   │   │   └── IntensityPanel.kt
@@ -182,6 +188,7 @@ rnd_transit_mtl/
 │   │       └── IntensityPanelPreview.kt
 │   │
 │   ├── current_trip/
+│   │   ├── ActiveMapContent.kt
 │   │   ├── CurrentTripScreen.kt
 │   │   ├── CurrentTripContent.kt
 │   │   ├── components/

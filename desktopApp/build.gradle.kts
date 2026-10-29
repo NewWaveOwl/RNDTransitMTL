@@ -23,6 +23,9 @@ compose.desktop {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "com.example.rnd_transit_mtl"
             packageVersion = "1.0.0"
+            windows { iconFile.set(project.file("src/main/resources/app_icon.ico")) }
+            linux { iconFile.set(project.file("src/main/resources/app_icon.png")) }
+            macOS { iconFile.set(project.file("src/main/resources/app_icon.icns")) }
         }
     }
 }

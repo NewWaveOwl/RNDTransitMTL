@@ -1,8 +1,12 @@
 package com.example.rnd_transit_mtl.View.main
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.AnchoredDraggableState
@@ -25,37 +29,44 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import com.example.rnd_transit_mtl.View.main.components.GOBox
+import com.example.rnd_transit_mtl.View.main.components.GoBoxCompactHeight
 import com.example.rnd_transit_mtl.View.main.components.PlannerPreferenceBands
 import com.example.rnd_transit_mtl.data.generation.TripGenerationBounds
 import com.example.rnd_transit_mtl.model.transport.TransportType
-import com.example.rnd_transit_mtl.View.main.components.GoBoxCompactHeight
-import com.example.rnd_transit_mtl.View.main.components.GOBox
-import com.example.rnd_transit_mtl.ui.global_ui_ellements.transitions.GO_TRIP_TRANSITION_MILLIS
+import com.example.rnd_transit_mtl.model.trip.TripPoint
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.plannerTripBounds
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.validMapSourceSize
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.transitions.GO_TRIP_TRANSITION_MILLIS
 import com.example.rnd_transit_mtl.ui.theme.*
+import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import rnd_transit_mtl.shared.generated.resources.Res
 import rnd_transit_mtl.shared.generated.resources.map_sample
-import kotlin.math.roundToInt
 
 // Layout settings — widths/padding in dp; fractions and reference coordinates keep the sheet responsive.
 private val PlannerSheetMaxWidth = 620.dp
 private val PlannerGoBoxHorizontalPadding = 24.dp
+private val PlannerOriginFieldHorizontalPadding = 16.dp
+private val PlannerOriginFieldTopPadding = 16.dp
 private val PlannerDragHandleWidth = 42.dp
 private val PlannerDragHandleHeight = 4.dp
 private val PlannerDragStripHeight = 16.dp
@@ -74,13 +85,14 @@ private val PlannerGoPreferencesGap = 12f
 
 // Animation settings — larger millisecond values make snapping and handle taps slower.
 private const val PLANNER_SHEET_ANIMATION_DURATION_MILLIS = 300
+private const val PLANNER_ORIGIN_FIELD_ANIMATION_DURATION_MILLIS = 300
 // GO exit timing is shared with navigation/footer transitions: edit ui/global_ui_ellements/transitions/TripTransition.kt.
 
 /** Three resting positions corresponding to Figma main_screen, routes, and preferences. */
 internal enum class PlannerSheetPosition { Main, Routes, Preferences }
 
 /**
- * Displays a stationary sample map and three draggable preference positions.
+ * Displays a pannable sample map and three draggable preference positions.
  *
  * GO follows the sheet. Expanded content scrolls after the sheet reaches its top stop.
  * Sheet position is presentation state; all editable choices belong to the caller.
@@ -92,9 +104,9 @@ internal enum class PlannerSheetPosition { Main, Routes, Preferences }
  * @param selectedZonesByTransport Independently selected zone IDs for each transit mode.
  * @param onToggleTransport Requests an independent transport toggle.
  * @param onToggleZone Requests a zone toggle for the supplied transport ID and zone ID.
- * @param intensity Attraction intensity from 0 to 100.
- * @param onIntensityChange Requests an intensity change.
  * @param walkingPreference Selected walking style, retained for future routing.
+ * @param bikeSpeedKmh Selected cycling speed in km/h, retained for future routing.
+ * @param onBikeSpeedChange Requests a cycling-speed change.
  * @param selectedAttractionIds Selected attraction labels, retained for future routing.
  * @param onWalkingPreferenceChange Requests a walking-style change.
  * @param onToggleAttraction Requests an attraction toggle.
@@ -111,6 +123,8 @@ internal enum class PlannerSheetPosition { Main, Routes, Preferences }
  * @param onMapViewportReady Reports normalized map-generation bounds.
  * @param onControlsHidden Runs only after the complete slide-down transition.
  * @param initialSheetPosition Initial position for previews or a new planner entry.
+ * @param origin Selected sample-map starting point, or none.
+ * @param onEditOrigin Opens the origin options without changing saved choices.
  */
 @Composable
 internal fun MainPlannerContent(
@@ -121,9 +135,9 @@ internal fun MainPlannerContent(
     selectedZonesByTransport: Map<String, List<String>>,
     onToggleTransport: (String) -> Unit,
     onToggleZone: (String, String) -> Unit,
-    intensity: Float,
-    onIntensityChange: (Float) -> Unit,
     walkingPreference: String,
+    bikeSpeedKmh: Int,
+    onBikeSpeedChange: (Int) -> Unit,
     selectedAttractionIds: List<String>,
     onWalkingPreferenceChange: (String) -> Unit,
     onToggleAttraction: (String) -> Unit,
@@ -139,10 +153,16 @@ internal fun MainPlannerContent(
     controlsVisible: Boolean = true,
     onMapViewportReady: (TripGenerationBounds) -> Unit = {},
     onControlsHidden: () -> Unit = {},
-    initialSheetPosition: PlannerSheetPosition = PlannerSheetPosition.Main
+    initialSheetPosition: PlannerSheetPosition = PlannerSheetPosition.Main,
+    origin: TripPoint? = TripPoint("Current location", 0.5f, 0.35f),
+    onEditOrigin: () -> Unit = {}
 ) {
     // Expansion is presentation state, separate from transport and zone selections.
     var expandedTransportId by rememberSaveable { mutableStateOf<String?>(null) }
+    var recenterRequest by rememberSaveable {
+        mutableStateOf(0)
+    }
+
     val exit = remember { Animatable(if (controlsVisible) 0f else 1f) }
     val latestControlsHidden by rememberUpdatedState(onControlsHidden)
     LaunchedEffect(controlsVisible) {
@@ -232,7 +252,13 @@ internal fun MainPlannerContent(
             }
         }
 
-        Image(painter, "Bundled sample transit map", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        FigmaOriginMap(
+            origin = origin,
+            enabled = enabled,
+            recenterRequest = recenterRequest,
+            modifier = Modifier.fillMaxSize()
+        )
+
 
         // Move GO and the sheet together on trip opening; keep the map outside this layer.
         Box(Modifier.width(panelWidth).fillMaxHeight().graphicsLayer {
@@ -241,6 +267,65 @@ internal fun MainPlannerContent(
             val gapPx = geometry.goGap(sheetOffset)
             val goHeightPx = with(density) { (GoBoxCompactHeight * scale).toPx() }
             val goTop = (sheetOffset - goHeightPx - gapPx).coerceAtLeast(0f)
+
+            val unitPx = with(density) { scale.dp.toPx() }
+
+            // Hide these controls as GO approaches the fully expanded position.
+            val showMapControls =
+                controlsVisible && goTop >= 100f * unitPx
+
+            // Keep the field in the shared moving layer during GO's slide-down exit.
+            // Sheet expansion hides it upward; pulling the sheet down reveals it smoothly.
+            AnimatedVisibility(
+                visible = goTop >= 100f * unitPx,
+                enter = slideInVertically(
+                    animationSpec = tween(PLANNER_ORIGIN_FIELD_ANIMATION_DURATION_MILLIS),
+                    initialOffsetY = { -it }
+                ) + fadeIn(tween(PLANNER_ORIGIN_FIELD_ANIMATION_DURATION_MILLIS)),
+                exit = slideOutVertically(
+                    animationSpec = tween(PLANNER_ORIGIN_FIELD_ANIMATION_DURATION_MILLIS),
+                    targetOffsetY = { -it }
+                ) + fadeOut(tween(PLANNER_ORIGIN_FIELD_ANIMATION_DURATION_MILLIS)),
+                modifier = Modifier
+                    .padding(horizontal = PlannerOriginFieldHorizontalPadding * scale)
+                    .offset(y = PlannerOriginFieldTopPadding * scale)
+            ) {
+                TripLabelValueField(
+                    label = "Starting point",
+                    value = origin?.label ?: "Search a place or address",
+                    showLocationIcon = true,
+                    modifier = Modifier.clickable(
+                        enabled = enabled && showMapControls,
+                        role = Role.Button,
+                        onClickLabel = "Choose starting point",
+                        onClick = onEditOrigin
+                    )
+                )
+            }
+
+            if (showMapControls) {
+                val fraction = (
+                    (sheetOffset - geometry.routes) /
+                        (geometry.main - geometry.routes)
+                ).coerceIn(0f, 1f)
+
+                // Figma: gap above GO is 15 dp in Main and 12 dp in Routes.
+                val recenterGap = 12f + 3f * fraction
+                val recenterTop = (
+                    goTop - (48f + recenterGap) * unitPx
+                ).coerceAtLeast(0f)
+
+                FigmaRecenterButton(
+                    enabled = enabled && origin != null,
+                    onClick = { recenterRequest += 1 },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(end = 16.dp * scale)
+                        .offset {
+                            IntOffset(0, recenterTop.roundToInt())
+                        }
+                )
+            }
 
             if (goTop > with(density) { 120.dp.toPx() }) {
                 Surface(
@@ -273,24 +358,109 @@ internal fun MainPlannerContent(
                     .nestedScroll(nestedScroll)
                     .anchoredDraggable(sheet, Orientation.Vertical, enabled = enabled)
             ) {
+                fun moveSheet(position: PlannerSheetPosition) {
+                    if (!enabled) return
+
+                    scope.launch {
+                        sheet.animateTo(
+                            position,
+                            tween(PLANNER_SHEET_ANIMATION_DURATION_MILLIS)
+                        )
+                    }
+                }
+
+                fun expandSheet() {
+                    moveSheet(
+                        when (sheet.targetValue) {
+                            PlannerSheetPosition.Main -> PlannerSheetPosition.Routes
+                            PlannerSheetPosition.Routes -> PlannerSheetPosition.Preferences
+                            PlannerSheetPosition.Preferences -> PlannerSheetPosition.Preferences
+                        }
+                    )
+                }
+
+                fun collapseSheet() {
+                    moveSheet(
+                        when (sheet.targetValue) {
+                            PlannerSheetPosition.Main -> PlannerSheetPosition.Main
+                            PlannerSheetPosition.Routes -> PlannerSheetPosition.Main
+                            PlannerSheetPosition.Preferences -> PlannerSheetPosition.Routes
+                        }
+                    )
+                }
+
                 Box(
-                    Modifier.fillMaxWidth().height(PlannerDragStripHeight * scale).background(TransitComplementary)
-                        .clickable(enabled = enabled, role = Role.Button,
-                            onClickLabel = "Show next preference position") {
-                            scope.launch {
-                                val next = when (sheet.currentValue) {
+                    Modifier
+                        .fillMaxWidth()
+                        .height(PlannerDragStripHeight * scale)
+                        .background(TransitComplementary)
+                        .onPreviewKeyEvent { event ->
+                            if (!enabled || event.type != KeyEventType.KeyDown) {
+                                false
+                            } else {
+                                when (event.key) {
+                                    Key.DirectionUp -> {
+                                        expandSheet()
+                                        true
+                                    }
+                                    Key.DirectionDown -> {
+                                        collapseSheet()
+                                        true
+                                    }
+                                    Key.MoveHome -> {
+                                        moveSheet(PlannerSheetPosition.Main)
+                                        true
+                                    }
+                                    Key.MoveEnd -> {
+                                        moveSheet(PlannerSheetPosition.Preferences)
+                                        true
+                                    }
+                                    else -> false
+                                }
+                            }
+                        }
+                        .clickable(
+                            enabled = enabled,
+                            role = Role.Button,
+                            onClickLabel = "Expand or collapse preferences"
+                        ) {
+                            moveSheet(
+                                when (sheet.targetValue) {
                                     PlannerSheetPosition.Main -> PlannerSheetPosition.Routes
                                     PlannerSheetPosition.Routes -> PlannerSheetPosition.Preferences
                                     PlannerSheetPosition.Preferences -> PlannerSheetPosition.Main
                                 }
-                                sheet.animateTo(next, tween(PLANNER_SHEET_ANIMATION_DURATION_MILLIS))
-                            }
+                            )
+                        }
+                        .semantics {
+                            contentDescription = "Trip preferences"
+                            stateDescription = sheet.targetValue.name
+                            customActions = listOf(
+                                CustomAccessibilityAction("Expand preferences") {
+                                    if (enabled) expandSheet()
+                                    enabled
+                                },
+                                CustomAccessibilityAction("Collapse preferences") {
+                                    if (enabled) collapseSheet()
+                                    enabled
+                                }
+                            )
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    Box(Modifier.size(PlannerDragHandleWidth * scale, PlannerDragHandleHeight * scale)
-                        .background(TransitWhite, RoundedCornerShape(2.dp)))
+                    Box(
+                        Modifier
+                            .size(
+                                PlannerDragHandleWidth * scale,
+                                PlannerDragHandleHeight * scale
+                            )
+                            .background(
+                                TransitWhite,
+                                RoundedCornerShape(2.dp)
+                            )
+                    )
                 }
+
                 LazyColumn(Modifier.fillMaxWidth().weight(1f), state = list, userScrollEnabled = enabled) {
                     val summary = activeTripSummary ?: pendingReviewSummary
                     if (summary != null || validationMessage.isNotEmpty()) {
@@ -307,8 +477,10 @@ internal fun MainPlannerContent(
                     PlannerPreferenceBands(
                         scale, transportTypes, selectedTransportIds, selectedZonesByTransport,
                         onToggleTransport, onToggleZone, walkingPreference, selectedAttractionIds,
-                        onWalkingPreferenceChange, onToggleAttraction, intensity, onIntensityChange,
+                        onWalkingPreferenceChange, onToggleAttraction,
                         enabled, onOpenDetailedSettings, expandedTransportId,
+                        bikeSpeedKmh = bikeSpeedKmh,
+                        onBikeSpeedChange = onBikeSpeedChange,
                         onExpandedTransportChange = { transportId ->
                             if (enabled) {
                                 expandedTransportId = if (expandedTransportId == transportId) null else transportId

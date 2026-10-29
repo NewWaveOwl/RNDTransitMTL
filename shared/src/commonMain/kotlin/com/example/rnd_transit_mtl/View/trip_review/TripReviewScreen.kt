@@ -53,7 +53,9 @@ fun TripReviewScreen(
     onOpenHistory: () -> Boolean,
     onReturnToOrigin: () -> Boolean,
     modifier: Modifier = Modifier,
-    registerBackHandler: RegisterReviewBackHandler? = null
+    registerBackHandler: RegisterReviewBackHandler? = null,
+    onOpenFeedback: () -> Unit = {},
+    feedbackAvailable: Boolean = false
 ) {
     val tripsStore = LocalTripsStore.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -367,52 +369,19 @@ fun TripReviewScreen(
                 tripTitle = trip.title,
                 mode = mode,
                 draft = draft,
-                controlsEnabled = isDestinationActive && isAppResumed,
+                controlsEnabled = canEdit(),
                 errorMessage = errorMessage,
                 onRatingChange = { question, rating ->
-                    updateDraft { latest ->
-                        if (latest.step == question) {
-                            latest.withRating(question, rating)
-                        } else {
-                            latest
-                        }
-                    }
+                    updateDraft { it.withRating(question, rating) }
                 },
                 onCommentChange = { comment ->
-                    updateDraft { latest ->
-                        if (latest.step == ReviewStep.OVERALL) {
-                            latest.copy(comment = comment)
-                        } else {
-                            latest
-                        }
-                    }
+                    updateDraft { it.copy(comment = comment) }
                 },
                 onImageUrlChange = { imageUrl ->
-                    updateDraft { latest ->
-                        if (latest.step == ReviewStep.OVERALL) {
-                            latest.copy(imageUrl = imageUrl)
-                        } else {
-                            latest
-                        }
-                    }
+                    updateDraft { it.copy(imageUrl = imageUrl) }
                 },
-                onStepChange = { requested ->
-                    updateDraft { latest ->
-                        val adjacent =
-                            requested == latest.step.previousOrNull() ||
-                                    requested == latest.step.nextOrNull()
-                        val forward =
-                            requested.ordinal > latest.step.ordinal
-
-                        if (
-                            adjacent &&
-                            (!forward || latest.overall != null)
-                        ) {
-                            latest.copy(step = requested)
-                        } else {
-                            latest
-                        }
-                    }
+                onStepChange = { step ->
+                    updateDraft { it.copy(step = step) }
                 },
                 onSave = { saveAndExit() },
                 onDiscard = { discardAndExit() },

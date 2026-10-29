@@ -7,6 +7,9 @@ import com.example.rnd_transit_mtl.data.generation.TripGenerationInput
 import com.example.rnd_transit_mtl.data.generation.TripGenerationResult
 import com.example.rnd_transit_mtl.model.transport.TransportType
 import com.example.rnd_transit_mtl.model.trip.Trip
+import com.example.rnd_transit_mtl.model.trip.TripPoint
+import com.example.rnd_transit_mtl.data.generation.TripGenerationBounds
+import kotlin.test.assertTrue
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.random.Random
@@ -16,6 +19,14 @@ import kotlin.test.assertIs
 
 /** Checks draft restoration and zone requests without geographic-routing assumptions. */
 class MainPlannerTest {
+    @Test
+    fun restoredZeroMinuteDraftUsesFiveMinuteMinimum() {
+        val planner = MainPlannerViewModel(MainPlannerState(minutes = 0))
+        assertEquals(5, planner.uiState.value.minutes)
+        planner.setMinutes(Int.MIN_VALUE)
+        assertEquals(5, planner.uiState.value.minutes)
+    }
+
     private val types = listOf(
         TransportType("walk", "Walk", false),
         TransportType("bus", "Bus", true)
@@ -55,7 +66,7 @@ class MainPlannerTest {
     @Test
     fun walkingAndAttractionChoicesRestoreWithoutChangingOtherPlannerValues() {
         val planner = MainPlannerViewModel()
-        planner.setWalkingPreference("Direct")
+        planner.setWalkingPreference("Dash")
         planner.toggleAttraction("Culture")
         planner.toggleAttraction("Nature")
         planner.setWalkingPreference("unsupported")
@@ -63,7 +74,7 @@ class MainPlannerTest {
         val restored = MainPlannerViewModel(Json.decodeFromString<MainPlannerState>(
             Json.encodeToString(planner.uiState.value)
         ))
-        assertEquals("Direct", restored.uiState.value.walkingPreference)
+        assertEquals("Dash", restored.uiState.value.walkingPreference)
         assertEquals(listOf("Surprise", "Culture"), restored.uiState.value.selectedAttractionIds)
         assertEquals(listOf("walk"), restored.uiState.value.selectedTransportIds)
         assertEquals(listOf("A"), restored.uiState.value.selectedZoneIds)
@@ -71,11 +82,51 @@ class MainPlannerTest {
     }
 
     @Test
+    fun walkingPacesRestoreAndOlderStylesReceiveAValidPace() {
+        assertEquals(listOf("Amble", "Walk", "Dash"), MainPlannerViewModel.walkingPreferences)
+        MainPlannerViewModel.walkingPreferences.forEach { pace ->
+            val planner = MainPlannerViewModel()
+            planner.setWalkingPreference(pace)
+            val restored = MainPlannerViewModel(Json.decodeFromString<MainPlannerState>(
+                Json.encodeToString(planner.uiState.value)
+            ))
+            assertEquals(pace, restored.uiState.value.walkingPreference)
+        }
+        mapOf("Scenic" to "Amble", "Direct" to "Walk", "Normal" to "Walk", "Stroll" to "Walk", "Fast" to "Dash", "unknown" to "Amble").forEach { (old, pace) ->
+            val restored = MainPlannerViewModel(MainPlannerState(walkingPreference = old))
+            assertEquals(pace, restored.uiState.value.walkingPreference)
+            restored.setWalkingPreference("Direct")
+            assertEquals(pace, restored.uiState.value.walkingPreference)
+        }
+    }
+
+    @Test
+    fun bikeSpeedClampsRestoresAndRetainsValueWhileDisabled() {
+        val planner = MainPlannerViewModel()
+        assertEquals(18, planner.uiState.value.bikeSpeedKmh)
+        planner.setBikeSpeedKmh(0)
+        assertEquals(8, planner.uiState.value.bikeSpeedKmh)
+        planner.setBikeSpeedKmh(100)
+        assertEquals(32, planner.uiState.value.bikeSpeedKmh)
+        planner.setBikeSpeedKmh(23)
+        planner.toggleTransport("bike", setOf("walk", "bike"))
+        planner.toggleTransport("bike", setOf("walk", "bike"))
+        val restored = MainPlannerViewModel(Json.decodeFromString<MainPlannerState>(Json.encodeToString(planner.uiState.value)))
+        assertEquals(23, restored.uiState.value.bikeSpeedKmh)
+        assertEquals(listOf("walk"), restored.uiState.value.selectedTransportIds)
+        assertEquals(32, MainPlannerViewModel(MainPlannerState(bikeSpeedKmh = 99)).uiState.value.bikeSpeedKmh)
+        mapOf(8 to "Slow", 13 to "Slow", 14 to "Normal", 19 to "Normal", 20 to "Steady", 25 to "Steady", 26 to "Fast", 32 to "Fast").forEach { (speed, band) ->
+            assertEquals(band, MainPlannerViewModel.bikePaceLabel(speed))
+        }
+    }
+
+    @Test
     fun earlierDraftsReceiveTheNewPreferenceDefaults() {
         val restored = Json.decodeFromString<MainPlannerState>(
             """{"minutes":45,"selectedTransportIds":["bus"],"selectedZoneIds":["B"],"intensity":60.0}"""
         )
-        assertEquals("Scenic", restored.walkingPreference)
+        assertEquals("Amble", restored.walkingPreference)
+        assertEquals(18, restored.bikeSpeedKmh)
         assertEquals(listOf("Nature", "Surprise"), restored.selectedAttractionIds)
         assertEquals(listOf("B"), restored.selectedZoneIds)
         assertEquals(45, restored.minutes)
@@ -201,6 +252,55 @@ class MainPlannerTest {
         // Default-valued fields are omitted, matching records saved before zone support.
         val oldRecord = Json.encodeToString(trip)
         assertEquals(emptyList(), Json.decodeFromString<Trip>(oldRecord).selectedZoneIds)
+    }
+
+    @Test
+    fun originRestoresAndEditingItKeepsAllOtherChoices() {
+        val legacy = Json.decodeFromString<MainPlannerState>("""{"minutes":45}""")
+        assertEquals(TripPoint("Current location", 0.5f, 0.35f), legacy.origin)
+        val initial = MainPlannerState(minutes = 45, walkingPreference = "Dash",
+            bikeSpeedKmh = 26, selectedZonesByTransport = mapOf("bus" to listOf("C")),
+            origin = null, locationAccessOff = true)
+        val planner = MainPlannerViewModel(initial)
+        val point = TripPoint("  Selected point  ", 0.23f, 0.67f)
+        planner.setOrigin(point)
+        val expected = initial.copy(origin = point.copy(label = "Selected point"), originIsManual = true)
+        assertEquals(expected, planner.uiState.value)
+        assertEquals(expected, Json.decodeFromString<MainPlannerState>(Json.encodeToString(expected)))
+        assertEquals(initial, Json.decodeFromString<MainPlannerState>(Json.encodeToString(initial)))
+    }
+
+    @Test
+    fun selectedOriginIsNotTransformedAgainAndDestinationStaysInBounds() {
+        val bounds = TripGenerationBounds(0.3f, 0.2f, 0.7f, 0.6f)
+        val generator = MockTripGenerator(random = Random(41), idFactory = { "origin-trip" },
+            nowEpochMillis = { 1_000L })
+        listOf(TripPoint("Selected point", 0.43f, 0.31f),
+            TripPoint("Outside visible crop", 0f, 1f)).forEach { origin ->
+            repeat(20) {
+                val trip = assertIs<TripGenerationResult.Success>(generator.generate(
+                    input(emptyList()).copy(selectedTransportIds = listOf("walk"), origin = origin),
+                    types, emptyList(), emptySet(), bounds)).trip
+                assertEquals(origin, trip.start)
+                assertTrue(trip.destination.x in bounds.left..bounds.right)
+                assertTrue(trip.destination.y in bounds.top..bounds.bottom)
+                assertTrue(origin.normalizedDistanceTo(trip.destination) >= 0.099999)
+                assertTrue(trip.distanceKm > 0)
+            }
+        }
+    }
+
+    @Test
+    fun repeatedRandomPointFallsBackToAFarCorner() {
+        val constantRandom = object : Random() { override fun nextBits(bitCount: Int): Int = 0 }
+        val origin = TripPoint("Selected point", MockTripGenerator.SAFE_MIN, MockTripGenerator.SAFE_MIN)
+        val trip = assertIs<TripGenerationResult.Success>(MockTripGenerator(
+            random = constantRandom, idFactory = { "fallback" }, nowEpochMillis = { 1_000L }
+        ).generate(input(emptyList()).copy(selectedTransportIds = listOf("walk"), origin = origin),
+            types, emptyList(), emptySet())).trip
+        assertEquals(origin, trip.start)
+        assertEquals(TripPoint("Destination", MockTripGenerator.SAFE_MAX, MockTripGenerator.SAFE_MAX),
+            trip.destination)
     }
 
     private fun input(zones: List<String>) = TripGenerationInput(

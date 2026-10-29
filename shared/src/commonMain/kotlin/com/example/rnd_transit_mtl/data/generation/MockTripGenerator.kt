@@ -18,6 +18,7 @@ import kotlin.uuid.Uuid
  * generate(), allowing normal input errors to become a result.
  *
  * It is not a Trip record or a saved planner-draft implementation.
+ * @property origin Exact source-image start; null preserves legacy random-start generation.
  */
 data class TripGenerationInput(
     val title: String,
@@ -27,10 +28,9 @@ data class TripGenerationInput(
     val selectedTransportIds: List<String>,
     val selectedRouteIds: List<String>,
     val attractionIntensity: Float,
-    /** Requested zones, recorded without geographic enforcement by this prototype. */
     val selectedZoneIds: List<String> = emptyList(),
-    /** Per-mode zone constraints. Empty retains the legacy shared-zone request contract. */
-    val selectedZonesByTransport: Map<String, List<String>> = emptyMap()
+    val selectedZonesByTransport: Map<String, List<String>> = emptyMap(),
+    val origin: TripPoint? = null
 )
 
 /**
@@ -162,21 +162,38 @@ class MockTripGenerator(
             )
         }
 
-        val start = randomPoint("Start")
-        val destination = generateDestination(start)
-        val distanceKm = round(
-            start.normalizedDistanceTo(destination) *
-                    DEMO_KM_PER_NORMALIZED_UNIT *
-                    100.0
-        ) / 100.0
+        val start: TripPoint
+        val destination: TripPoint
+        val distanceBasis: Double
+
+        val requestedOrigin = normalizedInput.origin
+
+        if (requestedOrigin == null) {
+            // Compatibility for existing test fixtures and older callers.
+            val localStart = randomPoint("Start")
+            val localDestination = generateDestination(localStart)
+
+            start = bounds.toSourcePoint(localStart)
+            destination = bounds.toSourcePoint(localDestination)
+            distanceBasis = localStart.normalizedDistanceTo(localDestination)
+        } else {
+            start = requestedOrigin.copy()
+            destination = generateDestinationFromOrigin(start, bounds)
+            distanceBasis = start.normalizedDistanceTo(destination)
+        }
+
+        val distanceKm = maxOf(
+            0.01,
+            round(distanceBasis * DEMO_KM_PER_NORMALIZED_UNIT * 100.0) / 100.0
+        )
 
         val trip = Trip(
             id = id,
             title = normalizedInput.title,
             description = normalizedInput.description,
             imageUrl = normalizedInput.imageUrl,
-            start = bounds.toSourcePoint(start),
-            destination = bounds.toSourcePoint(destination),
+            start = start,
+            destination = destination,
             plannedMinutes = normalizedInput.plannedMinutes,
             selectedTransports = snapshots.first,
             selectedRoutes = snapshots.second,
@@ -283,6 +300,38 @@ class MockTripGenerator(
                 SAFE_MAX.toDouble()
             ).toFloat()
         )
+
+    /** Samples a destination in the generation bounds, with a far-corner fallback.
+     * @param origin Selected source-image point, unchanged by generation.
+     * @param bounds Destination area within the source PNG.
+     */
+    private fun generateDestinationFromOrigin(
+        origin: TripPoint,
+        bounds: TripGenerationBounds
+    ): TripPoint {
+        val minimumSeparation = minOf(
+            bounds.right - bounds.left,
+            bounds.bottom - bounds.top
+        ).toDouble() * MIN_NORMALIZED_SEPARATION
+
+        repeat(MAX_DESTINATION_ATTEMPTS) {
+            val candidate = bounds.toSourcePoint(
+                randomPoint("Destination")
+            )
+            if (origin.normalizedDistanceTo(candidate) >= minimumSeparation) {
+                return candidate
+            }
+        }
+
+        return listOf(
+            TripPoint("Destination", SAFE_MIN, SAFE_MIN),
+            TripPoint("Destination", SAFE_MIN, SAFE_MAX),
+            TripPoint("Destination", SAFE_MAX, SAFE_MIN),
+            TripPoint("Destination", SAFE_MAX, SAFE_MAX)
+        )
+            .map(bounds::toSourcePoint)
+            .maxByOrNull { origin.normalizedDistanceTo(it) }!!
+    }
 
     private fun generateDestination(start: TripPoint): TripPoint {
         repeat(MAX_DESTINATION_ATTEMPTS) {

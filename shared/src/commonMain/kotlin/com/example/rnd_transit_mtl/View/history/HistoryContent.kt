@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -34,6 +33,10 @@ import com.example.rnd_transit_mtl.ui.theme.TransitMain
 import com.example.rnd_transit_mtl.ui.theme.TransitSelected
 import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 import com.example.rnd_transit_mtl.View.history.components.TripHistoryCard
+
+// Layout settings — cards fill the viewport; headings and filters retain their horizontal inset.
+private val HistoryHeadingHorizontalPadding = 16.dp
+private val HistoryListVerticalPadding = 16.dp
 
 /**
  * Presents an already sorted/filtered list.
@@ -63,13 +66,13 @@ fun HistoryContent(
     ) {
         LazyColumn(
             modifier = Modifier
-                .widthIn(max = 900.dp)
                 .fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
+            contentPadding = PaddingValues(vertical = HistoryListVerticalPadding),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
                 Column(
+                    modifier = Modifier.padding(horizontal = HistoryHeadingHorizontalPadding),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
@@ -108,6 +111,7 @@ fun HistoryContent(
                 item {
                     Text(
                         text = errorMessage,
+                        modifier = Modifier.padding(horizontal = HistoryHeadingHorizontalPadding),
                         style = MaterialTheme.typography.bodyLarge,
                         color = TransitWhite
                     )
@@ -119,6 +123,7 @@ fun HistoryContent(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .padding(horizontal = HistoryHeadingHorizontalPadding)
                             .background(
                                 color = TransitWhite,
                                 shape = RoundedCornerShape(24.dp)

@@ -274,16 +274,57 @@ class TripInvariantsTest {
     }
 
     @Test
-    fun minuteSelectorCapsAt360AndStepsBackTo355() {
-        assertEquals(360, Trip.coercePlannedMinutes(Int.MAX_VALUE))
-        assertEquals(0, Trip.coercePlannedMinutes(Int.MIN_VALUE))
+    fun minuteSelectorStaysBetweenFiveAnd360() {
+        assertEquals(5, Trip.coercePlannedMinutes(Int.MIN_VALUE))
+        assertEquals(5, Trip.coercePlannedMinutes(-5))
+        assertEquals(5, Trip.coercePlannedMinutes(0))
+        assertEquals(5, Trip.coercePlannedMinutes(4))
+        assertEquals(5, Trip.coercePlannedMinutes(5))
         assertEquals(350, Trip.coercePlannedMinutes(354))
+        assertEquals(360, Trip.coercePlannedMinutes(Int.MAX_VALUE))
+
+        assertEquals(10, Trip.adjustPlannedMinutes(5, 1))
+        assertEquals(5, Trip.adjustPlannedMinutes(10, -1))
+        assertEquals(5, Trip.adjustPlannedMinutes(5, -1))
+        assertEquals(5, Trip.adjustPlannedMinutes(0, -1))
+
         assertEquals(360, Trip.adjustPlannedMinutes(355, 1))
         assertEquals(360, Trip.adjustPlannedMinutes(360, 1))
         assertEquals(355, Trip.adjustPlannedMinutes(360, -1))
-        assertEquals(350, Trip.adjustPlannedMinutes(355, -1))
-        assertEquals(0, Trip.adjustPlannedMinutes(5, -1))
-        assertEquals(0, Trip.adjustPlannedMinutes(0, -1))
+        assertEquals(30, Trip.adjustPlannedMinutes(30, 0))
+    }
+
+    @Test
+    fun zeroAndUnsupportedPlannedMinutesAreRejected() {
+        listOf(-5, 0, 1, 4, 7, 365).forEach { minutes ->
+            assertFailsWith<IllegalArgumentException> {
+                fixtureTrip("invalid-minutes-$minutes")
+                    .copy(plannedMinutes = minutes)
+            }
+        }
+
+        listOf(5, 30, 355, 360).forEach { minutes ->
+            assertEquals(
+                minutes,
+                fixtureTrip("valid-minutes-$minutes")
+                    .copy(plannedMinutes = minutes)
+                    .plannedMinutes
+            )
+        }
+    }
+
+    @Test
+    fun rawZeroMinuteGenerationFailsBeforeCreatingAnId() {
+        var idRequests = 0
+        val generator = MockTripGenerator(random = Random(1),
+            idFactory = { idRequests++; "minimum-trip" }, nowEpochMillis = { 12_000L })
+        val input = TripGenerationInput("Trip", "Sample trip", "", 0,
+            listOf("walk"), emptyList(), 50f)
+        val types = listOf(TransportType("walk", "Walk", false))
+        assertIs<TripGenerationResult.InvalidInput>(generator.generate(input, types, emptyList(), emptySet()))
+        assertEquals(0, idRequests)
+        assertIs<TripGenerationResult.Success>(generator.generate(input.copy(plannedMinutes = 5), types, emptyList(), emptySet()))
+        assertEquals(1, idRequests)
     }
 
     @Test

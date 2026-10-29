@@ -35,8 +35,9 @@ private fun PlannerFlowExample(position: PlannerSheetPosition) {
                 TransportType("train", "Train", true), TransportType("rem", "REM", true)
             ),
             selectedTransportIds = listOf("walk", "bus"), selectedZonesByTransport = mapOf("bus" to listOf("A")),
-            onToggleTransport = {}, onToggleZone = { _, _ -> }, intensity = 90f, onIntensityChange = {},
-            walkingPreference = "Scenic", selectedAttractionIds = listOf("Nature", "Surprise"),
+            onToggleTransport = {}, onToggleZone = { _, _ -> },
+            walkingPreference = "Amble", selectedAttractionIds = listOf("Nature", "Surprise"),
+            bikeSpeedKmh = 18, onBikeSpeedChange = {},
             onWalkingPreferenceChange = {}, onToggleAttraction = {}, validationMessage = "",
             actionLabel = "GO", actionEnabled = true, inputsEnabled = true,
             activeTripSummary = null, pendingReviewSummary = null, onPrimaryAction = {},

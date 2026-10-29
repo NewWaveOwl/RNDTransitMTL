@@ -1,6 +1,11 @@
 package com.example.rnd_transit_mtl.View.history
 
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -10,17 +15,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.example.rnd_transit_mtl.state.trip.LocalTripsStore
 import com.example.rnd_transit_mtl.state.trip.TripActionResult
-import com.example.rnd_transit_mtl.navigation.Router
+import com.example.rnd_transit_mtl.ui.theme.TransitComplementary
+import com.example.rnd_transit_mtl.ui.theme.TransitMain
+import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 
 /**
- * Coordinates completed History from the one shared TripsStore.
+ * Displays completed trips from the shared store.
  *
- * Navigation callbacks receive stable IDs. Review navigation should
- * open TripReviewMode.EDIT with History as its origin, including when
- * adding feedback to a previously skipped trip.
- *
- * Nullable callbacks keep the current Router call valid until final
- * route integration. Unavailable navigation actions are disabled.
+ * Remove requests confirmation. Only the dialog's explicit confirmation
+ * calls removeCompleted. Cancel, Back and outside dismissal keep the trip.
  */
 @Composable
 fun HistoryScreen(
@@ -30,28 +33,45 @@ fun HistoryScreen(
     modifier: Modifier = Modifier
 ) {
     val tripsStore = LocalTripsStore.current
+
     val latestDestinationActive by rememberUpdatedState(
         isDestinationActive
     )
-
-    var filterName by rememberSaveable {
-        mutableStateOf(TripHistoryFilter.ALL.name)
-    }
 
     var errorMessage by remember {
         mutableStateOf<String?>(null)
     }
 
-    val filter = TripHistoryFilter.entries.firstOrNull {
-        it.name == filterName
-    } ?: TripHistoryFilter.ALL
+    // Store only the ID. Resolve the latest record from TripsStore.
+    var pendingRemovalId by rememberSaveable {
+        mutableStateOf<String?>(null)
+    }
 
-    /*
-     * The getter reads observable store state during composition.
-     * No separate History collection is stored here.
-     */
+    var filterName by rememberSaveable { mutableStateOf(TripHistoryFilter.ALL.name) }
+    val filter = TripHistoryFilter.entries.firstOrNull { it.name == filterName } ?: TripHistoryFilter.ALL
+
     val completedTrips = tripsStore.completedTrips
-    val displayedTrips = historyTrips(completedTrips, filter)
+    val pendingRemovalTrip = completedTrips.firstOrNull {
+        it.id == pendingRemovalId
+    }
+
+    // Do not leave a confirmation pending after navigating away.
+    // Also recover if another action removes the selected record.
+    LaunchedEffect(
+        isDestinationActive,
+        pendingRemovalId,
+        pendingRemovalTrip?.id
+    ) {
+        if (!isDestinationActive) {
+            pendingRemovalId = null
+        } else if (
+            pendingRemovalId != null &&
+            pendingRemovalTrip == null
+        ) {
+            pendingRemovalId = null
+            errorMessage = "This trip is no longer available."
+        }
+    }
 
     fun openExistingTrip(
         tripId: String,
@@ -67,6 +87,52 @@ fun HistoryScreen(
         }
     }
 
+    fun requestRemoval(tripId: String) {
+        if (!latestDestinationActive) return
+
+        if (tripsStore.findCompleted(tripId) == null) {
+            errorMessage = "This trip is no longer available."
+            return
+        }
+
+        errorMessage = null
+        pendingRemovalId = tripId
+    }
+
+    fun confirmRemoval() {
+        if (!latestDestinationActive) return
+        val tripId = pendingRemovalId ?: return
+
+        // Check again at confirmation time, rather than using an old record.
+        if (tripsStore.findCompleted(tripId) == null) {
+            pendingRemovalId = null
+            errorMessage = "This trip has already been removed."
+            return
+        }
+
+        when (val result = tripsStore.removeCompleted(tripId)) {
+            TripActionResult.Applied -> {
+                pendingRemovalId = null
+                errorMessage = null
+            }
+
+            is TripActionResult.MissingTrip -> {
+                pendingRemovalId = null
+                errorMessage = "This trip has already been removed."
+            }
+
+            is TripActionResult.InvalidInput -> {
+                pendingRemovalId = null
+                errorMessage = result.message
+            }
+
+            else -> {
+                pendingRemovalId = null
+                errorMessage = "This trip could not be removed."
+            }
+        }
+    }
+
     val detailsCallback: ((String) -> Unit)? =
         onOpenDetails?.let { callback ->
             { tripId -> openExistingTrip(tripId, callback) }
@@ -78,7 +144,7 @@ fun HistoryScreen(
         }
 
     HistoryContent(
-        trips = displayedTrips,
+        trips = historyTrips(completedTrips, filter),
         filter = filter,
         totalCount = completedTrips.size,
         onFilterChange = { selected ->
@@ -89,21 +155,48 @@ fun HistoryScreen(
         },
         onOpenDetails = detailsCallback,
         onReview = reviewCallback,
-        onRemove = { tripId ->
-            if (latestDestinationActive) {
-                errorMessage = when (
-                    val result = tripsStore.removeCompleted(tripId)
-                ) {
-                    TripActionResult.Applied -> null
-                    is TripActionResult.MissingTrip ->
-                        "This trip has already been removed."
-                    is TripActionResult.InvalidInput -> result.message
-                    else -> "The trip could not be removed."
-                }
-            }
-        },
+        onRemove = { requestRemoval(it) },
         actionsEnabled = isDestinationActive,
         errorMessage = errorMessage,
         modifier = modifier
     )
+    if (isDestinationActive && pendingRemovalTrip != null) {
+        AlertDialog(
+            onDismissRequest = {
+                pendingRemovalId = null
+            },
+            containerColor = TransitWhite,
+            titleContentColor = TransitComplementary,
+            textContentColor = TransitComplementary,
+            title = {
+                Text("Remove this adventure?")
+            },
+            text = {
+                Text(
+                    "Remove “${pendingRemovalTrip.title}” from History? " +
+                        "Its saved review will also be removed. " +
+                        "This cannot be undone."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { confirmRemoval() }
+                ) {
+                    Text(
+                        "Remove trip",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        pendingRemovalId = null
+                    }
+                ) {
+                    Text("Keep trip", color = TransitMain)
+                }
+            }
+        )
+    }
 }

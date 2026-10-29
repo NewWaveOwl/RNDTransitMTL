@@ -68,14 +68,14 @@ fun TripPlannerMaxMinutesPreview() {
 }
 
 @Preview(
-    name = "Zero minutes hides lower arrow",
+    name = "Five minutes hides lower arrow",
     showBackground = true,
     widthDp = 320,
     heightDp = 780
 )
 @Composable
-fun TripPlannerZeroMinutesPreview() {
-    PlannerPreviewContent(minutes = 0)
+fun TripPlannerMinimumMinutesPreview() {
+    PlannerPreviewContent(minutes = 5)
 }
 
 @Preview(
@@ -118,8 +118,6 @@ private fun PlannerPreviewContent(
             onExpandedTransportChange = {},
             onToggleTransport = {},
             onToggleRoute = { _, _ -> },
-            intensity = 90f,
-            onIntensityChange = {},
             validationMessage = if (showErrors) {
                 "Choose at least one transport type."
             } else {

@@ -1,73 +1,51 @@
 package com.example.rnd_transit_mtl.layout
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.rnd_transit_mtl.navigation.AboutScreenKey
-import com.example.rnd_transit_mtl.navigation.CurrentTripScreenKey
-import com.example.rnd_transit_mtl.navigation.HistoryScreenKey
-import com.example.rnd_transit_mtl.navigation.LocalNavigator
-import com.example.rnd_transit_mtl.navigation.LocalTripNavigation
-import com.example.rnd_transit_mtl.navigation.MainScreenKey
-import com.example.rnd_transit_mtl.navigation.ProfileScreenKey
-import com.example.rnd_transit_mtl.navigation.ScreenKey
-import com.example.rnd_transit_mtl.navigation.SettingsScreenKey
-import com.example.rnd_transit_mtl.navigation.TripDetailsScreenKey
-import com.example.rnd_transit_mtl.navigation.TripReviewScreenKey
 import com.example.rnd_transit_mtl.model.review.TripReviewMode
+import com.example.rnd_transit_mtl.navigation.*
 import com.example.rnd_transit_mtl.ui.theme.TransitMain
-import com.example.rnd_transit_mtl.ui.theme.TransitSelected
 import com.example.rnd_transit_mtl.ui.theme.TransitWhite
+import com.example.rnd_transit_mtl.ui.theme.TransitSelected
 import org.jetbrains.compose.resources.painterResource
-import rnd_transit_mtl.shared.generated.resources.Res
-import rnd_transit_mtl.shared.generated.resources.ic_account_circle
-import rnd_transit_mtl.shared.generated.resources.ic_home
-import rnd_transit_mtl.shared.generated.resources.ic_receipt_long
-import rnd_transit_mtl.shared.generated.resources.ic_settings
+import rnd_transit_mtl.shared.generated.resources.*
 
-// Layout settings — button widths and spacing also control how much of the left group scrolls.
-private val HeaderButtonWidth = 64.dp
-private val HeaderButtonHeight = 68.dp
-private val HeaderIconSize = 34.dp
-private val HeaderHorizontalPadding = 8.dp
-private val HeaderVerticalPadding = 6.dp
-private val HeaderButtonSpacing = 6.dp
-private val HeaderButtonContentPadding = 4.dp
-private val HeaderButtonCornerRadius = 14.dp
+// Layout settings — dimensions are in dp.
+private val HeaderHeight = 64.dp
+private val HeaderHorizontalPadding = 12.dp
+private val HeaderActionSize = 48.dp
+private val HeaderIconSize = 32.dp
+private val HeaderLogoSize = 64.dp
+private val HeaderActionSpacing = 0.dp
+private val HeaderLeftPadding = 8.dp
+private val HeaderLeftGroupVerticalOffset = 1.dp
+private val HeaderGoWidth = 72.dp
+private val HeaderGoHeight = 44.dp
+private val HeaderGoCornerRadius = 18.dp
 
-/**
- * Shared navigation remains above all destination transition animations.
- */
+// Appearance settings — matches the updated GO instance in Figma header 103:191.
+private val HeaderGoGradient = Brush.horizontalGradient(0.264423f to TransitMain, 1f to TransitSelected)
+private val HeaderBottomCornerRadius = 16.dp
+
+/** Connects the shared header to the application's navigation owner. */
 @Composable
 fun SharedTopBar() {
     val navigator = LocalNavigator.current
@@ -91,7 +69,12 @@ fun SharedTopBar() {
 }
 
 /**
- * Stateless header presentation.
+ * Displays the blue header and the existing contextual page title.
+ *
+ * @param currentKey Destination currently displayed.
+ * @param hasPrevious Whether Back has an earlier destination.
+ * @param onBack Requests the existing guarded Back operation.
+ * @param onOpenSection Opens a shared section without creating a trip.
  */
 @Composable
 internal fun SharedTopBarContent(
@@ -100,77 +83,104 @@ internal fun SharedTopBarContent(
     onBack: () -> Unit,
     onOpenSection: (ScreenKey) -> Unit
 ) {
+    val profileSelected =
+        currentKey == ProfileScreenKey ||
+            currentKey == AboutScreenKey
+
     val historySelected =
         currentKey == HistoryScreenKey ||
-                currentKey is TripDetailsScreenKey ||
-                (
-                    currentKey is TripReviewScreenKey &&
-                            currentKey.mode == TripReviewMode.EDIT
-                    )
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(TransitMain)
-            .windowInsetsPadding(
-                WindowInsets.safeDrawing.only(
-                    WindowInsetsSides.Top + WindowInsetsSides.Horizontal
-                )
+            currentKey is TripDetailsScreenKey ||
+            (
+                currentKey is TripReviewScreenKey &&
+                    currentKey.mode == TripReviewMode.EDIT
             )
-    ) {
-        Row(
+
+    Column(Modifier.fillMaxWidth()) {
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = HeaderHorizontalPadding, vertical = HeaderVerticalPadding),
-            horizontalArrangement = Arrangement.spacedBy(HeaderButtonSpacing),
-            verticalAlignment = Alignment.CenterVertically
+                .clip(
+                    RoundedCornerShape(
+                        bottomStart = HeaderBottomCornerRadius,
+                        bottomEnd = HeaderBottomCornerRadius
+                    )
+                )
+                .background(TransitMain)
+                .windowInsetsPadding(
+                    WindowInsets.safeDrawing.only(
+                        WindowInsetsSides.Top +
+                            WindowInsetsSides.Horizontal
+                    )
+                )
         ) {
-            // Settings stays at the right edge; only the left group scrolls
-            // when a window is too narrow for all three destinations.
-            Row(
-                modifier = Modifier.weight(1f)
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(HeaderButtonSpacing),
-                verticalAlignment = Alignment.CenterVertically
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(HeaderHeight)
             ) {
-                HeaderIconItem(
-                    label = "Home",
-                    painter = painterResource(Res.drawable.ic_home),
-                    isSelected = currentKey == MainScreenKey,
-                    showGo = currentKey != MainScreenKey,
-                    onClick = { onOpenSection(MainScreenKey) }
-                )
-                HeaderIconItem(
-                    label = "Profile",
-                    painter = painterResource(Res.drawable.ic_account_circle),
-                    isSelected = currentKey == ProfileScreenKey || currentKey == AboutScreenKey,
-                    onClick = { onOpenSection(ProfileScreenKey) }
-                )
-                HeaderIconItem(
-                    label = "History",
-                    painter = painterResource(Res.drawable.ic_receipt_long),
-                    isSelected = historySelected,
-                    onClick = { onOpenSection(HistoryScreenKey) }
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .offset(y = HeaderLeftGroupVerticalOffset)
+                        .padding(start = HeaderLeftPadding),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement =
+                        Arrangement.spacedBy(HeaderActionSpacing)
+                ) {
+                    HeaderGoShortcut(onClick = { onOpenSection(MainScreenKey) })
+
+                    HeaderAction(
+                        painter = painterResource(
+                            Res.drawable.rnd_header_history
+                        ),
+                        label = "History",
+                        isSelected = historySelected,
+                        onClick = {
+                            onOpenSection(HistoryScreenKey)
+                        }
+                    )
+                }
+
+                IconButton(
+                    onClick = { onOpenSection(MainScreenKey) },
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(HeaderLogoSize)
+                ) {
+                    Image(
+                        painter = painterResource(
+                            Res.drawable.rnd_logo_on_blue
+                        ),
+                        contentDescription = "Return to Main",
+                        modifier = Modifier.size(HeaderLogoSize)
+                    )
+                }
+
+                HeaderAction(
+                    painter = painterResource(
+                        Res.drawable.rnd_header_settings
+                    ),
+                    label = "Settings",
+                    isSelected = currentKey == SettingsScreenKey,
+                    onClick = {
+                        onOpenSection(SettingsScreenKey)
+                    },
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = HeaderHorizontalPadding)
                 )
             }
-            HeaderIconItem(
-                label = "Settings",
-                painter = painterResource(Res.drawable.ic_settings),
-                isSelected = currentKey == SettingsScreenKey,
-                onClick = { onOpenSection(SettingsScreenKey) }
-            )
         }
 
-        // The current-trip title overlays the map so GO and trip viewports match.
-        if (currentKey !is CurrentTripScreenKey &&
+        // Preserve the existing title and review-aware Back behavior.
+        if (
+            currentKey !is CurrentTripScreenKey &&
             (currentKey != MainScreenKey || hasPrevious)
         ) {
             PageTitle(
                 title = currentKey?.screenTitle ?: "RND Transit",
                 layoutScale = 1f,
-                highlighted =
-                    currentKey == ProfileScreenKey ||
-                            currentKey == AboutScreenKey,
+                highlighted = profileSelected,
                 showBack = hasPrevious,
                 onBack = onBack
             )
@@ -178,60 +188,47 @@ internal fun SharedTopBarContent(
     }
 }
 
+/** GO shortcut from the updated Figma header.
+ * @param onClick Returns to the existing Main destination without generating a trip.
+ */
 @Composable
-private fun HeaderIconItem(
-    label: String,
+private fun HeaderGoShortcut(onClick: () -> Unit) {
+        Box(Modifier.width(HeaderGoWidth).height(HeaderGoHeight)
+            .clip(RoundedCornerShape(HeaderGoCornerRadius)).background(HeaderGoGradient)
+            .clickable(role = Role.Button, onClick = onClick), contentAlignment = Alignment.Center) {
+            Text("GO", color = TransitWhite, fontSize = 20.sp, lineHeight = 28.sp,
+                fontWeight = FontWeight.Bold)
+        }
+}
+
+/**
+ * Displays one white header icon with a 48 dp action target.
+ *
+ * @param painter Exported Figma icon.
+ * @param label Accessible action name.
+ * @param isSelected Whether its associated section is displayed.
+ * @param onClick Requests the section change.
+ * @param modifier Placement within the header.
+ */
+@Composable
+private fun HeaderAction(
     painter: Painter,
+    label: String,
     isSelected: Boolean,
     onClick: () -> Unit,
-    showGo: Boolean = false
+    modifier: Modifier = Modifier
 ) {
-    val foreground = if (isSelected) TransitMain else TransitWhite
-
-    Column(
-        modifier = Modifier
-            .width(HeaderButtonWidth)
-            .height(HeaderButtonHeight)
-            .clip(RoundedCornerShape(HeaderButtonCornerRadius))
-            .background(
-                if (isSelected) TransitSelected else TransitMain
-            )
-            .clickable(
-                role = Role.Button,
-                onClick = onClick
-            )
-            .semantics {
-                selected = isSelected
-                contentDescription = label
-            }
-            .padding(HeaderButtonContentPadding),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+    IconButton(
+        onClick = onClick,
+        modifier = modifier
+            .size(HeaderActionSize)
+            .semantics { selected = isSelected }
     ) {
-        if (showGo) {
-            Text(
-                text = "GO",
-                style = MaterialTheme.typography.titleLarge.copy(
-                    brush = Brush.horizontalGradient(
-                        listOf(TransitWhite, TransitSelected)
-                    ),
-                    fontSize = 30.sp
-                )
-            )
-        } else {
-            Icon(
-                painter = painter,
-                contentDescription = null,
-                tint = foreground,
-                modifier = Modifier.size(HeaderIconSize)
-            )
-        }
-
-        Text(
-            text = label,
-            color = foreground,
-            style = MaterialTheme.typography.labelSmall,
-            maxLines = 1
+        Icon(
+            painter = painter,
+            contentDescription = label,
+            tint = TransitWhite,
+            modifier = Modifier.size(HeaderIconSize)
         )
     }
 }
