@@ -73,8 +73,6 @@ private val PreferenceDropdownEasing = FastOutSlowInEasing
  * @param walkingPreference Selected walking style.
  * @param bikeSpeedKmh Selected cycling speed in km/h.
  * @param onBikeSpeedChange Requests a cycling-speed change.
- * @param intensity Current attraction intensity from 0 to 100.
- * @param onIntensityChange Requests an attraction-intensity change.
  * @param selectedAttractionIds Enabled attraction labels.
  * @param onWalkingPreferenceChange Requests a walking-style change.
  * @param onToggleAttraction Requests an attraction toggle.
@@ -100,8 +98,6 @@ internal fun LazyListScope.PlannerPreferenceBands(
     onExpandedTransportChange: (String) -> Unit,
     bikeSpeedKmh: Int,
     onBikeSpeedChange: (Int) -> Unit,
-    intensity: Float,
-    onIntensityChange: (Float) -> Unit
 ) {
     item(key = "transport") {
         // Animate the dropdown itself so following bands move with its visible height.

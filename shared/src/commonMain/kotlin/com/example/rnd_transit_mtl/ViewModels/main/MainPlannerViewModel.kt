@@ -113,11 +113,6 @@ class MainPlannerViewModel(
         }
     }
 
-    /** Saves a confirmed map origin without changing other planner preferences.
-     * @param point Normalized source-image point chosen by the user.
-     */
-    fun setManualOrigin(point: TripPoint) = setOrigin(point)
-
     /**
      * Updates the time using the existing five-minute bounds.
      *

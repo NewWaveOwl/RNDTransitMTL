@@ -127,7 +127,6 @@ internal fun TransitOpeningScreen(
 
     val boundedMinutes = Trip.coercePlannedMinutes(planner.minutes)
     val selectedTransportIds = planner.selectedTransportIds
-    val intensity = planner.intensity
     var validationMessage by rememberSaveable {
         mutableStateOf("")
     }
@@ -206,7 +205,7 @@ internal fun TransitOpeningScreen(
         else -> "GO"
     }
     val activeSummary = activeState?.let {
-        val percentage = (it.elapsedMillis.toFloat() / 10_000f * 100f)
+        val percentage = (it.elapsedMillis.toFloat() / TRIP_SIMULATION_DURATION_MILLIS * 100f)
             .toInt().coerceIn(0, 99)
         "Unfinished: ${it.trip.title} · $percentage%"
     }
@@ -514,7 +513,7 @@ internal fun TransitOpeningScreen(
                 failureMessage = ""
             },
             onConfirmOrigin = { point ->
-                plannerViewModel.setManualOrigin(point)
+                plannerViewModel.setOrigin(point)
                 closeProposalFlow()
             },
             onRetry = {
@@ -594,9 +593,9 @@ internal fun TransitOpeningScreen(
                 }
             },
             onGenerateAnother = {
-    closeProposalFlow()
-    performPrimaryAction()
-},
+                closeProposalFlow()
+                performPrimaryAction()
+            },
             onEditSettings = { closeProposalFlow() },
             modifier = proposalModifier
         )
@@ -658,7 +657,7 @@ internal fun TransitOpeningScreen(
             },
             onConfirm = {
                 if (canChangeInputs() && draftOrigin != null) {
-                    plannerViewModel.setManualOrigin(draftOrigin)
+                    plannerViewModel.setOrigin(draftOrigin)
                     proposalJson = null
                     clearValidation()
                     originMode = "planner"
@@ -710,13 +709,6 @@ internal fun TransitOpeningScreen(
             onToggleZone = { transportId, id ->
                 if (canChangeInputs()) {
                     plannerViewModel.toggleZone(transportId, id)
-                    clearValidation()
-                }
-            },
-            intensity = intensity,
-            onIntensityChange = {
-                if (canChangeInputs()) {
-                    plannerViewModel.setIntensity(it)
                     clearValidation()
                 }
             },

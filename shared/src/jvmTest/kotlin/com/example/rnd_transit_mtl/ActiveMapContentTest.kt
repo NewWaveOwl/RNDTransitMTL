@@ -75,7 +75,7 @@ class ActiveMapContentTest {
         val scene = ImageComposeScene(412, 720) {
             RNDTransitTheme {
                 when (mode) {
-                    0 -> CurrentTripContent(trip, progress, true, true, null, {}, {},
+                    0 -> CurrentTripContent(trip, progress, true, null, {}, {},
                         onRequestReview = { events += "review" },
                         onFinishRequested = { events += "finish"; progress = 1f },
                         onOpenImageReference = {})

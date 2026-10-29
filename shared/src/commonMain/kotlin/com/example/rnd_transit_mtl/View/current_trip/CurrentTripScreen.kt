@@ -323,9 +323,6 @@ fun CurrentTripScreen(
         CurrentTripContent(
             trip = storedTrip,
             progress = progress,
-            isRunning = hasActiveTrip &&
-                    isDestinationActive &&
-                    isAppResumed,
             actionsEnabled = isDestinationActive && isAppResumed,
             message = operationMessage,
             onLeave = {
@@ -428,8 +425,6 @@ fun CurrentTripScreen(
             onDismissInformation = {
                 navigation.dismissTripInformation(trip.id)
             },
-            mapInteractive = true,
-            animateEntrance = true,
             onShowInformation = {
                 if (latestDestinationActive) navigation.requestTripInformation()
             },

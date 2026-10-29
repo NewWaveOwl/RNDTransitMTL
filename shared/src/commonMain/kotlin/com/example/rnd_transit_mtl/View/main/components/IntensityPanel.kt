@@ -16,7 +16,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.setProgress
-import androidx.compose.ui.text.style.TextOverflow
 import com.example.rnd_transit_mtl.ui.theme.TransitSelected
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier

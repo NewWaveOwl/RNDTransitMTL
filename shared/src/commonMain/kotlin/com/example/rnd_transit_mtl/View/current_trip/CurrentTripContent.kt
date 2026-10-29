@@ -29,7 +29,6 @@ private const val TripInformationMaximumHeightFraction = 0.6f
 fun CurrentTripContent(
     trip: Trip,
     progress: Float,
-    isRunning: Boolean,
     actionsEnabled: Boolean,
     message: String?,
     onLeave: () -> Unit,
@@ -40,9 +39,7 @@ fun CurrentTripContent(
     modifier: Modifier = Modifier,
     showTripInformation: Boolean = false,
     onDismissInformation: () -> Unit = {},
-    mapInteractive: Boolean = false,
     onShowInformation: () -> Unit = {},
-    animateEntrance: Boolean = false,
     instruction: ActiveMapInstruction? = null,
     locationState: TripLocationState = TripLocationState.Sample,
     staleMessage: String? = null

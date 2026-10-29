@@ -33,7 +33,7 @@ class PlannerOriginUiTest {
         val scene = ImageComposeScene(412, 800) {
             RNDTransitTheme {
                 MainPlannerContent(30, {}, emptyList(), listOf("walk"), emptyMap(), {}, { _, _ -> },
-                    90f, {}, "Amble", 18, {}, emptyList(), {}, {}, "", "GO", true, true,
+                    "Amble", 18, {}, emptyList(), {}, {}, "", "GO", true, true,
                     null, null, {}, {}, onEditOrigin = { edited++ })
             }
         }

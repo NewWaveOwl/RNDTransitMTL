@@ -104,8 +104,6 @@ internal enum class PlannerSheetPosition { Main, Routes, Preferences }
  * @param selectedZonesByTransport Independently selected zone IDs for each transit mode.
  * @param onToggleTransport Requests an independent transport toggle.
  * @param onToggleZone Requests a zone toggle for the supplied transport ID and zone ID.
- * @param intensity Attraction intensity from 0 to 100.
- * @param onIntensityChange Requests an intensity change.
  * @param walkingPreference Selected walking style, retained for future routing.
  * @param bikeSpeedKmh Selected cycling speed in km/h, retained for future routing.
  * @param onBikeSpeedChange Requests a cycling-speed change.
@@ -137,8 +135,6 @@ internal fun MainPlannerContent(
     selectedZonesByTransport: Map<String, List<String>>,
     onToggleTransport: (String) -> Unit,
     onToggleZone: (String, String) -> Unit,
-    intensity: Float,
-    onIntensityChange: (Float) -> Unit,
     walkingPreference: String,
     bikeSpeedKmh: Int,
     onBikeSpeedChange: (Int) -> Unit,
@@ -484,7 +480,6 @@ internal fun MainPlannerContent(
                         onWalkingPreferenceChange, onToggleAttraction,
                         enabled, onOpenDetailedSettings, expandedTransportId,
                         bikeSpeedKmh = bikeSpeedKmh,
-                        intensity = intensity, onIntensityChange = onIntensityChange,
                         onBikeSpeedChange = onBikeSpeedChange,
                         onExpandedTransportChange = { transportId ->
                             if (enabled) {

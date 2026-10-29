@@ -118,8 +118,6 @@ private fun PlannerPreviewContent(
             onExpandedTransportChange = {},
             onToggleTransport = {},
             onToggleRoute = { _, _ -> },
-            intensity = 90f,
-            onIntensityChange = {},
             validationMessage = if (showErrors) {
                 "Choose at least one transport type."
             } else {

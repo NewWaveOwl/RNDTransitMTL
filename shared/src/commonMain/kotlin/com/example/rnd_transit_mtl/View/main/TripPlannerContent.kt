@@ -69,8 +69,6 @@ fun TripPlannerContent(
     onExpandedTransportChange: (String) -> Unit,
     onToggleTransport: (String) -> Unit,
     onToggleRoute: (String, String) -> Unit,
-    intensity: Float,
-    onIntensityChange: (Float) -> Unit,
     validationMessage: String,
     actionLabel: String,
     actionEnabled: Boolean,
