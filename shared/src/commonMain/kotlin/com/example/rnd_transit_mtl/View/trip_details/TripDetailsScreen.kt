@@ -66,6 +66,7 @@ fun TripDetailsScreen(
             completedLabel = formatTripTimestampUtc(trip.completedAtEpochMillis ?: trip.createdAtEpochMillis),
             onRepeat = { if (latestDestinationActive) navigation.openPlannerCopy(tripId, true) },
             onEditCopy = { if (latestDestinationActive) navigation.openPlannerCopy(tripId, false) },
+            onReview = reviewCallback,
             enabled = isDestinationActive, errorMessage = errorMessage, modifier = modifier)
         return
     }

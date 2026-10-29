@@ -532,7 +532,9 @@ fun HistoryV3(
 
 // ---------- SAVED TRIP DETAILS ----------
 
-/** Saved-trip presentation. Repeat creates a fresh proposal; Edit copy restores preferences without overwriting history. */
+/** Saved-trip presentation. Repeat creates a fresh proposal; Edit copy restores preferences without overwriting history.
+ * @param onReview Opens the saved trip's review editor; null omits the action when navigation is unavailable.
+ */
 @Composable
 fun TripDetailsV3(
     trip: Trip,
@@ -541,7 +543,8 @@ fun TripDetailsV3(
     onEditCopy: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    errorMessage: String? = null
+    errorMessage: String? = null,
+    onReview: (() -> Unit)? = null
 ) {
     Column(modifier.fillMaxSize().background(TransitWhite)) {
         Box(Modifier.fillMaxWidth().weight(1f)) {
@@ -613,6 +616,13 @@ fun TripDetailsV3(
             }
 
             V3Error(errorMessage)
+            if (onReview != null) {
+                V3Button(
+                    label = if (review == null) "Review trip" else "Edit review",
+                    onClick = onReview,
+                    enabled = enabled
+                )
+            }
             V3Button("Repeat as a new trip", onRepeat, enabled)
             V3Button("Edit a copy of these settings", onEditCopy, enabled, true)
             Text(
