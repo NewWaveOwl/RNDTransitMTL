@@ -1,4 +1,6 @@
 package com.example.rnd_transit_mtl.View.main
+import com.example.rnd_transit_mtl.model.ids.RouteId
+import com.example.rnd_transit_mtl.model.ids.TransportId
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
@@ -63,12 +65,12 @@ fun TripPlannerContent(
     onMinutesChange: (Int) -> Unit,
     transportTypes: List<TransportType>,
     transportRoutes: List<TransportRoute>,
-    selectedTransportIds: List<String>,
-    selectedRouteIds: List<String>,
-    expandedTransportId: String?,
-    onExpandedTransportChange: (String) -> Unit,
-    onToggleTransport: (String) -> Unit,
-    onToggleRoute: (String, String) -> Unit,
+    selectedTransportIds: List<TransportId>,
+    selectedRouteIds: List<RouteId>,
+    expandedTransportId: TransportId?,
+    onExpandedTransportChange: (TransportId) -> Unit,
+    onToggleTransport: (TransportId) -> Unit,
+    onToggleRoute: (TransportId, RouteId) -> Unit,
     validationMessage: String,
     actionLabel: String,
     actionEnabled: Boolean,

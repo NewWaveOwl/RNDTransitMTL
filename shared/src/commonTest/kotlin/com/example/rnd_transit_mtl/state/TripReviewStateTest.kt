@@ -1,5 +1,7 @@
 package com.example.rnd_transit_mtl.state
 
+import com.example.rnd_transit_mtl.model.ids.TransportId
+import com.example.rnd_transit_mtl.model.ids.TripId
 import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.model.trip.TripPoint
 import com.example.rnd_transit_mtl.model.review.TripReview
@@ -221,7 +223,7 @@ class TripReviewStateTest {
     }
 
     private fun sampleTrip(): Trip = Trip(
-        id = "review-state-test-trip",
+        id = TripId("review-state-test-trip"),
         title = "Review test",
         description = "Fixed completed trip for review verification.",
         imageUrl = "https://example.com/reference.jpg",
@@ -230,7 +232,7 @@ class TripReviewStateTest {
         plannedMinutes = 30,
         selectedTransports = listOf(
             TripTransportSnapshot(
-                id = "walking",
+                id = TransportId("walking"),
                 label = "Walking",
                 usesRoutes = false
             )

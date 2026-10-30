@@ -1,5 +1,6 @@
 package com.example.rnd_transit_mtl
 
+import com.example.rnd_transit_mtl.model.ids.TransportId
 import androidx.compose.runtime.*
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
@@ -64,7 +65,7 @@ class Trip33FlowTest {
                 LocalTripNavigation provides navigation
             ) {
                 RNDTransitTheme {
-                    TransitOpeningScreen(listOf(TransportType("walk", "Walk", false)), emptyList(),
+                    TransitOpeningScreen(listOf(TransportType(TransportId("walk"), "Walk", false)), emptyList(),
                         onOpenCurrentTrip = { true }, sampleOutcome = outcome)
                 }
             }

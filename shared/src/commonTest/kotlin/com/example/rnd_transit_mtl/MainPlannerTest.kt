@@ -1,5 +1,7 @@
 package com.example.rnd_transit_mtl
 
+import com.example.rnd_transit_mtl.model.ids.ZoneId
+import com.example.rnd_transit_mtl.model.ids.TransportId
 import com.example.rnd_transit_mtl.ViewModels.main.MainPlannerState
 import com.example.rnd_transit_mtl.ViewModels.main.MainPlannerViewModel
 import com.example.rnd_transit_mtl.data.generation.MockTripGenerator
@@ -28,24 +30,24 @@ class MainPlannerTest {
     }
 
     private val types = listOf(
-        TransportType("walk", "Walk", false),
-        TransportType("bus", "Bus", true)
+        TransportType(TransportId("walk"), "Walk", false),
+        TransportType(TransportId("bus"), "Bus", true)
     )
 
     @Test
     fun transportModesToggleIndependentlyAndRetainHiddenZoneChoices() {
         val planner = MainPlannerViewModel()
         val available = types.map { it.id }.toSet()
-        planner.toggleTransport("bus", available)
-        planner.toggleZone("bus", "B")
-        assertEquals(listOf("walk", "bus"), planner.uiState.value.selectedTransportIds)
-        planner.toggleTransport("bus", available)
-        planner.toggleTransport("missing", available)
-        planner.toggleZone("bus", "missing")
-        assertEquals(listOf("walk"), planner.uiState.value.selectedTransportIds)
-        assertEquals(listOf("A", "B"), planner.uiState.value.zonesForTransport("bus"))
-        planner.toggleTransport("bus", available)
-        assertEquals(listOf("A", "B"), planner.uiState.value.zonesForTransport("bus"))
+        planner.toggleTransport(TransportId("bus"), available)
+        planner.toggleZone(TransportId("bus"), ZoneId("B"))
+        assertEquals(listOf(TransportId("walk"), TransportId("bus")), planner.uiState.value.selectedTransportIds)
+        planner.toggleTransport(TransportId("bus"), available)
+        planner.toggleTransport(TransportId("missing"), available)
+        planner.toggleZone(TransportId("bus"), ZoneId("missing"))
+        assertEquals(listOf(TransportId("walk")), planner.uiState.value.selectedTransportIds)
+        assertEquals(listOf(ZoneId("A"), ZoneId("B")), planner.uiState.value.zonesForTransport(TransportId("bus")))
+        planner.toggleTransport(TransportId("bus"), available)
+        assertEquals(listOf(ZoneId("A"), ZoneId("B")), planner.uiState.value.zonesForTransport(TransportId("bus")))
     }
 
     @Test
@@ -54,7 +56,7 @@ class MainPlannerTest {
         planner.setMinutes(37)
         planner.setIntensity(150f)
         planner.setIntensity(Float.NaN)
-        planner.toggleZone("bus", "D")
+        planner.toggleZone(TransportId("bus"), ZoneId("D"))
         val restored = MainPlannerViewModel(Json.decodeFromString<MainPlannerState>(
             Json.encodeToString(planner.uiState.value)
         ))
@@ -76,8 +78,8 @@ class MainPlannerTest {
         ))
         assertEquals("Dash", restored.uiState.value.walkingPreference)
         assertEquals(listOf("Surprise", "Culture"), restored.uiState.value.selectedAttractionIds)
-        assertEquals(listOf("walk"), restored.uiState.value.selectedTransportIds)
-        assertEquals(listOf("A"), restored.uiState.value.selectedZoneIds)
+        assertEquals(listOf(TransportId("walk")), restored.uiState.value.selectedTransportIds)
+        assertEquals(listOf(ZoneId("A")), restored.uiState.value.selectedZoneIds)
         assertEquals(30, restored.uiState.value.minutes)
     }
 
@@ -109,11 +111,11 @@ class MainPlannerTest {
         planner.setBikeSpeedKmh(100)
         assertEquals(32, planner.uiState.value.bikeSpeedKmh)
         planner.setBikeSpeedKmh(23)
-        planner.toggleTransport("bike", setOf("walk", "bike"))
-        planner.toggleTransport("bike", setOf("walk", "bike"))
+        planner.toggleTransport(TransportId("bike"), setOf(TransportId("walk"), TransportId("bike")))
+        planner.toggleTransport(TransportId("bike"), setOf(TransportId("walk"), TransportId("bike")))
         val restored = MainPlannerViewModel(Json.decodeFromString<MainPlannerState>(Json.encodeToString(planner.uiState.value)))
         assertEquals(23, restored.uiState.value.bikeSpeedKmh)
-        assertEquals(listOf("walk"), restored.uiState.value.selectedTransportIds)
+        assertEquals(listOf(TransportId("walk")), restored.uiState.value.selectedTransportIds)
         assertEquals(32, MainPlannerViewModel(MainPlannerState(bikeSpeedKmh = 99)).uiState.value.bikeSpeedKmh)
         mapOf(8 to "Slow", 13 to "Slow", 14 to "Normal", 19 to "Normal", 20 to "Steady", 25 to "Steady", 26 to "Fast", 32 to "Fast").forEach { (speed, band) ->
             assertEquals(band, MainPlannerViewModel.bikePaceLabel(speed))
@@ -128,47 +130,47 @@ class MainPlannerTest {
         assertEquals("Amble", restored.walkingPreference)
         assertEquals(18, restored.bikeSpeedKmh)
         assertEquals(listOf("Nature", "Surprise"), restored.selectedAttractionIds)
-        assertEquals(listOf("B"), restored.selectedZoneIds)
+        assertEquals(listOf(ZoneId("B")), restored.selectedZoneIds)
         assertEquals(45, restored.minutes)
     }
 
     @Test
     fun transitZonesStayIndependentAcrossTogglingAndDraftRestoration() {
         val planner = MainPlannerViewModel()
-        val available = setOf("walk", "bus", "metro", "train", "rem")
-        planner.toggleTransport("bus", available)
-        planner.toggleTransport("metro", available)
-        planner.toggleZone("bus", "B")
-        planner.toggleZone("metro", "A")
-        planner.toggleZone("metro", "C")
-        planner.toggleZone("train", "D")
-        planner.toggleZone("rem", "B")
-        planner.toggleTransport("metro", available)
-        planner.toggleTransport("metro", available)
-        planner.toggleZone("walk", "D")
+        val available = setOf(TransportId("walk"), TransportId("bus"), TransportId("metro"), TransportId("train"), TransportId("rem"))
+        planner.toggleTransport(TransportId("bus"), available)
+        planner.toggleTransport(TransportId("metro"), available)
+        planner.toggleZone(TransportId("bus"), ZoneId("B"))
+        planner.toggleZone(TransportId("metro"), ZoneId("A"))
+        planner.toggleZone(TransportId("metro"), ZoneId("C"))
+        planner.toggleZone(TransportId("train"), ZoneId("D"))
+        planner.toggleZone(TransportId("rem"), ZoneId("B"))
+        planner.toggleTransport(TransportId("metro"), available)
+        planner.toggleTransport(TransportId("metro"), available)
+        planner.toggleZone(TransportId("walk"), ZoneId("D"))
         val restored = MainPlannerViewModel(Json.decodeFromString<MainPlannerState>(
             Json.encodeToString(planner.uiState.value)
         )).uiState.value
-        assertEquals(listOf("A", "B"), restored.zonesForTransport("bus"))
-        assertEquals(listOf("C"), restored.zonesForTransport("metro"))
-        assertEquals(listOf("D"), restored.zonesForTransport("train"))
-        assertEquals(listOf("B"), restored.zonesForTransport("rem"))
-        assertEquals(false, restored.selectedZonesByTransport.containsKey("walk"))
+        assertEquals(listOf(ZoneId("A"), ZoneId("B")), restored.zonesForTransport(TransportId("bus")))
+        assertEquals(listOf(ZoneId("C")), restored.zonesForTransport(TransportId("metro")))
+        assertEquals(listOf(ZoneId("D")), restored.zonesForTransport(TransportId("train")))
+        assertEquals(listOf(ZoneId("B")), restored.zonesForTransport(TransportId("rem")))
+        assertEquals(false, restored.selectedZonesByTransport.containsKey(TransportId("walk")))
     }
 
     @Test
     fun choosingTheFirstZoneIncludesTheModeAndClearingItsLastZoneRemovesOnlyThatMode() {
         val planner = MainPlannerViewModel()
-        assertEquals(emptyList(), planner.uiState.value.zonesForTransport("bus"))
-        planner.toggleZone("bus", "B")
-        planner.toggleZone("metro", "C")
-        assertEquals(listOf("walk", "bus", "metro"), planner.uiState.value.selectedTransportIds)
-        planner.toggleZone("bus", "B")
-        assertEquals(listOf("walk", "metro"), planner.uiState.value.selectedTransportIds)
-        assertEquals(emptyList(), planner.uiState.value.zonesForTransport("bus"))
-        assertEquals(listOf("C"), planner.uiState.value.zonesForTransport("metro"))
-        planner.toggleZone("bus", "D")
-        assertEquals(listOf("D"), planner.uiState.value.zonesForTransport("bus"))
+        assertEquals(emptyList(), planner.uiState.value.zonesForTransport(TransportId("bus")))
+        planner.toggleZone(TransportId("bus"), ZoneId("B"))
+        planner.toggleZone(TransportId("metro"), ZoneId("C"))
+        assertEquals(listOf(TransportId("walk"), TransportId("bus"), TransportId("metro")), planner.uiState.value.selectedTransportIds)
+        planner.toggleZone(TransportId("bus"), ZoneId("B"))
+        assertEquals(listOf(TransportId("walk"), TransportId("metro")), planner.uiState.value.selectedTransportIds)
+        assertEquals(emptyList(), planner.uiState.value.zonesForTransport(TransportId("bus")))
+        assertEquals(listOf(ZoneId("C")), planner.uiState.value.zonesForTransport(TransportId("metro")))
+        planner.toggleZone(TransportId("bus"), ZoneId("D"))
+        assertEquals(listOf(ZoneId("D")), planner.uiState.value.zonesForTransport(TransportId("bus")))
     }
 
     @Test
@@ -177,23 +179,23 @@ class MainPlannerTest {
             """{"selectedTransportIds":["bus","metro"],"selectedZoneIds":["B"]}"""
         )
         val planner = MainPlannerViewModel(oldDraft)
-        planner.toggleZone("bus", "C")
-        assertEquals(listOf("B", "C"), planner.uiState.value.zonesForTransport("bus"))
-        assertEquals(listOf("B"), planner.uiState.value.zonesForTransport("metro"))
-        planner.toggleZone("bus", "B")
-        planner.toggleZone("bus", "C")
-        assertEquals(emptyList(), planner.uiState.value.zonesForTransport("bus"))
-        assertEquals(listOf("B"), planner.uiState.value.zonesForTransport("metro"))
+        planner.toggleZone(TransportId("bus"), ZoneId("C"))
+        assertEquals(listOf(ZoneId("B"), ZoneId("C")), planner.uiState.value.zonesForTransport(TransportId("bus")))
+        assertEquals(listOf(ZoneId("B")), planner.uiState.value.zonesForTransport(TransportId("metro")))
+        planner.toggleZone(TransportId("bus"), ZoneId("B"))
+        planner.toggleZone(TransportId("bus"), ZoneId("C"))
+        assertEquals(emptyList(), planner.uiState.value.zonesForTransport(TransportId("bus")))
+        assertEquals(listOf(ZoneId("B")), planner.uiState.value.zonesForTransport(TransportId("metro")))
     }
 
     @Test
     fun generatedTripPreservesIndependentZonesAndRejectsIncompleteOrInvalidMaps() {
-        val types = types + TransportType("metro", "Metro", true)
-        val busZones = mutableListOf("A", "B")
-        val metroZones = mutableListOf("C")
-        val zones = mutableMapOf("bus" to busZones, "metro" to metroZones)
-        val request = input(listOf("A", "B", "C")).copy(
-            selectedTransportIds = listOf("bus", "metro"), selectedZonesByTransport = zones
+        val types = types + TransportType(TransportId("metro"), "Metro", true)
+        val busZones = mutableListOf(ZoneId("A"), ZoneId("B"))
+        val metroZones = mutableListOf(ZoneId("C"))
+        val zones = mutableMapOf(TransportId("bus") to busZones, TransportId("metro") to metroZones)
+        val request = input(listOf(ZoneId("A"), ZoneId("B"), ZoneId("C"))).copy(
+            selectedTransportIds = listOf(TransportId("bus"), TransportId("metro")), selectedZonesByTransport = zones
         )
         var ids = 0
         val generator = MockTripGenerator(idFactory = { "trip-${++ids}" }, nowEpochMillis = { 1_000L })
@@ -201,11 +203,11 @@ class MainPlannerTest {
             generator.generate(request, types, emptyList(), emptySet())
         ).trip
         listOf(
-            mapOf("bus" to listOf("A")),
-            mapOf("bus" to emptyList(), "metro" to listOf("C")),
-            mapOf("bus" to listOf("A", "A"), "metro" to listOf("C")),
-            mapOf("bus" to listOf("E"), "metro" to listOf("C")),
-            mapOf("bus" to listOf("A"), "walk" to listOf("C"))
+            mapOf(TransportId("bus") to listOf(ZoneId("A"))),
+            mapOf(TransportId("bus") to emptyList(), TransportId("metro") to listOf(ZoneId("C"))),
+            mapOf(TransportId("bus") to listOf(ZoneId("A"), ZoneId("A")), TransportId("metro") to listOf(ZoneId("C"))),
+            mapOf(TransportId("bus") to listOf(ZoneId("E")), TransportId("metro") to listOf(ZoneId("C"))),
+            mapOf(TransportId("bus") to listOf(ZoneId("A")), TransportId("walk") to listOf(ZoneId("C")))
         ).forEach { invalid ->
             assertIs<TripGenerationResult.InvalidInput>(generator.generate(
                 request.copy(selectedZonesByTransport = invalid), types, emptyList(), emptySet()
@@ -215,7 +217,7 @@ class MainPlannerTest {
         busZones.clear()
         metroZones.clear()
         zones.clear()
-        assertEquals(mapOf("bus" to listOf("A", "B"), "metro" to listOf("C")), trip.selectedZonesByTransport)
+        assertEquals(mapOf(TransportId("bus") to listOf(ZoneId("A"), ZoneId("B")), TransportId("metro") to listOf(ZoneId("C"))), trip.selectedZonesByTransport)
         assertEquals(trip, Json.decodeFromString<Trip>(Json.encodeToString(trip)))
     }
 
@@ -223,7 +225,7 @@ class MainPlannerTest {
     fun transitRequiresUniqueSupportedZonesBeforeAllocatingAnId() {
         var idsAllocated = 0
         val generator = MockTripGenerator(idFactory = { idsAllocated++; "trip" })
-        listOf(emptyList(), listOf("E"), listOf("A", "A")).forEach { zones ->
+        listOf(emptyList(), listOf(ZoneId("E")), listOf(ZoneId("A"), ZoneId("A"))).forEach { zones ->
             assertIs<TripGenerationResult.InvalidInput>(generator.generate(
                 input(zones), types, emptyList(), emptySet()
             ))
@@ -233,12 +235,12 @@ class MainPlannerTest {
 
     @Test
     fun transitGeneratesWithoutRouteNumbersAndSnapshotsZones() {
-        val zones = mutableListOf("A", "B")
+        val zones = mutableListOf(ZoneId("A"), ZoneId("B"))
         val trip = assertIs<TripGenerationResult.Success>(MockTripGenerator(
             random = Random(7), idFactory = { "zone-trip" }, nowEpochMillis = { 1_000L }
         ).generate(input(zones), types, emptyList(), emptySet())).trip
         zones.clear()
-        assertEquals(listOf("A", "B"), trip.selectedZoneIds)
+        assertEquals(listOf(ZoneId("A"), ZoneId("B")), trip.selectedZoneIds)
         assertEquals(emptyList(), trip.selectedRoutes)
         assertEquals(trip, Json.decodeFromString<Trip>(Json.encodeToString(trip)))
     }
@@ -247,7 +249,7 @@ class MainPlannerTest {
     fun walkingNeedsNoZonesAndOldTripRecordsStillDecode() {
         val trip = assertIs<TripGenerationResult.Success>(MockTripGenerator(
             random = Random(7), idFactory = { "walk-trip" }, nowEpochMillis = { 1_000L }
-        ).generate(input(emptyList()).copy(selectedTransportIds = listOf("walk")),
+        ).generate(input(emptyList()).copy(selectedTransportIds = listOf(TransportId("walk"))),
             types, emptyList(), emptySet())).trip
         // Default-valued fields are omitted, matching records saved before zone support.
         val oldRecord = Json.encodeToString(trip)
@@ -259,7 +261,7 @@ class MainPlannerTest {
         val legacy = Json.decodeFromString<MainPlannerState>("""{"minutes":45}""")
         assertEquals(TripPoint("Current location", 0.5f, 0.35f), legacy.origin)
         val initial = MainPlannerState(minutes = 45, walkingPreference = "Dash",
-            bikeSpeedKmh = 26, selectedZonesByTransport = mapOf("bus" to listOf("C")),
+            bikeSpeedKmh = 26, selectedZonesByTransport = mapOf(TransportId("bus") to listOf(ZoneId("C"))),
             origin = null, locationAccessOff = true)
         val planner = MainPlannerViewModel(initial)
         val point = TripPoint("  Selected point  ", 0.23f, 0.67f)
@@ -279,7 +281,7 @@ class MainPlannerTest {
             TripPoint("Outside visible crop", 0f, 1f)).forEach { origin ->
             repeat(20) {
                 val trip = assertIs<TripGenerationResult.Success>(generator.generate(
-                    input(emptyList()).copy(selectedTransportIds = listOf("walk"), origin = origin),
+                    input(emptyList()).copy(selectedTransportIds = listOf(TransportId("walk")), origin = origin),
                     types, emptyList(), emptySet(), bounds)).trip
                 assertEquals(origin, trip.start)
                 assertTrue(trip.destination.x in bounds.left..bounds.right)
@@ -296,19 +298,19 @@ class MainPlannerTest {
         val origin = TripPoint("Selected point", MockTripGenerator.SAFE_MIN, MockTripGenerator.SAFE_MIN)
         val trip = assertIs<TripGenerationResult.Success>(MockTripGenerator(
             random = constantRandom, idFactory = { "fallback" }, nowEpochMillis = { 1_000L }
-        ).generate(input(emptyList()).copy(selectedTransportIds = listOf("walk"), origin = origin),
+        ).generate(input(emptyList()).copy(selectedTransportIds = listOf(TransportId("walk")), origin = origin),
             types, emptyList(), emptySet())).trip
         assertEquals(origin, trip.start)
         assertEquals(TripPoint("Destination", MockTripGenerator.SAFE_MAX, MockTripGenerator.SAFE_MAX),
             trip.destination)
     }
 
-    private fun input(zones: List<String>) = TripGenerationInput(
+    private fun input(zones: List<ZoneId>) = TripGenerationInput(
         title = "Zone trip",
         description = "A sample transit request.",
         imageUrl = "",
         plannedMinutes = 30,
-        selectedTransportIds = listOf("bus"),
+        selectedTransportIds = listOf(TransportId("bus")),
         selectedRouteIds = emptyList(),
         attractionIntensity = 90f,
         selectedZoneIds = zones

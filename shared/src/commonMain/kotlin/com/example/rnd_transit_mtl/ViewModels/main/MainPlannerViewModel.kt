@@ -1,4 +1,6 @@
 package com.example.rnd_transit_mtl.ViewModels.main
+import com.example.rnd_transit_mtl.model.ids.ZoneId
+import com.example.rnd_transit_mtl.model.ids.TransportId
 
 import com.example.rnd_transit_mtl.model.trip.TripPoint
 import androidx.lifecycle.ViewModel
@@ -26,12 +28,12 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class MainPlannerState(
     val minutes: Int = 30,
-    val selectedTransportIds: List<String> = listOf("walk"),
-    val selectedZoneIds: List<String> = listOf("A"),
+    val selectedTransportIds: List<TransportId> = listOf(TransportId("walk")),
+    val selectedZoneIds: List<ZoneId> = listOf(ZoneId("A")),
     val intensity: Float = 90f,
     val walkingPreference: String = "Amble",
     val selectedAttractionIds: List<String> = listOf("Nature", "Surprise"),
-    val selectedZonesByTransport: Map<String, List<String>> = emptyMap(),
+    val selectedZonesByTransport: Map<TransportId, List<ZoneId>> = emptyMap(),
     val bikeSpeedKmh: Int = 18,
 
     // Labelled sample data; these are PNG coordinates, not GPS.
@@ -44,7 +46,7 @@ data class MainPlannerState(
     /** Returns independently saved zones, with legacy shared-zone fallback.
      * @param transportId Transit mode whose zones are requested.
      */
-    fun zonesForTransport(transportId: String): List<String> =
+    fun zonesForTransport(transportId: TransportId): List<ZoneId> =
         selectedZonesByTransport[transportId]
             ?: if (transportId in selectedTransportIds) {
                 selectedZoneIds
@@ -130,7 +132,7 @@ class MainPlannerViewModel(
      * @param id Mode being toggled.
      * @param availableIds IDs from the loaded transport catalogue.
      */
-    fun toggleTransport(id: String, availableIds: Set<String>) {
+    fun toggleTransport(id: TransportId, availableIds: Set<TransportId>) {
         if (id !in availableIds) return
 
         mutableUiState.update {
@@ -147,7 +149,7 @@ class MainPlannerViewModel(
      * @param transportId Bus, Metro, Train, or REM catalogue ID.
      * @param id Zone A, B, C, or D; unsupported identifiers are ignored.
      */
-    fun toggleZone(transportId: String, id: String) {
+    fun toggleZone(transportId: TransportId, id: ZoneId) {
         if (transportId !in transitIds || id !in zoneIds) return
         mutableUiState.update { state ->
             val zones = state.zonesForTransport(transportId).toggled(id)
@@ -206,9 +208,9 @@ class MainPlannerViewModel(
 
     companion object {
         /** Supported zone identifiers for the planner interface. */
-        val zoneIds = listOf("A", "B", "C", "D")
+        val zoneIds = listOf("A", "B", "C", "D").map(::ZoneId)
         /** Modes offering their own transit-zone constraints. */
-        val transitIds = setOf("bus", "metro", "train", "rem")
+        val transitIds = setOf("bus", "metro", "train", "rem").map(::TransportId).toSet()
         /** Walking paces displayed from slowest to fastest when walking is enabled. */
         val walkingPreferences = listOf("Amble", "Walk", "Dash")
         const val MIN_BIKE_SPEED_KMH = 8
@@ -234,5 +236,5 @@ class MainPlannerViewModel(
  * @param id Selection identifier to toggle.
  * @return A new selection list.
  */
-private fun List<String>.toggled(id: String): List<String> =
+private fun <T> List<T>.toggled(id: T): List<T> =
     if (id in this) filterNot { it == id } else this + id

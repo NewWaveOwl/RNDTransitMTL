@@ -1,5 +1,7 @@
 package com.example.rnd_transit_mtl
 
+import com.example.rnd_transit_mtl.model.ids.TransportId
+import com.example.rnd_transit_mtl.model.ids.TripId
 import com.example.rnd_transit_mtl.View.main.ProposalGuard
 import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.model.trip.TripPoint
@@ -10,7 +12,7 @@ import kotlin.test.*
 
 class ProposalGuardTest {
     private fun trip(id: String) = Trip(
-        id = id,
+        id = TripId(id),
         title = "Sample trip",
         description = "Test fixture",
         imageUrl = "",
@@ -18,7 +20,7 @@ class ProposalGuardTest {
         destination = TripPoint("Destination", 0.6f, 0.5f),
         plannedMinutes = 30,
         selectedTransports = listOf(
-            TripTransportSnapshot("walk", "Walk", false)
+            TripTransportSnapshot(TransportId("walk"), "Walk", false)
         ),
         selectedRoutes = emptyList(),
         attractionIntensity = 50f,
@@ -45,13 +47,13 @@ class ProposalGuardTest {
         val old = guard.begin()
         guard.cancel()
 
-        assertFalse(guard.complete(old, "cancelled"))
+        assertFalse(guard.complete(old, TripId("cancelled")))
 
         val current = guard.begin()
-        assertFalse(guard.complete(old, "old"))
-        assertTrue(guard.complete(current, "current"))
-        assertFalse(guard.canStart("old"))
-        assertTrue(guard.canStart("current"))
+        assertFalse(guard.complete(old, TripId("old")))
+        assertTrue(guard.complete(current, TripId("current")))
+        assertFalse(guard.canStart(TripId("old")))
+        assertTrue(guard.canStart(TripId("current")))
     }
 
     @Test

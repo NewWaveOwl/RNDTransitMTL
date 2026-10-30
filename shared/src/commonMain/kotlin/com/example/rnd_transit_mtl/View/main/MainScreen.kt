@@ -1,5 +1,6 @@
 package com.example.rnd_transit_mtl.View.main
 
+import com.example.rnd_transit_mtl.model.ids.TripId
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
@@ -26,7 +27,7 @@ fun MainScreen(
     transportRoutes: List<TransportRoute>?,
     loadingError: Boolean,
     onOpenCurrentTrip: ((Trip) -> Boolean)? = null,
-    onOpenCompletedTrip: ((String) -> Boolean)? = null,
+    onOpenCompletedTrip: ((TripId) -> Boolean)? = null,
     isDestinationActive: Boolean = true
 ) {
     Box(

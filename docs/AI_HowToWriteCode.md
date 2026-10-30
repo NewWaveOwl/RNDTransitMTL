@@ -45,6 +45,8 @@ Place screen code in View/<screen_name>/, ViewModels in ViewModels/<screen_name>
 
 Keep theme code in ui/theme, application assembly in App.kt, shared scaffold and navigation bars in layout/, navigation state and destinations in navigation/, models in the corresponding model/<domain> folder, and repository/provider implementations in the named data subfolders.
 
+Use the ID classes in `model/ids/Ids.kt` instead of `String` for trip, user, group, transport, route, and zone IDs. To hold one in `rememberSaveable`, use a saver from `state/IdSavers.kt`; a value class cannot be saved directly.
+
 Use matching package declarations and update imports, previews, and tests when files move. Do not add a ViewModel to a purely static component merely to satisfy folder symmetry.
 
 For Main, users choose transport modes and transit zones. Individual bus numbers and route restrictions belong in detailed Settings. Never translate zone IDs into fabricated route IDs or claim geographic enforcement without supporting routing data.
@@ -264,6 +266,9 @@ rnd_transit_mtl/
 │   └── together/
 │
 ├── model/
+│   ├── ids/
+│   │   └── Ids.kt
+│   │
 │   ├── trip/
 │   │   ├── Trip.kt
 │   │   └── TripPoint.kt
@@ -302,6 +307,8 @@ rnd_transit_mtl/
 │       └── dto/
 │
 ├── state/
+│   ├── IdSavers.kt
+│   │
 │   ├── trip/
 │   │   ├── TripsStore.kt
 │   │   ├── TripState.kt

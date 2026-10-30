@@ -1,5 +1,6 @@
 package com.example.rnd_transit_mtl.navigation
 
+import com.example.rnd_transit_mtl.model.ids.TripId
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,14 +29,14 @@ class TripNavigation(
     private val tripsStore: TripsStore
 ) {
     /** A completed record to copy into the planner; true requests a fresh proposal. */
-    var plannerCopyRequest by mutableStateOf<Pair<String, Boolean>?>(null)
+    var plannerCopyRequest by mutableStateOf<Pair<TripId, Boolean>?>(null)
         private set
 
     /** Opens a copy of saved preferences without changing the completed record.
      * @param tripId Saved record to resolve from the store.
      * @param generate Whether to generate a fresh proposal once the planner is ready.
      */
-    fun openPlannerCopy(tripId: String, generate: Boolean): Boolean {
+    fun openPlannerCopy(tripId: TripId, generate: Boolean): Boolean {
         if (tripsStore.findCompleted(tripId) == null) return false
         if (!returnToPlanner()) return false
         plannerCopyRequest = tripId to generate
@@ -45,7 +46,7 @@ class TripNavigation(
     fun consumePlannerCopy() { plannerCopyRequest = null }
 
     /** Transient popup request; trip records still come only from TripsStore. */
-    var informationTripId by mutableStateOf<String?>(null)
+    var informationTripId by mutableStateOf<TripId?>(null)
         private set
 
     fun requestTripInformation(): Boolean {
@@ -55,7 +56,7 @@ class TripNavigation(
         return true
     }
 
-    fun dismissTripInformation(tripId: String? = null) {
+    fun dismissTripInformation(tripId: TripId? = null) {
         if (tripId == null || informationTripId == tripId) {
             informationTripId = null
         }
@@ -110,7 +111,7 @@ class TripNavigation(
     }
 
     /** Restores the completed 100% presentation without running a simulation. */
-    fun openCompletedTrip(tripId: String): Boolean {
+    fun openCompletedTrip(tripId: TripId): Boolean {
         dismissTripInformation()
         val completed = tripsStore.findCompleted(tripId) ?: return false
         if (!discardCurrentReview()) return false
@@ -134,7 +135,7 @@ class TripNavigation(
      * Establishes the matching initial review before acknowledging its event.
      * Repeated requests recognize the existing destination.
      */
-    fun openInitialReview(tripId: String): Boolean {
+    fun openInitialReview(tripId: TripId): Boolean {
         dismissTripInformation()
         if (tripsStore.findCompleted(tripId) == null) return false
 
@@ -194,7 +195,7 @@ class TripNavigation(
         return openInitialReview(tripId)
     }
 
-    fun openDetails(tripId: String): Boolean {
+    fun openDetails(tripId: TripId): Boolean {
         dismissTripInformation()
         if (tripsStore.findCompleted(tripId) == null) return false
         if (!discardCurrentReview()) return false
@@ -207,7 +208,7 @@ class TripNavigation(
     }
 
     fun openReview(
-        tripId: String,
+        tripId: TripId,
         origin: ReviewOrigin
     ): Boolean {
         if (tripsStore.findCompleted(tripId) == null) return false
@@ -362,7 +363,7 @@ class TripNavigation(
     }
 
     private fun acknowledgeMatchingPendingReview(
-        tripId: String
+        tripId: TripId
     ): Boolean {
         if (tripsStore.pendingReviewTripId != tripId) return true
 

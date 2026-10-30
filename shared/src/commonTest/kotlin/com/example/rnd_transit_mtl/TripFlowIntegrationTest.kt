@@ -1,5 +1,9 @@
 package com.example.rnd_transit_mtl
 
+import com.example.rnd_transit_mtl.model.ids.TripId
+import com.example.rnd_transit_mtl.model.ids.ZoneId
+import com.example.rnd_transit_mtl.model.ids.RouteId
+import com.example.rnd_transit_mtl.model.ids.TransportId
 import androidx.navigation3.runtime.NavKey
 import com.example.rnd_transit_mtl.data.generation.MockTripGenerator
 import com.example.rnd_transit_mtl.data.generation.TripGenerationInput
@@ -32,10 +36,10 @@ import com.example.rnd_transit_mtl.navigation.backStackConfig
 
 class TripFlowIntegrationTest {
     private val types = listOf(
-        TransportType("walk", "Walk", false),
-        TransportType("bus", "Bus", true)
+        TransportType(TransportId("walk"), "Walk", false),
+        TransportType(TransportId("bus"), "Bus", true)
     )
-    private val routes = listOf(TransportRoute("bus:401", "bus", "401"))
+    private val routes = listOf(TransportRoute(RouteId("bus:401"), TransportId("bus"), "401"))
     private val navigationJson = Json {
         serializersModule = backStackConfig.serializersModule
     }
@@ -71,7 +75,7 @@ class TripFlowIntegrationTest {
         val restored = navigationJson.decodeFromString(stackSerializer, legacy)
         assertEquals(listOf(
             MainScreenKey, HistoryScreenKey,
-            TripReviewScreenKey("legacy-trip", TripReviewMode.EDIT, ReviewOrigin.Details("legacy-trip"))
+            TripReviewScreenKey(TripId("legacy-trip"), TripReviewMode.EDIT, ReviewOrigin.Details(TripId("legacy-trip")))
         ), restored)
         val encoded = navigationJson.encodeToString(stackSerializer, restored)
         kotlin.test.assertTrue(encoded.contains("com.example.rnd_transit_mtl.MainScreenKey"))
@@ -164,10 +168,10 @@ class TripFlowIntegrationTest {
         description = "Walk and ride the bus.",
         imageUrl = "https://example.com/trip.png",
         plannedMinutes = 30,
-        selectedTransportIds = listOf("walk", "bus"),
-        selectedRouteIds = listOf("bus:401"),
+        selectedTransportIds = listOf(TransportId("walk"), TransportId("bus")),
+        selectedRouteIds = listOf(RouteId("bus:401")),
         attractionIntensity = 65f,
-        selectedZoneIds = listOf("A"),
-        selectedZonesByTransport = mapOf("bus" to listOf("A"))
+        selectedZoneIds = listOf(ZoneId("A")),
+        selectedZonesByTransport = mapOf(TransportId("bus") to listOf(ZoneId("A")))
     )
 }

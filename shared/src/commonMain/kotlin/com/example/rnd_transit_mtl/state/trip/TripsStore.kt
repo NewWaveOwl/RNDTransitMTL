@@ -1,5 +1,6 @@
 package com.example.rnd_transit_mtl.state.trip
 
+import com.example.rnd_transit_mtl.model.ids.TripId
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.Saver as ComposeSaver
@@ -69,10 +70,10 @@ class TripsStore private constructor(
     val completedTrips: List<Trip>
         get() = mutableState.value.completedTrips
 
-    val pendingReviewTripId: String?
+    val pendingReviewTripId: TripId?
         get() = mutableState.value.pendingReviewTripId
 
-    val reviewDrafts: Map<String, ReviewDraft>
+    val reviewDrafts: Map<TripId, ReviewDraft>
         get() = mutableState.value.reviewDrafts
 
     /**
@@ -81,13 +82,13 @@ class TripsStore private constructor(
      * Null is the unsuccessful lookup result for a missing/deleted ID.
      * A lookup never creates or restores a record from a route parameter.
      */
-    fun findTrip(tripId: String): Trip? {
+    fun findTrip(tripId: TripId): Trip? {
         val current = mutableState.value
         return current.activeTrip?.trip?.takeIf { it.id == tripId }
             ?: current.completedTrips.firstOrNull { it.id == tripId }
     }
 
-    fun findCompleted(tripId: String): Trip? =
+    fun findCompleted(tripId: TripId): Trip? =
         mutableState.value.completedTrips.firstOrNull {
             it.id == tripId
         }
@@ -98,7 +99,7 @@ class TripsStore private constructor(
      * A completed record always has progress 1, without restarting
      * a simulation. A missing/deleted ID returns null.
      */
-    fun progressFor(tripId: String): Float? {
+    fun progressFor(tripId: TripId): Float? {
         val current = mutableState.value
         val active = current.activeTrip
 
@@ -167,7 +168,7 @@ class TripsStore private constructor(
      * continues from elapsedMillis without counting the paused interval.
      */
     fun updateElapsed(
-        tripId: String,
+        tripId: TripId,
         elapsedMillis: Long
     ): TripActionResult {
         if (elapsedMillis < 0L) {
@@ -218,7 +219,7 @@ class TripsStore private constructor(
      * This operation also supports an explicit completion check.
      * Repeated completion cannot append a second record.
      */
-    fun complete(tripId: String): TripActionResult {
+    fun complete(tripId: TripId): TripActionResult {
         val current = mutableState.value
 
         if (current.completedTrips.any { it.id == tripId }) {
@@ -243,7 +244,7 @@ class TripsStore private constructor(
      *
      * Cancellation does not append anything to completedTrips.
      */
-    fun cancel(tripId: String): TripActionResult {
+    fun cancel(tripId: TripId): TripActionResult {
         val current = mutableState.value
 
         if (current.completedTrips.any { it.id == tripId }) {
@@ -265,7 +266,7 @@ class TripsStore private constructor(
      * Opening an existing draft preserves its unsaved edits.
      * Otherwise, editing starts from the saved review or empty ratings.
      */
-    fun beginReview(tripId: String): TripActionResult {
+    fun beginReview(tripId: TripId): TripActionResult {
         val current = mutableState.value
         val trip = current.completedTrips.firstOrNull {
             it.id == tripId
@@ -296,7 +297,7 @@ class TripsStore private constructor(
     }
 
     fun updateReviewDraft(
-        tripId: String,
+        tripId: TripId,
         draft: ReviewDraft
     ): TripActionResult {
         val current = mutableState.value
@@ -316,7 +317,7 @@ class TripsStore private constructor(
      *
      * Missing overall feedback leaves the draft and saved review intact.
      */
-    fun saveReview(tripId: String): TripActionResult {
+    fun saveReview(tripId: TripId): TripActionResult {
         val current = mutableState.value
 
         if (current.completedTrips.none { it.id == tripId }) {
@@ -359,7 +360,7 @@ class TripsStore private constructor(
      * It cannot recreate a removed trip.
      */
     fun saveReview(
-        tripId: String,
+        tripId: TripId,
         review: TripReview
     ): TripActionResult {
         val current = mutableState.value
@@ -394,7 +395,7 @@ class TripsStore private constructor(
      * On an initial review, review remains null. When skipping edits,
      * any previously saved review remains unchanged.
      */
-    fun skipReview(tripId: String): TripActionResult {
+    fun skipReview(tripId: TripId): TripActionResult {
         val current = mutableState.value
 
         if (current.completedTrips.none { it.id == tripId }) {
@@ -413,7 +414,7 @@ class TripsStore private constructor(
     /**
      * Removes a completed record and all associated transient state.
      */
-    fun removeCompleted(tripId: String): TripActionResult {
+    fun removeCompleted(tripId: TripId): TripActionResult {
         val current = mutableState.value
 
         if (current.completedTrips.none { it.id == tripId }) {
@@ -440,7 +441,7 @@ class TripsStore private constructor(
      * acknowledgement for another pending trip is rejected.
      */
     fun acknowledgeReviewNavigation(
-        tripId: String
+        tripId: TripId
     ): TripActionResult {
         val current = mutableState.value
 

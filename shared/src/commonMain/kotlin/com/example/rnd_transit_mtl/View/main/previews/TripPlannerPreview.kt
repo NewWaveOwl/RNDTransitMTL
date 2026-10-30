@@ -1,4 +1,6 @@
 package com.example.rnd_transit_mtl.View.main.previews
+import com.example.rnd_transit_mtl.model.ids.RouteId
+import com.example.rnd_transit_mtl.model.ids.TransportId
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
@@ -8,19 +10,19 @@ import com.example.rnd_transit_mtl.View.main.TripPlannerContent
 import com.example.rnd_transit_mtl.ui.theme.RNDTransitTheme
 
 private val plannerPreviewTypes = listOf(
-    TransportType("train", "Train", true),
-    TransportType("rem", "REM", true),
-    TransportType("walk", "Walk", false),
-    TransportType("bus", "Bus", true),
-    TransportType("metro", "Metro", true),
-    TransportType("bike", "Bike", false)
+    TransportType(TransportId("train"), "Train", true),
+    TransportType(TransportId("rem"), "REM", true),
+    TransportType(TransportId("walk"), "Walk", false),
+    TransportType(TransportId("bus"), "Bus", true),
+    TransportType(TransportId("metro"), "Metro", true),
+    TransportType(TransportId("bike"), "Bike", false)
 )
 
 private val plannerPreviewRoutes = listOf(
-    TransportRoute("train:11", "train", "11"),
-    TransportRoute("train:14", "train", "14"),
-    TransportRoute("bus:401", "bus", "401"),
-    TransportRoute("bus:747", "bus", "747")
+    TransportRoute(RouteId("train:11"), TransportId("train"), "11"),
+    TransportRoute(RouteId("train:14"), TransportId("train"), "14"),
+    TransportRoute(RouteId("bus:401"), TransportId("bus"), "401"),
+    TransportRoute(RouteId("bus:747"), TransportId("bus"), "747")
 )
 
 @Preview(
@@ -112,8 +114,8 @@ private fun PlannerPreviewContent(
             onMinutesChange = {},
             transportTypes = plannerPreviewTypes,
             transportRoutes = plannerPreviewRoutes,
-            selectedTransportIds = if (showErrors) emptyList() else listOf("walk", "bus"),
-            selectedRouteIds = if (showErrors) emptyList() else listOf("bus:401"),
+            selectedTransportIds = if (showErrors) emptyList() else listOf(TransportId("walk"), TransportId("bus")),
+            selectedRouteIds = if (showErrors) emptyList() else listOf(RouteId("bus:401")),
             expandedTransportId = null,
             onExpandedTransportChange = {},
             onToggleTransport = {},

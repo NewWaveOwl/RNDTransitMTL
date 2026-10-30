@@ -1,5 +1,6 @@
 package com.example.rnd_transit_mtl
 
+import com.example.rnd_transit_mtl.model.ids.TransportId
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import com.example.rnd_transit_mtl.data.generation.MockTripGenerator
@@ -111,11 +112,11 @@ class TripMapGeometryTest {
                     description = "Random mock route with 30 planned minutes.",
                     imageUrl = "",
                     plannedMinutes = 30,
-                    selectedTransportIds = listOf("walk"),
+                    selectedTransportIds = listOf(TransportId("walk")),
                     selectedRouteIds = emptyList(),
                     attractionIntensity = 90f
                 ),
-                transportTypes = listOf(TransportType("walk", "Walk", false)),
+                transportTypes = listOf(TransportType(TransportId("walk"), "Walk", false)),
                 transportRoutes = emptyList(),
                 existingTripIds = emptySet(),
                 bounds = bounds

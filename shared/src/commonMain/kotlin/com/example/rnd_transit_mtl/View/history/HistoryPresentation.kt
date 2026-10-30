@@ -32,7 +32,7 @@ internal fun historyTrips(
                 it.completedAtEpochMillis ?: Long.MIN_VALUE
             }
                 .thenByDescending { it.createdAtEpochMillis }
-                .thenBy { it.id }
+                .thenBy { it.id.value }
         )
 
 internal fun formatTripTimestampUtc(epochMillis: Long): String =

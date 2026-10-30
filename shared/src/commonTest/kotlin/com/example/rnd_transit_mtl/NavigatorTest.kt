@@ -1,5 +1,7 @@
 package com.example.rnd_transit_mtl
 
+import com.example.rnd_transit_mtl.model.ids.TransportId
+import com.example.rnd_transit_mtl.model.ids.TripId
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import com.example.rnd_transit_mtl.model.trip.Trip
@@ -477,7 +479,7 @@ private fun completeTrip(
 }
 
 private fun testTrip(): Trip = Trip(
-    id = "navigation-test-trip",
+    id = TripId("navigation-test-trip"),
     title = "Navigation test",
     description = "A fixed mock trip for navigation verification.",
     imageUrl = "https://example.com/reference.jpg",
@@ -485,7 +487,7 @@ private fun testTrip(): Trip = Trip(
     destination = TripPoint("Destination", 0.80f, 0.70f),
     plannedMinutes = 30,
     selectedTransports = listOf(
-        TripTransportSnapshot("walk", "Walk", false)
+        TripTransportSnapshot(TransportId("walk"), "Walk", false)
     ),
     selectedRoutes = emptyList(),
     attractionIntensity = 65f,

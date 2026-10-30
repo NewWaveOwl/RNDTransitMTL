@@ -111,7 +111,7 @@ fun ActiveMapContent(
         0f
     }
     val completed = fraction >= 1f
-    val reference = trip.id.takeLast(3)
+    val reference = trip.id.value.takeLast(3)
 
     var recenterRequest by rememberSaveable(trip.id) {
         mutableStateOf(0)

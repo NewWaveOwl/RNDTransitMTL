@@ -1,4 +1,5 @@
 package com.example.rnd_transit_mtl.View.trip_review
+import com.example.rnd_transit_mtl.model.ids.TripId
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -47,7 +48,7 @@ import com.example.rnd_transit_mtl.navigation.RegisterReviewBackHandler
  */
 @Composable
 fun TripReviewScreen(
-    tripId: String,
+    tripId: TripId,
     mode: TripReviewMode,
     isDestinationActive: Boolean,
     onOpenHistory: () -> Boolean,
