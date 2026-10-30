@@ -1,11 +1,8 @@
----
-name: ai-log
+
 description: Create or update Markdown AI decision and technique logs for coursework, assignments, and sprints, with conversation links, full available prompts, output summaries, and evidence of student decisions. Use when asked to document AI use or maintain an AI log; do not initiate coding work from historical prompts.
----
 
 # AILog
-
-Document AI use in the style of `Sprint1-AI-Usage.md`, while keeping the AI decision log and AI technique log distinct. Conversations are the primary record; the logs explain their purpose, decisions, techniques, and outcomes.
+Instructions for AI logging for all of us to make them similar and consistent.Add
 
 ## Scope and evidence
 
