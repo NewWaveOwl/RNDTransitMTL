@@ -8,6 +8,7 @@ import kotlin.jvm.JvmInline
  * fails at compile time. All of them serialize as a plain JSON string, which
  * keeps saved state and navigation keys in the same format as a String ID.
  * toString() returns the raw value so messages and string keys read the same.
+ * PlatformSerializable lets Android store them as lazy-list keys and saved state.
  */
 
 /**
@@ -17,7 +18,7 @@ import kotlin.jvm.JvmInline
  */
 @Serializable
 @JvmInline
-value class TripId(val value: String) {
+value class TripId(val value: String) : PlatformSerializable {
     init {
         require(value.isNotBlank()) { "Trip ID must not be blank." }
     }
@@ -32,7 +33,7 @@ value class TripId(val value: String) {
  */
 @Serializable
 @JvmInline
-value class UserId(val value: String) {
+value class UserId(val value: String) : PlatformSerializable {
     init {
         require(value.isNotBlank()) { "User ID must not be blank." }
     }
@@ -47,7 +48,7 @@ value class UserId(val value: String) {
  */
 @Serializable
 @JvmInline
-value class GroupId(val value: String) {
+value class GroupId(val value: String) : PlatformSerializable {
     init {
         require(value.isNotBlank()) { "Group ID must not be blank." }
     }
@@ -62,7 +63,7 @@ value class GroupId(val value: String) {
  */
 @Serializable
 @JvmInline
-value class TransportId(val value: String) {
+value class TransportId(val value: String) : PlatformSerializable {
     init {
         require(value.isNotBlank()) { "Transport ID must not be blank." }
     }
@@ -77,7 +78,7 @@ value class TransportId(val value: String) {
  */
 @Serializable
 @JvmInline
-value class RouteId(val value: String) {
+value class RouteId(val value: String) : PlatformSerializable {
     init {
         require(value.isNotBlank()) { "Route ID must not be blank." }
     }
@@ -92,7 +93,7 @@ value class RouteId(val value: String) {
  */
 @Serializable
 @JvmInline
-value class ZoneId(val value: String) {
+value class ZoneId(val value: String) : PlatformSerializable {
     init {
         require(value.isNotBlank()) { "Zone ID must not be blank." }
     }

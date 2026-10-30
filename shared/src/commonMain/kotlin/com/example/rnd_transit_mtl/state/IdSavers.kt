@@ -5,8 +5,8 @@ import com.example.rnd_transit_mtl.model.ids.TransportId
 import com.example.rnd_transit_mtl.model.ids.TripId
 
 /*
- * rememberSaveable cannot store a value class on its own: Android would throw
- * when saving instance state. These savers store the underlying String instead.
+ * These savers store the underlying String, so saved state does not depend on
+ * Java serialization of the ID classes.
  */
 
 /** Saves an optional [TripId] for rememberSaveable; null is not saved. */

@@ -47,7 +47,7 @@ Place screen code in View/<screen_name>/, ViewModels in ViewModels/<screen_name>
 
 Keep theme code in ui/theme, application assembly in App.kt, shared scaffold and navigation bars in layout/, navigation state and destinations in navigation/, models in the corresponding model/<domain> folder, and repository/provider implementations in the named data subfolders.
 
-Use the ID classes in `model/ids/Ids.kt` instead of `String` for trip, user, group, transport, route, and zone IDs. To hold one in `rememberSaveable`, use a saver from `state/IdSavers.kt`; a value class cannot be saved directly.
+Use the ID classes in `model/ids/Ids.kt` instead of `String` for trip, user, group, transport, route, and zone IDs. Every ID class must implement `PlatformSerializable`, because Android only accepts Bundle-compatible types as `rememberSaveable` values and lazy-list keys, and this failure only appears at runtime on Android.
 
 Use matching package declarations and update imports, previews, and tests when files move. Do not add a ViewModel to a purely static component merely to satisfy folder symmetry.
 
@@ -269,7 +269,8 @@ rnd_transit_mtl/
 │
 ├── model/
 │   ├── ids/
-│   │   └── Ids.kt
+│   │   ├── Ids.kt
+│   │   └── PlatformSerializable.kt
 │   │
 │   ├── trip/
 │   │   ├── Trip.kt
