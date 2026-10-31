@@ -1,5 +1,6 @@
 package com.example.rnd_transit_mtl.simulation
 
+import com.example.rnd_transit_mtl.model.ids.TripId
 import com.example.rnd_transit_mtl.state.trip.TRIP_SIMULATION_DURATION_MILLIS
 import com.example.rnd_transit_mtl.state.trip.TripActionResult
 import com.example.rnd_transit_mtl.state.trip.TripsStore
@@ -17,7 +18,7 @@ import kotlin.time.TimeSource
  */
 internal class ActiveTripSimulation(
     private val tripsStore: TripsStore,
-    private val tripId: String,
+    private val tripId: TripId,
     private val timeSource: TimeSource = TimeSource.Monotonic
 ) {
     /**

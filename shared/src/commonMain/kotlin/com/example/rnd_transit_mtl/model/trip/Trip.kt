@@ -1,5 +1,9 @@
 package com.example.rnd_transit_mtl.model.trip
 
+import com.example.rnd_transit_mtl.model.ids.RouteId
+import com.example.rnd_transit_mtl.model.ids.TripId
+import com.example.rnd_transit_mtl.model.ids.ZoneId
+import com.example.rnd_transit_mtl.model.ids.TransportId
 import kotlinx.serialization.Serializable
 import com.example.rnd_transit_mtl.model.review.TripReview
 
@@ -11,14 +15,11 @@ import com.example.rnd_transit_mtl.model.review.TripReview
  */
 @Serializable
 data class TripTransportSnapshot(
-    val id: String,
+    val id: TransportId,
     val label: String,
     val usesRoutes: Boolean
 ) {
     init {
-        require(id.isNotBlank()) {
-            "Transport ID must not be blank."
-        }
         require(label.isNotBlank()) {
             "Transport label must not be blank."
         }
@@ -30,17 +31,11 @@ data class TripTransportSnapshot(
  */
 @Serializable
 data class TripRouteSnapshot(
-    val id: String,
-    val transportTypeId: String,
+    val id: RouteId,
+    val transportTypeId: TransportId,
     val label: String
 ) {
     init {
-        require(id.isNotBlank()) {
-            "Route ID must not be blank."
-        }
-        require(transportTypeId.isNotBlank()) {
-            "Route transport ID must not be blank."
-        }
         require(label.isNotBlank()) {
             "Route label must not be blank."
         }
@@ -68,7 +63,7 @@ data class TripRouteSnapshot(
  */
 @Serializable
 data class Trip(
-    val id: String,
+    val id: TripId,
     val title: String,
     val description: String,
     // Empty for bundled-map trips; older trips can retain their reference URL.
@@ -84,15 +79,11 @@ data class Trip(
     val completedAtEpochMillis: Long? = null,
     val review: TripReview? = null,
     /** Transit-zone constraints recorded when this trip was generated. */
-    val selectedZoneIds: List<String> = emptyList(),
+    val selectedZoneIds: List<ZoneId> = emptyList(),
     /** Independent zone constraints recorded for each selected transit mode; empty on older trips. */
-    val selectedZonesByTransport: Map<String, List<String>> = emptyMap()
+    val selectedZonesByTransport: Map<TransportId, List<ZoneId>> = emptyMap()
 ) {
     init {
-        require(id.isNotBlank()) {
-            "Trip ID must not be blank."
-        }
-
         validatePlannerValues(
             title = title,
             description = description,
@@ -156,9 +147,9 @@ data class Trip(
          * @param zonesByTransport Independent zones for every selected transit mode.
          */
         internal fun validateTransportZones(
-            transitIds: Set<String>,
-            zoneIds: List<String>,
-            zonesByTransport: Map<String, List<String>>
+            transitIds: Set<TransportId>,
+            zoneIds: List<ZoneId>,
+            zonesByTransport: Map<TransportId, List<ZoneId>>
         ) {
             if (zonesByTransport.isEmpty()) return
             require(zonesByTransport.keys == transitIds) {
@@ -166,7 +157,7 @@ data class Trip(
             }
             zonesByTransport.forEach { (transportId, zones) ->
                 require(zones.isNotEmpty()) { "Choose at least one transit zone for $transportId." }
-                require(zones.all { it in setOf("A", "B", "C", "D") }) {
+                require(zones.all { it.value in setOf("A", "B", "C", "D") }) {
                     "A selected transit zone is unavailable for $transportId."
                 }
                 require(zones.distinct().size == zones.size) {

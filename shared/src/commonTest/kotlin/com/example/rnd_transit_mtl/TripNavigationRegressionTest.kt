@@ -1,5 +1,7 @@
 package com.example.rnd_transit_mtl
 
+import com.example.rnd_transit_mtl.model.ids.TransportId
+import com.example.rnd_transit_mtl.model.ids.TripId
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import com.example.rnd_transit_mtl.model.trip.Trip
@@ -171,7 +173,7 @@ class TripNavigationRegressionTest {
     }
 
     private fun fixtureTrip(): Trip = Trip(
-        id = "navigation-regression-trip",
+        id = TripId("navigation-regression-trip"),
         title = "Navigation regression",
         description = "Fixed record for navigation boundary verification.",
         imageUrl = "https://example.com/reference.jpg",
@@ -179,7 +181,7 @@ class TripNavigationRegressionTest {
         destination = TripPoint("Destination", 0.80f, 0.70f),
         plannedMinutes = 30,
         selectedTransports = listOf(
-            TripTransportSnapshot("walk", "Walk", false)
+            TripTransportSnapshot(TransportId("walk"), "Walk", false)
         ),
         selectedRoutes = emptyList(),
         attractionIntensity = 65f,

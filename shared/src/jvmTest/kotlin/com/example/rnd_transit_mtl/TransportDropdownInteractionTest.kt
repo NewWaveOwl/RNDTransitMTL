@@ -1,5 +1,7 @@
 package com.example.rnd_transit_mtl
 
+import com.example.rnd_transit_mtl.model.ids.ZoneId
+import com.example.rnd_transit_mtl.model.ids.TransportId
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.geometry.Offset
@@ -27,7 +29,7 @@ class TransportDropdownInteractionTest {
     @OptIn(ExperimentalComposeUiApi::class)
     @Test
     fun clicksCloseSwitchAndKeepSelectionsWhileHeightAnimatesThroughIntermediateFrames() {
-        var expanded by mutableStateOf<String?>(null)
+        var expanded by mutableStateOf<TransportId?>(null)
         val vm = MainPlannerViewModel()
         val scene = ImageComposeScene(412, 1000) {
             val draft by vm.uiState.collectAsState()
@@ -35,12 +37,12 @@ class TransportDropdownInteractionTest {
                 LazyColumn(Modifier.fillMaxSize()) {
                     PlannerPreferenceBands(
                         scale = 1f,
-                        transportTypes = listOf(TransportType("walk", "Walk", false), TransportType("bike", "Bike", false),
-                            TransportType("bus", "Bus", true), TransportType("metro", "Metro", true),
-                            TransportType("train", "Train", true), TransportType("rem", "REM", true)),
+                        transportTypes = listOf(TransportType(TransportId("walk"), "Walk", false), TransportType(TransportId("bike"), "Bike", false),
+                            TransportType(TransportId("bus"), "Bus", true), TransportType(TransportId("metro"), "Metro", true),
+                            TransportType(TransportId("train"), "Train", true), TransportType(TransportId("rem"), "REM", true)),
                         selectedTransportIds = draft.selectedTransportIds,
                         selectedZonesByTransport = MainPlannerViewModel.transitIds.associateWith { draft.zonesForTransport(it) },
-                        onToggleTransport = { vm.toggleTransport(it, setOf("walk", "bike")) },
+                        onToggleTransport = { vm.toggleTransport(it, setOf(TransportId("walk"), TransportId("bike"))) },
                         onToggleZone = vm::toggleZone, walkingPreference = draft.walkingPreference,
                         bikeSpeedKmh = draft.bikeSpeedKmh, onBikeSpeedChange = vm::setBikeSpeedKmh,
                         selectedAttractionIds = draft.selectedAttractionIds, onWalkingPreferenceChange = vm::setWalkingPreference,
@@ -87,15 +89,15 @@ class TransportDropdownInteractionTest {
             val open = headingY()
             assertTrue(openingAfter240ms > opening && openingAfter240ms < open,
                 "The slower opening must still be progressing after 240 ms")
-            assertEquals("bus", expanded)
-            assertEquals(listOf("walk"), vm.uiState.value.selectedTransportIds)
+            assertEquals(TransportId("bus"), expanded)
+            assertEquals(listOf(TransportId("walk")), vm.uiState.value.selectedTransportIds)
             assertTrue(opening > closed && opening < open, "Opening must pass smoothly through an intermediate height")
             click(206f, 270f)
             frames(5)
             save("Zone-selection-filling-inward.png")
             frames(25)
             save("Zone-selection-filled.png")
-            assertEquals(listOf("B"), vm.uiState.value.zonesForTransport("bus"))
+            assertEquals(listOf(ZoneId("B")), vm.uiState.value.zonesForTransport(TransportId("bus")))
             click(330f, 74f)
             frames(5)
             val closing = headingY()
@@ -103,8 +105,8 @@ class TransportDropdownInteractionTest {
             frames(40)
             assertNull(expanded)
             assertTrue(closing > headingY() && closing < open, "Closing must pass smoothly through an intermediate height")
-            assertEquals(listOf("walk", "bus"), vm.uiState.value.selectedTransportIds)
-            assertEquals(listOf("B"), vm.uiState.value.zonesForTransport("bus"))
+            assertEquals(listOf(TransportId("walk"), TransportId("bus")), vm.uiState.value.selectedTransportIds)
+            assertEquals(listOf(ZoneId("B")), vm.uiState.value.zonesForTransport(TransportId("bus")))
             click(330f, 74f)
             frames(40)
             click(82f, 126f)
@@ -118,11 +120,11 @@ class TransportDropdownInteractionTest {
             assertNotNull(textNode("Metro zones"))
             assertTrue(headingY() < switchingDown, "The new menu must start opening from the collapsed position")
             frames(40)
-            assertEquals("metro", expanded)
+            assertEquals(TransportId("metro"), expanded)
             click(330f, 270f)
             frames(5)
-            assertEquals(listOf("C"), vm.uiState.value.zonesForTransport("metro"))
-            assertEquals(listOf("B"), vm.uiState.value.zonesForTransport("bus"))
+            assertEquals(listOf(ZoneId("C")), vm.uiState.value.zonesForTransport(TransportId("metro")))
+            assertEquals(listOf(ZoneId("B")), vm.uiState.value.zonesForTransport(TransportId("bus")))
             save("Dropdown-switched-to-metro.png")
             click(82f, 126f)
             frames(40)
@@ -138,10 +140,10 @@ class TransportDropdownInteractionTest {
             assertNull(textNode("REM zones"))
             click(330f, 74f) // Latest request wins while the previous switch is collapsing.
             frames(80)
-            assertEquals("bus", expanded)
+            assertEquals(TransportId("bus"), expanded)
             assertNotNull(textNode("Bus zones"))
             assertNull(textNode("REM zones"))
-            assertEquals(listOf("B"), vm.uiState.value.zonesForTransport("bus"))
+            assertEquals(listOf(ZoneId("B")), vm.uiState.value.zonesForTransport(TransportId("bus")))
 
             // Walking uses the exact same 500 ms motion in both directions.
             vm.setWalkingPreference("Dash")
@@ -169,7 +171,7 @@ class TransportDropdownInteractionTest {
             assertTrue(walkingOpeningAfter240ms > walkingOpening && walkingOpeningAfter240ms < attractionsY())
             assertEquals(withWalking, attractionsY())
             assertEquals("Dash", vm.uiState.value.walkingPreference)
-            assertEquals(listOf("B"), vm.uiState.value.zonesForTransport("bus"))
+            assertEquals(listOf(ZoneId("B")), vm.uiState.value.zonesForTransport(TransportId("bus")))
 
             val originalRowY = assertNotNull(textNode("Walk")).boundsInRoot.top
             // Bike uses the same opening motion, accepts taps and continuous drags, and keeps its value when hidden.
@@ -226,13 +228,13 @@ class TransportDropdownInteractionTest {
             frames(10)
             save("Dropdown-all-zones-ellipsis.png")
             MainPlannerViewModel.transitIds.forEach { mode ->
-                val title = when (mode) { "bus" -> "Bus"; "metro" -> "Metro"; "train" -> "Train"; else -> "REM" }
+                val title = when (mode.value) { "bus" -> "Bus"; "metro" -> "Metro"; "train" -> "Train"; else -> "REM" }
                 val label = "$title A, B, C, D"
                 val node = assertNotNull(textNode(label), "Retain the full zone summary for accessibility")
                 val layouts = mutableListOf<TextLayoutResult>()
                 assertTrue(node.config.getOrNull(SemanticsActions.GetTextLayoutResult)?.action?.invoke(layouts) == true)
                 assertEquals(1, layouts.single().lineCount, "Long transport summaries must never wrap")
-                if (mode == "metro") {
+                if (mode == TransportId("metro")) {
                     // Check measured overflow; the rendered Skia text visibly truncates with an ellipsis.
                     assertTrue(layouts.single().multiParagraph.intrinsics.maxIntrinsicWidth > layouts.single().size.width)
                     assertEquals(TextOverflow.Ellipsis, layouts.single().layoutInput.overflow)

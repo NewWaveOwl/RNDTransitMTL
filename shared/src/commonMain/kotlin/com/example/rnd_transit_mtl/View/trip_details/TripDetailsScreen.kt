@@ -1,4 +1,5 @@
 package com.example.rnd_transit_mtl.View.trip_details
+import com.example.rnd_transit_mtl.model.ids.TripId
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,9 +26,9 @@ import com.example.rnd_transit_mtl.View.history.formatTripTimestampUtc
  */
 @Composable
 fun TripDetailsScreen(
-    tripId: String,
+    tripId: TripId,
     onReturnToHistory: () -> Unit,
-    onReview: ((String) -> Unit)? = null,
+    onReview: ((TripId) -> Unit)? = null,
     isDestinationActive: Boolean = true,
     modifier: Modifier = Modifier
 ) {

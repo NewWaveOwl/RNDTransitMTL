@@ -1,4 +1,5 @@
 package com.example.rnd_transit_mtl.View.history
+import com.example.rnd_transit_mtl.model.ids.TripId
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -51,9 +52,9 @@ fun HistoryContent(
     filter: TripHistoryFilter,
     totalCount: Int,
     onFilterChange: (TripHistoryFilter) -> Unit,
-    onOpenDetails: ((String) -> Unit)?,
-    onReview: ((String) -> Unit)?,
-    onRemove: (String) -> Unit,
+    onOpenDetails: ((TripId) -> Unit)?,
+    onReview: ((TripId) -> Unit)?,
+    onRemove: (TripId) -> Unit,
     modifier: Modifier = Modifier,
     actionsEnabled: Boolean = true,
     errorMessage: String? = null

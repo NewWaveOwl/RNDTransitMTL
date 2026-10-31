@@ -1,4 +1,6 @@
 package com.example.rnd_transit_mtl.data.fake
+import com.example.rnd_transit_mtl.model.ids.RouteId
+import com.example.rnd_transit_mtl.model.ids.TransportId
 
 import com.example.rnd_transit_mtl.model.transport.TransportRoute
 import kotlinx.serialization.json.jsonObject
@@ -19,8 +21,8 @@ class FakeTransportRouteRepository {
         .map { element ->
             val item = element.jsonObject
             TransportRoute(
-                id = item.getValue("id").jsonPrimitive.content,
-                transportTypeId = item.getValue("transportTypeId").jsonPrimitive.content,
+                id = RouteId(item.getValue("id").jsonPrimitive.content),
+                transportTypeId = TransportId(item.getValue("transportTypeId").jsonPrimitive.content),
                 label = item.getValue("label").jsonPrimitive.content
             )
         }

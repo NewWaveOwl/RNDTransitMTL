@@ -1,5 +1,7 @@
 package com.example.rnd_transit_mtl.View.history
 
+import com.example.rnd_transit_mtl.state.NullableTripIdSaver
+import com.example.rnd_transit_mtl.model.ids.TripId
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -27,8 +29,8 @@ import com.example.rnd_transit_mtl.ui.theme.TransitWhite
  */
 @Composable
 fun HistoryScreen(
-    onOpenDetails: ((String) -> Unit)? = null,
-    onReview: ((String) -> Unit)? = null,
+    onOpenDetails: ((TripId) -> Unit)? = null,
+    onReview: ((TripId) -> Unit)? = null,
     isDestinationActive: Boolean = true,
     modifier: Modifier = Modifier
 ) {
@@ -43,8 +45,8 @@ fun HistoryScreen(
     }
 
     // Store only the ID. Resolve the latest record from TripsStore.
-    var pendingRemovalId by rememberSaveable {
-        mutableStateOf<String?>(null)
+    var pendingRemovalId by rememberSaveable(stateSaver = NullableTripIdSaver) {
+        mutableStateOf<TripId?>(null)
     }
 
     var filterName by rememberSaveable { mutableStateOf(TripHistoryFilter.ALL.name) }
@@ -74,8 +76,8 @@ fun HistoryScreen(
     }
 
     fun openExistingTrip(
-        tripId: String,
-        callback: (String) -> Unit
+        tripId: TripId,
+        callback: (TripId) -> Unit
     ) {
         if (!latestDestinationActive) return
 
@@ -87,7 +89,7 @@ fun HistoryScreen(
         }
     }
 
-    fun requestRemoval(tripId: String) {
+    fun requestRemoval(tripId: TripId) {
         if (!latestDestinationActive) return
 
         if (tripsStore.findCompleted(tripId) == null) {
@@ -133,12 +135,12 @@ fun HistoryScreen(
         }
     }
 
-    val detailsCallback: ((String) -> Unit)? =
+    val detailsCallback: ((TripId) -> Unit)? =
         onOpenDetails?.let { callback ->
             { tripId -> openExistingTrip(tripId, callback) }
         }
 
-    val reviewCallback: ((String) -> Unit)? =
+    val reviewCallback: ((TripId) -> Unit)? =
         onReview?.let { callback ->
             { tripId -> openExistingTrip(tripId, callback) }
         }

@@ -1,4 +1,5 @@
 package com.example.rnd_transit_mtl.ui.global_ui_ellements.trip
+import com.example.rnd_transit_mtl.model.ids.TripId
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -213,7 +214,7 @@ fun CompleteV3(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                "${trip.title} · Sample trip #${trip.id.takeLast(3)}",
+                "${trip.title} · Sample trip #${trip.id.value.takeLast(3)}",
                 color = TransitWhite
             )
             Text(
@@ -423,7 +424,7 @@ fun FeedbackV3(
 
 /** Presentation snapshot of a real saved record; status is supplied by the coordinator. */
 data class HistoryRowV3(
-    val id: String,
+    val id: TripId,
     val title: String,
     val summary: String,
     val status: String,
@@ -435,14 +436,14 @@ data class HistoryRowV3(
 @Composable
 fun HistoryV3(
     rows: List<HistoryRowV3>,
-    onOpenTrip: (String) -> Unit,
+    onOpenTrip: (TripId) -> Unit,
     onPlanNew: () -> Unit,
     onGo: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     errorMessage: String? = null,
-    onReviewTrip: ((String) -> Unit)? = null,
-    onRemoveTrip: ((String) -> Unit)? = null
+    onReviewTrip: ((TripId) -> Unit)? = null,
+    onRemoveTrip: ((TripId) -> Unit)? = null
 ) {
     LazyColumn(
         modifier.fillMaxSize().background(TransitWhite),
@@ -487,7 +488,7 @@ fun HistoryV3(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    "${row.title} · #${row.id.takeLast(3)}",
+                    "${row.title} · #${row.id.value.takeLast(3)}",
                     color = TransitWhite,
                     fontSize = 21.sp,
                     fontWeight = FontWeight.Bold
@@ -561,7 +562,7 @@ fun TripDetailsV3(
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Text(
-                    "Saved trip · #${trip.id.takeLast(3)}",
+                    "Saved trip · #${trip.id.value.takeLast(3)}",
                     color = TransitMain,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(8.dp)
@@ -589,7 +590,7 @@ fun TripDetailsV3(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                "${trip.title} · #${trip.id.takeLast(3)}",
+                "${trip.title} · #${trip.id.value.takeLast(3)}",
                 color = TransitWhite,
                 fontSize = 25.sp,
                 fontWeight = FontWeight.Bold

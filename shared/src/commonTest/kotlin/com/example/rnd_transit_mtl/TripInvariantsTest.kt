@@ -1,5 +1,7 @@
 package com.example.rnd_transit_mtl
 
+import com.example.rnd_transit_mtl.model.ids.TripId
+import com.example.rnd_transit_mtl.model.ids.TransportId
 import com.example.rnd_transit_mtl.data.generation.MockTripGenerator
 import com.example.rnd_transit_mtl.data.generation.TripGenerationInput
 import com.example.rnd_transit_mtl.data.generation.TripGenerationResult
@@ -319,8 +321,8 @@ class TripInvariantsTest {
         val generator = MockTripGenerator(random = Random(1),
             idFactory = { idRequests++; "minimum-trip" }, nowEpochMillis = { 12_000L })
         val input = TripGenerationInput("Trip", "Sample trip", "", 0,
-            listOf("walk"), emptyList(), 50f)
-        val types = listOf(TransportType("walk", "Walk", false))
+            listOf(TransportId("walk")), emptyList(), 50f)
+        val types = listOf(TransportType(TransportId("walk"), "Walk", false))
         assertIs<TripGenerationResult.InvalidInput>(generator.generate(input, types, emptyList(), emptySet()))
         assertEquals(0, idRequests)
         assertIs<TripGenerationResult.Success>(generator.generate(input.copy(plannedMinutes = 5), types, emptyList(), emptySet()))
@@ -386,12 +388,12 @@ class TripInvariantsTest {
                     description = "A predictable mock trip.",
                     imageUrl = "https://example.com/reference.jpg",
                     plannedMinutes = 30,
-                    selectedTransportIds = listOf("walk"),
+                    selectedTransportIds = listOf(TransportId("walk")),
                     selectedRouteIds = emptyList(),
                     attractionIntensity = 65f
                 ),
                 transportTypes = listOf(
-                    TransportType("walk", "Walk", false)
+                    TransportType(TransportId("walk"), "Walk", false)
                 ),
                 transportRoutes = emptyList(),
                 existingTripIds = emptySet()
@@ -400,7 +402,7 @@ class TripInvariantsTest {
     }
 
     private fun fixtureTrip(id: String): Trip = Trip(
-        id = id,
+        id = TripId(id),
         title = "Trip $id",
         description = "Fixed record for state invariant verification.",
         imageUrl = "https://example.com/reference.jpg",
@@ -408,7 +410,7 @@ class TripInvariantsTest {
         destination = TripPoint("Destination", 0.80f, 0.70f),
         plannedMinutes = 30,
         selectedTransports = listOf(
-            TripTransportSnapshot("walk", "Walk", false)
+            TripTransportSnapshot(TransportId("walk"), "Walk", false)
         ),
         selectedRoutes = emptyList(),
         attractionIntensity = 65f,

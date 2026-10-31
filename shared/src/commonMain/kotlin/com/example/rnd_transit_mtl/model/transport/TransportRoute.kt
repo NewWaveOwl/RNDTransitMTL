@@ -1,4 +1,6 @@
 package com.example.rnd_transit_mtl.model.transport
+import com.example.rnd_transit_mtl.model.ids.RouteId
+import com.example.rnd_transit_mtl.model.ids.TransportId
 
 /**
  * Describes one route and its owning transport option.
@@ -8,7 +10,7 @@ package com.example.rnd_transit_mtl.model.transport
  * @param label Route name or number displayed to the user.
  */
 data class TransportRoute(
-    val id: String,
-    val transportTypeId: String,
+    val id: RouteId,
+    val transportTypeId: TransportId,
     val label: String
 )

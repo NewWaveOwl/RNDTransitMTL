@@ -1,5 +1,6 @@
 package com.example.rnd_transit_mtl
 
+import com.example.rnd_transit_mtl.model.ids.TripId
 import androidx.compose.runtime.*
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
@@ -90,7 +91,7 @@ class TripDetailsReviewActionTest {
             val store = assertNotNull(TripsStore.fromSavedStateJson(
                 Json.encodeToString(TripsState(completedTrips = listOf(trip))), { 1_800_000_000_000L }))
             val navigation = TripNavigation(Navigator(NavBackStack<NavKey>(TripDetailsScreenKey(trip.id))), store)
-            val requestedIds = mutableListOf<String>()
+            val requestedIds = mutableListOf<TripId>()
             var active by mutableStateOf(true)
             var reviewAvailable by mutableStateOf(true)
             val scene = ImageComposeScene(412, 720) {

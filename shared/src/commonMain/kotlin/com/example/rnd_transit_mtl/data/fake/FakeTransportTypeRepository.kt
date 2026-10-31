@@ -1,4 +1,5 @@
 package com.example.rnd_transit_mtl.data.fake
+import com.example.rnd_transit_mtl.model.ids.TransportId
 
 import com.example.rnd_transit_mtl.model.transport.TransportType
 import kotlinx.serialization.json.boolean
@@ -20,7 +21,7 @@ class FakeTransportTypeRepository {
         .map { element ->
             val item = element.jsonObject
             TransportType(
-                id = item.getValue("id").jsonPrimitive.content,
+                id = TransportId(item.getValue("id").jsonPrimitive.content),
                 label = item.getValue("label").jsonPrimitive.content,
                 usesRoutes = item.getValue("usesRoutes").jsonPrimitive.boolean
             )

@@ -1,5 +1,6 @@
 package com.example.rnd_transit_mtl.navigation
 
+import com.example.rnd_transit_mtl.model.ids.TripId
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
@@ -93,7 +94,7 @@ data class CurrentTripScreenKey(
 @Serializable
 @SerialName("com.example.rnd_transit_mtl.TripDetailsScreenKey")
 data class TripDetailsScreenKey(
-    val tripId: String
+    val tripId: TripId
 ) : ScreenKey() {
     override val screenTitle = "Trip details"
 }
@@ -117,7 +118,7 @@ sealed class ReviewOrigin {
     @Serializable
     @SerialName("com.example.rnd_transit_mtl.ReviewOrigin.Details")
     data class Details(
-        val tripId: String
+        val tripId: TripId
     ) : ReviewOrigin() {
         override fun destination(): ScreenKey =
             TripDetailsScreenKey(tripId)
@@ -127,7 +128,7 @@ sealed class ReviewOrigin {
 @Serializable
 @SerialName("com.example.rnd_transit_mtl.TripReviewScreenKey")
 data class TripReviewScreenKey(
-    val tripId: String,
+    val tripId: TripId,
     val mode: TripReviewMode,
     val origin: ReviewOrigin = ReviewOrigin.History
 ) : ScreenKey() {

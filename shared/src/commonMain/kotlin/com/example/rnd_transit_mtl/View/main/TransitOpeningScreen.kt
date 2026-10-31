@@ -1,4 +1,6 @@
 package com.example.rnd_transit_mtl.View.main
+import com.example.rnd_transit_mtl.state.NullableTripIdSaver
+import com.example.rnd_transit_mtl.model.ids.TripId
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -57,7 +59,7 @@ internal fun TransitOpeningScreen(
     transportTypes: List<TransportType>,
     transportRoutes: List<TransportRoute>,
     onOpenCurrentTrip: ((Trip) -> Boolean)? = null,
-    onOpenCompletedTrip: ((String) -> Boolean)? = null,
+    onOpenCompletedTrip: ((TripId) -> Boolean)? = null,
     isDestinationActive: Boolean = true,
     modifier: Modifier = Modifier,
     sampleOutcome: Trip33Sample = Trip33Sample.Normal
@@ -178,7 +180,7 @@ internal fun TransitOpeningScreen(
     }
 
     // Save only the opening intent and temporary labels, not a second Trip.
-    var pendingOpenTripId by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingOpenTripId by rememberSaveable(stateSaver = NullableTripIdSaver) { mutableStateOf<TripId?>(null) }
     var pendingActionLabel by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingSummary by rememberSaveable { mutableStateOf<String?>(null) }
 
@@ -223,7 +225,7 @@ internal fun TransitOpeningScreen(
         }
     }
 
-    fun queueTripOpening(tripId: String) {
+    fun queueTripOpening(tripId: TripId) {
         pendingActionLabel = actionLabel
         pendingSummary = activeSummary ?: completedSummary
         pendingOpenTripId = tripId
@@ -356,7 +358,7 @@ internal fun TransitOpeningScreen(
                     selectedTransportIds = planner.selectedTransportIds.toList(),
                     selectedRouteIds = emptyList(),
                     attractionIntensity = planner.intensity,
-                    selectedZoneIds = zones.values.flatten().distinct().sorted(),
+                    selectedZoneIds = zones.values.flatten().distinct().sortedBy { it.value },
                     selectedZonesByTransport = zones,
                     origin = origin.copy()
                 )

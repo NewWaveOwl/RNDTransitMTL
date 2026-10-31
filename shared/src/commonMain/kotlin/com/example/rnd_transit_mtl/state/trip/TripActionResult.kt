@@ -1,5 +1,6 @@
 package com.example.rnd_transit_mtl.state.trip
 
+import com.example.rnd_transit_mtl.model.ids.TripId
 /**
  * Restricted outcomes of a store operation.
  *
@@ -12,11 +13,11 @@ sealed class TripActionResult {
     data object AlreadyCompleted : TripActionResult()
 
     data class ActiveTripExists(
-        val tripId: String
+        val tripId: TripId
     ) : TripActionResult()
 
     data class MissingTrip(
-        val tripId: String
+        val tripId: TripId
     ) : TripActionResult()
 
     data class InvalidInput(

@@ -1,5 +1,6 @@
 package com.example.rnd_transit_mtl
 
+import com.example.rnd_transit_mtl.model.ids.TransportId
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -32,7 +33,7 @@ class PlannerOriginUiTest {
         var edited = 0
         val scene = ImageComposeScene(412, 800) {
             RNDTransitTheme {
-                MainPlannerContent(30, {}, emptyList(), listOf("walk"), emptyMap(), {}, { _, _ -> },
+                MainPlannerContent(30, {}, emptyList(), listOf(TransportId("walk")), emptyMap(), {}, { _, _ -> },
                     "Amble", 18, {}, emptyList(), {}, {}, "", "GO", true, true,
                     null, null, {}, {}, onEditOrigin = { edited++ })
             }

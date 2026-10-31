@@ -1,8 +1,8 @@
-# AI_HowToWriteCode
+# HowToWriteCode_InTheProjec
 
 ## Purpose and source boundaries
 
-Use this document when asking AI to explain, review, or write Kotlin and Compose code for Application Development II. It combines the coding topics from 18 supplied PowerPoints, covering 624 slides, with an application architecture adapted from [Now in Android](https://github.com/android/nowinandroid).
+Use this document when asking AI and Human to explain, review, or write Kotlin and Compose code for Application Development II. It combines the coding topics from 18 supplied PowerPoints, covering 624 slides, with an application architecture adapted from [Now in Android](https://github.com/android/nowinandroid).
 
 The lecture sequence determines the learning structure. Now in Android supplies the broader architectural reference. KDoc with `/** ... */` and `@param` is an explicit requirement of this guide and the user's request. The original sources were reviewed on October 2, 2026. The Days 20–23 decks and their version-sensitive APIs were reviewed on October 18, 2026. This update adds guidance; it does not migrate the existing app to ViewModels or Flow.
 
@@ -11,6 +11,7 @@ The lecture sequence determines the learning structure. Now in Android supplies 
 Examples marked **slide adaptation** preserve the teaching pattern while improving formatting, documentation, or correctness. Examples marked **architecture adaptation** illustrate Now in Android principles using original course-sized code. They are not verbatim Now in Android source files. Short snippets omit routine imports and some repeated documentation to focus on the technique. Complete generated declarations must follow section 4. These examples have been reviewed as documentation, not compiled together as an application.
 
 ## 1. Global instructions for the coding AI
+
 0. Do not write vars and methods names with "-" use "_". Only use "-" if it grammatically required.
 1. Read the requested behavior, relevant existing code, build configuration, and project decisions before writing code.
 2. Use Kotlin and Compose. Use Material 3 for this course. For the later multiplatform/navigation work, use Navigation 3.
@@ -27,6 +28,7 @@ Examples marked **slide adaptation** preserve the teaching pattern while improvi
 13. For ViewModels and streams, define the owner, lifetime, cancellation, state/event distinction, and delivery requirements before choosing an API. Follow section 18 for the Days 20–23 practices.
 14. In Compose files being created or edited, put the main component layout and animation settings in clearly labeled sections immediately after imports. Use names that state each value's responsibility and unit; follow the mandatory tuning practice below.
 15. Reuse existing project icons. If an icon is missing, export it from the RndTransit_main Figma design (Android Design kit or Core experience) or use Google Material Symbols from fonts.google.com/icons. If neither has the needed icon, create it in Figma and export it. Do not generate replacement icons in application code. Keep the requested solution simple and preserve its proposed structure.
+16. Use supabase for the project backend
 
 **Lecture basis:** S01 slides 8 and 39–45; S02 slides 3–5; S06 slides 4–14; S07 slides 3–11; S16 slides 6–25.
 
@@ -44,6 +46,8 @@ Place screen code in View/<screen_name>/, ViewModels in ViewModels/<screen_name>
 `ui/global_ui_ellements/trip/TripScreensV3.kt` contains the shared completion, overall review, feedback, history, and saved-details presentations. Their callbacks delegate to the existing coordinators. Segment/place feedback stays disabled until target-based persistence and navigation exist. Repeat generates a fresh proposal; Edit copy restores recorded planner preferences without modifying the completed trip.
 
 Keep theme code in ui/theme, application assembly in App.kt, shared scaffold and navigation bars in layout/, navigation state and destinations in navigation/, models in the corresponding model/<domain> folder, and repository/provider implementations in the named data subfolders.
+
+Use the ID classes in `model/ids/Ids.kt` instead of `String` for trip, user, group, transport, route, and zone IDs. Every ID class must implement `PlatformSerializable`, because Android only accepts Bundle-compatible types as `rememberSaveable` values and lazy-list keys, and this failure only appears at runtime on Android.
 
 Use matching package declarations and update imports, previews, and tests when files move. Do not add a ViewModel to a purely static component merely to satisfy folder symmetry.
 
@@ -264,6 +268,10 @@ rnd_transit_mtl/
 │   └── together/
 │
 ├── model/
+│   ├── ids/
+│   │   ├── Ids.kt
+│   │   └── PlatformSerializable.kt
+│   │
 │   ├── trip/
 │   │   ├── Trip.kt
 │   │   └── TripPoint.kt
@@ -302,6 +310,8 @@ rnd_transit_mtl/
 │       └── dto/
 │
 ├── state/
+│   ├── IdSavers.kt
+│   │
 │   ├── trip/
 │   │   ├── TripsStore.kt
 │   │   ├── TripState.kt
