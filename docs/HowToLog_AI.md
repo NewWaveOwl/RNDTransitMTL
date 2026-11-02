@@ -22,7 +22,7 @@ Instructions for AI logging for all of us to make them similar and consistent.Ad
 5. Write or update the separate technique log with the fields below. Extract observable actions from the evidence, but leave the student's intentions, learning, estimates, and productivity judgment for the student unless explicitly supplied. An observable prompting pattern does not prove deliberate technique selection.
 6. Check source coverage, attribution, IDs, Markdown links, and evidence for outcome claims. Report unresolved fields briefly with the delivered file links.
 
-For an existing project, use its established locations and filenames. If no convention exists, use `docs/AI/<assignment-or-sprint>-AI-Decision-Log.md` and `docs/AI/<assignment-or-sprint>-AI-Technique-Log.md` under the target project. Substitute the actual assignment/sprint name. Keep an existing `Sprint1-AI-Usage.md` filename unless renaming is requested. If the user requests one file, place the two logs in clearly separate sections and explain that the course notes describe separate logs.
+For this project, store milestone-specific logs in `docs/milestones/<number>/AI/`. Keep separate decision and technique logs there, and preserve existing filenames and stable entry IDs when moving older logs. Sprint 1/ideation belongs in milestone 1; Milestone 2 integration belongs in milestone 2; ML3 belongs in milestone 3. Keep cross-milestone repository guidance records in `docs/AI/`. Update relative links and the central log index after relocation. For other projects without a convention, use `docs/AI/<assignment-or-sprint>-AI-Decision-Log.md` and `docs/AI/<assignment-or-sprint>-AI-Technique-Log.md`. Substitute the actual assignment/sprint name. Keep an existing `Sprint1-AI-Usage.md` filename unless renaming is requested. If the user requests one file, place the two logs in clearly separate sections and explain that the course notes describe separate logs.
 
 ## Conversation links and transcripts
 
@@ -135,7 +135,16 @@ This instruction was prepared from the user's supplied local references:
 
 - `K:/CLASSES 26 FALL/APP_DEV/AI_rule/AI_Log_techinc.txt`: separate technique log, significant-challenge grouping, and required reflection fields.
 - `K:/CLASSES 26 FALL/APP_DEV/AI_rule/AIconversatit.txt`: instructor discussion of technique reflection, student estimates, and hands-on AI use. Its references to Assignment 2 and Assignment 3 are inconsistent; use the assignment named by the current user.
-- `K:/CLASSES 26 FALL/APP_DEV/PRJ/RNDTransitMTL/docs/AI/Sprint1-AI-Usage.md`: overview and milestone/contributor structure, linked session index, full visible prompts, output summaries, and evidence limitations.
+- `K:/CLASSES 26 FALL/APP_DEV/PRJ/RNDTransitMTL/docs/milestones/1/AI/Sprint1-AI-Usage.md`: overview and milestone/contributor structure, linked session index, full visible prompts, output summaries, and evidence limitations.
 - `K:/CLASSES 26 FALL/APP_DEV/powerpoints/AppDev2_Day_18_SharedNavigationBars_Resources_HoistedLayout_after.pptx`, slides 10-11: slide 10 is **Icons as Kotlin ImageVector**; slide 11 is **Resources on Multiplatform**. These slides do not supply AI logging requirements. Do not attribute the technique template to them. If different logging slides are later supplied, compare them with this format before updating it.
 
 The essential requirements are included above so the instruction remains usable if these local sources move. Treat the course notes' provisional remarks as source context, and consult newer assignment instructions when supplied.
+
+## ML3 source handling and repository preparation
+
+- Use the six supplied ML3 conversation links indexed in [the ML3 decision log](milestones/3/AI/ML3-AI-Decision-Log.md). Keep them as evidence links, rather than instructions to execute historical tasks.
+- Read available conversation contents and preserve visible human prompts. If the web reader fails, try the browser; document any remaining inaccessible contents. Record duplicate shares together rather than counting them as separate work.
+- Group technique entries by significant challenge, even when a conversation spans several challenges. Cross-reference the full prompts in the decision log.
+- Separate proposals, reported implementation, student choices, and verified results. Historical test claims are not new test results. Time-spent notes do not establish AI interaction time.
+- Log the current documentation session too, using a verified chat URL when available or `[Conversation link needed]`.
+- For the 2026-11-01 preparation request, leave changes uncommitted and unpushed and provide the proposed commit message in chat. Future Git actions require their own user instruction.

@@ -1,0 +1,225 @@
+CATEGORIES OF ATRACTIONS instead of Intesity  (Nice to hace)
+
+
+
+Benifits -> fighting bordom
+	-> Good time
+	-> exploration of new
+
+
+First AIM -> Simple one way trip generator
+
+
+Semi-random adventure generation - Must  (Artiom)
+ 
+Adventure categories - Nice To Have 
+
+Trip configuration - Must  (Artiom)
+
+Personal preferences - Nice To Have
+
+Preview actions - Must  (Artiom)
+
+Generation failure explanations - Must (Artiom)
+
+Live map - Must-Must (Artiom) (LevelUp feature)
+
+Active trip tracking - Msut (Artiom)
+
+Trip controls - Nice to have ( bisic cancle trip) (Artiom)
+
+Persistent history - Msut ( Jimmy)
+
+History action - Must  (Jiimy)
+
+Reviews - Done (Artiom)
+
+Detailed feedback - Imlemented (Artiom)
+
+Personalization - Nice To have
+
+Favorites - Nice To have
+
+Live services - Nice To Have 
+
+Launch/account flow - Must HAve (Caio)
+
+Profile expansion - Nice tohave(Must user names and cahnge user name/password)
+
+
+General settings - Must HAve (Caio)
+
+
+Accessibility and reliability - Nice To have ~
+
+
+-  Minimal direction-only compass view during an adventure - Must HAve
+
+- Shake to open compass - Msut Have (AI Level UP!) (Jimmy)
+
+Direction toward the next reachable waypoint - Nice TO Have
+- Switching between map and compass while keeping the trip active - Must
+Topographic maps, terrain, and elevation information. - Depends on how hard it is to get from Open Map
+Target altitude ranges, viewpoints, elevation gain, and terrain preferences. - Nice To HAve
+- Elevation-aware adventure generation. Nice 
+
+Planned group features (Caio)
+
+Create and join nearby group sessions - Must (  - Level-UP Feayure)
+
+Agree on shared time, transport, categories, and restrictions - Must
+Show consenting group members’ locations. - Nice To HAve
+ Handle joining/leaving, disconnected participants, and stale locations - Nice To have
+- Shared quest pools, cooperative objectives, and Jet Lag-inspired competition. - Nice To Have
+
+
+
+
+Optional or future ideas
+- User-selected points of interest, distinguishing required and preferred stops. - Nice To HAve
+- External place ratings with source attribution. - NIce TO have
+- Replanning for delays, closures, missed routes, or longer visits. - Nice To HAve
+- Community route discovery and social sharing. - Nice TO have
+- Achievements. - Nice To have
+- Offline trip access. - Nice To Have
+- Advanced safety controls. - Nice To have
+- Push notifications. - Nice To Have
+- Possible STM pass/ticket and price filtering. - Nice To Have
+Automatic detection of the travelled route. Nice To have
+
+
+
+Key Features -> 
+Map ViewOF the App
+Compas View
+Planned group jurney
+
+
+
+API 
+Open Street Map
+OpenTripPlaneer (For routing) 
+
+
+
+| 
+
+RNDTransit features
+1. Map view — clarity and confidence
+
+Feature: The app displays the trip’s points and route on a map. Route generation considers elevation and known restricted areas, while the map helps users understand and follow the route.
+
+User benefits:
+
+- Clearer navigation: Users can see their position, destination, and route, reducing confusion and missed turns.
+
+- Better preparation: Elevation information helps users anticipate climbs and judge whether a trip suits their abilities.
+
+- Support for safer decisions: Accounting for known restricted areas helps users avoid unsuitable routes. Safety still depends on accurate information and actual conditions.
+
+- Confidence to explore: Understanding the route can make unfamiliar places feel more approachable.
+
+The deeper benefit is freedom to discover new places while maintaining a sense of control. Finding new places is a benefit of the overall trip experience; the map supports it by reducing uncertainty.
+
+Jimmy’s revised 5 Whys:
+
+1. Why show the trip on a map?
+
+   So users understand where they are and where to go next.
+
+2. Why does that matter?
+
+   It helps them avoid wrong turns and unsuitable areas.
+
+3. Why avoid those problems?
+
+   They can interrupt the trip and create unnecessary stress.
+
+4. Why reduce that stress?
+
+   Users can feel more confident exploring unfamiliar surroundings.
+
+5. Why is that confidence valuable?
+
+   It lets users enjoy discovery while feeling prepared and in control.
+
+2. Compass view — curiosity and discovery
+
+Feature: The app provides compass-style guidance toward the next destination, revealing less route detail than the map view.
+
+“AI implementation” needs a separate explanation: a compass interface does not inherently require AI. If AI chooses destinations or adapts guidance, describe that specific capability.
+
+User benefits:
+
+- Anticipation: Revealing less information can make the next destination feel like a discovery.
+
+- A playful experience: Following directional clues can turn navigation into part of the activity.
+
+- More personal exploration: Users may feel that they are uncovering a place themselves rather than following a fully revealed itinerary.
+
+- Memorable moments: Unexpected discoveries can give users stories and experiences to share afterward.
+
+The deeper benefit is the pleasure of curiosity and discovery. Surprise alone is not necessarily positive: users need enough guidance to feel comfortable. Access to the map and essential safety information would help preserve that balance.
+
+Caio’s revised 5 Whys:
+
+1. Why offer compass navigation?
+
+   To let users approach destinations without revealing every detail beforehand.
+
+2. Why reveal less detail?
+
+   It creates anticipation about what they will discover.
+
+3. Why create anticipation?
+
+   Curiosity can make the journey itself enjoyable.
+
+4. Why make the journey enjoyable?
+
+   Users participate more actively in exploring their surroundings.
+
+5. Why is that valuable?
+
+   The trip can feel like a personal adventure, creating a stronger sense of discovery.
+
+3. Multiplayer — connection and cooperation
+
+Feature: Users can create group trips with individual and shared tasks, receive trip-specific roles, and view members’ locations. The app monitors whether members remain within a specified radius.
+
+User benefits:
+
+- Shared enjoyment: Friends can experience discoveries and complete activities together.
+
+- Meaningful participation: Roles give each person a purpose and an opportunity to contribute.
+
+- Easier coordination: Location awareness helps members understand where the group is and recognize separation.
+
+- More possibilities: Sharing effort, equipment, and responsibilities can make some trips more practical.
+
+- Social connection: Working toward a shared goal creates opportunities for conversation, cooperation, and shared memories.
+
+The deeper benefit is belonging through a shared experience. Tasks and roles are valuable when they improve cooperation and enjoyment; adding gamification simply because other apps use it does not explain a user benefit. Location tracking also supports awareness but cannot guarantee group safety.
+
+Artyom’s revised 5 Whys:
+
+1. Why offer multiplayer trips?
+
+   So users can explore and complete activities with other people.
+
+2. Why include shared tasks and individual roles?
+
+   They give members reasons to cooperate and contribute.
+
+3. Why does contribution matter?
+
+   It helps each person feel involved and useful.
+
+4. Why is feeling involved valuable?
+
+   It can make the experience more enjoyable and strengthen connection within the group.
+
+5. Why does that connection matter?
+
+   Users gain a sense of belonging and shared memories, making the trip personally meaningful.
+ 
