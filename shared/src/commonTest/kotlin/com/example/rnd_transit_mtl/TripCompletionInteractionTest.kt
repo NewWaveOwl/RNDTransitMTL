@@ -1,5 +1,7 @@
 package com.example.rnd_transit_mtl
 
+import com.example.rnd_transit_mtl.model.ids.TripId
+import com.example.rnd_transit_mtl.model.ids.TransportId
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import com.example.rnd_transit_mtl.data.generation.MockTripGenerator
@@ -33,7 +35,7 @@ class TripCompletionInteractionTest {
         assertTrue(trip.start.normalizedDistanceTo(trip.destination) >=
             MockTripGenerator.MIN_NORMALIZED_SEPARATION)
         assertEquals(30, trip.plannedMinutes)
-        assertEquals(listOf("walk"), trip.selectedTransports.map { it.id })
+        assertEquals(listOf(TransportId("walk")), trip.selectedTransports.map { it.id })
     }
 
     @Test
@@ -121,7 +123,7 @@ class TripCompletionInteractionTest {
         assertEquals(trip, store.activeTrip)
 
         // A stale popup for another ID cannot dismiss the current popup.
-        navigation.dismissTripInformation("different-trip")
+        navigation.dismissTripInformation(TripId("different-trip"))
         assertEquals(trip.id, navigation.informationTripId)
         assertTrue(navigation.returnToPlanner())
         assertNull(navigation.informationTripId)
@@ -142,11 +144,11 @@ class TripCompletionInteractionTest {
                     description = "Random mock route with 30 planned minutes.",
                     imageUrl = "",
                     plannedMinutes = 30,
-                    selectedTransportIds = listOf("walk"),
+                    selectedTransportIds = listOf(TransportId("walk")),
                     selectedRouteIds = emptyList(),
                     attractionIntensity = 90f
                 ),
-                transportTypes = listOf(TransportType("walk", "Walk", false)),
+                transportTypes = listOf(TransportType(TransportId("walk"), "Walk", false)),
                 transportRoutes = emptyList(),
                 existingTripIds = emptySet()
             )

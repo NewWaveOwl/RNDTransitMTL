@@ -1,4 +1,5 @@
 package com.example.rnd_transit_mtl.View.main.previews
+import com.example.rnd_transit_mtl.model.ids.TripId
 
 import androidx.compose.runtime.*
 import androidx.compose.ui.tooling.preview.Preview
@@ -72,7 +73,7 @@ fun Permission33Preview() =
 @Composable
 private fun ActiveLocationSample(state: TripLocationState) {
     val trip = reviewedHistoryPreviewTrip.copy(
-        id = "sample-024",
+        id = TripId("sample-024"),
         plannedMinutes = 30,
         distanceKm = 2.6666667,
         completedAtEpochMillis = null,

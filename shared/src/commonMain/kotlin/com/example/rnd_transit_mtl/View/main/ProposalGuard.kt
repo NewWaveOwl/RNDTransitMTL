@@ -1,4 +1,5 @@
 package com.example.rnd_transit_mtl.View.main
+import com.example.rnd_transit_mtl.model.ids.TripId
 
 import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.state.trip.TripActionResult
@@ -25,7 +26,7 @@ enum class Trip33Sample {
  * @param initialProposalId Restored preview ID, or null when no valid preview exists.
  */
 internal class ProposalGuard(
-    initialProposalId: String? = null
+    initialProposalId: TripId? = null
 ) {
     private var revision = 0L
     private var waiting = false
@@ -47,7 +48,7 @@ internal class ProposalGuard(
      * @param token Request revision returned by begin.
      * @param acceptedProposalId Successful preview ID, or null for a failure.
      */
-    fun complete(token: Long, acceptedProposalId: String?): Boolean {
+    fun complete(token: Long, acceptedProposalId: TripId?): Boolean {
         if (!isCurrent(token) || !waiting) return false
 
         waiting = false
@@ -63,7 +64,7 @@ internal class ProposalGuard(
     }
 
     /** @param id Preview ID that must match the accepted result. */
-    fun canStart(id: String): Boolean =
+    fun canStart(id: TripId): Boolean =
         !waiting && proposalId == id
 
     /** Consumes an accepted preview through the store's existing active-trip guard.

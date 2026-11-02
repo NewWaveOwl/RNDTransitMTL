@@ -25,9 +25,9 @@ class TripScreensV3Test {
             RNDTransitTheme {
                 when (mode) {
                     0 -> CompleteV3(trip, { events += "review" }, { events += "skip" }, {}, {})
-                    1 -> ReviewV3(trip.title, trip.id.takeLast(3), rating, "", { rating = it }, {},
+                    1 -> ReviewV3(trip.title, trip.id.value.takeLast(3), rating, "", { rating = it }, {},
                         { events += "save" }, {}, {}, {}, feedbackEnabled = false)
-                    2 -> FeedbackV3(trip.id.takeLast(3), "Sample segment", "Preview fixture only", choice,
+                    2 -> FeedbackV3(trip.id.value.takeLast(3), "Sample segment", "Preview fixture only", choice,
                         "", { choice = it }, {}, { events += "feedback" }, {})
                     3 -> HistoryV3(listOf(HistoryRowV3(trip.id, trip.title, "30 min · Walk", "Completed", true)),
                         { events += "details" }, {}, {})

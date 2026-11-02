@@ -1,5 +1,7 @@
 package com.example.rnd_transit_mtl.ui
 
+import com.example.rnd_transit_mtl.model.ids.TripId
+import com.example.rnd_transit_mtl.model.ids.TransportId
 import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.model.trip.TripPoint
 import com.example.rnd_transit_mtl.model.review.TripReview
@@ -40,7 +42,7 @@ class HistoryPresentationTest {
 
         assertEquals(
             listOf("completed-later", "middle", "created-later"),
-            result.map { it.id }
+            result.map { it.id.value }
         )
     }
 
@@ -57,7 +59,7 @@ class HistoryPresentationTest {
             historyTrips(
                 listOf(skipped, reviewed),
                 TripHistoryFilter.REVIEWED
-            ).map { it.id }
+            ).map { it.id.value }
         )
 
         assertEquals(
@@ -65,7 +67,7 @@ class HistoryPresentationTest {
             historyTrips(
                 listOf(skipped, reviewed),
                 TripHistoryFilter.NOT_REVIEWED
-            ).map { it.id }
+            ).map { it.id.value }
         )
     }
 
@@ -144,7 +146,7 @@ class HistoryPresentationTest {
         completedAt: Long = 10_000L,
         review: TripReview? = null
     ): Trip = Trip(
-        id = id,
+        id = TripId(id),
         title = "History test",
         description = "Fixed record for History verification.",
         imageUrl = "https://example.com/reference.jpg",
@@ -153,7 +155,7 @@ class HistoryPresentationTest {
         plannedMinutes = 30,
         selectedTransports = listOf(
             TripTransportSnapshot(
-                id = "walking",
+                id = TransportId("walking"),
                 label = "Walking",
                 usesRoutes = false
             )

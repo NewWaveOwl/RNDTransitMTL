@@ -1,4 +1,6 @@
 package com.example.rnd_transit_mtl.View.main.previews
+import com.example.rnd_transit_mtl.model.ids.ZoneId
+import com.example.rnd_transit_mtl.model.ids.TransportId
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
@@ -30,11 +32,11 @@ private fun PlannerFlowExample(position: PlannerSheetPosition) {
         MainPlannerContent(
             minutes = 30, onMinutesChange = {},
             transportTypes = listOf(
-                TransportType("walk", "Walk", false), TransportType("bike", "Bike", false),
-                TransportType("bus", "Bus", true), TransportType("metro", "Metro", true),
-                TransportType("train", "Train", true), TransportType("rem", "REM", true)
+                TransportType(TransportId("walk"), "Walk", false), TransportType(TransportId("bike"), "Bike", false),
+                TransportType(TransportId("bus"), "Bus", true), TransportType(TransportId("metro"), "Metro", true),
+                TransportType(TransportId("train"), "Train", true), TransportType(TransportId("rem"), "REM", true)
             ),
-            selectedTransportIds = listOf("walk", "bus"), selectedZonesByTransport = mapOf("bus" to listOf("A")),
+            selectedTransportIds = listOf(TransportId("walk"), TransportId("bus")), selectedZonesByTransport = mapOf(TransportId("bus") to listOf(ZoneId("A"))),
             onToggleTransport = {}, onToggleZone = { _, _ -> },
             walkingPreference = "Amble", selectedAttractionIds = listOf("Nature", "Surprise"),
             bikeSpeedKmh = 18, onBikeSpeedChange = {},

@@ -1,5 +1,9 @@
 package com.example.rnd_transit_mtl.data.generation
 
+import com.example.rnd_transit_mtl.model.ids.ZoneId
+import com.example.rnd_transit_mtl.model.ids.RouteId
+import com.example.rnd_transit_mtl.model.ids.TransportId
+import com.example.rnd_transit_mtl.model.ids.TripId
 import com.example.rnd_transit_mtl.model.transport.TransportRoute
 import com.example.rnd_transit_mtl.model.transport.TransportType
 import com.example.rnd_transit_mtl.model.trip.Trip
@@ -25,11 +29,11 @@ data class TripGenerationInput(
     val description: String,
     val imageUrl: String,
     val plannedMinutes: Int,
-    val selectedTransportIds: List<String>,
-    val selectedRouteIds: List<String>,
+    val selectedTransportIds: List<TransportId>,
+    val selectedRouteIds: List<RouteId>,
     val attractionIntensity: Float,
-    val selectedZoneIds: List<String> = emptyList(),
-    val selectedZonesByTransport: Map<String, List<String>> = emptyMap(),
+    val selectedZoneIds: List<ZoneId> = emptyList(),
+    val selectedZonesByTransport: Map<TransportId, List<ZoneId>> = emptyMap(),
     val origin: TripPoint? = null
 )
 
@@ -88,7 +92,7 @@ class MockTripGenerator(
         input: TripGenerationInput,
         transportTypes: List<TransportType>,
         transportRoutes: List<TransportRoute>,
-        existingTripIds: Set<String>,
+        existingTripIds: Set<TripId>,
         bounds: TripGenerationBounds = TripGenerationBounds()
     ): TripGenerationResult {
         val normalizedInput = input.copy(
@@ -112,7 +116,7 @@ class MockTripGenerator(
 
             require(
                 normalizedInput.selectedZoneIds.all {
-                    it in setOf("A", "B", "C", "D")
+                    it.value in setOf("A", "B", "C", "D")
                 }
             ) {
                 "A selected transit zone is unavailable."
@@ -275,14 +279,14 @@ class MockTripGenerator(
         return transports to routes
     }
 
-    private fun findUnusedId(existingTripIds: Set<String>): String? {
+    private fun findUnusedId(existingTripIds: Set<TripId>): TripId? {
         repeat(MAX_ID_ATTEMPTS) {
             val candidate = idFactory()
             if (candidate.isNotBlank() &&
                 candidate == candidate.trim() &&
-                candidate !in existingTripIds
+                TripId(candidate) !in existingTripIds
             ) {
-                return candidate
+                return TripId(candidate)
             }
         }
         return null

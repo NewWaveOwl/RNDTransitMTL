@@ -1,4 +1,7 @@
 package com.example.rnd_transit_mtl.View.current_trip.previews
+import com.example.rnd_transit_mtl.model.ids.RouteId
+import com.example.rnd_transit_mtl.model.ids.TransportId
+import com.example.rnd_transit_mtl.model.ids.TripId
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
@@ -10,7 +13,7 @@ import com.example.rnd_transit_mtl.View.current_trip.CurrentTripContent
 import com.example.rnd_transit_mtl.ui.theme.RNDTransitTheme
 
 private val currentTripPreviewRecord = Trip(
-    id = "current-trip-static-preview",
+    id = TripId("current-trip-static-preview"),
     title = "Current trip 1",
     description = "A relaxed afternoon exploring the mock transit route.",
     imageUrl = "",
@@ -27,20 +30,20 @@ private val currentTripPreviewRecord = Trip(
     plannedMinutes = 30,
     selectedTransports = listOf(
         TripTransportSnapshot(
-            id = "preview-walk",
+            id = TransportId("preview-walk"),
             label = "Walking",
             usesRoutes = false
         ),
         TripTransportSnapshot(
-            id = "preview-bus",
+            id = TransportId("preview-bus"),
             label = "Bus",
             usesRoutes = true
         )
     ),
     selectedRoutes = listOf(
         TripRouteSnapshot(
-            id = "preview-route",
-            transportTypeId = "preview-bus",
+            id = RouteId("preview-route"),
+            transportTypeId = TransportId("preview-bus"),
             label = "Preview route"
         )
     ),

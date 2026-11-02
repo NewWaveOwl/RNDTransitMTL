@@ -1,5 +1,6 @@
 package com.example.rnd_transit_mtl.state.trip
 
+import com.example.rnd_transit_mtl.model.ids.TripId
 import com.example.rnd_transit_mtl.model.trip.Trip
 import kotlinx.serialization.Serializable
 import com.example.rnd_transit_mtl.state.review.ReviewDraft
@@ -53,8 +54,8 @@ data class TripsState(
     val schemaVersion: Int = CURRENT_SCHEMA_VERSION,
     val activeTrip: ActiveTripState? = null,
     val completedTrips: List<Trip> = emptyList(),
-    val pendingReviewTripId: String? = null,
-    val reviewDrafts: Map<String, ReviewDraft> = emptyMap()
+    val pendingReviewTripId: TripId? = null,
+    val reviewDrafts: Map<TripId, ReviewDraft> = emptyMap()
 ) {
     init {
         require(schemaVersion == CURRENT_SCHEMA_VERSION) {

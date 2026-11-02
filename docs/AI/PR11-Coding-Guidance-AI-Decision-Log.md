@@ -12,7 +12,7 @@ This record documents the 2026-10-18 update to PR [11](https://github.com/NewWav
 
 **Source:** Current conversation; [Conversation link needed]. No public conversation share was created.
 **AI tool/model:** Codex desktop; exact model version [Not documented]. No subagents were used.
-**Task/context:** Existing PR 11 adds `docs/AI_HowToWriteCode.md`. The user requested new slide-derived practices and a TravelTracker-style agent setup using the installed AI-log skill.
+**Task/context:** Existing PR 11 adds `../HowToWriteCode_InTheProject.md`. The user requested new slide-derived practices and a TravelTracker-style agent setup using the installed AI-log skill.
 **Attachments supplied as local file references:**
 
 - `AppDev2_Day_20and21_ViewModels_rev4.pptx`: 54 slides.

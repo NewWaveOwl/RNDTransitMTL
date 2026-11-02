@@ -1,4 +1,5 @@
 package com.example.rnd_transit_mtl.layout.previews
+import com.example.rnd_transit_mtl.model.ids.TripId
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
@@ -52,7 +53,7 @@ fun NavigationDetailsHeaderPreview() {
 @Composable
 fun NavigationResumeHeaderPreview() {
     val activeTrip = reviewedHistoryPreviewTrip.copy(
-        id = "preview-active-trip",
+        id = TripId("preview-active-trip"),
         completedAtEpochMillis = null,
         review = null
     )

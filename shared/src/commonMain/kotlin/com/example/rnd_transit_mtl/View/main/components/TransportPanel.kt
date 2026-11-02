@@ -1,4 +1,6 @@
 package com.example.rnd_transit_mtl.View.main.components
+import com.example.rnd_transit_mtl.model.ids.RouteId
+import com.example.rnd_transit_mtl.model.ids.TransportId
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
@@ -54,12 +56,12 @@ internal fun TransportPanel(
     layoutScale: Float = 1f,
     transportTypes: List<TransportType>,
     transportRoutes: List<TransportRoute>,
-    selectedTransportIds: List<String>,
-    selectedRouteIds: List<String>,
-    expandedTransportId: String?,
-    onExpandedTransportChange: (String) -> Unit,
-    onToggleTransport: (String) -> Unit,
-    onToggleRoute: (String, String) -> Unit,
+    selectedTransportIds: List<TransportId>,
+    selectedRouteIds: List<RouteId>,
+    expandedTransportId: TransportId?,
+    onExpandedTransportChange: (TransportId) -> Unit,
+    onToggleTransport: (TransportId) -> Unit,
+    onToggleRoute: (TransportId, RouteId) -> Unit,
     modifier: Modifier = Modifier
 ) {
     /** Group routes by transport ID and reuse the result until the route list changes. */
@@ -92,7 +94,7 @@ internal fun TransportPanel(
                         .map { it.label }
                     TransportChoice(
                         layoutScale = layoutScale,
-                        title = if (transport.id == "walk") "Walk" else transport.label,
+                        title = if (transport.id == TransportId("walk")) "Walk" else transport.label,
                         isRouteTransport = transport.usesRoutes,
                         selected = transport.id in selectedTransportIds,
                         selectedRoutes = selectedRouteLabels,

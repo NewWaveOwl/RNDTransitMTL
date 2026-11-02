@@ -1,5 +1,6 @@
 package com.example.rnd_transit_mtl
 
+import com.example.rnd_transit_mtl.model.ids.TripId
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import com.example.rnd_transit_mtl.View.history.previews.reviewedHistoryPreviewTrip
@@ -20,7 +21,7 @@ class PlannerCopyTest {
         val stack = NavBackStack<NavKey>(TripDetailsScreenKey(trip.id))
         val navigator = Navigator(stack)
         val navigation = TripNavigation(navigator, store)
-        assertFalse(navigation.openPlannerCopy("missing", true))
+        assertFalse(navigation.openPlannerCopy(TripId("missing"), true))
         assertTrue(navigation.openPlannerCopy(trip.id, true))
         assertEquals(MainScreenKey, navigator.current)
         assertEquals(trip.id to true, navigation.plannerCopyRequest)

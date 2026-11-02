@@ -1,5 +1,7 @@
 package com.example.rnd_transit_mtl.simulation
 
+import com.example.rnd_transit_mtl.model.ids.TransportId
+import com.example.rnd_transit_mtl.model.ids.TripId
 import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.model.trip.TripPoint
 import com.example.rnd_transit_mtl.model.trip.TripTransportSnapshot
@@ -177,7 +179,7 @@ class ActiveTripSimulationTest {
     }
 
     private fun sampleTrip(): Trip = Trip(
-        id = "simulation-test-trip",
+        id = TripId("simulation-test-trip"),
         title = "Simulation test",
         description = "A fixed trip for timing verification.",
         imageUrl = "https://example.com/reference.jpg",
@@ -186,7 +188,7 @@ class ActiveTripSimulationTest {
         plannedMinutes = 30,
         selectedTransports = listOf(
             TripTransportSnapshot(
-                id = "walking",
+                id = TransportId("walking"),
                 label = "Walking",
                 usesRoutes = false
             )

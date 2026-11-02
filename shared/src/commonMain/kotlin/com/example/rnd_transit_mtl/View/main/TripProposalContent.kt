@@ -231,7 +231,7 @@ internal fun TripProposalContent(
                 color = TransitWhite
             ) {
                 Text(
-                    text = "Sample trip · #${trip.id.takeLast(3)}",
+                    text = "Sample trip · #${trip.id.value.takeLast(3)}",
                     color = TransitMain,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,

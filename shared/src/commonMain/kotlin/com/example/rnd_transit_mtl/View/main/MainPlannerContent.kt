@@ -1,5 +1,8 @@
 package com.example.rnd_transit_mtl.View.main
 
+import com.example.rnd_transit_mtl.state.NullableTransportIdSaver
+import com.example.rnd_transit_mtl.model.ids.ZoneId
+import com.example.rnd_transit_mtl.model.ids.TransportId
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -131,10 +134,10 @@ internal fun MainPlannerContent(
     minutes: Int,
     onMinutesChange: (Int) -> Unit,
     transportTypes: List<TransportType>,
-    selectedTransportIds: List<String>,
-    selectedZonesByTransport: Map<String, List<String>>,
-    onToggleTransport: (String) -> Unit,
-    onToggleZone: (String, String) -> Unit,
+    selectedTransportIds: List<TransportId>,
+    selectedZonesByTransport: Map<TransportId, List<ZoneId>>,
+    onToggleTransport: (TransportId) -> Unit,
+    onToggleZone: (TransportId, ZoneId) -> Unit,
     walkingPreference: String,
     bikeSpeedKmh: Int,
     onBikeSpeedChange: (Int) -> Unit,
@@ -158,7 +161,7 @@ internal fun MainPlannerContent(
     onEditOrigin: () -> Unit = {}
 ) {
     // Expansion is presentation state, separate from transport and zone selections.
-    var expandedTransportId by rememberSaveable { mutableStateOf<String?>(null) }
+    var expandedTransportId by rememberSaveable(stateSaver = NullableTransportIdSaver) { mutableStateOf<TransportId?>(null) }
     var recenterRequest by rememberSaveable {
         mutableStateOf(0)
     }

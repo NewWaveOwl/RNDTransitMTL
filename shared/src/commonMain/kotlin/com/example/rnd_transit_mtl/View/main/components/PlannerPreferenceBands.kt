@@ -1,4 +1,6 @@
 package com.example.rnd_transit_mtl.View.main.components
+import com.example.rnd_transit_mtl.model.ids.ZoneId
+import com.example.rnd_transit_mtl.model.ids.TransportId
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -84,18 +86,18 @@ private val PreferenceDropdownEasing = FastOutSlowInEasing
 internal fun LazyListScope.PlannerPreferenceBands(
     scale: Float,
     transportTypes: List<TransportType>,
-    selectedTransportIds: List<String>,
-    selectedZonesByTransport: Map<String, List<String>>,
-    onToggleTransport: (String) -> Unit,
-    onToggleZone: (String, String) -> Unit,
+    selectedTransportIds: List<TransportId>,
+    selectedZonesByTransport: Map<TransportId, List<ZoneId>>,
+    onToggleTransport: (TransportId) -> Unit,
+    onToggleZone: (TransportId, ZoneId) -> Unit,
     walkingPreference: String,
     selectedAttractionIds: List<String>,
     onWalkingPreferenceChange: (String) -> Unit,
     onToggleAttraction: (String) -> Unit,
     enabled: Boolean,
     onOpenDetailedSettings: () -> Unit,
-    expandedTransportId: String?,
-    onExpandedTransportChange: (String) -> Unit,
+    expandedTransportId: TransportId?,
+    onExpandedTransportChange: (TransportId) -> Unit,
     bikeSpeedKmh: Int,
     onBikeSpeedChange: (Int) -> Unit,
 ) {
@@ -106,15 +108,15 @@ internal fun LazyListScope.PlannerPreferenceBands(
                 Text("Types of transport", color = TransitWhite, fontSize = 20.sp * scale,
                     lineHeight = 28.sp * scale, fontWeight = FontWeight.Bold)
                 val order = listOf("walk", "bike", "bus", "metro", "train", "rem")
-                val ordered = transportTypes.sortedBy { order.indexOf(it.id).takeIf { index -> index >= 0 } ?: Int.MAX_VALUE }
+                val ordered = transportTypes.sortedBy { order.indexOf(it.id.value).takeIf { index -> index >= 0 } ?: Int.MAX_VALUE }
                 ordered.chunked(TransportGridColumnCount).forEach { row ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(PreferenceChoiceSpacing * scale)) {
                         row.forEach { transport ->
                             val selected = transport.id in selectedTransportIds
-                            val title = if (transport.id == "walk") "Walk" else transport.label
+                            val title = if (transport.id == TransportId("walk")) "Walk" else transport.label
                             val selectedZoneIds = selectedZonesByTransport[transport.id].orEmpty()
                             val zones = if (selected && transport.usesRoutes && selectedZoneIds.isNotEmpty())
-                                " " + selectedZoneIds.sorted().joinToString(", ") else ""
+                                " " + selectedZoneIds.sortedBy { it.value }.joinToString(", ") else ""
                             Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                                 PlannerChoice(title + zones, selected, enabled, {
                                     if (transport.usesRoutes) onExpandedTransportChange(transport.id)
@@ -139,14 +141,14 @@ internal fun LazyListScope.PlannerPreferenceBands(
     }
     // Keep the lazy item mounted until the closing animation has finished.
     item(key = "bike") {
-        AnimatedVisibility(visible = "bike" in selectedTransportIds,
+        AnimatedVisibility(visible = TransportId("bike") in selectedTransportIds,
             enter = preferenceDropdownEnter(), exit = preferenceDropdownExit()) {
-            BikeSpeedPanel(bikeSpeedKmh, onBikeSpeedChange, scale, enabled && "bike" in selectedTransportIds)
+            BikeSpeedPanel(bikeSpeedKmh, onBikeSpeedChange, scale, enabled && TransportId("bike") in selectedTransportIds)
         }
     }
     item(key = "walking") {
         AnimatedVisibility(
-            visible = "walk" in selectedTransportIds,
+            visible = TransportId("walk") in selectedTransportIds,
             enter = preferenceDropdownEnter(),
             exit = preferenceDropdownExit()
         ) {
@@ -157,7 +159,7 @@ internal fun LazyListScope.PlannerPreferenceBands(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(PreferenceChoiceSpacing * scale)) {
                     MainPlannerViewModel.walkingPreferences.forEach { preference ->
                         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                            PlannerChoice(preference, preference == walkingPreference, enabled && "walk" in selectedTransportIds,
+                            PlannerChoice(preference, preference == walkingPreference, enabled && TransportId("walk") in selectedTransportIds,
                                 { onWalkingPreferenceChange(preference) }, scale, Modifier.fillMaxWidth(WalkingButtonWidthFraction), Role.RadioButton)
                         }
                     }
@@ -213,14 +215,14 @@ private fun preferenceDropdownExit() = shrinkVertically(
 @Composable
 private fun TransitZoneDropdown(
     transportTypes: List<TransportType>,
-    requestedTransportId: String?,
-    selectedZonesByTransport: Map<String, List<String>>,
-    onToggleZone: (String, String) -> Unit,
+    requestedTransportId: TransportId?,
+    selectedZonesByTransport: Map<TransportId, List<ZoneId>>,
+    onToggleZone: (TransportId, ZoneId) -> Unit,
     scale: Float,
     enabled: Boolean
 ) {
     val requestedMode = transportTypes.firstOrNull { it.usesRoutes && it.id == requestedTransportId }
-    var displayedTransportId by remember { mutableStateOf<String?>(null) }
+    var displayedTransportId by remember { mutableStateOf<TransportId?>(null) }
     val visibility = remember { MutableTransitionState(false) }
 
     LaunchedEffect(requestedMode?.id) {
@@ -285,9 +287,9 @@ private fun BandTitle(title: String, color: Color, scale: Float) {
  * @param label Converts an identifier to its visible label.
  */
 @Composable
-private fun ChoiceGrid(ids: List<String>, selected: List<String>, enabled: Boolean,
-    onToggle: (String) -> Unit, scale: Float,
-    buttonWidthFraction: Float = AttractionButtonWidthFraction, label: (String) -> String = { it }) {
+private fun <T> ChoiceGrid(ids: List<T>, selected: List<T>, enabled: Boolean,
+    onToggle: (T) -> Unit, scale: Float,
+    buttonWidthFraction: Float = AttractionButtonWidthFraction, label: (T) -> String = { it.toString() }) {
     ids.chunked(PreferenceGridColumnCount).forEach { row ->
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(PreferenceChoiceSpacing * scale)) {
             row.forEach { id ->

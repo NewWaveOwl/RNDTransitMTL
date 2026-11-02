@@ -1,5 +1,6 @@
 package com.example.rnd_transit_mtl.View.current_trip
 
+import com.example.rnd_transit_mtl.model.ids.TripId
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -60,7 +61,7 @@ import com.example.rnd_transit_mtl.ui.global_ui_ellements.trip.CompleteV3
 fun CurrentTripScreen(
     trip: Trip,
     isDestinationActive: Boolean,
-    onReviewRequested: (tripId: String) -> Boolean,
+    onReviewRequested: (tripId: TripId) -> Boolean,
     onLeave: () -> Unit,
     onReturnToPlanner: () -> Unit,
     modifier: Modifier = Modifier

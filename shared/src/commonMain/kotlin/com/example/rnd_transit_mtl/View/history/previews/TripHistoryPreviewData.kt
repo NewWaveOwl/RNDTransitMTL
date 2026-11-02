@@ -1,4 +1,7 @@
 package com.example.rnd_transit_mtl.View.history.previews
+import com.example.rnd_transit_mtl.model.ids.RouteId
+import com.example.rnd_transit_mtl.model.ids.TransportId
+import com.example.rnd_transit_mtl.model.ids.TripId
 
 import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.model.trip.TripPoint
@@ -14,7 +17,7 @@ private val previewCreatedAt =
     Instant.parse("2026-10-04T14:00:00Z").toEpochMilliseconds()
 
 internal val reviewedHistoryPreviewTrip = Trip(
-    id = "preview-sunday-discovery",
+    id = TripId("preview-sunday-discovery"),
     title = "Sunday discovery walk",
     description = "A relaxed trip combining a short bus ride " +
         "with a walk between two points on the bundled mock map.",
@@ -24,20 +27,20 @@ internal val reviewedHistoryPreviewTrip = Trip(
     plannedMinutes = 30,
     selectedTransports = listOf(
         TripTransportSnapshot(
-            id = "preview-walking",
+            id = TransportId("preview-walking"),
             label = "Walking",
             usesRoutes = false
         ),
         TripTransportSnapshot(
-            id = "preview-bus",
+            id = TransportId("preview-bus"),
             label = "Bus",
             usesRoutes = true
         )
     ),
     selectedRoutes = listOf(
         TripRouteSnapshot(
-            id = "preview-bus-route",
-            transportTypeId = "preview-bus",
+            id = RouteId("preview-bus-route"),
+            transportTypeId = TransportId("preview-bus"),
             label = "Demo route 24"
         )
     ),
@@ -58,7 +61,7 @@ internal val reviewedHistoryPreviewTrip = Trip(
 
 internal val unreviewedHistoryPreviewTrip =
     reviewedHistoryPreviewTrip.copy(
-        id = "preview-morning-trip",
+        id = TripId("preview-morning-trip"),
         title = "Morning transit trip",
         description = "A completed mock trip whose review was skipped.",
         imageUrl = "https://example.com/morning-reference.jpg",
@@ -73,7 +76,7 @@ internal val unreviewedHistoryPreviewTrip =
 
 internal val partialReviewHistoryPreviewTrip =
     reviewedHistoryPreviewTrip.copy(
-        id = "preview-afternoon-loop",
+        id = TripId("preview-afternoon-loop"),
         title = "Afternoon discovery",
         description = "A completed trip with optional categories left unrated.",
         imageUrl = "https://example.com/afternoon-reference.jpg",

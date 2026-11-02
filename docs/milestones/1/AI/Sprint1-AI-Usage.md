@@ -443,7 +443,7 @@ According to all PowerPoints, create a document for AI to how to write Kotlin/Co
 Reply should be in chat text as full doc
 ~~~~
 
-**AI output summary:** The shared page reports that `AI_HowToWriteCode.md` was saved and shows edited files supporting slide extraction and review.
+**AI output summary:** The shared page reports that `HowToWriteCode_InTheProject.md` was saved and shows edited files supporting slide extraction and review.
 
 **How the output was used / evidence:** AI was used to produce a coding-practice document for technical learning and future implementation. The public snapshot shows the request and completion statement but does not display the full guide body, so this log does not invent its contents or claim that all examples were validated. The prompt's reference is [Android's Now in Android repository](https://github.com/android/nowinandroid).
 
