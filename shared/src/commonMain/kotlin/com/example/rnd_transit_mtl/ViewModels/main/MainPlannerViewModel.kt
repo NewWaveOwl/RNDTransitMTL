@@ -1,4 +1,5 @@
 package com.example.rnd_transit_mtl.ViewModels.main
+import com.example.rnd_transit_mtl.data.assets.toSampleMapPoint
 import com.example.rnd_transit_mtl.model.ids.ZoneId
 import com.example.rnd_transit_mtl.model.ids.TransportId
 
@@ -97,7 +98,7 @@ class MainPlannerViewModel(
                         entry.value.toList()
                     },
                 intensity = trip.attractionIntensity,
-                origin = trip.start.copy(),
+                origin = trip.origin.toSampleMapPoint(),
                 originIsManual = true
             )
         }

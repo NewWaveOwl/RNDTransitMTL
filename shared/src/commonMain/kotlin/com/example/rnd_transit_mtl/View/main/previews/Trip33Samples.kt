@@ -9,6 +9,7 @@ import com.example.rnd_transit_mtl.View.main.*
 import com.example.rnd_transit_mtl.layout.previews.NavigationPreviewHost
 import com.example.rnd_transit_mtl.model.trip.TripPoint
 import com.example.rnd_transit_mtl.navigation.MainScreenKey
+import com.example.rnd_transit_mtl.model.trip.TripStatus
 
 /** Interactive failure fixture without provider calls or trip activation.
  * @param failure Explicit outcome being demonstrated.
@@ -74,9 +75,9 @@ fun Permission33Preview() =
 private fun ActiveLocationSample(state: TripLocationState) {
     val trip = reviewedHistoryPreviewTrip.copy(
         id = TripId("sample-024"),
+        status = TripStatus.Active,
         plannedMinutes = 30,
-        distanceKm = 2.6666667,
-        completedAtEpochMillis = null,
+        completedAt = null,
         review = null
     )
     var progress by remember { mutableStateOf(0.4f) }
@@ -91,8 +92,8 @@ private fun ActiveLocationSample(state: TripLocationState) {
                 progress = 1f
                 message = "Sample completed."
             },
-            onConfirmCancel = {
-                message = "Sample cancelled. No real trip was changed."
+            onConfirmCancel = { keepInHistory ->
+                message = "Sample cancelled (save to History: $keepInHistory). No real trip was changed."
             },
             instruction = ActiveMapInstruction(
                 "Turn left in 120 m",

@@ -9,23 +9,25 @@ import com.example.rnd_transit_mtl.model.trip.TripTransportSnapshot
 import com.example.rnd_transit_mtl.state.trip.TripActionResult
 import com.example.rnd_transit_mtl.state.trip.TripsStore
 import kotlin.test.*
+import com.example.rnd_transit_mtl.model.trip.TripStatus
 
 class ProposalGuardTest {
     private fun trip(id: String) = Trip(
         id = TripId(id),
+        status = TripStatus.Generated,
         title = "Sample trip",
         description = "Test fixture",
         imageUrl = "",
-        start = TripPoint("Start", 0.4f, 0.3f),
-        destination = TripPoint("Destination", 0.6f, 0.5f),
+        origin = testOrigin,
+        destination = testDestination,
+        legs = testLegs(TransportId("walk")),
         plannedMinutes = 30,
         selectedTransports = listOf(
             TripTransportSnapshot(TransportId("walk"), "Walk", false)
         ),
         selectedRoutes = emptyList(),
         attractionIntensity = 50f,
-        distanceKm = 2.4,
-        createdAtEpochMillis = 1_000L
+        createdAt = 1_000L
     )
 
     @Test

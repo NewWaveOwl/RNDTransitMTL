@@ -1,5 +1,6 @@
 package com.example.rnd_transit_mtl.View.current_trip
 
+import com.example.rnd_transit_mtl.data.assets.toSampleMapPoint
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -77,7 +78,7 @@ enum class TripLocationState {
  * @param progress Estimated fraction from 0 to 1; invalid values display as zero.
  * @param actionsEnabled Whether lifecycle and navigation permit interaction.
  * @param onFinish Finishes the demo early, or requests review after completion.
- * @param onConfirmCancel Cancels only after confirmation.
+ * @param onConfirmCancel Cancels only after confirmation; true when the user chose to save the trip to History.
  * @param modifier Parent layout constraints.
  * @param instruction Real routing instructions, or null for mock routes.
  * @param staleMessage Real location warning, or null when unavailable.
@@ -94,7 +95,7 @@ fun ActiveMapContent(
     progress: Float,
     actionsEnabled: Boolean,
     onFinish: () -> Unit,
-    onConfirmCancel: () -> Unit,
+    onConfirmCancel: (keepInHistory: Boolean) -> Unit,
     modifier: Modifier = Modifier,
     instruction: ActiveMapInstruction? = null,
     staleMessage: String? = null,
@@ -149,8 +150,8 @@ fun ActiveMapContent(
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxWidth().weight(1f)) {
                 MockTripMap(
-                    start = trip.start,
-                    destination = trip.destination,
+                    start = trip.origin.toSampleMapPoint(),
+                    destination = trip.destination.toSampleMapPoint(),
                     progress = retainedMapProgress,
                     interactive = actionsEnabled && !confirmingCancel && !confirmingFinish,
                     matchPlannerBackground = true,
@@ -383,18 +384,28 @@ fun ActiveMapContent(
                 )
 
                 Text(
-                    "This ends trip #$reference. " +
-                        "Your planner choices will stay saved.",
+                    "This ends trip #$reference. Do you want to save it " +
+                        "to your History? Your planner choices stay saved either way.",
                     color = TransitComplementary,
                     fontSize = 16.sp
                 )
 
                 TripActionButton(
-                    label = "Yes, cancel trip",
+                    label = "Cancel and save to History",
                     enabled = actionsEnabled,
                     onClick = {
                         confirmingCancel = false
-                        onConfirmCancel()
+                        onConfirmCancel(true)
+                    }
+                )
+
+                TripActionButton(
+                    label = "Cancel without saving",
+                    enabled = actionsEnabled,
+                    secondary = true,
+                    onClick = {
+                        confirmingCancel = false
+                        onConfirmCancel(false)
                     }
                 )
 

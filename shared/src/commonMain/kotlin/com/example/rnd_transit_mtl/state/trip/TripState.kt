@@ -2,6 +2,7 @@ package com.example.rnd_transit_mtl.state.trip
 
 import com.example.rnd_transit_mtl.model.ids.TripId
 import com.example.rnd_transit_mtl.model.trip.Trip
+import com.example.rnd_transit_mtl.model.trip.TripStatus
 import kotlinx.serialization.Serializable
 import com.example.rnd_transit_mtl.state.review.ReviewDraft
 
@@ -25,8 +26,8 @@ data class ActiveTripState(
     val elapsedMillis: Long = 0L
 ) {
     init {
-        require(trip.completedAtEpochMillis == null) {
-            "An active trip must not already be completed."
+        require(trip.status == TripStatus.Active) {
+            "An active trip must have the Active status."
         }
         require(trip.review == null) {
             "An active trip must not have a saved review."
@@ -47,6 +48,9 @@ data class ActiveTripState(
  * navigation has not yet acknowledged. A new trip cannot start until
  * that request has been handled, preventing it from being overwritten.
  *
+ * cancelledTrips holds cancelled trips the user chose to keep in History.
+ * They cannot be reviewed, so drafts and pending reviews never reference them.
+ *
  * reviewDrafts holds unsaved feedback, not additional Trip records.
  */
 @Serializable
@@ -54,6 +58,7 @@ data class TripsState(
     val schemaVersion: Int = CURRENT_SCHEMA_VERSION,
     val activeTrip: ActiveTripState? = null,
     val completedTrips: List<Trip> = emptyList(),
+    val cancelledTrips: List<Trip> = emptyList(),
     val pendingReviewTripId: TripId? = null,
     val reviewDrafts: Map<TripId, ReviewDraft> = emptyMap()
 ) {
@@ -68,7 +73,7 @@ data class TripsState(
             "Completed trip IDs must be unique."
         }
         require(completedTrips.all {
-            it.completedAtEpochMillis != null
+            it.status == TripStatus.Completed
         }) {
             "Completed collection must contain only completed trips."
         }
@@ -77,6 +82,17 @@ data class TripsState(
                     activeTrip.trip.id !in completedIds
         ) {
             "A trip cannot be active and completed simultaneously."
+        }
+
+        val cancelledIds = cancelledTrips.map { it.id }
+        require(cancelledIds.distinct().size == cancelledIds.size) {
+            "Cancelled trip IDs must be unique."
+        }
+        require(cancelledTrips.all { it.status == TripStatus.Cancelled }) {
+            "Cancelled collection must contain only cancelled trips."
+        }
+        require(cancelledIds.none { it in completedIds || it == activeTrip?.trip?.id }) {
+            "A cancelled trip cannot also be active or completed."
         }
         require(
             pendingReviewTripId == null ||
@@ -96,6 +112,7 @@ data class TripsState(
     }
 
     companion object {
-        const val CURRENT_SCHEMA_VERSION: Int = 1
+        /** 2: trips store places, legs, status and owner instead of map points and a demo distance. */
+        const val CURRENT_SCHEMA_VERSION: Int = 2
     }
 }

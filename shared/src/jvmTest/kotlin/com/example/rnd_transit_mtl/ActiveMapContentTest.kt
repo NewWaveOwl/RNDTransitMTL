@@ -131,4 +131,50 @@ class ActiveMapContentTest {
             assertEquals(listOf("finish", "review", "resume", "edit", "retry", "retry", "edit"), events)
         } finally { scene.close() }
     }
+
+    @OptIn(ExperimentalComposeUiApi::class)
+    @Test
+    fun cancelPopupAsksWhetherToSaveTheTrip() {
+        val choices = mutableListOf<Boolean>()
+        val scene = ImageComposeScene(412, 720) {
+            RNDTransitTheme {
+                ActiveMapContent(reviewedHistoryPreviewTrip, 0.4f, true, {}, { keepInHistory -> choices += keepInHistory })
+            }
+        }
+        var time = 0L
+        fun render(name: String? = null) {
+            repeat(16) { time += 16_000_000; scene.render(time).close() }
+            if (name != null) scene.render(time).use { image ->
+                val folder = File("build/planner-previews").apply { mkdirs() }
+                image.encodeToData()!!.use { File(folder, name).writeBytes(it.bytes) }
+            }
+        }
+        fun all(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::all)
+        fun node(label: String) = scene.semanticsOwners.flatMap { all(it.rootSemanticsNode) }.firstOrNull {
+            it.config.getOrNull(SemanticsProperties.Text)?.any { text -> text.text == label } == true
+        }
+        fun click(label: String) {
+            val point = assertNotNull(node(label), "Missing \"$label\"").boundsInRoot.center
+            scene.sendPointerEvent(PointerEventType.Press, point, timeMillis = time / 1_000_000)
+            scene.sendPointerEvent(PointerEventType.Release, point, timeMillis = time / 1_000_000 + 1)
+            render()
+        }
+        try {
+            render()
+            click("Cancel")
+            render("Cancel-confirmation.png")
+            assertNotNull(node("Cancel this adventure?"))
+            click("Cancel and save to History")
+            assertNull(node("Cancel this adventure?"))
+
+            click("Cancel")
+            click("Cancel without saving")
+
+            click("Cancel")
+            click("Keep travelling")
+            assertNull(node("Cancel this adventure?"))
+
+            assertEquals(listOf(true, false), choices)
+        } finally { scene.close() }
+    }
 }

@@ -10,6 +10,7 @@ import com.example.rnd_transit_mtl.state.trip.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.test.*
+import com.example.rnd_transit_mtl.data.assets.toSampleMapPoint
 
 /** Checks that repeat/copy navigation never starts or overwrites a historical record. */
 class PlannerCopyTest {
@@ -30,7 +31,7 @@ class PlannerCopyTest {
         planner.setWalkingPreference("Dash")
         planner.setBikeSpeedKmh(26)
         planner.copyTripPreferences(trip)
-        assertEquals(trip.start, planner.uiState.value.origin)
+        assertEquals(trip.origin.toSampleMapPoint(), planner.uiState.value.origin)
         assertEquals("Dash", planner.uiState.value.walkingPreference)
         assertEquals(26, planner.uiState.value.bikeSpeedKmh)
         assertEquals(trip.plannedMinutes, planner.uiState.value.minutes)

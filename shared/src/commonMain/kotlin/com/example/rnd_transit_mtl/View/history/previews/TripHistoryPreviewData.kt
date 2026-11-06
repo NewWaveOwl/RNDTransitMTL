@@ -3,7 +3,11 @@ import com.example.rnd_transit_mtl.model.ids.RouteId
 import com.example.rnd_transit_mtl.model.ids.TransportId
 import com.example.rnd_transit_mtl.model.ids.TripId
 
+import com.example.rnd_transit_mtl.data.assets.toSampleMapPlace
+import com.example.rnd_transit_mtl.model.trip.Place
+import com.example.rnd_transit_mtl.model.trip.RouteLeg
 import com.example.rnd_transit_mtl.model.trip.Trip
+import com.example.rnd_transit_mtl.model.trip.TripStatus
 import com.example.rnd_transit_mtl.model.trip.TripPoint
 import com.example.rnd_transit_mtl.model.review.TripReview
 import com.example.rnd_transit_mtl.model.trip.TripRouteSnapshot
@@ -16,14 +20,26 @@ import kotlin.time.Instant
 private val previewCreatedAt =
     Instant.parse("2026-10-04T14:00:00Z").toEpochMilliseconds()
 
+/** One straight walking leg, as the generator creates before routing exists. */
+private fun previewWalkingLeg(from: Place, to: Place, plannedMinutes: Int): List<RouteLeg> = listOf(
+    RouteLeg.straightLine(TransportId("preview-walking"), from.point, to.point, plannedMinutes * 60L)
+)
+
+private val parkEntrance = TripPoint("Park entrance", 0.20f, 0.30f).toSampleMapPlace()
+private val riversideStop = TripPoint("Riverside stop", 0.80f, 0.70f).toSampleMapPlace()
+private val morningStart = TripPoint("Morning start", 0.25f, 0.65f).toSampleMapPlace()
+private val morningDestination = TripPoint("Morning destination", 0.75f, 0.25f).toSampleMapPlace()
+
 internal val reviewedHistoryPreviewTrip = Trip(
     id = TripId("preview-sunday-discovery"),
+    status = TripStatus.Completed,
     title = "Sunday discovery walk",
     description = "A relaxed trip combining a short bus ride " +
         "with a walk between two points on the bundled mock map.",
     imageUrl = "https://example.com/sunday-reference.jpg",
-    start = TripPoint("Park entrance", 0.20f, 0.30f),
-    destination = TripPoint("Riverside stop", 0.80f, 0.70f),
+    origin = parkEntrance,
+    destination = riversideStop,
+    legs = previewWalkingLeg(parkEntrance, riversideStop, plannedMinutes = 30),
     plannedMinutes = 30,
     selectedTransports = listOf(
         TripTransportSnapshot(
@@ -45,9 +61,8 @@ internal val reviewedHistoryPreviewTrip = Trip(
         )
     ),
     attractionIntensity = 65f,
-    distanceKm = 2.4,
-    createdAtEpochMillis = previewCreatedAt,
-    completedAtEpochMillis = previewCreatedAt + 10_000L,
+    createdAt = previewCreatedAt,
+    completedAt = previewCreatedAt + 10_000L,
     review = TripReview(
         overall = 4,
         quality = 4,
@@ -65,12 +80,12 @@ internal val unreviewedHistoryPreviewTrip =
         title = "Morning transit trip",
         description = "A completed mock trip whose review was skipped.",
         imageUrl = "https://example.com/morning-reference.jpg",
-        start = TripPoint("Morning start", 0.25f, 0.65f),
-        destination = TripPoint("Morning destination", 0.75f, 0.25f),
+        origin = morningStart,
+        destination = morningDestination,
+        legs = previewWalkingLeg(morningStart, morningDestination, plannedMinutes = 20),
         plannedMinutes = 20,
-        distanceKm = 1.8,
-        createdAtEpochMillis = previewCreatedAt - 3_600_000L,
-        completedAtEpochMillis = previewCreatedAt - 3_590_000L,
+        createdAt = previewCreatedAt - 3_600_000L,
+        completedAt = previewCreatedAt - 3_590_000L,
         review = null
     )
 
@@ -81,9 +96,9 @@ internal val partialReviewHistoryPreviewTrip =
         description = "A completed trip with optional categories left unrated.",
         imageUrl = "https://example.com/afternoon-reference.jpg",
         plannedMinutes = 45,
-        distanceKm = 3.1,
-        createdAtEpochMillis = previewCreatedAt - 1_800_000L,
-        completedAtEpochMillis = previewCreatedAt - 1_790_000L,
+        legs = previewWalkingLeg(parkEntrance, riversideStop, plannedMinutes = 45),
+        createdAt = previewCreatedAt - 1_800_000L,
+        completedAt = previewCreatedAt - 1_790_000L,
         review = TripReview(
             overall = 3,
             interesting = 4

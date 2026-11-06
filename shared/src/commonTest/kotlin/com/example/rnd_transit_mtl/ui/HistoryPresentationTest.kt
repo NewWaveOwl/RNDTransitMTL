@@ -15,6 +15,12 @@ import kotlin.test.assertTrue
 import com.example.rnd_transit_mtl.View.history.TripHistoryFilter
 import com.example.rnd_transit_mtl.View.history.firstReviewSentence
 import com.example.rnd_transit_mtl.View.history.historyTrips
+import com.example.rnd_transit_mtl.model.trip.TripStatus
+import com.example.rnd_transit_mtl.testOrigin
+import com.example.rnd_transit_mtl.testDestination
+import com.example.rnd_transit_mtl.testLegs
+import com.example.rnd_transit_mtl.View.history.components.historyCardSummaryLine
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.formatDemoDistanceKm
 
 class HistoryPresentationTest {
     @Test
@@ -47,6 +53,32 @@ class HistoryPresentationTest {
     }
 
     @Test
+    fun keptCancelledTripsAppearByEndTimeAndOnlyInTheirOwnFilter() {
+        val completed = completedTrip(id = "completed", completedAt = 10_000L)
+        val cancelled = completedTrip(id = "cancelled", completedAt = 10_000L)
+            .copy(status = TripStatus.Cancelled, completedAt = null, cancelledAt = 12_000L)
+        val trips = listOf(completed, cancelled)
+
+        assertEquals(listOf("cancelled", "completed"), historyTrips(trips, TripHistoryFilter.ALL).map { it.id.value })
+        assertEquals(listOf("cancelled"), historyTrips(trips, TripHistoryFilter.CANCELLED).map { it.id.value })
+        // Cancelled trips cannot be reviewed, so they are not "not reviewed" either.
+        assertEquals(listOf("completed"), historyTrips(trips, TripHistoryFilter.NOT_REVIEWED).map { it.id.value })
+        assertEquals(emptyList(), historyTrips(trips, TripHistoryFilter.REVIEWED))
+    }
+
+    @Test
+    fun collapsedCardSummaryFitsOnOneLine() {
+        val reviewed = completedTrip(id = "summary", completedAt = 1_793_000_000_000L, review = TripReview(overall = 4))
+        val cancelled = reviewed.copy(
+            status = TripStatus.Cancelled, completedAt = null, cancelledAt = 1_793_000_000_000L, review = null
+        )
+        val distance = formatDemoDistanceKm(reviewed.distanceKm)
+
+        assertEquals("30 min · $distance km · 2026-10-26 · ★ 4/5", historyCardSummaryLine(reviewed))
+        assertEquals("30 min · $distance km · 2026-10-26", historyCardSummaryLine(cancelled))
+    }
+
+    @Test
     fun reviewedMeansSavedReviewEvenWithOptionalValuesMissing() {
         val reviewed = completedTrip(
             id = "reviewed",
@@ -75,7 +107,8 @@ class HistoryPresentationTest {
     fun sharedReviewUpdateAndRemovalChangeDerivedHistory() {
         val store = TripsStore(nowEpochMillis = { 12_000L })
         val trip = completedTrip(id = "shared-trip").copy(
-            completedAtEpochMillis = null
+            status = TripStatus.Generated,
+            completedAt = null
         )
 
         assertEquals(TripActionResult.Applied, store.start(trip))
@@ -147,11 +180,13 @@ class HistoryPresentationTest {
         review: TripReview? = null
     ): Trip = Trip(
         id = TripId(id),
+        status = TripStatus.Completed,
         title = "History test",
         description = "Fixed record for History verification.",
         imageUrl = "https://example.com/reference.jpg",
-        start = TripPoint("Start", 0.20f, 0.30f),
-        destination = TripPoint("Destination", 0.80f, 0.70f),
+        origin = testOrigin,
+        destination = testDestination,
+        legs = testLegs(TransportId("walking")),
         plannedMinutes = 30,
         selectedTransports = listOf(
             TripTransportSnapshot(
@@ -162,9 +197,8 @@ class HistoryPresentationTest {
         ),
         selectedRoutes = emptyList(),
         attractionIntensity = 50f,
-        distanceKm = 2.4,
-        createdAtEpochMillis = createdAt,
-        completedAtEpochMillis = completedAt,
+        createdAt = createdAt,
+        completedAt = completedAt,
         review = review
     )
 }

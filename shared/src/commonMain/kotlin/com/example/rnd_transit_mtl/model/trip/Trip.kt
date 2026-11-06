@@ -2,6 +2,7 @@ package com.example.rnd_transit_mtl.model.trip
 
 import com.example.rnd_transit_mtl.model.ids.RouteId
 import com.example.rnd_transit_mtl.model.ids.TripId
+import com.example.rnd_transit_mtl.model.ids.UserId
 import com.example.rnd_transit_mtl.model.ids.ZoneId
 import com.example.rnd_transit_mtl.model.ids.TransportId
 import kotlinx.serialization.Serializable
@@ -45,38 +46,49 @@ data class TripRouteSnapshot(
 /**
  * One generated trip record. The shared collection will use List<Trip>.
  *
- * Endpoints and distanceKm are generated once and then stored.
- * Opening details, resizing, drawing, and restoration must reuse them.
+ * Places and legs are generated once and then stored. Opening details,
+ * resizing, drawing, and restoration must reuse them. Legs are in travel
+ * order, connect end to start, and run from origin to destination.
+ * Until a routing service exists, legs are straight lines with isRouted
+ * false, so distanceKm is a straight-line distance, not a street route.
+ * Planned minutes describe the planner choice and do not determine the
+ * simulation duration.
  *
- * distanceKm is a synthetic demo value, not a measured geographic
- * distance or a street-routing result. Planned minutes describe the
- * planner choice and do not determine the simulation duration.
+ * status follows TripStatus: completedAt is set exactly when the
+ * status is Completed. Timestamps are UTC epoch milliseconds used as record
+ * information. They must not be used to measure the simulation's active time.
  *
- * Timestamps are UTC epoch milliseconds used as record information.
- * They must not be used to measure the simulation's active time.
- *
- * completedAtEpochMillis is null until completion. A null review means
- * no saved feedback, including when the user skips the review.
+ * A null review means no saved feedback, including when the user skips the review.
  *
  * List properties are read-only contracts. Callers must not pass lists
  * that they subsequently mutate. The generator creates fresh snapshots.
+ *
+ * @property ownerId User who planned the trip; null for a guest.
+ * @property createdAt When the trip was generated, in UTC milliseconds since 1970-01-01.
+ * @property completedAt When the trip was completed, in UTC milliseconds since 1970-01-01;
+ * null unless the status is Completed.
+ * @property cancelledAt When the trip was cancelled, in UTC milliseconds since 1970-01-01;
+ * null unless the status is Cancelled. Only trips the user chose to keep are stored.
  */
 @Serializable
 data class Trip(
     val id: TripId,
+    val ownerId: UserId? = null,
+    val status: TripStatus,
     val title: String,
     val description: String,
     // Empty for bundled-map trips; older trips can retain their reference URL.
     val imageUrl: String,
-    val start: TripPoint,
-    val destination: TripPoint,
+    val origin: Place,
+    val destination: Place,
+    val legs: List<RouteLeg>,
     val plannedMinutes: Int,
     val selectedTransports: List<TripTransportSnapshot>,
     val selectedRoutes: List<TripRouteSnapshot>,
     val attractionIntensity: Float,
-    val distanceKm: Double,
-    val createdAtEpochMillis: Long,
-    val completedAtEpochMillis: Long? = null,
+    val createdAt: Long,
+    val completedAt: Long? = null,
+    val cancelledAt: Long? = null,
     val review: TripReview? = null,
     /** Transit-zone constraints recorded when this trip was generated. */
     val selectedZoneIds: List<ZoneId> = emptyList(),
@@ -92,22 +104,38 @@ data class Trip(
             attractionIntensity = attractionIntensity
         )
 
-        require(start.normalizedDistanceTo(destination) > 0.0) {
+        require(origin.point != destination.point) {
             "Start and destination must be different."
         }
-        require(distanceKm.isFinite() && distanceKm > 0.0) {
-            "Demo distance must be finite and positive."
+        require(legs.isNotEmpty()) { "A trip needs at least one leg." }
+        require(legs.first().start == origin.point && legs.last().end == destination.point) {
+            "Legs must run from the origin to the destination."
         }
-        require(createdAtEpochMillis >= 0L) {
+        require(legs.zipWithNext().all { (previous, next) -> previous.end == next.start }) {
+            "Each leg must start where the previous leg ends."
+        }
+        require(distanceKm > 0.0) {
+            "Trip distance must be positive."
+        }
+        require(createdAt >= 0L) {
             "Creation timestamp must not be negative."
         }
+        require((completedAt != null) == (status == TripStatus.Completed)) {
+            "Only a completed trip has a completion timestamp."
+        }
         require(
-            completedAtEpochMillis == null ||
-                    completedAtEpochMillis >= createdAtEpochMillis
+            completedAt == null ||
+                    completedAt >= createdAt
         ) {
             "Completion timestamp must not precede creation."
         }
-        require(review == null || completedAtEpochMillis != null) {
+        require((cancelledAt != null) == (status == TripStatus.Cancelled)) {
+            "Only a cancelled trip has a cancellation timestamp."
+        }
+        require(cancelledAt == null || cancelledAt >= createdAt) {
+            "Cancellation timestamp must not precede creation."
+        }
+        require(review == null || completedAt != null) {
             "Only a completed trip can have a saved review."
         }
 
@@ -132,6 +160,9 @@ data class Trip(
             selectedZoneIds, selectedZonesByTransport
         )
         val transportsById = selectedTransports.associateBy { it.id }
+        require(legs.all { it.transportId in transportsById }) {
+            "Each leg must use a selected transport."
+        }
         selectedRoutes.forEach { route ->
             val transport = transportsById[route.transportTypeId]
             require(transport != null && transport.usesRoutes) {
@@ -139,6 +170,9 @@ data class Trip(
             }
         }
     }
+
+    /** Total distance of all legs in kilometers; straight-line while legs are unrouted. */
+    val distanceKm: Double get() = legs.sumOf { it.distanceMeters } / 1000.0
 
     companion object {
         /** Checks new per-mode zone snapshots; an empty map remains valid for legacy records.

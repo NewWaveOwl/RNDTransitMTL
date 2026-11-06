@@ -4,16 +4,25 @@ import com.example.rnd_transit_mtl.model.ids.ZoneId
 import com.example.rnd_transit_mtl.model.ids.RouteId
 import com.example.rnd_transit_mtl.model.ids.TransportId
 import com.example.rnd_transit_mtl.model.ids.TripId
+import com.example.rnd_transit_mtl.model.ids.UserId
 import com.example.rnd_transit_mtl.model.transport.TransportRoute
 import com.example.rnd_transit_mtl.model.transport.TransportType
+import com.example.rnd_transit_mtl.data.assets.toSampleMapPlace
+import com.example.rnd_transit_mtl.model.trip.RouteLeg
 import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.model.trip.TripPoint
 import com.example.rnd_transit_mtl.model.trip.TripRouteSnapshot
+import com.example.rnd_transit_mtl.model.trip.TripStatus
 import com.example.rnd_transit_mtl.model.trip.TripTransportSnapshot
-import kotlin.math.round
 import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
+import com.example.rnd_transit_mtl.data.fake.FakeRoutingService
+import com.example.rnd_transit_mtl.data.routing.RoutingResult
+import com.example.rnd_transit_mtl.data.routing.RoutingService
+import com.example.rnd_transit_mtl.model.trip.Place
+import com.example.rnd_transit_mtl.model.trip.TripRequest
+import com.example.rnd_transit_mtl.model.trip.message
 
 /**
  * Current planner values supplied to one generation request.
@@ -23,6 +32,7 @@ import kotlin.uuid.Uuid
  *
  * It is not a Trip record or a saved planner-draft implementation.
  * @property origin Exact source-image start; null preserves legacy random-start generation.
+ * @property ownerId User planning the trip; null for a guest.
  */
 data class TripGenerationInput(
     val title: String,
@@ -34,7 +44,8 @@ data class TripGenerationInput(
     val attractionIntensity: Float,
     val selectedZoneIds: List<ZoneId> = emptyList(),
     val selectedZonesByTransport: Map<TransportId, List<ZoneId>> = emptyMap(),
-    val origin: TripPoint? = null
+    val origin: TripPoint? = null,
+    val ownerId: UserId? = null
 )
 
 /**
@@ -50,18 +61,26 @@ sealed class TripGenerationResult {
     data class InvalidInput(val message: String) : TripGenerationResult()
 
     data object IdUnavailable : TripGenerationResult()
+
+    /** The routing service found no route, or a point is outside its area. */
+    data object NoRoute : TripGenerationResult()
+
+    /** The routing service failed; retrying later may work. */
+    data class RoutingUnavailable(val message: String) : TripGenerationResult()
 }
 
 /**
  * Creates one mock trip from validated planner values.
  *
- * Coordinates describe the whole PNG in normalized units. New trips can use
- * the planner's visible crop as generation bounds. Coordinates do
- * not represent GPS coordinates or positions on actual streets.
+ * Endpoints are chosen in normalized PNG units. New trips can use the
+ * planner's visible crop as generation bounds. They are then converted
+ * to real places with SampleMapProjection, but are not snapped to streets.
  *
- * Demo distance is separation inside the generation area multiplied
- * by a synthetic scale and rounded to two decimal places. It is
- * intentionally independent of planned minutes and transport modes.
+ * The endpoints become a TripRequest, which is validated and passed to
+ * routingService for the legs. With the default FakeRoutingService the trip
+ * has one straight, unrouted leg using the first selected mode, so its
+ * distance is the straight-line distance between the places.
+ * The trip starts as Generated and owned by input.ownerId.
  *
  * Call generate() once in response to starting a trip, after checking
  * that no unfinished trip exists. Store and navigate with the returned
@@ -71,8 +90,11 @@ sealed class TripGenerationResult {
  * Injected factories must not throw; time must be a nonnegative epoch
  * millisecond value. A seeded Random controls endpoints. For complete
  * reproducibility, also inject a fixed time and predictable ID source.
+ *
+ * @param routingService Plans the legs between the chosen places.
  */
 class MockTripGenerator(
+    private val routingService: RoutingService = FakeRoutingService(),
     private val random: Random = Random.Default,
     private val idFactory: () -> String = { Uuid.random().toString() },
     private val nowEpochMillis: () -> Long = {
@@ -88,7 +110,7 @@ class MockTripGenerator(
      * IDs are checked before returning Success. The future store must
      * also enforce uniqueness when inserting the returned record.
      */
-    fun generate(
+    suspend fun generate(
         input: TripGenerationInput,
         transportTypes: List<TransportType>,
         transportRoutes: List<TransportRoute>,
@@ -168,7 +190,6 @@ class MockTripGenerator(
 
         val start: TripPoint
         val destination: TripPoint
-        val distanceBasis: Double
 
         val requestedOrigin = normalizedInput.origin
 
@@ -179,39 +200,73 @@ class MockTripGenerator(
 
             start = bounds.toSourcePoint(localStart)
             destination = bounds.toSourcePoint(localDestination)
-            distanceBasis = localStart.normalizedDistanceTo(localDestination)
         } else {
             start = requestedOrigin.copy()
             destination = generateDestinationFromOrigin(start, bounds)
-            distanceBasis = start.normalizedDistanceTo(destination)
         }
 
-        val distanceKm = maxOf(
-            0.01,
-            round(distanceBasis * DEMO_KM_PER_NORMALIZED_UNIT * 100.0) / 100.0
-        )
+        // Endpoints are picked on the PNG, then stored as real places.
+        val origin = start.toSampleMapPlace()
+        val destinationPlace = destination.toSampleMapPlace()
 
-        val trip = Trip(
-            id = id,
-            title = normalizedInput.title,
-            description = normalizedInput.description,
-            imageUrl = normalizedInput.imageUrl,
-            start = start,
-            destination = destination,
+        val request = TripRequest(
+            ownerId = normalizedInput.ownerId,
+            origin = origin,
+            destination = destinationPlace,
             plannedMinutes = normalizedInput.plannedMinutes,
-            selectedTransports = snapshots.first,
-            selectedRoutes = snapshots.second,
-            attractionIntensity = normalizedInput.attractionIntensity,
-            distanceKm = distanceKm,
-            createdAtEpochMillis = createdAt,
-            completedAtEpochMillis = null,
-            review = null,
-            selectedZoneIds = normalizedInput.selectedZoneIds.toList(),
-            selectedZonesByTransport = normalizedInput.selectedZonesByTransport.mapValues { (_, zones) -> zones.toList() }
+            modes = normalizedInput.selectedTransportIds,
+            zonesByTransport = normalizedInput.selectedZonesByTransport
         )
+        request.validate(transportTypes.map { it.id }.toSet()).firstOrNull()?.let {
+            return TripGenerationResult.InvalidInput(it.message)
+        }
+
+        val legs = when (val routed = routingService.route(request)) {
+            is RoutingResult.Success -> routed.legs
+            RoutingResult.NoRouteFound, is RoutingResult.OutsideServiceArea ->
+                return TripGenerationResult.NoRoute
+            is RoutingResult.Unavailable ->
+                return TripGenerationResult.RoutingUnavailable(routed.message)
+        }
+
+        val trip = try {
+            createTrip(id, normalizedInput, snapshots, origin, destinationPlace, legs, createdAt)
+        } catch (_: IllegalArgumentException) {
+            // Legs that break Trip's rules are a provider fault, not a user input error.
+            return TripGenerationResult.RoutingUnavailable("The routing service returned an invalid route.")
+        }
 
         return TripGenerationResult.Success(trip)
     }
+
+    private fun createTrip(
+        id: TripId,
+        normalizedInput: TripGenerationInput,
+        snapshots: Pair<List<TripTransportSnapshot>, List<TripRouteSnapshot>>,
+        origin: Place,
+        destinationPlace: Place,
+        legs: List<RouteLeg>,
+        createdAt: Long
+    ): Trip = Trip(
+        id = id,
+        ownerId = normalizedInput.ownerId,
+        status = TripStatus.Generated,
+        title = normalizedInput.title,
+        description = normalizedInput.description,
+        imageUrl = normalizedInput.imageUrl,
+        origin = origin,
+        destination = destinationPlace,
+        legs = legs,
+        plannedMinutes = normalizedInput.plannedMinutes,
+        selectedTransports = snapshots.first,
+        selectedRoutes = snapshots.second,
+        attractionIntensity = normalizedInput.attractionIntensity,
+        createdAt = createdAt,
+        completedAt = null,
+        review = null,
+        selectedZoneIds = normalizedInput.selectedZoneIds.toList(),
+        selectedZonesByTransport = normalizedInput.selectedZonesByTransport.mapValues { (_, zones) -> zones.toList() }
+    )
 
     private fun resolveSelections(
         input: TripGenerationInput,
@@ -376,11 +431,5 @@ class MockTripGenerator(
         const val MIN_NORMALIZED_SEPARATION: Double = 0.25
         const val MAX_DESTINATION_ATTEMPTS: Int = 32
         const val MAX_ID_ATTEMPTS: Int = 16
-
-        /**
-         * Synthetic conversion for the demo only.
-         * This does not calibrate the bundled map geographically.
-         */
-        const val DEMO_KM_PER_NORMALIZED_UNIT: Double = 5.0
     }
 }

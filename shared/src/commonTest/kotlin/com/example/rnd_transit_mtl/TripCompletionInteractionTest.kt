@@ -26,20 +26,23 @@ import com.example.rnd_transit_mtl.navigation.MainScreenKey
 import com.example.rnd_transit_mtl.navigation.Navigator
 import com.example.rnd_transit_mtl.navigation.TripNavigation
 import com.example.rnd_transit_mtl.navigation.TripReviewScreenKey
+import com.example.rnd_transit_mtl.data.assets.toSampleMapPoint
+import com.example.rnd_transit_mtl.model.trip.TripStatus
+import kotlinx.coroutines.test.runTest
 
 class TripCompletionInteractionTest {
     @Test
-    fun bundledMapTripNeedsNoReferenceUrl() {
+    fun bundledMapTripNeedsNoReferenceUrl() = runTest {
         val trip = generatedTrip()
         assertEquals("", trip.imageUrl)
-        assertTrue(trip.start.normalizedDistanceTo(trip.destination) >=
-            MockTripGenerator.MIN_NORMALIZED_SEPARATION)
+        assertTrue(trip.origin.toSampleMapPoint().normalizedDistanceTo(trip.destination.toSampleMapPoint()) >=
+            MockTripGenerator.MIN_NORMALIZED_SEPARATION - MAP_POINT_TOLERANCE)
         assertEquals(30, trip.plannedMinutes)
         assertEquals(listOf(TransportId("walk")), trip.selectedTransports.map { it.id })
     }
 
     @Test
-    fun completionWaitsForReviewActionAndRepeatedRequestsDoNotDuplicate() {
+    fun completionWaitsForReviewActionAndRepeatedRequestsDoNotDuplicate() = runTest {
         val trip = generatedTrip()
         val store = TripsStore(nowEpochMillis = { 20_000L })
         val stack = NavBackStack<NavKey>(MainScreenKey)
@@ -72,7 +75,7 @@ class TripCompletionInteractionTest {
     }
 
     @Test
-    fun restoredCompletionReopensAt100WithoutRestartingOrOpeningReview() {
+    fun restoredCompletionReopensAt100WithoutRestartingOrOpeningReview() = runTest {
         val trip = generatedTrip()
         val original = TripsStore(nowEpochMillis = { 20_000L })
         original.start(trip)
@@ -88,7 +91,7 @@ class TripCompletionInteractionTest {
         assertTrue(navigation.openCompletedTrip(trip.id))
         val current = assertIs<CurrentTripScreenKey>(navigator.current)
         assertEquals(trip.id, current.trip.id)
-        assertEquals(trip.start, current.trip.start)
+        assertEquals(trip.origin, current.trip.origin)
         assertEquals(trip.destination, current.trip.destination)
         assertEquals(1f, restored.progressFor(trip.id))
         assertNull(restored.activeTrip)
@@ -106,7 +109,7 @@ class TripCompletionInteractionTest {
     }
 
     @Test
-    fun informationPopupRequiresCurrentTripAndClosesWhenReturningToGO() {
+    fun informationPopupRequiresCurrentTripAndClosesWhenReturningToGO() = runTest {
         val trip = generatedTrip()
         val store = TripsStore(nowEpochMillis = { 20_000L })
         val stack = NavBackStack<NavKey>(MainScreenKey)
@@ -120,7 +123,8 @@ class TripCompletionInteractionTest {
         assertNull(navigation.informationTripId)
         assertTrue(navigation.requestTripInformation())
         assertEquals(trip.id, navigation.informationTripId)
-        assertEquals(trip, store.activeTrip)
+        // Starting stores the same trip with the Active status.
+        assertEquals(trip.copy(status = TripStatus.Active), store.activeTrip)
 
         // A stale popup for another ID cannot dismiss the current popup.
         navigation.dismissTripInformation(TripId("different-trip"))
@@ -132,7 +136,7 @@ class TripCompletionInteractionTest {
         assertTrue(store.completedTrips.isEmpty())
     }
 
-    private fun generatedTrip(): Trip =
+    private suspend fun generatedTrip(): Trip =
         assertIs<TripGenerationResult.Success>(
             MockTripGenerator(
                 random = Random(7),

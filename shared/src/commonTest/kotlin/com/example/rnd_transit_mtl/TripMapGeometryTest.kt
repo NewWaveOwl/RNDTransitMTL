@@ -8,7 +8,9 @@ import com.example.rnd_transit_mtl.data.generation.TripGenerationBounds
 import com.example.rnd_transit_mtl.data.generation.TripGenerationInput
 import com.example.rnd_transit_mtl.data.generation.TripGenerationResult
 import com.example.rnd_transit_mtl.model.transport.TransportType
+import com.example.rnd_transit_mtl.data.assets.toSampleMapPoint
 import com.example.rnd_transit_mtl.model.trip.Trip
+import com.example.rnd_transit_mtl.model.trip.TripStatus
 import com.example.rnd_transit_mtl.state.trip.TripActionResult
 import com.example.rnd_transit_mtl.state.trip.TripsStore
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.bundledMapSize
@@ -22,6 +24,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.test.runTest
 
 /** Pure geometry/state checks; no Compose clock or changing preview data. */
 class TripMapGeometryTest {
@@ -49,34 +52,40 @@ class TripMapGeometryTest {
     }
 
     @Test
-    fun seededEndpointsUseVisibleCropOnceAndKeepSyntheticDistance() {
+    fun seededEndpointsUseVisibleCropOnce() = runTest {
         val viewport = Size(390f, 700f)
         val bounds = plannerTripBounds(viewport, bundledMapSize, titleHeight = 64f)
         val localTrip = generatedTrip(TripGenerationBounds())
         val visibleTrip = generatedTrip(bounds)
         val rect = mapImageRect(viewport, bundledMapSize, crop = true)
+        val localStart = localTrip.origin.toSampleMapPoint()
+        val localDestination = localTrip.destination.toSampleMapPoint()
+        val visibleStart = visibleTrip.origin.toSampleMapPoint()
+        val visibleDestination = visibleTrip.destination.toSampleMapPoint()
         assertEquals(localTrip.id, visibleTrip.id)
-        assertEquals(localTrip.distanceKm, visibleTrip.distanceKm)
-        assertEquals(bounds.toSourcePoint(localTrip.start), visibleTrip.start)
-        assertEquals(bounds.toSourcePoint(localTrip.destination), visibleTrip.destination)
+        // The same seeded points are placed inside the visible crop. Distances are
+        // now real, so they shrink with the crop instead of staying synthetic.
+        assertNearMapPoint(bounds.toSourcePoint(localStart), visibleStart)
+        assertNearMapPoint(bounds.toSourcePoint(localDestination), visibleDestination)
+        assertTrue(visibleTrip.distanceKm < localTrip.distanceKm)
 
-        for (point in listOf(visibleTrip.start, visibleTrip.destination)) {
+        for (point in listOf(visibleStart, visibleDestination)) {
             val screenPoint = point.toMapPosition(rect)
             assertTrue(screenPoint.x in 0f..viewport.width)
             assertTrue(screenPoint.y in 64f..(viewport.height * 0.55f))
         }
-        val startOnScreen = visibleTrip.start.toMapPosition(rect)
-        val destinationOnScreen = visibleTrip.destination.toMapPosition(rect)
+        val startOnScreen = visibleStart.toMapPosition(rect)
+        val destinationOnScreen = visibleDestination.toMapPosition(rect)
         // Normalized separation is enforced in the visible generation area.
         assertTrue(
-            localTrip.start.normalizedDistanceTo(localTrip.destination) >=
-                MockTripGenerator.MIN_NORMALIZED_SEPARATION
+            localStart.normalizedDistanceTo(localDestination) >=
+                MockTripGenerator.MIN_NORMALIZED_SEPARATION - MAP_POINT_TOLERANCE
         )
         assertTrue((destinationOnScreen - startOnScreen).getDistance() > 60f)
     }
 
     @Test
-    fun viewportChangeAndRestorationDoNotReplaceStoredEndpointsOrElapsedTime() {
+    fun viewportChangeAndRestorationDoNotReplaceStoredEndpointsOrElapsedTime() = runTest {
         val bounds = plannerTripBounds(Size(390f, 700f), bundledMapSize, 64f)
         val trip = generatedTrip(bounds)
         val store = TripsStore(nowEpochMillis = { 20_000L })
@@ -87,7 +96,7 @@ class TripMapGeometryTest {
         ))
         val active = assertNotNull(restored.activeTrip)
         assertEquals(trip.id, active.id)
-        assertEquals(trip.start, active.start)
+        assertEquals(trip.origin, active.origin)
         assertEquals(trip.destination, active.destination)
         assertEquals(3_500L, restored.elapsedMillis)
         assertEquals(0.35f, assertNotNull(restored.progressFor(trip.id)), absoluteTolerance = 0.0001f)
@@ -95,12 +104,13 @@ class TripMapGeometryTest {
 
         // A different camera changes projected pixels, not the saved Trip.
         val desktopRect = mapImageRect(Size(1000f, 700f), bundledMapSize, crop = true)
-        assertTrue(trip.start.toMapPosition(desktopRect) !=
-            trip.start.toMapPosition(mapImageRect(Size(390f, 700f), bundledMapSize, true)))
-        assertEquals(trip, restored.activeTrip)
+        val start = trip.origin.toSampleMapPoint()
+        assertTrue(start.toMapPosition(desktopRect) !=
+            start.toMapPosition(mapImageRect(Size(390f, 700f), bundledMapSize, true)))
+        assertEquals(trip.copy(status = TripStatus.Active), restored.activeTrip)
     }
 
-    private fun generatedTrip(bounds: TripGenerationBounds): Trip =
+    private suspend fun generatedTrip(bounds: TripGenerationBounds): Trip =
         assertIs<TripGenerationResult.Success>(
             MockTripGenerator(
                 random = Random(7),

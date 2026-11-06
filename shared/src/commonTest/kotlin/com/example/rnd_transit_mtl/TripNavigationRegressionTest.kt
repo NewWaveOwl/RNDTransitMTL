@@ -27,6 +27,7 @@ import com.example.rnd_transit_mtl.navigation.SettingsScreenKey
 import com.example.rnd_transit_mtl.navigation.TripDetailsScreenKey
 import com.example.rnd_transit_mtl.navigation.TripNavigation
 import com.example.rnd_transit_mtl.navigation.TripReviewScreenKey
+import com.example.rnd_transit_mtl.model.trip.TripStatus
 
 class TripNavigationRegressionTest {
     @Test
@@ -174,18 +175,19 @@ class TripNavigationRegressionTest {
 
     private fun fixtureTrip(): Trip = Trip(
         id = TripId("navigation-regression-trip"),
+        status = TripStatus.Generated,
         title = "Navigation regression",
         description = "Fixed record for navigation boundary verification.",
         imageUrl = "https://example.com/reference.jpg",
-        start = TripPoint("Start", 0.20f, 0.30f),
-        destination = TripPoint("Destination", 0.80f, 0.70f),
+        origin = testOrigin,
+        destination = testDestination,
+        legs = testLegs(TransportId("walk")),
         plannedMinutes = 30,
         selectedTransports = listOf(
             TripTransportSnapshot(TransportId("walk"), "Walk", false)
         ),
         selectedRoutes = emptyList(),
         attractionIntensity = 65f,
-        distanceKm = 2.4,
-        createdAtEpochMillis = 1_000L
+        createdAt = 1_000L
     )
 }

@@ -22,6 +22,10 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import com.example.rnd_transit_mtl.model.trip.TripStatus
+import com.example.rnd_transit_mtl.data.assets.toSampleMapPlace
+import com.example.rnd_transit_mtl.data.assets.toSampleMapPoint
+import kotlinx.coroutines.test.runTest
 
 class TripInvariantsTest {
     @Test
@@ -164,7 +168,7 @@ class TripInvariantsTest {
         assertEquals(before, restored.snapshot())
         assertEquals(4_321L, restored.elapsedMillis)
         assertEquals(0.4321f, restored.progress)
-        assertEquals(activeTrip.start, restored.activeTrip?.start)
+        assertEquals(activeTrip.origin, restored.activeTrip?.origin)
         assertEquals(activeTrip.destination, restored.activeTrip?.destination)
         assertEquals(savedReview, restored.findCompleted(completedTrip.id)?.review)
         assertEquals(draft, restored.reviewDrafts[completedTrip.id])
@@ -208,7 +212,7 @@ class TripInvariantsTest {
     }
 
     @Test
-    fun seededGenerationIsRepeatableAndEndpointsRespectMarginsAndSeparation() {
+    fun seededGenerationIsRepeatableAndEndpointsRespectMarginsAndSeparation() = runTest {
         assertEquals(
             generatedTrip(Random(17), "seeded"),
             generatedTrip(Random(17), "seeded")
@@ -217,20 +221,20 @@ class TripInvariantsTest {
         repeat(32) { seed ->
             val trip = generatedTrip(Random(seed), "seed-$seed")
 
-            listOf(trip.start, trip.destination).forEach { point ->
+            val safeRange = (MockTripGenerator.SAFE_MIN - MAP_POINT_TOLERANCE)..
+                (MockTripGenerator.SAFE_MAX + MAP_POINT_TOLERANCE)
+            val start = trip.origin.toSampleMapPoint()
+            val destination = trip.destination.toSampleMapPoint()
+            listOf(start, destination).forEach { point ->
                 assertTrue(point.x.isFinite())
                 assertTrue(point.y.isFinite())
-                assertTrue(
-                    point.x in MockTripGenerator.SAFE_MIN..MockTripGenerator.SAFE_MAX
-                )
-                assertTrue(
-                    point.y in MockTripGenerator.SAFE_MIN..MockTripGenerator.SAFE_MAX
-                )
+                assertTrue(point.x in safeRange)
+                assertTrue(point.y in safeRange)
             }
 
             assertTrue(
-                trip.start.normalizedDistanceTo(trip.destination) >=
-                        MockTripGenerator.MIN_NORMALIZED_SEPARATION
+                start.normalizedDistanceTo(destination) >=
+                        MockTripGenerator.MIN_NORMALIZED_SEPARATION - MAP_POINT_TOLERANCE
             )
             assertTrue(trip.distanceKm.isFinite() && trip.distanceKm > 0.0)
             assertEquals(30, trip.plannedMinutes)
@@ -238,18 +242,15 @@ class TripInvariantsTest {
     }
 
     @Test
-    fun repeatedIdenticalCandidatesUseTheBoundedFallback() {
+    fun repeatedIdenticalCandidatesUseTheBoundedFallback() = runTest {
         val random = ZeroRandom()
         val trip = generatedTrip(random, "fallback")
 
-        assertEquals(MockTripGenerator.SAFE_MIN, trip.start.x)
-        assertEquals(MockTripGenerator.SAFE_MIN, trip.start.y)
-        assertEquals(MockTripGenerator.SAFE_MAX, trip.destination.x)
-        assertEquals(MockTripGenerator.SAFE_MAX, trip.destination.y)
-        assertTrue(
-            trip.start.normalizedDistanceTo(trip.destination) >=
-                    MockTripGenerator.MIN_NORMALIZED_SEPARATION
-        )
+        val safeMin = MockTripGenerator.SAFE_MIN
+        val safeMax = MockTripGenerator.SAFE_MAX
+        // Generated trips store the places converted from these PNG corners.
+        assertEquals(TripPoint("Start", safeMin, safeMin).toSampleMapPlace().point, trip.origin.point)
+        assertEquals(TripPoint("Destination", safeMax, safeMax).toSampleMapPlace().point, trip.destination.point)
         assertTrue(random.calls > 0)
     }
 
@@ -316,7 +317,7 @@ class TripInvariantsTest {
     }
 
     @Test
-    fun rawZeroMinuteGenerationFailsBeforeCreatingAnId() {
+    fun rawZeroMinuteGenerationFailsBeforeCreatingAnId() = runTest {
         var idRequests = 0
         val generator = MockTripGenerator(random = Random(1),
             idFactory = { idRequests++; "minimum-trip" }, nowEpochMillis = { 12_000L })
@@ -374,7 +375,7 @@ class TripInvariantsTest {
         )
     }
 
-    private fun generatedTrip(random: Random, id: String): Trip {
+    private suspend fun generatedTrip(random: Random, id: String): Trip {
         val generator = MockTripGenerator(
             random = random,
             idFactory = { id },
@@ -403,19 +404,20 @@ class TripInvariantsTest {
 
     private fun fixtureTrip(id: String): Trip = Trip(
         id = TripId(id),
+        status = TripStatus.Generated,
         title = "Trip $id",
         description = "Fixed record for state invariant verification.",
         imageUrl = "https://example.com/reference.jpg",
-        start = TripPoint("Start", 0.20f, 0.30f),
-        destination = TripPoint("Destination", 0.80f, 0.70f),
+        origin = testOrigin,
+        destination = testDestination,
+        legs = testLegs(TransportId("walk")),
         plannedMinutes = 30,
         selectedTransports = listOf(
             TripTransportSnapshot(TransportId("walk"), "Walk", false)
         ),
         selectedRoutes = emptyList(),
         attractionIntensity = 65f,
-        distanceKm = 2.4,
-        createdAtEpochMillis = 1_000L
+        createdAt = 1_000L
     )
 
     /**

@@ -30,6 +30,7 @@ import kotlinx.coroutines.yield
 import kotlinx.coroutines.delay
 import java.io.File
 import kotlin.test.*
+import com.example.rnd_transit_mtl.data.assets.toSampleMapPlace
 
 /** Runs the real planner coordinator with explicit outcomes and an isolated store. */
 @OptIn(ExperimentalComposeUiApi::class)
@@ -175,7 +176,7 @@ class Trip33FlowTest {
             host.await("Start Trip")
             host.click("Start Trip")
             host.render()
-            assertEquals(selected.origin, assertNotNull(host.store.activeTrip).start)
+            assertEquals(selected.origin?.toSampleMapPlace(), assertNotNull(host.store.activeTrip).origin)
             assertTrue(host.store.completedTrips.isEmpty())
         }
     }

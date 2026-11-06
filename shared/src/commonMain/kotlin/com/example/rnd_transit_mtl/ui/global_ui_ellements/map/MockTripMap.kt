@@ -54,6 +54,13 @@ private val TripMapControlSize = 48.dp
  * The PNG, route, endpoints and directed pointer share one uniform transform.
  * Current trip starts with exactly the planner's centered Crop; static details
  * use Fit. Pinch/drag changes only the camera, never stored endpoints or time.
+ *
+ * Map renderer decision (issue #27): drawing stays a composable, not a
+ * MapRenderer interface, because rendering belongs to Compose and has no
+ * data contract to share. Callers convert stored places with
+ * Place.toSampleMapPoint(); this PNG map is the only code that knows the
+ * image. An OpenStreetMap tile map will be a sibling composable taking
+ * places and legs directly, so screens switch maps without model changes.
  * @param start Immutable source-image start point.
  * @param destination Immutable source-image destination.
  * @param progress Position along the simulated route, bounded to 0..1.
