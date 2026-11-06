@@ -1,4 +1,5 @@
 package com.example.rnd_transit_mtl.View.main
+import com.example.rnd_transit_mtl.data.assets.toSampleMapPoint
 import com.example.rnd_transit_mtl.state.NullableTripIdSaver
 import com.example.rnd_transit_mtl.model.ids.TripId
 
@@ -378,6 +379,7 @@ internal fun TransitOpeningScreen(
 
                 val existingIds = buildSet {
                     addAll(tripsStore.completedTrips.map { it.id })
+                    addAll(tripsStore.cancelledTrips.map { it.id })
                     tripsStore.activeTrip?.let { add(it.id) }
                 }
 
@@ -415,6 +417,14 @@ internal fun TransitOpeningScreen(
                             "A unique trip ID could not be created. Try again."
                         )
                     }
+
+                    TripGenerationResult.NoRoute -> {
+                        fail(Trip33Failure.NoRoute)
+                    }
+
+                    is TripGenerationResult.RoutingUnavailable -> {
+                        fail(Trip33Failure.ProviderUnavailable, generated.message)
+                    }
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -445,7 +455,7 @@ internal fun TransitOpeningScreen(
     var copiedTripToGenerate by remember { mutableStateOf<Trip?>(null) }
     LaunchedEffect(copyRequest, generationBounds, isDestinationActive) {
         if (copyRequest != null && isDestinationActive && generationBounds != null) {
-            val saved = tripsStore.findCompleted(copyRequest.first)
+            val saved = tripsStore.findInHistory(copyRequest.first)
             navigation.consumePlannerCopy()
             if (saved != null) {
                 closeProposalFlow()
@@ -461,7 +471,7 @@ internal fun TransitOpeningScreen(
             planner.selectedTransportIds == saved.selectedTransports.map { it.id } &&
             planner.selectedZoneIds == saved.selectedZoneIds &&
             planner.selectedZonesByTransport == saved.selectedZonesByTransport &&
-            planner.origin == saved.start &&
+            planner.origin == saved.origin.toSampleMapPoint() &&
             planner.intensity == saved.attractionIntensity) {
             copiedTripToGenerate = null
             performPrimaryAction()
@@ -615,7 +625,7 @@ internal fun TransitOpeningScreen(
             mainOverview = true,
             onResume = { performPrimaryAction() },
             onFinish = {},
-            onConfirmCancel = {},
+            onConfirmCancel = { _ -> },
             modifier = modifier
         )
         return

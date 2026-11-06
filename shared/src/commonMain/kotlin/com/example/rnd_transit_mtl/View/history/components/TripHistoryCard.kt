@@ -43,20 +43,32 @@ import com.example.rnd_transit_mtl.ui.theme.TransitSelected
 import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 import org.jetbrains.compose.resources.painterResource
 import rnd_transit_mtl.shared.generated.resources.Res
+import rnd_transit_mtl.shared.generated.resources.ic_arrow_drop_down
+import rnd_transit_mtl.shared.generated.resources.ic_arrow_drop_up
 import rnd_transit_mtl.shared.generated.resources.ic_google_demo_delete
 import rnd_transit_mtl.shared.generated.resources.ic_google_demo_edit
-import com.example.rnd_transit_mtl.View.history.firstReviewSentence
 import com.example.rnd_transit_mtl.View.history.formatTripTimestampUtc
 import com.example.rnd_transit_mtl.View.history.tripRouteSummary
 import com.example.rnd_transit_mtl.View.history.tripTransportSummary
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.formatDemoDistanceKm
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.ratings.RatingStarsDisplay
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.trip.TripReviewSummary
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.formatGeoPoint
+import com.example.rnd_transit_mtl.model.trip.TripStatus
+
+// Layout settings — dp sizes used by the history card.
+private val HistoryCardContentPadding = 16.dp
+private val HistoryCardSectionSpacing = 12.dp
+private val HistoryCardButtonMinHeight = 48.dp
+private val HistoryCardExpandIconSize = 20.dp
+private val HistoryCardSwipeThreshold = 64.dp
 
 /**
- * Stateless completed-trip card.
+ * Stateless history card for a completed or kept cancelled trip.
  *
- * The parent owns expansion and action-tray visibility by trip ID.
+ * Collapsed, it shows two summary lines; More expands every detail,
+ * including the full review. The parent owns expansion and action-tray
+ * visibility by trip ID.
  * A drag only requests a presentation change; it never removes a trip.
  *
  * Single-tap toggles the action tray; double-tap opens trip details.
@@ -79,12 +91,13 @@ fun TripHistoryCard(
     actionsEnabled: Boolean = true
 ) {
     val density = LocalDensity.current
-    val swipeThreshold = with(density) { 64.dp.toPx() }
+    val swipeThreshold = with(density) { HistoryCardSwipeThreshold.toPx() }
 
     val latestShowActions by rememberUpdatedState(onShowActions)
     val latestHideActions by rememberUpdatedState(onHideActions)
 
     val review = trip.review
+    val cancelled = trip.status == TripStatus.Cancelled
 
     Column(modifier.fillMaxWidth().animateContentSize()) {
     Card(
@@ -143,12 +156,12 @@ fun TripHistoryCard(
         )
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(HistoryCardContentPadding),
+            verticalArrangement = Arrangement.spacedBy(HistoryCardSectionSpacing)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(HistoryCardSectionSpacing),
                 verticalAlignment = Alignment.Top
             ) {
                 Text(
@@ -158,18 +171,18 @@ fun TripHistoryCard(
                 )
 
                 Text(
-                    text = if (review == null) {
-                        "Not reviewed"
-                    } else {
-                        "Reviewed"
+                    text = when {
+                        cancelled -> "Cancelled"
+                        review == null -> "Not reviewed"
+                        else -> "Reviewed"
                     },
                     style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier
                         .background(
-                            color = if (review == null) {
-                                TransitHighlight
-                            } else {
-                                TransitSelected
+                            color = when {
+                                cancelled -> TransitMain.copy(alpha = 0.15f)
+                                review == null -> TransitHighlight
+                                else -> TransitSelected
                             },
                             shape = RoundedCornerShape(12.dp)
                         )
@@ -177,87 +190,117 @@ fun TripHistoryCard(
                 )
             }
 
-            Text(
-                text = "${trip.start.label} to ${trip.destination.label}",
-                style = MaterialTheme.typography.bodyLarge
-            )
-
-            Text(
-                text = "${trip.plannedMinutes} planned minutes · " +
-                    "${formatDemoDistanceKm(trip.distanceKm)} km demo distance",
-                style = MaterialTheme.typography.bodyMedium
-            )
-
-            Text(
-                text = "Transport: ${tripTransportSummary(trip)}",
-                style = MaterialTheme.typography.bodyMedium
-            )
-
-            Text(
-                text = "Routes: ${tripRouteSummary(trip)}",
-                style = MaterialTheme.typography.bodyMedium
-            )
-
-            val completionText = trip.completedAtEpochMillis
-                ?.let(::formatTripTimestampUtc)
-                ?: "Completion information unavailable"
-
-            Text(
-                text = "Completed: $completionText",
-                style = MaterialTheme.typography.bodySmall
-            )
-
-            if (review == null) {
-                Text(
-                    text = "No review saved. You can review this trip later.",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            } else {
-                RatingStarsDisplay(
-                    label = "Overall experience",
-                    rating = review.overall,
-                    prominent = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            color = TransitMain,
-                            shape = RoundedCornerShape(16.dp)
-                        )
-                        .padding(12.dp)
-                )
-
-                if (!expanded) {
+            // Collapsed summary: two lines, plus a small button to show everything.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                     Text(
-                        text = if (review.comment.isBlank()) {
-                            "No written comment."
-                        } else {
-                            "“${firstReviewSentence(review.comment)}”"
-                        },
+                        text = "${trip.origin.label} to ${trip.destination.label}",
                         style = MaterialTheme.typography.bodyLarge,
-                        maxLines = 2,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    if (review.imageUrl.isNotEmpty()) {
-                        Text("Photo attached · expand to view",
-                            style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-
-                AnimatedVisibility(
-                    visible = expanded,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
-                ) {
-                    TripReviewSummary(
-                        review = review,
-                        includeOverall = false,
-                        linksEnabled = actionsEnabled
+                    Text(
+                        text = historyCardSummaryLine(trip),
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
-                TextButton(onClick = onToggleExpanded, enabled = actionsEnabled) {
-                    Text(if (expanded) "Collapse review" else "Read full review",
-                        style = MaterialTheme.typography.labelMedium, color = TransitMain)
+                TextButton(
+                    onClick = onToggleExpanded,
+                    enabled = actionsEnabled,
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = TransitMain,
+                        disabledContentColor = TransitMain.copy(alpha = 0.45f)
+                    ),
+                    modifier = Modifier.heightIn(min = HistoryCardButtonMinHeight)
+                ) {
+                    Text(if (expanded) "Less" else "More", style = MaterialTheme.typography.labelMedium)
+                    Icon(
+                        painter = painterResource(
+                            if (expanded) Res.drawable.ic_arrow_drop_up else Res.drawable.ic_arrow_drop_down
+                        ),
+                        contentDescription = null,
+                        modifier = Modifier.size(HistoryCardExpandIconSize)
+                    )
+                }
+            }
+
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(HistoryCardSectionSpacing)) {
+                    Text(
+                        text = "From ${formatGeoPoint(trip.origin.point)} " +
+                            "to ${formatGeoPoint(trip.destination.point)}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+
+                    Text(
+                        text = "Transport: ${tripTransportSummary(trip)}",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+
+                    Text(
+                        text = "Routes: ${tripRouteSummary(trip)}",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+
+                    if (cancelled) {
+                        Text(
+                            text = "Cancelled: " + formatTripTimestampUtc(trip.cancelledAt ?: trip.createdAt),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            text = "Cancelled before the end, so it cannot be reviewed.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    } else {
+                        val completionText = trip.completedAt
+                            ?.let(::formatTripTimestampUtc)
+                            ?: "Completion information unavailable"
+
+                        Text(
+                            text = "Completed: $completionText",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+
+                        if (review == null) {
+                            Text(
+                                text = "No review saved. You can review this trip later.",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        } else {
+                            RatingStarsDisplay(
+                                label = "Overall experience",
+                                rating = review.overall,
+                                prominent = true,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        color = TransitMain,
+                                        shape = RoundedCornerShape(16.dp)
+                                    )
+                                    .padding(12.dp)
+                            )
+
+                            TripReviewSummary(
+                                review = review,
+                                includeOverall = false,
+                                linksEnabled = actionsEnabled
+                            )
+                        }
+                    }
                 }
             }
 
@@ -274,7 +317,7 @@ fun TripHistoryCard(
                     ),
                     modifier = Modifier
                         .weight(1f)
-                        .heightIn(min = 48.dp)
+                        .heightIn(min = HistoryCardButtonMinHeight)
                 ) {
                     Text("Details")
                 }
@@ -294,7 +337,7 @@ fun TripHistoryCard(
                     ),
                     modifier = Modifier
                         .weight(1f)
-                        .heightIn(min = 48.dp)
+                        .heightIn(min = HistoryCardButtonMinHeight)
                 ) {
                     Text(
                         if (actionsVisible) {
@@ -320,7 +363,7 @@ fun TripHistoryCard(
                     .padding(12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Button(
+                if (!cancelled) Button(
                     onClick = { onReview?.invoke() },
                     enabled = actionsEnabled && onReview != null,
                     colors = ButtonDefaults.buttonColors(
@@ -331,7 +374,7 @@ fun TripHistoryCard(
                     ),
                     modifier = Modifier
                         .weight(1f)
-                        .heightIn(min = 48.dp)
+                        .heightIn(min = HistoryCardButtonMinHeight)
                 ) {
                     Icon(
                         painter = painterResource(
@@ -362,7 +405,7 @@ fun TripHistoryCard(
                     ),
                     modifier = Modifier
                         .weight(1f)
-                        .heightIn(min = 48.dp)
+                        .heightIn(min = HistoryCardButtonMinHeight)
                 ) {
                     Icon(
                         painter = painterResource(
@@ -380,4 +423,17 @@ fun TripHistoryCard(
             }
         }
     }
+}
+
+/**
+ * The collapsed card's second line: planned time, distance, end date and,
+ * for a reviewed trip, its overall rating.
+ *
+ * @param trip Completed or kept cancelled trip.
+ */
+internal fun historyCardSummaryLine(trip: Trip): String {
+    val endedAt = trip.completedAt ?: trip.cancelledAt ?: trip.createdAt
+    val date = formatTripTimestampUtc(endedAt).substringBefore(' ')
+    val rating = trip.review?.let { " · ★ ${it.overall}/5" }.orEmpty()
+    return "${trip.plannedMinutes} min · ${formatDemoDistanceKm(trip.distanceKm)} km · $date$rating"
 }

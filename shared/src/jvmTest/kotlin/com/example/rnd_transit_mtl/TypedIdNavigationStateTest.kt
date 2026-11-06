@@ -20,6 +20,7 @@ import com.example.rnd_transit_mtl.navigation.backStackConfig
 import kotlinx.serialization.PolymorphicSerializer
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import com.example.rnd_transit_mtl.model.trip.TripStatus
 
 /** Saves destinations the way the back stack does, because a restore failure only appears at runtime. */
 class TypedIdNavigationStateTest {
@@ -49,17 +50,18 @@ class TypedIdNavigationStateTest {
             CurrentTripScreenKey(
                 Trip(
                     id = TripId("trip-1"),
+                    status = TripStatus.Generated,
                     title = "Sample trip",
                     description = "Fixed record for save verification.",
                     imageUrl = "",
-                    start = TripPoint("Start", 0.2f, 0.2f),
-                    destination = TripPoint("Destination", 0.8f, 0.8f),
+                    origin = testOrigin,
+                    destination = testDestination,
+                    legs = testLegs(bus),
                     plannedMinutes = 30,
                     selectedTransports = listOf(TripTransportSnapshot(bus, "Bus", true)),
                     selectedRoutes = listOf(TripRouteSnapshot(RouteId("bus:401"), bus, "401")),
                     attractionIntensity = 50f,
-                    distanceKm = 1.5,
-                    createdAtEpochMillis = 1_000L,
+                    createdAt = 1_000L,
                     selectedZoneIds = listOf(zone),
                     selectedZonesByTransport = mapOf(bus to listOf(zone))
                 )

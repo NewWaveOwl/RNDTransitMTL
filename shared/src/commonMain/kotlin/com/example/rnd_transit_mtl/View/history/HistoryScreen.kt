@@ -52,8 +52,9 @@ fun HistoryScreen(
     var filterName by rememberSaveable { mutableStateOf(TripHistoryFilter.ALL.name) }
     val filter = TripHistoryFilter.entries.firstOrNull { it.name == filterName } ?: TripHistoryFilter.ALL
 
-    val completedTrips = tripsStore.completedTrips
-    val pendingRemovalTrip = completedTrips.firstOrNull {
+    // History lists completed trips and cancelled trips the user chose to keep.
+    val historyRecords = tripsStore.completedTrips + tripsStore.cancelledTrips
+    val pendingRemovalTrip = historyRecords.firstOrNull {
         it.id == pendingRemovalId
     }
 
@@ -81,7 +82,7 @@ fun HistoryScreen(
     ) {
         if (!latestDestinationActive) return
 
-        if (tripsStore.findCompleted(tripId) == null) {
+        if (tripsStore.findInHistory(tripId) == null) {
             errorMessage = "This trip is no longer available."
         } else {
             errorMessage = null
@@ -92,7 +93,7 @@ fun HistoryScreen(
     fun requestRemoval(tripId: TripId) {
         if (!latestDestinationActive) return
 
-        if (tripsStore.findCompleted(tripId) == null) {
+        if (tripsStore.findInHistory(tripId) == null) {
             errorMessage = "This trip is no longer available."
             return
         }
@@ -106,13 +107,13 @@ fun HistoryScreen(
         val tripId = pendingRemovalId ?: return
 
         // Check again at confirmation time, rather than using an old record.
-        if (tripsStore.findCompleted(tripId) == null) {
+        if (tripsStore.findInHistory(tripId) == null) {
             pendingRemovalId = null
             errorMessage = "This trip has already been removed."
             return
         }
 
-        when (val result = tripsStore.removeCompleted(tripId)) {
+        when (val result = tripsStore.removeFromHistory(tripId)) {
             TripActionResult.Applied -> {
                 pendingRemovalId = null
                 errorMessage = null
@@ -146,9 +147,9 @@ fun HistoryScreen(
         }
 
     HistoryContent(
-        trips = historyTrips(completedTrips, filter),
+        trips = historyTrips(historyRecords, filter),
         filter = filter,
-        totalCount = completedTrips.size,
+        totalCount = historyRecords.size,
         onFilterChange = { selected ->
             if (latestDestinationActive) {
                 filterName = selected.name

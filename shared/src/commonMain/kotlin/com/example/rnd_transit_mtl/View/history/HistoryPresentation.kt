@@ -2,36 +2,42 @@ package com.example.rnd_transit_mtl.View.history
 
 import com.example.rnd_transit_mtl.model.trip.Trip
 import kotlin.time.Instant
+import com.example.rnd_transit_mtl.model.trip.TripStatus
 
 enum class TripHistoryFilter(val label: String) {
     ALL("All"),
     REVIEWED("Reviewed"),
-    NOT_REVIEWED("Not reviewed")
+    NOT_REVIEWED("Not reviewed"),
+    CANCELLED("Cancelled")
 }
 
 /**
- * Derives a presentation list from the shared completed collection.
+ * Derives a presentation list from the shared completed and kept cancelled trips.
  *
- * This is not another stored collection. Completion time determines
- * order; creation time and ID provide deterministic tie breaking.
+ * This is not another stored collection. The time a trip ended (completion
+ * or cancellation) determines order; creation time and ID provide
+ * deterministic tie breaking. Review filters only include completed trips,
+ * because cancelled trips cannot be reviewed.
  */
 internal fun historyTrips(
-    completedTrips: List<Trip>,
+    trips: List<Trip>,
     filter: TripHistoryFilter
 ): List<Trip> =
-    completedTrips
+    trips
         .filter { trip ->
+            val completed = trip.status == TripStatus.Completed
             when (filter) {
                 TripHistoryFilter.ALL -> true
-                TripHistoryFilter.REVIEWED -> trip.review != null
-                TripHistoryFilter.NOT_REVIEWED -> trip.review == null
+                TripHistoryFilter.REVIEWED -> completed && trip.review != null
+                TripHistoryFilter.NOT_REVIEWED -> completed && trip.review == null
+                TripHistoryFilter.CANCELLED -> trip.status == TripStatus.Cancelled
             }
         }
         .sortedWith(
             compareByDescending<Trip> {
-                it.completedAtEpochMillis ?: Long.MIN_VALUE
+                it.completedAt ?: it.cancelledAt ?: Long.MIN_VALUE
             }
-                .thenByDescending { it.createdAtEpochMillis }
+                .thenByDescending { it.createdAt }
                 .thenBy { it.id.value }
         )
 

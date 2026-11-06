@@ -32,7 +32,7 @@ fun CurrentTripContent(
     actionsEnabled: Boolean,
     message: String?,
     onLeave: () -> Unit,
-    onCancel: () -> Unit,
+    onCancel: (keepInHistory: Boolean) -> Unit,
     onRequestReview: () -> Unit,
     onFinishRequested: () -> Unit,
     onOpenImageReference: () -> Unit,

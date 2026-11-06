@@ -25,7 +25,13 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -54,9 +60,22 @@ private val TripMapControlSize = 48.dp
  * The PNG, route, endpoints and directed pointer share one uniform transform.
  * Current trip starts with exactly the planner's centered Crop; static details
  * use Fit. Pinch/drag changes only the camera, never stored endpoints or time.
+ *
+ * Map renderer decision (issue #27): drawing stays a composable, not a
+ * MapRenderer interface, because rendering belongs to Compose and has no
+ * data contract to share. Callers convert stored places with
+ * Place.toSampleMapPoint(); this PNG map is the only code that knows the
+ * image. An OpenStreetMap tile map will be a sibling composable taking
+ * places and legs directly, so screens switch maps without model changes.
+ *
+ * Each leg is drawn along its stored geometry, so a routed trip shows its
+ * turns and transfers. Unrouted legs are dashed to mark them as straight-line
+ * fallbacks. The pointer moves along the whole line by length.
  * @param start Immutable source-image start point.
  * @param destination Immutable source-image destination.
  * @param progress Position along the simulated route, bounded to 0..1.
+ * @param legs Stored legs from start to destination, usually Trip.toSampleMapLegs();
+ * defaults to one unrouted straight line.
  * @param modifier Parent viewport constraints.
  * @param interactive Whether pinch and drag gestures are enabled.
  * @param matchPlannerBackground Whether the initial image uses Crop rather than Fit.
@@ -70,6 +89,7 @@ fun MockTripMap(
     start: TripPoint,
     destination: TripPoint,
     progress: Float,
+    legs: List<TripMapLeg> = listOf(TripMapLeg(listOf(start, destination), isRouted = false)),
     modifier: Modifier = Modifier,
     interactive: Boolean = false,
     matchPlannerBackground: Boolean = false,
@@ -117,20 +137,16 @@ fun MockTripMap(
         panY = boundedPan.y / viewport.height
     }
 
-    LaunchedEffect(recenterRequest, viewport, start, destination) {
+    LaunchedEffect(recenterRequest, viewport, start, destination, legs) {
         if (recenterRequest > 0 &&
             viewport.width > 0f &&
             viewport.height > 0f &&
             baseRect.width > 0f
         ) {
-            val startPosition = start.toMapPosition(baseRect)
-            val endPosition = destination.toMapPosition(baseRect)
-            val point = Offset(
-                startPosition.x +
-                    (endPosition.x - startPosition.x) * boundedProgress,
-                startPosition.y +
-                    (endPosition.y - startPosition.y) * boundedProgress
-            )
+            val point = positionAlongPolyline(
+                routeLine(legs.map { leg -> leg.points.map { it.toMapPosition(baseRect) } }),
+                boundedProgress
+            ).point
             val center = Offset(
                 viewport.width / 2f,
                 viewport.height / 2f
@@ -150,6 +166,8 @@ fun MockTripMap(
                 contentDescription = "Mock transit map. Yellow start triangle, " +
                     "green destination triangle. " +
                     (if (showPosition) "Directed yellow position pointer. " else "Position unavailable. ") +
+                    (if (legs.all { it.isRouted }) "Solid line follows the planned route. "
+                    else "Dashed line is a straight-line preview, not a real route. ") +
                     if (interactive) "Pinch to zoom and drag to move the picture." else ""
                 stateDescription = "$percentage percent complete"
             }
@@ -191,27 +209,32 @@ fun MockTripMap(
 
             val startPosition = start.toMapPosition(mapRect)
             val endPosition = destination.toMapPosition(mapRect)
-            val currentPosition = Offset(
-                startPosition.x + (endPosition.x - startPosition.x) * boundedProgress,
-                startPosition.y + (endPosition.y - startPosition.y) * boundedProgress
-            )
+            val legPositions = legs.map { leg -> leg.points.map { it.toMapPosition(mapRect) } }
+            val current = positionAlongPolyline(routeLine(legPositions), boundedProgress)
             val pointerSize = minOf(48.dp.toPx(), size.width * 0.14f, size.height * 0.14f)
             val endpointSize = pointerSize * 1.5f
             val routeWidth = minOf(10.dp.toPx(), pointerSize * 0.25f)
-            drawLine(
-                TransitMain, startPosition, endPosition,
-                strokeWidth = routeWidth, cap = StrokeCap.Round
-            )
-            if (boundedProgress > 0f) {
-                drawLine(
-                    TransitOrange, startPosition, currentPosition,
-                    strokeWidth = routeWidth * 0.65f, cap = StrokeCap.Round
+            val travelledFractions = legProgressFractions(legPositions, boundedProgress)
+            legPositions.forEachIndexed { index, positions ->
+                // Gaps wide enough to read as dashes under the travelled overlay.
+                val dashes = if (legs[index].isRouted) null else PathEffect.dashPathEffect(
+                    floatArrayOf(routeWidth * 1.6f, routeWidth * 1.6f)
                 )
+                drawRouteLine(positions, TransitMain, routeWidth, dashes)
+                val travelled = travelledFractions[index]
+                if (travelled > 0f) {
+                    drawRouteLine(
+                        positionAlongPolyline(positions, travelled).travelled,
+                        TransitOrange, routeWidth * 0.65f, dashes
+                    )
+                }
             }
             if (showPosition) {
+                val direction = current.direction.takeUnless { it == Offset.Zero }
+                    ?: (endPosition - startPosition)
                 drawDirectedTripPointer(
-                    pointerPainter, currentPosition, pointerSize,
-                    tripPointerRotation(startPosition, endPosition)
+                    pointerPainter, current.point, pointerSize,
+                    tripPointerRotation(Offset.Zero, direction)
                 )
             }
             drawAnchoredTripEndpoint(startPainter, startPosition, endpointSize)
@@ -247,4 +270,22 @@ fun MockTripMap(
             }
         }
     }
+}
+
+/** Draws a leg through its points with round ends and corners. */
+private fun DrawScope.drawRouteLine(
+    points: List<Offset>,
+    color: Color,
+    width: Float,
+    pathEffect: PathEffect?
+) {
+    if (points.size < 2) return
+    val path = Path().apply {
+        moveTo(points.first().x, points.first().y)
+        points.drop(1).forEach { lineTo(it.x, it.y) }
+    }
+    drawPath(
+        path, color,
+        style = Stroke(width = width, cap = StrokeCap.Round, join = StrokeJoin.Round, pathEffect = pathEffect)
+    )
 }

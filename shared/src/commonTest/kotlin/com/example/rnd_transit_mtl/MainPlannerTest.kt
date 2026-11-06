@@ -18,6 +18,9 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import com.example.rnd_transit_mtl.data.assets.toSampleMapPlace
+import com.example.rnd_transit_mtl.data.assets.toSampleMapPoint
+import kotlinx.coroutines.test.runTest
 
 /** Checks draft restoration and zone requests without geographic-routing assumptions. */
 class MainPlannerTest {
@@ -189,7 +192,7 @@ class MainPlannerTest {
     }
 
     @Test
-    fun generatedTripPreservesIndependentZonesAndRejectsIncompleteOrInvalidMaps() {
+    fun generatedTripPreservesIndependentZonesAndRejectsIncompleteOrInvalidMaps() = runTest {
         val types = types + TransportType(TransportId("metro"), "Metro", true)
         val busZones = mutableListOf(ZoneId("A"), ZoneId("B"))
         val metroZones = mutableListOf(ZoneId("C"))
@@ -222,7 +225,7 @@ class MainPlannerTest {
     }
 
     @Test
-    fun transitRequiresUniqueSupportedZonesBeforeAllocatingAnId() {
+    fun transitRequiresUniqueSupportedZonesBeforeAllocatingAnId() = runTest {
         var idsAllocated = 0
         val generator = MockTripGenerator(idFactory = { idsAllocated++; "trip" })
         listOf(emptyList(), listOf(ZoneId("E")), listOf(ZoneId("A"), ZoneId("A"))).forEach { zones ->
@@ -234,7 +237,7 @@ class MainPlannerTest {
     }
 
     @Test
-    fun transitGeneratesWithoutRouteNumbersAndSnapshotsZones() {
+    fun transitGeneratesWithoutRouteNumbersAndSnapshotsZones() = runTest {
         val zones = mutableListOf(ZoneId("A"), ZoneId("B"))
         val trip = assertIs<TripGenerationResult.Success>(MockTripGenerator(
             random = Random(7), idFactory = { "zone-trip" }, nowEpochMillis = { 1_000L }
@@ -246,7 +249,7 @@ class MainPlannerTest {
     }
 
     @Test
-    fun walkingNeedsNoZonesAndOldTripRecordsStillDecode() {
+    fun walkingNeedsNoZonesAndOldTripRecordsStillDecode() = runTest {
         val trip = assertIs<TripGenerationResult.Success>(MockTripGenerator(
             random = Random(7), idFactory = { "walk-trip" }, nowEpochMillis = { 1_000L }
         ).generate(input(emptyList()).copy(selectedTransportIds = listOf(TransportId("walk"))),
@@ -273,7 +276,7 @@ class MainPlannerTest {
     }
 
     @Test
-    fun selectedOriginIsNotTransformedAgainAndDestinationStaysInBounds() {
+    fun selectedOriginIsNotTransformedAgainAndDestinationStaysInBounds() = runTest {
         val bounds = TripGenerationBounds(0.3f, 0.2f, 0.7f, 0.6f)
         val generator = MockTripGenerator(random = Random(41), idFactory = { "origin-trip" },
             nowEpochMillis = { 1_000L })
@@ -283,25 +286,26 @@ class MainPlannerTest {
                 val trip = assertIs<TripGenerationResult.Success>(generator.generate(
                     input(emptyList()).copy(selectedTransportIds = listOf(TransportId("walk")), origin = origin),
                     types, emptyList(), emptySet(), bounds)).trip
-                assertEquals(origin, trip.start)
-                assertTrue(trip.destination.x in bounds.left..bounds.right)
-                assertTrue(trip.destination.y in bounds.top..bounds.bottom)
-                assertTrue(origin.normalizedDistanceTo(trip.destination) >= 0.099999)
+                assertEquals(origin.toSampleMapPlace(), trip.origin)
+                val destination = trip.destination.toSampleMapPoint()
+                assertTrue(destination.x in (bounds.left - MAP_POINT_TOLERANCE)..(bounds.right + MAP_POINT_TOLERANCE))
+                assertTrue(destination.y in (bounds.top - MAP_POINT_TOLERANCE)..(bounds.bottom + MAP_POINT_TOLERANCE))
+                assertTrue(origin.normalizedDistanceTo(destination) >= 0.099999 - MAP_POINT_TOLERANCE)
                 assertTrue(trip.distanceKm > 0)
             }
         }
     }
 
     @Test
-    fun repeatedRandomPointFallsBackToAFarCorner() {
+    fun repeatedRandomPointFallsBackToAFarCorner() = runTest {
         val constantRandom = object : Random() { override fun nextBits(bitCount: Int): Int = 0 }
         val origin = TripPoint("Selected point", MockTripGenerator.SAFE_MIN, MockTripGenerator.SAFE_MIN)
         val trip = assertIs<TripGenerationResult.Success>(MockTripGenerator(
             random = constantRandom, idFactory = { "fallback" }, nowEpochMillis = { 1_000L }
         ).generate(input(emptyList()).copy(selectedTransportIds = listOf(TransportId("walk")), origin = origin),
             types, emptyList(), emptySet())).trip
-        assertEquals(origin, trip.start)
-        assertEquals(TripPoint("Destination", MockTripGenerator.SAFE_MAX, MockTripGenerator.SAFE_MAX),
+        assertEquals(origin.toSampleMapPlace(), trip.origin)
+        assertEquals(TripPoint("Destination", MockTripGenerator.SAFE_MAX, MockTripGenerator.SAFE_MAX).toSampleMapPlace(),
             trip.destination)
     }
 

@@ -336,7 +336,7 @@ fun CurrentTripScreen(
                     latestLeave()
                 }
             },
-            onCancel = {
+            onCancel = { keepInHistory ->
                 if (
                     latestDestinationActive &&
                     lifecycle.currentState
@@ -349,7 +349,7 @@ fun CurrentTripScreen(
                      */
                     simulation.pause()
 
-                    when (tripsStore.cancel(trip.id)) {
+                    when (tripsStore.cancel(trip.id, keepInHistory)) {
                         TripActionResult.Applied -> {
                             operationMessage = null
                             latestReturnToPlanner()

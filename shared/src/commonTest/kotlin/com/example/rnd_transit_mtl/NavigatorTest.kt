@@ -33,6 +33,7 @@ import com.example.rnd_transit_mtl.navigation.TripDetailsScreenKey
 import com.example.rnd_transit_mtl.navigation.TripNavigation
 import com.example.rnd_transit_mtl.navigation.TripReviewScreenKey
 import com.example.rnd_transit_mtl.navigation.backStackConfig
+import com.example.rnd_transit_mtl.model.trip.TripStatus
 
 class NavigatorTest {
     @Test
@@ -459,7 +460,7 @@ class NavigatorTest {
             restored.filterIsInstance<CurrentTripScreenKey>()
                 .singleOrNull()
         )
-        assertEquals(trip.start, parameter.trip.start)
+        assertEquals(trip.origin, parameter.trip.origin)
         assertEquals(trip.destination, parameter.trip.destination)
     }
 }
@@ -480,17 +481,18 @@ private fun completeTrip(
 
 private fun testTrip(): Trip = Trip(
     id = TripId("navigation-test-trip"),
+    status = TripStatus.Generated,
     title = "Navigation test",
     description = "A fixed mock trip for navigation verification.",
     imageUrl = "https://example.com/reference.jpg",
-    start = TripPoint("Start", 0.20f, 0.30f),
-    destination = TripPoint("Destination", 0.80f, 0.70f),
+    origin = testOrigin,
+    destination = testDestination,
+    legs = testLegs(TransportId("walk")),
     plannedMinutes = 30,
     selectedTransports = listOf(
         TripTransportSnapshot(TransportId("walk"), "Walk", false)
     ),
     selectedRoutes = emptyList(),
     attractionIntensity = 65f,
-    distanceKm = 2.4,
-    createdAtEpochMillis = 1_000L
+    createdAt = 1_000L
 )

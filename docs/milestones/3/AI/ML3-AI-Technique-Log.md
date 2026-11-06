@@ -135,3 +135,22 @@ See the [decision log](ML3-AI-Decision-Log.md) for full prompts and source cover
 | Time | [Not documented]. |
 | Outcome | Milestone logs relocated, ML3 logs and guide updated; initially left uncommitted, then committed on a documentation branch after explicit follow-up authorization. See M3-A6 follow-up in the decision log. |
 | Productivity / learning reflection | [Student reflection needed]. |
+
+## M3-A7 - Issue #29 gap analysis
+
+**Date:** 2026-11-02. **Contributor:** Caio Nunes. **AI used:** Claude Code CLI (Claude Opus 5.5), no subagents. **Conversation:** [Conversation link needed]. **Full prompts:** [M3-A7](ML3-AI-Decision-Log.md).
+
+| Field | Record |
+| --- | --- |
+| Challenge / context | Sync the branch with main, then find which parts of issue #29 (accounts, settings, group data definitions) remain unimplemented. |
+| Observable pattern | User supplied the issue link and asked for a gap list before implementation; also asked for logging per `docs/HowToLog_AI.md`. These observations do not prove deliberate technique selection. |
+| Techniques deliberately used | [Student reflection needed]. |
+| Iterations | Twenty-six visible prompts so far. |
+| Debugging / refinement | `gh` CLI unavailable; AI used the public GitHub REST API instead. |
+| Failed / rejected approaches | AI first assumed issue #27 was the typed-ID work; corrected after the user asked about #27 and the issue was read. |
+| Strategy changes | None recorded. |
+| Verification | Merge checked with `git status` / `git log`; gap analysis by source review; calibration by Python calculation; implementation by `:shared:jvmTest` (110 passed) and Android compile. One AI-written test assertion had the Mercator direction backwards and was corrected. |
+| Code impact | New geo, trip and DTO source files plus test files in `shared`; `Trip`, `TripsStore`, generator, map screens and 14 existing test files migrated. Student-estimated percentage [Not documented]. |
+| Time | [Not documented]. |
+| Outcome | Branch merged with main; #29 and #27 gaps identified; PNG map calibrated from three student-supplied landmarks; `GeoPoint`, `GeoBounds`, `MapProjection` and sample-map calibration implemented; trip models (`Place`, `RouteLeg` â€” first named `RouteSegment`, `TripStatus`, `TripRequest`) and backend DTOs added; 22 new JVM tests passing; `Trip` migrated to places, legs, status and owner with 134 JVM tests passing; `TripDto` added (137 tests) and the trip flow verified in the running desktop app. |
+| Productivity / learning reflection | [Student reflection needed]. |

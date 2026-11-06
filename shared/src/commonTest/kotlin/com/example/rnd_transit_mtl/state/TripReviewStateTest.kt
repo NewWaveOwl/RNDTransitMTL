@@ -17,6 +17,10 @@ import com.example.rnd_transit_mtl.state.review.ReviewStep
 import com.example.rnd_transit_mtl.state.trip.TRIP_SIMULATION_DURATION_MILLIS
 import com.example.rnd_transit_mtl.state.trip.TripActionResult
 import com.example.rnd_transit_mtl.state.trip.TripsStore
+import com.example.rnd_transit_mtl.model.trip.TripStatus
+import com.example.rnd_transit_mtl.testOrigin
+import com.example.rnd_transit_mtl.testDestination
+import com.example.rnd_transit_mtl.testLegs
 
 class TripReviewStateTest {
     @Test
@@ -224,11 +228,13 @@ class TripReviewStateTest {
 
     private fun sampleTrip(): Trip = Trip(
         id = TripId("review-state-test-trip"),
+        status = TripStatus.Generated,
         title = "Review test",
         description = "Fixed completed trip for review verification.",
         imageUrl = "https://example.com/reference.jpg",
-        start = TripPoint("Start", 0.20f, 0.30f),
-        destination = TripPoint("Destination", 0.80f, 0.70f),
+        origin = testOrigin,
+        destination = testDestination,
+        legs = testLegs(TransportId("walking")),
         plannedMinutes = 30,
         selectedTransports = listOf(
             TripTransportSnapshot(
@@ -239,7 +245,6 @@ class TripReviewStateTest {
         ),
         selectedRoutes = emptyList(),
         attractionIntensity = 50f,
-        distanceKm = 10.0,
-        createdAtEpochMillis = 1_000L
+        createdAt = 1_000L
     )
 }
