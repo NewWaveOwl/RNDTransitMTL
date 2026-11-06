@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 
 /** Material color model that maps the transit palette to semantic theme roles. */
 private val TransitColors = lightColorScheme(
+
     primary = TransitMain,
     onPrimary = TransitWhite,
     secondary = TransitHighlight,

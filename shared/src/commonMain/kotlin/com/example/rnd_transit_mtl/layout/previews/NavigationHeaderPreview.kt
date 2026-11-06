@@ -19,6 +19,7 @@ import com.example.rnd_transit_mtl.state.trip.TripsState
 import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 import com.example.rnd_transit_mtl.View.history.previews.historyPreviewTrips
 import com.example.rnd_transit_mtl.View.history.previews.reviewedHistoryPreviewTrip
+import com.example.rnd_transit_mtl.model.trip.TripStatus
 
 @Preview(
     name = "Shared header — Details",
@@ -54,7 +55,8 @@ fun NavigationDetailsHeaderPreview() {
 fun NavigationResumeHeaderPreview() {
     val activeTrip = reviewedHistoryPreviewTrip.copy(
         id = TripId("preview-active-trip"),
-        completedAtEpochMillis = null,
+        status = TripStatus.Active,
+        completedAt = null,
         review = null
     )
 

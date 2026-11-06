@@ -100,6 +100,8 @@ kotlin {
 
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+            // runTest drives suspend generation and routing in shared tests.
+            implementation(libs.kotlinx.coroutinesTest)
         }
 
         jvmTest.dependencies {

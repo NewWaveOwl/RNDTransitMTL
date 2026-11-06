@@ -1,5 +1,7 @@
 package com.example.rnd_transit_mtl.ui.global_ui_ellements.map
 
+import com.example.rnd_transit_mtl.model.geo.GeoPoint
+import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
@@ -50,4 +52,19 @@ internal fun formatDemoDistanceKm(distanceKm: Double): String {
         .padStart(2, '0')
 
     return "$whole.$fraction"
+}
+/**
+ * Formats a position as "latitude, longitude" with five decimal places
+ * (about 1 m), using common Kotlin facilities only.
+ *
+ * @param point Position to show.
+ */
+internal fun formatGeoPoint(point: GeoPoint): String =
+    "${formatFiveDecimals(point.latitude)}, ${formatFiveDecimals(point.longitude)}"
+
+private fun formatFiveDecimals(value: Double): String {
+    val hundredThousandths = (abs(value) * 100_000.0).roundToLong()
+    val sign = if (value < 0.0 && hundredThousandths != 0L) "-" else ""
+    val fraction = (hundredThousandths % 100_000L).toString().padStart(5, '0')
+    return "$sign${hundredThousandths / 100_000L}.$fraction"
 }

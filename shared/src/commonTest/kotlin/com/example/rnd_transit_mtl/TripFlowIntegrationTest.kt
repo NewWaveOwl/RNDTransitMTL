@@ -33,6 +33,8 @@ import com.example.rnd_transit_mtl.navigation.SettingsScreenKey
 import com.example.rnd_transit_mtl.navigation.TripReviewScreenKey
 import com.example.rnd_transit_mtl.navigation.ReviewOrigin
 import com.example.rnd_transit_mtl.navigation.backStackConfig
+import com.example.rnd_transit_mtl.model.trip.TripStatus
+import kotlinx.coroutines.test.runTest
 
 class TripFlowIntegrationTest {
     private val types = listOf(
@@ -46,7 +48,7 @@ class TripFlowIntegrationTest {
     private val stackSerializer = ListSerializer(PolymorphicSerializer(NavKey::class))
 
     @Test
-    fun registeredDestinationsRestoreTripParametersAndBothReviewModes() {
+    fun registeredDestinationsRestoreTripParametersAndBothReviewModes() = runTest {
         val trip = generatedTrip()
         val stack: List<NavKey> = listOf(
             MainScreenKey, ProfileScreenKey, AboutScreenKey,
@@ -83,7 +85,7 @@ class TripFlowIntegrationTest {
     }
 
     @Test
-    fun restoredActiveTripRetainsPlannerSnapshotAndElapsedProgress() {
+    fun restoredActiveTripRetainsPlannerSnapshotAndElapsedProgress() = runTest {
         val trip = generatedTrip()
         val store = TripsStore(nowEpochMillis = { 12_000L })
         assertEquals(TripActionResult.Applied, store.start(trip))
@@ -93,7 +95,7 @@ class TripFlowIntegrationTest {
             store.toSavedStateJson(), nowEpochMillis = { 12_000L }
         ))
 
-        assertEquals(trip, restored.activeTrip)
+        assertEquals(trip.copy(status = TripStatus.Active), restored.activeTrip)
         assertEquals(4_000L, restored.elapsedMillis)
         assertEquals(TripActionResult.ActiveTripExists(trip.id), restored.start(trip))
         assertEquals(TripActionResult.Applied, restored.updateElapsed(
@@ -101,7 +103,7 @@ class TripFlowIntegrationTest {
         ))
         assertNull(restored.activeTrip)
         assertEquals(trip.id, restored.pendingReviewTripId)
-        assertEquals(trip.start, restored.completedTrips.single().start)
+        assertEquals(trip.origin, restored.completedTrips.single().origin)
         assertEquals(trip.destination, restored.completedTrips.single().destination)
         assertEquals(trip.selectedRoutes, restored.completedTrips.single().selectedRoutes)
         assertEquals(trip.selectedZoneIds, restored.completedTrips.single().selectedZoneIds)
@@ -113,7 +115,7 @@ class TripFlowIntegrationTest {
     }
 
     @Test
-    fun invalidPlannerInputDoesNotAllocateTripIds() {
+    fun invalidPlannerInputDoesNotAllocateTripIds() = runTest {
         var idsAllocated = 0
         val generator = MockTripGenerator(
             random = Random(7),
@@ -138,7 +140,7 @@ class TripFlowIntegrationTest {
     }
 
     @Test
-    fun retainedNavigationParameterCannotRecreateRemovedCompletedTrip() {
+    fun retainedNavigationParameterCannotRecreateRemovedCompletedTrip() = runTest {
         val trip = generatedTrip()
         val key = CurrentTripScreenKey(trip)
         val store = TripsStore(nowEpochMillis = { 12_000L })
@@ -155,7 +157,7 @@ class TripFlowIntegrationTest {
         assertEquals(emptyList(), restored.completedTrips)
     }
 
-    private fun generatedTrip(): Trip = assertIs<TripGenerationResult.Success>(
+    private suspend fun generatedTrip(): Trip = assertIs<TripGenerationResult.Success>(
         MockTripGenerator(
             random = Random(7),
             idFactory = { "generated-trip" },

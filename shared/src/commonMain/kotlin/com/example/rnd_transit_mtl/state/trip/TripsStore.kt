@@ -5,9 +5,13 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.Saver as ComposeSaver
 import com.example.rnd_transit_mtl.model.trip.Trip
+import com.example.rnd_transit_mtl.model.trip.TripStatus
 import com.example.rnd_transit_mtl.model.review.TripReview
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Clock
 import com.example.rnd_transit_mtl.state.review.ReviewDraft
 
@@ -70,6 +74,10 @@ class TripsStore private constructor(
     val completedTrips: List<Trip>
         get() = mutableState.value.completedTrips
 
+    /** Cancelled trips the user chose to keep in History. */
+    val cancelledTrips: List<Trip>
+        get() = mutableState.value.cancelledTrips
+
     val pendingReviewTripId: TripId?
         get() = mutableState.value.pendingReviewTripId
 
@@ -86,7 +94,13 @@ class TripsStore private constructor(
         val current = mutableState.value
         return current.activeTrip?.trip?.takeIf { it.id == tripId }
             ?: current.completedTrips.firstOrNull { it.id == tripId }
+            ?: current.cancelledTrips.firstOrNull { it.id == tripId }
     }
+
+    /** A completed or kept cancelled trip, as History shows them. */
+    fun findInHistory(tripId: TripId): Trip? =
+        findCompleted(tripId)
+            ?: mutableState.value.cancelledTrips.firstOrNull { it.id == tripId }
 
     fun findCompleted(tripId: TripId): Trip? =
         mutableState.value.completedTrips.firstOrNull {
@@ -116,7 +130,8 @@ class TripsStore private constructor(
     }
 
     /**
-     * Starts one unfinished trip at zero elapsed active time.
+     * Starts one Generated trip at zero elapsed active time and stores it
+     * as Active, the Start Trip transition of TripStatus.
      *
      * Another start cannot replace the existing active trip.
      */
@@ -132,19 +147,21 @@ class TripsStore private constructor(
                 "Handle the pending trip review before starting another trip."
             )
         }
-        if (current.completedTrips.any { it.id == trip.id }) {
+        if (current.completedTrips.any { it.id == trip.id } ||
+            current.cancelledTrips.any { it.id == trip.id }
+        ) {
             return TripActionResult.InvalidInput(
-                "A completed trip already uses this ID."
+                "A saved trip already uses this ID."
             )
         }
-        if (trip.completedAtEpochMillis != null || trip.review != null) {
+        if (!trip.status.canMoveTo(TripStatus.Active) || trip.review != null) {
             return TripActionResult.InvalidInput(
-                "Only an unfinished trip can be started."
+                "Only a generated trip can be started."
             )
         }
 
         val ownedTrip = try {
-            detachedTrip(trip)
+            detachedTrip(trip.copy(status = TripStatus.Active))
         } catch (invalid: IllegalArgumentException) {
             return TripActionResult.InvalidInput(
                 invalid.message ?: "Invalid trip record."
@@ -242,9 +259,14 @@ class TripsStore private constructor(
     /**
      * Cancels only an unfinished active trip.
      *
-     * Cancellation does not append anything to completedTrips.
+     * Cancellation never adds to completedTrips. With keepInHistory the
+     * trip is stored in cancelledTrips as Cancelled with its cancellation
+     * time; otherwise it is discarded.
+     *
+     * @param tripId Active trip to cancel.
+     * @param keepInHistory Whether the user chose to save the cancelled trip.
      */
-    fun cancel(tripId: TripId): TripActionResult {
+    fun cancel(tripId: TripId, keepInHistory: Boolean = false): TripActionResult {
         val current = mutableState.value
 
         if (current.completedTrips.any { it.id == tripId }) {
@@ -256,7 +278,16 @@ class TripsStore private constructor(
             return TripActionResult.MissingTrip(tripId)
         }
 
-        mutableState.value = current.copy(activeTrip = null)
+        mutableState.value = if (keepInHistory) {
+            val cancelledTrip = active.trip.copy(
+                status = TripStatus.Cancelled,
+                // Wall-clock adjustments must not place cancellation before creation.
+                cancelledAt = nowEpochMillis().coerceAtLeast(active.trip.createdAt)
+            )
+            current.copy(activeTrip = null, cancelledTrips = current.cancelledTrips + cancelledTrip)
+        } else {
+            current.copy(activeTrip = null)
+        }
         return TripActionResult.Applied
     }
 
@@ -414,6 +445,23 @@ class TripsStore private constructor(
     /**
      * Removes a completed record and all associated transient state.
      */
+    /**
+     * Removes a completed or kept cancelled trip from History.
+     *
+     * @param tripId Trip shown in History.
+     */
+    fun removeFromHistory(tripId: TripId): TripActionResult {
+        val current = mutableState.value
+        if (current.cancelledTrips.none { it.id == tripId }) {
+            return removeCompleted(tripId)
+        }
+
+        mutableState.value = current.copy(
+            cancelledTrips = current.cancelledTrips.filterNot { it.id == tripId }
+        )
+        return TripActionResult.Applied
+    }
+
     fun removeCompleted(tripId: TripId): TripActionResult {
         val current = mutableState.value
 
@@ -494,10 +542,11 @@ class TripsStore private constructor(
          * earlier than creation. Active duration is measured separately.
          */
         val completedAt = nowEpochMillis().coerceAtLeast(
-            active.trip.createdAtEpochMillis
+            active.trip.createdAt
         )
         val completedTrip = active.trip.copy(
-            completedAtEpochMillis = completedAt,
+            status = TripStatus.Completed,
+            completedAt = completedAt,
             review = null
         )
 
@@ -515,6 +564,8 @@ class TripsStore private constructor(
     }
 
     companion object {
+        private const val SCHEMA_VERSION_KEY = "schemaVersion"
+
         private val savedStateJson = Json {
             encodeDefaults = true
             ignoreUnknownKeys = false
@@ -535,7 +586,8 @@ class TripsStore private constructor(
          * Explicit restoration entry point for the Saver and manual checks.
          *
          * Decoding invokes record and snapshot validation. Malformed JSON,
-         * invalid records, or an unsupported schema return null.
+         * invalid records, or an unsupported schema return null. A schema 1
+         * snapshot from an earlier build is migrated, keeping its trips.
          *
          * A defensive boundary case at exactly 10000 milliseconds is
          * completed immediately. Ordinary saves never expose that
@@ -548,10 +600,16 @@ class TripsStore private constructor(
             }
         ): TripsStore? {
             val decoded = try {
-                savedStateJson.decodeFromString(
-                    TripsState.serializer(),
-                    encoded
-                )
+                val savedVersion = savedStateJson.parseToJsonElement(encoded)
+                    .jsonObject[SCHEMA_VERSION_KEY]?.jsonPrimitive?.intOrNull
+                if (savedVersion == 1) {
+                    savedStateJson.decodeFromString(TripsStateV1.serializer(), encoded).migrate()
+                } else {
+                    savedStateJson.decodeFromString(
+                        TripsState.serializer(),
+                        encoded
+                    )
+                }
             } catch (_: SerializationException) {
                 return null
             } catch (_: IllegalArgumentException) {
@@ -576,6 +634,7 @@ class TripsStore private constructor(
 
         private fun detachedTrip(trip: Trip): Trip =
             trip.copy(
+                legs = trip.legs.toList(),
                 selectedTransports = trip.selectedTransports.toList(),
                 selectedRoutes = trip.selectedRoutes.toList()
             )
@@ -586,6 +645,9 @@ class TripsStore private constructor(
                     it.copy(trip = detachedTrip(it.trip))
                 },
                 completedTrips = source.completedTrips.map {
+                    detachedTrip(it)
+                },
+                cancelledTrips = source.cancelledTrips.map {
                     detachedTrip(it)
                 },
                 reviewDrafts = source.reviewDrafts.toMap()

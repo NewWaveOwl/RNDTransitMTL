@@ -15,6 +15,10 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TestTimeSource
+import com.example.rnd_transit_mtl.model.trip.TripStatus
+import com.example.rnd_transit_mtl.testOrigin
+import com.example.rnd_transit_mtl.testDestination
+import com.example.rnd_transit_mtl.testLegs
 
 class ActiveTripSimulationTest {
     @Test
@@ -100,7 +104,7 @@ class ActiveTripSimulationTest {
 
         assertEquals(5_000L, restoredStore.elapsedMillis)
         assertEquals(trip.id, restoredStore.activeTrip?.id)
-        assertEquals(trip.start, restoredStore.activeTrip?.start)
+        assertEquals(trip.origin, restoredStore.activeTrip?.origin)
         assertEquals(
             trip.destination,
             restoredStore.activeTrip?.destination
@@ -127,8 +131,8 @@ class ActiveTripSimulationTest {
         assertEquals(1f, restoredStore.progressFor(trip.id))
         assertEquals(1, restoredStore.completedTrips.size)
         assertEquals(
-            trip.start,
-            restoredStore.completedTrips.single().start
+            trip.origin,
+            restoredStore.completedTrips.single().origin
         )
         assertEquals(
             trip.destination,
@@ -180,11 +184,13 @@ class ActiveTripSimulationTest {
 
     private fun sampleTrip(): Trip = Trip(
         id = TripId("simulation-test-trip"),
+        status = TripStatus.Generated,
         title = "Simulation test",
         description = "A fixed trip for timing verification.",
         imageUrl = "https://example.com/reference.jpg",
-        start = TripPoint("Start", 0.20f, 0.30f),
-        destination = TripPoint("Destination", 0.80f, 0.70f),
+        origin = testOrigin,
+        destination = testDestination,
+        legs = testLegs(TransportId("walking")),
         plannedMinutes = 30,
         selectedTransports = listOf(
             TripTransportSnapshot(
@@ -195,7 +201,6 @@ class ActiveTripSimulationTest {
         ),
         selectedRoutes = emptyList(),
         attractionIntensity = 50f,
-        distanceKm = 10.0,
-        createdAtEpochMillis = 1_000L
+        createdAt = 1_000L
     )
 }

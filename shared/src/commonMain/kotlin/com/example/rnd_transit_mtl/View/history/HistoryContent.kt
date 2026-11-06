@@ -34,6 +34,7 @@ import com.example.rnd_transit_mtl.ui.theme.TransitMain
 import com.example.rnd_transit_mtl.ui.theme.TransitSelected
 import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 import com.example.rnd_transit_mtl.View.history.components.TripHistoryCard
+import com.example.rnd_transit_mtl.model.trip.TripStatus
 
 // Layout settings — cards fill the viewport; headings and filters retain their horizontal inset.
 private val HistoryHeadingHorizontalPadding = 16.dp
@@ -77,7 +78,7 @@ fun HistoryContent(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = "$totalCount completed " +
+                        text = "$totalCount saved " +
                             if (totalCount == 1) "trip" else "trips",
                         style = MaterialTheme.typography.titleMedium,
                         color = TransitWhite
@@ -134,11 +135,13 @@ fun HistoryContent(
                     ) {
                         Text(
                             text = when {
-                                totalCount == 0 -> "No completed trips yet"
+                                totalCount == 0 -> "No trips yet"
                                 filter == TripHistoryFilter.REVIEWED ->
                                     "No reviewed trips"
                                 filter == TripHistoryFilter.NOT_REVIEWED ->
                                     "Every completed trip is reviewed"
+                                filter == TripHistoryFilter.CANCELLED ->
+                                    "No saved cancelled trips"
                                 else -> "No trips to display"
                             },
                             style = MaterialTheme.typography.titleLarge,
@@ -190,7 +193,8 @@ fun HistoryContent(
                     onOpenDetails = onOpenDetails?.let { callback ->
                         { callback(trip.id) }
                     },
-                    onReview = onReview?.let { callback ->
+                    // Cancelled trips cannot be reviewed.
+                    onReview = onReview?.takeIf { trip.status == TripStatus.Completed }?.let { callback ->
                         { callback(trip.id) }
                     },
                     onRemove = { onRemove(trip.id) },

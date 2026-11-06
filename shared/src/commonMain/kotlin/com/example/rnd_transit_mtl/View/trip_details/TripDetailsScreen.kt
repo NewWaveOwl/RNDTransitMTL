@@ -13,6 +13,7 @@ import com.example.rnd_transit_mtl.state.trip.LocalTripsStore
 import com.example.rnd_transit_mtl.navigation.LocalTripNavigation
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.trip.TripDetailsV3
 import com.example.rnd_transit_mtl.View.history.formatTripTimestampUtc
+import com.example.rnd_transit_mtl.model.trip.TripStatus
 
 /**
  * Resolves the latest completed record by stable ID.
@@ -38,7 +39,7 @@ fun TripDetailsScreen(
     val snapshot by tripsStore.state
     val trip = snapshot.completedTrips.firstOrNull {
         it.id == tripId
-    }
+    } ?: snapshot.cancelledTrips.firstOrNull { it.id == tripId }
 
     val latestDestinationActive by rememberUpdatedState(
         isDestinationActive
@@ -64,10 +65,11 @@ fun TripDetailsScreen(
     val navigation = LocalTripNavigation.current
     if (trip != null) {
         TripDetailsV3(trip,
-            completedLabel = formatTripTimestampUtc(trip.completedAtEpochMillis ?: trip.createdAtEpochMillis),
+            completedLabel = formatTripTimestampUtc(trip.completedAt ?: trip.cancelledAt ?: trip.createdAt),
             onRepeat = { if (latestDestinationActive) navigation.openPlannerCopy(tripId, true) },
             onEditCopy = { if (latestDestinationActive) navigation.openPlannerCopy(tripId, false) },
-            onReview = reviewCallback,
+            // Cancelled trips cannot be reviewed.
+            onReview = reviewCallback.takeIf { trip.status == TripStatus.Completed },
             enabled = isDestinationActive, errorMessage = errorMessage, modifier = modifier)
         return
     }

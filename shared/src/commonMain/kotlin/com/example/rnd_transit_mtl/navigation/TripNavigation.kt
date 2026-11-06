@@ -37,7 +37,7 @@ class TripNavigation(
      * @param generate Whether to generate a fresh proposal once the planner is ready.
      */
     fun openPlannerCopy(tripId: TripId, generate: Boolean): Boolean {
-        if (tripsStore.findCompleted(tripId) == null) return false
+        if (tripsStore.findInHistory(tripId) == null) return false
         if (!returnToPlanner()) return false
         plannerCopyRequest = tripId to generate
         return true
@@ -197,7 +197,8 @@ class TripNavigation(
 
     fun openDetails(tripId: TripId): Boolean {
         dismissTripInformation()
-        if (tripsStore.findCompleted(tripId) == null) return false
+        // Details also open kept cancelled trips from History.
+        if (tripsStore.findInHistory(tripId) == null) return false
         if (!discardCurrentReview()) return false
 
         pruneCompletedSimulationEntries()

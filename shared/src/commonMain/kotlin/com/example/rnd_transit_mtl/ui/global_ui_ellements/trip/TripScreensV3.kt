@@ -1,4 +1,5 @@
 package com.example.rnd_transit_mtl.ui.global_ui_ellements.trip
+import com.example.rnd_transit_mtl.data.assets.toSampleMapPoint
 import com.example.rnd_transit_mtl.model.ids.TripId
 
 import androidx.compose.foundation.BorderStroke
@@ -29,9 +30,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.MockTripMap
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.toSampleMapLegs
 import com.example.rnd_transit_mtl.ui.theme.*
 import kotlin.math.roundToInt
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.ratings.StarRatingRow
+import com.example.rnd_transit_mtl.model.trip.TripStatus
 
 // Layout settings — dp dimensions shared by the supplied V3 screens.
 private val V3SectionPadding = 16.dp
@@ -306,7 +309,7 @@ fun ReviewV3(
             V3Button("Save review", onSave, enabled && rating != null)
             V3Button("Skip review", onSkip, enabled, true)
             V3Button(
-                "Rate a route segment or place",
+                "Rate a route leg or place",
                 onFeedback,
                 enabled && feedbackEnabled,
                 true
@@ -315,7 +318,7 @@ fun ReviewV3(
     }
 }
 
-// ---------- SEGMENT / PLACE FEEDBACK ----------
+// ---------- LEG / PLACE FEEDBACK ----------
 
 enum class FeedbackChoice {
     NONE, LIKED, DISLIKED
@@ -531,6 +534,8 @@ fun HistoryV3(
 // ---------- SAVED TRIP DETAILS ----------
 
 /** Saved-trip presentation. Repeat creates a fresh proposal; Edit copy restores preferences without overwriting history.
+ * A kept cancelled trip shows as Cancelled without a review section.
+ * @param completedLabel Formatted time the trip ended, by completion or cancellation.
  * @param onReview Opens the saved trip's review editor; null omits the action when navigation is unavailable.
  */
 @Composable
@@ -547,8 +552,9 @@ fun TripDetailsV3(
     Column(modifier.fillMaxSize().background(TransitWhite)) {
         Box(Modifier.fillMaxWidth().weight(1f)) {
             MockTripMap(
-                start = trip.start,
-                destination = trip.destination,
+                start = trip.origin.toSampleMapPoint(),
+                destination = trip.destination.toSampleMapPoint(),
+                legs = trip.toSampleMapLegs(),
                 progress = 1f,
                 matchPlannerBackground = true,
                 modifier = Modifier.fillMaxSize()
@@ -595,8 +601,9 @@ fun TripDetailsV3(
                 fontSize = 25.sp,
                 fontWeight = FontWeight.Bold
             )
+            val cancelled = trip.status == TripStatus.Cancelled
             Text(
-                "Completed · $completedLabel",
+                "${if (cancelled) "Cancelled" else "Completed"} · $completedLabel",
                 color = TransitSelected,
                 fontWeight = FontWeight.Bold
             )
@@ -608,7 +615,7 @@ fun TripDetailsV3(
             )
 
             val review = trip.review
-            TripReviewSummary(review = review, linksEnabled = enabled)
+            if (!cancelled) TripReviewSummary(review = review, linksEnabled = enabled)
 
             V3Error(errorMessage)
             if (onReview != null) {
@@ -621,7 +628,7 @@ fun TripDetailsV3(
             V3Button("Repeat as a new trip", onRepeat, enabled)
             V3Button("Edit a copy of these settings", onEditCopy, enabled, true)
             Text(
-                "This completed record is never overwritten.",
+                "This saved record is never overwritten.",
                 color = TransitWhite,
                 fontSize = 12.sp
             )

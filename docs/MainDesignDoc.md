@@ -166,9 +166,9 @@ Later versions may recalculate when transit is delayed, a place is closed, the u
 
 Open the review page after an adventure is completed or explicitly ended. Offer an overall **1вЂ“5 star rating** and a short written review. The user may skip either. The proposed star scale should be confirmed during interface design.
 
-Retain the source document's detailed feedback on individual route segments and attractions: single tap selects a segment and opens its information; double tap can like it; dislike is available from the information panel. Segment feedback may cover walking, cycling, transit, streets, parks, waterfronts, viewpoints, and attractions. Distinguish liked and disliked sections visually and with labels.
+Retain the source document's detailed feedback on individual route legs and attractions: single tap selects a leg and opens its information; double tap can like it; dislike is available from the information panel. Leg feedback may cover walking, cycling, transit, streets, parks, waterfronts, viewpoints, and attractions. Distinguish liked and disliked sections visually and with labels.
 
-Store reviews separately from the original trip. Overall stars and text complement the per-segment and per-attraction likes/dislikes. A skipped review leaves the trip saved without a rating.
+Store reviews separately from the original trip. Overall stars and text complement the per-leg and per-attraction likes/dislikes. A skipped review leaves the trip saved without a rating.
 
 External place ratings, such as Google, Tripadvisor, or Yelp, are an optional future integration and must be shown with their source. They remain distinct from ratings written inside TransitRandomizer.
 
@@ -266,16 +266,16 @@ These are proposed product entities. They describe required information without 
 | User | `userId`, `username`, `email`, `profileImage`, `createdAt`, `preferencesId`, `privacySettings` |
 | UserPreferences | `preferencesId`, `userId`, `enabledTransportModes`, `selectedZoneIds`, optional `allowedRouteIds` for detailed Settings, `interestCategories`, `explorationLevel`, `maximumWalkingDistance`, `maximumCyclingDistance`, `budgetPreference`, `accessibilityRequirements`, `indoorOutdoorPreference`, `language`; proposed elevation preferences |
 | TransportationMode | `transportModeId`, `type`, `category`, `routeName`, `stopOrStation`, `scheduledTime`, `estimatedTravelTime`, `availability` |
-| Trip | `tripId`, `userId`, `status`, `startLocation`, `endLocation`, `startedAt`, `completedAt`, `estimatedDuration`, `actualDuration`, `estimatedDistance`, `actualDistance`, `transportModes`, `routeSegments`, `attractions`, `selectedZoneIds` (generation-time snapshot), `isFavorite`; proposed origin/revision link for editable copies |
-| RouteSegment | `segmentId`, `tripId`, `orderNumber`, `transportMode`, `startCoordinates`, `endCoordinates`, `geometry`, `estimatedDuration`, `actualDuration`, `distance`, `relatedAttractionId`; proposed elevation measurements |
+| Trip | `tripId`, `userId`, `status`, `startLocation`, `endLocation`, `startedAt`, `completedAt`, `estimatedDuration`, `actualDuration`, `estimatedDistance`, `actualDistance`, `transportModes`, `routeLegs`, `attractions`, `selectedZoneIds` (generation-time snapshot), `isFavorite`; proposed origin/revision link for editable copies |
+| RouteLeg | `legId`, `tripId`, `orderNumber`, `transportMode`, `startCoordinates`, `endCoordinates`, `geometry`, `estimatedDuration`, `actualDuration`, `distance`, `relatedAttractionId`; proposed elevation measurements |
 | Attraction or InterestingSpot | `attractionId`, `name`, `coordinates`, `category`, `description`, `rating`, `popularity`, `interestingnessScore`, `typicalVisitDuration`, `openingHours`, `priceLevel`, `accessibilityInformation`, `source`; proposed altitude |
-| TripReview | `reviewId`, `tripId`, `userId`, `overallRating`, `createdAt`, `routeSegmentRatings`, `attractionRatings`; add `reviewText` for the short review |
+| TripReview | `reviewId`, `tripId`, `userId`, `overallRating`, `createdAt`, `routeLegRatings`, `attractionRatings`; add `reviewText` for the short review |
 | VisitedLocation | `visitedLocationId`, `userId`, `attractionId`, `tripId`, `visitedAt`, `visitCount`, `lastRating` |
 | Favorite | `favoriteId`, `userId`, `itemType`, `tripId` or `attractionId`, `createdAt` |
 
-Trip status values are **Draft**, **Generated**, **Active**, **Paused**, **Completed**, and **Cancelled**. Overall review ratings use the proposed star scale or no rating; route-segment and attraction feedback use Like, Dislike, or No Rating.
+Trip status values are **Draft**, **Generated**, **Active**, **Paused**, **Completed**, and **Cancelled**. Overall review ratings use the proposed star scale or no rating; route-leg and attraction feedback use Like, Dislike, or No Rating.
 
-A user has preferences and many trips. A trip has ordered route segments, attraction references, visit records, and an optional review. A segment may reference an attraction. Favorites belong to users and reference a trip or place. Editable copies link to their original trip rather than overwriting completed travel records.
+A user has preferences and many trips. A trip has ordered route legs, attraction references, visit records, and an optional review. A leg may reference an attraction. Favorites belong to users and reference a trip or place. Editable copies link to their original trip rather than overwriting completed travel records.
 
 Proposed extension entities are:
 
@@ -334,7 +334,7 @@ Further possibilities from the source document include real-time replanning, wea
 - Whether the first complete MVP uses live data or a controlled dataset.
 - Local persistence, remote backend, account services, and guest-data behavior.
 - Car support and how many transport combinations are practical for a given time budget.
-- In-app versus external detailed navigation and reliable selection of map segments.
+- In-app versus external detailed navigation and reliable selection of route legs on the map.
 - How attraction intensity maps to scoring and exploration levels.
 - Altitude-range versus elevation-gain controls and provider coverage for hikes.
 - Compass heading source, waypoint selection, shake sensitivity, and shake-again behavior.

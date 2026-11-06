@@ -22,12 +22,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.rnd_transit_mtl.data.assets.toSampleMapPoint
 import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.ui.theme.TransitMain
 import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 import com.example.rnd_transit_mtl.View.history.formatTripTimestampUtc
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.MockTripMap
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.toSampleMapLegs
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.formatDemoDistanceKm
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.formatGeoPoint
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.trip.TripInformationPanel
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.trip.TripReviewSummary
 
@@ -93,7 +96,7 @@ fun TripDetailsContent(
                 )
 
                 Text(
-                    text = "${trip.start.label} to ${trip.destination.label}",
+                    text = "${trip.origin.label} to ${trip.destination.label}",
                     style = MaterialTheme.typography.titleMedium,
                     color = TransitMain
                 )
@@ -123,7 +126,7 @@ fun TripDetailsContent(
 
                     Text(
                         text = "Created: " +
-                            formatTripTimestampUtc(trip.createdAtEpochMillis),
+                            formatTripTimestampUtc(trip.createdAt),
                         style = MaterialTheme.typography.bodyMedium,
                         color = TransitWhite
                     )
@@ -131,7 +134,7 @@ fun TripDetailsContent(
                     Text(
                         text = "Completed: " +
                             (
-                                trip.completedAtEpochMillis
+                                trip.completedAt
                                     ?.let(::formatTripTimestampUtc)
                                     ?: "Completion information unavailable"
                                 ),
@@ -155,8 +158,9 @@ fun TripDetailsContent(
                 )
 
                 MockTripMap(
-                    start = trip.start,
-                    destination = trip.destination,
+                    start = trip.origin.toSampleMapPoint(),
+                    destination = trip.destination.toSampleMapPoint(),
+                    legs = trip.toSampleMapLegs(),
                     progress = 1f,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -164,12 +168,11 @@ fun TripDetailsContent(
                 )
 
                 Text(
-                    text = "Start map point: " +
-                        "(${trip.start.x}, ${trip.start.y})\n" +
-                        "Destination map point: " +
-                        "(${trip.destination.x}, ${trip.destination.y})\n" +
-                        "These are normalized mock-image positions, " +
-                        "not geographic coordinates. This map is static.",
+                    text = "Start: ${formatGeoPoint(trip.origin.point)}\n" +
+                        "Destination: ${formatGeoPoint(trip.destination.point)}\n" +
+                        (if (trip.legs.all { it.isRouted }) "Drawn along the planned route. "
+                        else "Dashed parts are straight lines, not a street route. ") +
+                        "This map is static.",
                     style = MaterialTheme.typography.bodySmall,
                     color = TransitMain
                 )
