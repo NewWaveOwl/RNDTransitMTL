@@ -9,6 +9,9 @@ import com.example.rnd_transit_mtl.model.trip.TripStatus
 import com.example.rnd_transit_mtl.model.review.TripReview
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Clock
 import com.example.rnd_transit_mtl.state.review.ReviewDraft
 
@@ -561,6 +564,8 @@ class TripsStore private constructor(
     }
 
     companion object {
+        private const val SCHEMA_VERSION_KEY = "schemaVersion"
+
         private val savedStateJson = Json {
             encodeDefaults = true
             ignoreUnknownKeys = false
@@ -581,7 +586,8 @@ class TripsStore private constructor(
          * Explicit restoration entry point for the Saver and manual checks.
          *
          * Decoding invokes record and snapshot validation. Malformed JSON,
-         * invalid records, or an unsupported schema return null.
+         * invalid records, or an unsupported schema return null. A schema 1
+         * snapshot from an earlier build is migrated, keeping its trips.
          *
          * A defensive boundary case at exactly 10000 milliseconds is
          * completed immediately. Ordinary saves never expose that
@@ -594,10 +600,16 @@ class TripsStore private constructor(
             }
         ): TripsStore? {
             val decoded = try {
-                savedStateJson.decodeFromString(
-                    TripsState.serializer(),
-                    encoded
-                )
+                val savedVersion = savedStateJson.parseToJsonElement(encoded)
+                    .jsonObject[SCHEMA_VERSION_KEY]?.jsonPrimitive?.intOrNull
+                if (savedVersion == 1) {
+                    savedStateJson.decodeFromString(TripsStateV1.serializer(), encoded).migrate()
+                } else {
+                    savedStateJson.decodeFromString(
+                        TripsState.serializer(),
+                        encoded
+                    )
+                }
             } catch (_: SerializationException) {
                 return null
             } catch (_: IllegalArgumentException) {

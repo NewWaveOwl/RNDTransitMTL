@@ -28,6 +28,7 @@ import com.example.rnd_transit_mtl.ui.theme.TransitMain
 import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 import com.example.rnd_transit_mtl.View.history.formatTripTimestampUtc
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.MockTripMap
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.toSampleMapLegs
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.formatDemoDistanceKm
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.formatGeoPoint
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.trip.TripInformationPanel
@@ -159,6 +160,7 @@ fun TripDetailsContent(
                 MockTripMap(
                     start = trip.origin.toSampleMapPoint(),
                     destination = trip.destination.toSampleMapPoint(),
+                    legs = trip.toSampleMapLegs(),
                     progress = 1f,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -168,7 +170,8 @@ fun TripDetailsContent(
                 Text(
                     text = "Start: ${formatGeoPoint(trip.origin.point)}\n" +
                         "Destination: ${formatGeoPoint(trip.destination.point)}\n" +
-                        "Drawn as a straight line, not a street route. " +
+                        (if (trip.legs.all { it.isRouted }) "Drawn along the planned route. "
+                        else "Dashed parts are straight lines, not a street route. ") +
                         "This map is static.",
                     style = MaterialTheme.typography.bodySmall,
                     color = TransitMain

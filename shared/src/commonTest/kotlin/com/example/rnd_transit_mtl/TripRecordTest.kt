@@ -177,14 +177,6 @@ class TripRecordTest {
     }
 
     @Test
-    fun savedStateFromBeforePlacesStartsFresh() {
-        val versionOne = """{"schemaVersion":1,"activeTrip":null,"completedTrips":[],""" +
-            """"pendingReviewTripId":null,"reviewDrafts":{}}"""
-
-        assertNull(TripsStore.fromSavedStateJson(versionOne))
-    }
-
-    @Test
     fun generatorCreatesAGeneratedOwnedTripWithOneStraightLeg() = runTest {
         val owner = UserId("user-7")
         val result = MockTripGenerator(

@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.model.trip.TripPoint
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.MockTripMap
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.toSampleMapLegs
 import com.example.rnd_transit_mtl.ui.theme.*
 import org.jetbrains.compose.resources.painterResource
 import rnd_transit_mtl.shared.generated.resources.Res
@@ -211,6 +212,7 @@ internal fun TripProposalContent(
         MockTripMap(
             start = trip.origin.toSampleMapPoint(),
             destination = trip.destination.toSampleMapPoint(),
+            legs = trip.toSampleMapLegs(),
             progress = 0f,
             matchPlannerBackground = true,
             modifier = Modifier.fillMaxSize()
@@ -269,7 +271,8 @@ internal fun TripProposalContent(
                 // Round like the active, completion and details screens so one trip shows one distance.
                 val distance = (trip.distanceKm * 10).roundToInt() / 10.0
                 Text(
-                    text = "${trip.plannedMinutes} min · $distance km · One way",
+                    text = "${trip.plannedMinutes} min · $distance km" +
+                        (if (trip.legs.all { it.isRouted }) "" else " straight line") + " · One way",
                     color = TransitWhite,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold

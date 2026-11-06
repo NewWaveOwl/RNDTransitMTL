@@ -28,6 +28,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.MockTripMap
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.toSampleMapLegs
 import com.example.rnd_transit_mtl.ui.theme.*
 import kotlin.math.ceil
 import kotlin.math.roundToInt
@@ -152,6 +153,7 @@ fun ActiveMapContent(
                 MockTripMap(
                     start = trip.origin.toSampleMapPoint(),
                     destination = trip.destination.toSampleMapPoint(),
+                    legs = trip.toSampleMapLegs(),
                     progress = retainedMapProgress,
                     interactive = actionsEnabled && !confirmingCancel && !confirmingFinish,
                     matchPlannerBackground = true,

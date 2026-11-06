@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.MockTripMap
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.toSampleMapLegs
 import com.example.rnd_transit_mtl.ui.theme.*
 import kotlin.math.roundToInt
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.ratings.StarRatingRow
@@ -553,6 +554,7 @@ fun TripDetailsV3(
             MockTripMap(
                 start = trip.origin.toSampleMapPoint(),
                 destination = trip.destination.toSampleMapPoint(),
+                legs = trip.toSampleMapLegs(),
                 progress = 1f,
                 matchPlannerBackground = true,
                 modifier = Modifier.fillMaxSize()

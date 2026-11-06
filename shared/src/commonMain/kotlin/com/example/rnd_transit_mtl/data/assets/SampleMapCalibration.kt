@@ -1,6 +1,7 @@
 package com.example.rnd_transit_mtl.data.assets
 
 import com.example.rnd_transit_mtl.model.geo.GeoBounds
+import com.example.rnd_transit_mtl.model.geo.GeoPoint
 import com.example.rnd_transit_mtl.model.geo.MapPosition
 import com.example.rnd_transit_mtl.model.geo.MapProjection
 import com.example.rnd_transit_mtl.model.trip.Place
@@ -43,8 +44,18 @@ fun TripPoint.toSampleMapPlace(): Place =
  * @receiver Real place to draw.
  * @return Normalized image position with the place's label.
  */
-fun Place.toSampleMapPoint(): TripPoint {
-    val position = SampleMapProjection.toMapPosition(point)
+fun Place.toSampleMapPoint(): TripPoint = point.toSampleMapPoint(label)
+
+/**
+ * Finds where a coordinate appears on map_sample.png, such as a point of a
+ * leg's geometry. Points outside the image are clamped to its nearest edge.
+ *
+ * @receiver Real position to draw.
+ * @param label Label for the returned point; not shown on the map.
+ * @return Normalized image position.
+ */
+fun GeoPoint.toSampleMapPoint(label: String): TripPoint {
+    val position = SampleMapProjection.toMapPosition(this)
     return TripPoint(
         label = label,
         x = position.x.toFloat().coerceIn(0f, 1f),
