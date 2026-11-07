@@ -1,5 +1,8 @@
 package com.example.rnd_transit_mtl.View.main
 import com.example.rnd_transit_mtl.LocalDebugStmTripLoader
+import com.example.rnd_transit_mtl.LocalDebugExoTripLoader
+import com.example.rnd_transit_mtl.LocalDebugTripLaunch
+import com.example.rnd_transit_mtl.DebugTripSource
 import com.example.rnd_transit_mtl.data.assets.toSampleMapPoint
 import com.example.rnd_transit_mtl.state.NullableTripIdSaver
 import com.example.rnd_transit_mtl.model.ids.TripId
@@ -73,7 +76,8 @@ internal fun TransitOpeningScreen(
     sampleOutcome: Trip33Sample = Trip33Sample.Normal
 ) {
     val loadDebugStmTrip = LocalDebugStmTripLoader.current
-    var stmProposal by rememberSaveable { mutableStateOf(false) }
+    val loadDebugExoTrip = LocalDebugExoTripLoader.current
+    var debugProposalSource by rememberSaveable { mutableStateOf<String?>(null) }
     val tripsStore = LocalTripsStore.current
     val liveMap = LocalTransitMap.current != null
     val location = LocalPlannerLocation.current
@@ -182,7 +186,7 @@ internal fun TransitOpeningScreen(
     }
 
     fun closeProposalFlow() {
-        stmProposal = false
+        debugProposalSource = null
         proposalGuard.cancel()
         generationJob?.cancel()
         generationJob = null
@@ -280,7 +284,7 @@ internal fun TransitOpeningScreen(
     }
 
     fun performPrimaryAction() {
-        stmProposal = false
+        debugProposalSource = null
         if (!latestDestinationActive ||
             processingAction ||
             pendingOpenTripId != null
@@ -495,33 +499,57 @@ internal fun TransitOpeningScreen(
         }
     }
 
-    fun requestStmTrip() {
-        val load = loadDebugStmTrip ?: return
+    fun requestDebugTrip(source: DebugTripSource) {
+        val load = (when (source) {
+            DebugTripSource.Stm -> loadDebugStmTrip
+            DebugTripSource.Exo -> loadDebugExoTrip
+        }) ?: return
         if (!latestDestinationActive || processingAction || pendingOpenTripId != null ||
             tripsStore.activeTrip != null || pendingReviewId != null
         ) return
 
         closeProposalFlow()
-        stmProposal = true
+        debugProposalSource = source.name
+        val enabledModes = planner.selectedTransportIds.toList()
+        val labels = transportTypes.filter { it.id in enabledModes }.joinToString(" + ") { it.label }
+        requestSummary = "$boundedMinutes minutes · $labels"
         val token = proposalGuard.begin()
         processingAction = true
         generationJob = generationScope.launch {
+            fun fail(kind: Trip33Failure, detail: String = "") {
+                if (proposalGuard.complete(token, null)) {
+                    failureName = kind.name
+                    failureMessage = detail
+                }
+            }
             try {
-                val trip = load()
-                val encoded = Json.encodeToString(trip)
-                if (latestDestinationActive && proposalGuard.complete(token, trip.id)) {
-                    proposalJson = encoded
+                when (val result = load(enabledModes)) {
+                    is TripGenerationResult.Success -> {
+                        val encoded = Json.encodeToString(result.trip)
+                        if (latestDestinationActive && proposalGuard.complete(token, result.trip.id)) {
+                            proposalJson = encoded
+                        }
+                    }
+                    is TripGenerationResult.InvalidInput -> fail(Trip33Failure.InvalidInput, result.message)
+                    TripGenerationResult.NoRoute -> fail(Trip33Failure.NoRoute)
+                    is TripGenerationResult.RoutingUnavailable -> fail(Trip33Failure.ProviderUnavailable, result.message)
+                    TripGenerationResult.IdUnavailable -> fail(Trip33Failure.InvalidInput, "Try again to create a trip ID.")
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                if (proposalGuard.complete(token, null)) {
-                    failureName = Trip33Failure.ProviderUnavailable.name
-                    failureMessage = "Could not load the STM test trip. Check that OTP is running and try again."
-                }
+                fail(Trip33Failure.ProviderUnavailable, "Could not load the test trip. Try again when OTP is available.")
             } finally {
                 if (proposalGuard.isCurrent(token)) processingAction = false
             }
+        }
+    }
+
+    val debugLaunch = LocalDebugTripLaunch.current
+    LaunchedEffect(debugLaunch?.source, isDestinationActive) {
+        if (debugLaunch != null && isDestinationActive) {
+            debugLaunch.consume()
+            requestDebugTrip(debugLaunch.source)
         }
     }
 
@@ -576,7 +604,8 @@ internal fun TransitOpeningScreen(
                 closeProposalFlow()
             },
             onRetry = {
-                if (stmProposal) requestStmTrip() else {
+                val source = debugProposalSource?.let(DebugTripSource::valueOf)
+                if (source != null) requestDebugTrip(source) else {
                     closeProposalFlow()
                     performPrimaryAction()
                 }
@@ -621,7 +650,7 @@ internal fun TransitOpeningScreen(
     if (proposal != null) {
         TripProposalContent(
             trip = proposal,
-            scheduled = stmProposal,
+            scheduled = debugProposalSource != null,
             onStart = {
                 if (latestDestinationActive &&
                     !processingAction &&
@@ -655,7 +684,8 @@ internal fun TransitOpeningScreen(
                 }
             },
             onGenerateAnother = {
-                if (stmProposal) requestStmTrip() else {
+                val source = debugProposalSource?.let(DebugTripSource::valueOf)
+                if (source != null) requestDebugTrip(source) else {
                     closeProposalFlow()
                     performPrimaryAction()
                 }
@@ -852,7 +882,10 @@ internal fun TransitOpeningScreen(
             onPrimaryAction = { performPrimaryAction() },
             onLoadStmTrip = if (loadDebugStmTrip != null && activeState == null &&
                 pendingReviewId == null && pendingOpenTripId == null && isDestinationActive
-            ) ::requestStmTrip else null,
+            ) ({ requestDebugTrip(DebugTripSource.Stm) }) else null,
+            onLoadExoTrip = if (loadDebugExoTrip != null && activeState == null &&
+                pendingReviewId == null && pendingOpenTripId == null && isDestinationActive
+            ) ({ requestDebugTrip(DebugTripSource.Exo) }) else null,
             onOpenDetailedSettings = {
                 if (canChangeInputs() && navigator.current == MainScreenKey) {
                     navigation.openSection(SettingsScreenKey)

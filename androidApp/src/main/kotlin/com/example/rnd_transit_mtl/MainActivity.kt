@@ -28,10 +28,15 @@ class MainActivity : ComponentActivity() {
 
         val showStartup = savedInstanceState == null &&
             (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || ValueAnimator.areAnimatorsEnabled())
+        val openStmPreview = BuildConfig.DEBUG && intent.getBooleanExtra("openStmPreview", false)
+        val openExoPreview = BuildConfig.DEBUG && intent.getBooleanExtra("openExoPreview", false)
         setContent {
             ProvideAndroidTransitMap(styleUrl = getString(R.string.map_style_url)) {
                 Box(Modifier.fillMaxSize()) {
-                    App(loadDebugStmTrip = stmTripLoader())
+                    App(
+                        loadDebugStmTrip = stmTripLoader(), openDebugStmPreview = openStmPreview,
+                        loadDebugExoTrip = exoTripLoader(), openDebugExoPreview = openExoPreview
+                    )
                     if (showStartup) AnimatedStartupOverlay()
                 }
             }

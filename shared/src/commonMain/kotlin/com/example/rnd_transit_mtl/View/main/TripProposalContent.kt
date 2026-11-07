@@ -13,6 +13,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.produceState
+import kotlinx.coroutines.delay
+import kotlin.time.Clock
+import kotlin.time.Instant
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -220,6 +224,13 @@ internal fun TripProposalContent(
     modifier: Modifier = Modifier,
     scheduled: Boolean = false
 ) {
+    val nowMillis by produceState(initialValue = Clock.System.now().toEpochMilliseconds(), key1 = trip.id) {
+        if (trip.legs.none { it.transitTiming != null }) return@produceState
+        while (true) {
+            delay(1000)
+            value = Clock.System.now().toEpochMilliseconds()
+        }
+    }
     val liveMap = LocalTransitMap.current != null
     val density = LocalDensity.current
     var headerHeight by remember { mutableIntStateOf(0) }
@@ -318,14 +329,32 @@ internal fun TripProposalContent(
                 } else {
                     ((trip.distanceKm * 10).roundToInt() / 10.0).toString()
                 }
-                val duration = if (scheduled) {
-                    "${(trip.legs.sumOf { it.durationSeconds } / 60.0).roundToInt()} min scheduled"
+                val timedLegs = trip.legs.filter { it.transitTiming != null }
+                val estimates = timedLegs.mapNotNull { it.transitTiming }.filter { it.realtimeApplied }
+                val elapsedSeconds = if (timedLegs.size > 1) {
+                    val first = requireNotNull(timedLegs.first().transitTiming)
+                    val last = requireNotNull(timedLegs.last().transitTiming)
+                    val departure = first.estimatedDeparture.takeIf { first.realtimeApplied } ?: first.scheduledDeparture
+                    val arrival = last.estimatedArrival.takeIf { last.realtimeApplied } ?: last.scheduledArrival
+                    runCatching { (Instant.parse(arrival) - Instant.parse(departure)).inWholeSeconds }
+                        .getOrNull()?.takeIf { it > 0 } ?: trip.legs.sumOf { it.durationSeconds }
+                } else trip.legs.sumOf { it.durationSeconds }
+                val minutes = (elapsedSeconds / 60.0).roundToInt()
+                val duration = if (estimates.isNotEmpty()) {
+                    val kind = if (estimates.all { it.predictionsFreshAt(nowMillis) }) "estimated" else "saved estimate"
+                    "$minutes min $kind"
+                } else if (scheduled) {
+                    if (timedLegs.isEmpty()) "$minutes min routed" else "$minutes min scheduled"
                 } else {
                     "${trip.plannedMinutes} min"
                 }
+                val geometryNote = when {
+                    trip.legs.all { it.isRouted } -> ""
+                    trip.legs.any { it.isRouted } -> " · includes short map connections"
+                    else -> " straight line"
+                }
                 Text(
-                    text = "$duration · $distance km" +
-                        (if (trip.legs.all { it.isRouted }) "" else " straight line") + " · One way",
+                    text = "$duration · $distance km$geometryNote · One way",
                     color = TransitWhite,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
@@ -342,7 +371,61 @@ internal fun TripProposalContent(
                     fontSize = 12.sp
                 )
 
-                ProposalButton("Start Trip", true, onStart)
+                if (timedLegs.size > 1) ProposalButton("Start Trip", true, onStart)
+
+                for (leg in timedLegs) {
+                    val timing = requireNotNull(leg.transitTiming)
+                    val predictionFresh = timing.predictionsFreshAt(nowMillis)
+                    if (timedLegs.size > 1) {
+                        trip.selectedRoutes.firstOrNull { it.id == leg.routeId }?.let { route ->
+                            Text(route.label, color = TransitWhite, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Text(
+                        text = when {
+                            timing.realtimeApplied && predictionFresh -> "Realtime estimate"
+                            timing.realtimeApplied -> "Saved realtime estimate · stale"
+                            timing.predictionSourceStatus == "stale" -> "Scheduled · predictions stale"
+                            timing.predictionSourceStatus == "unavailable" -> "Scheduled · predictions unavailable"
+                            timing.predictionSourceStatus == null -> "Scheduled · feed freshness unverified"
+                            else -> "Scheduled"
+                        },
+                        color = TransitWhite,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = "Scheduled: ${timing.scheduledDeparture} → ${timing.scheduledArrival}",
+                        color = TransitWhite,
+                        fontSize = 12.sp
+                    )
+                    if (timing.realtimeApplied) {
+                        Text(
+                            text = (if (predictionFresh) "Estimated: " else "Saved estimate: ") +
+                                "${timing.estimatedDeparture ?: timing.scheduledDeparture} → " +
+                                (timing.estimatedArrival ?: timing.scheduledArrival),
+                            color = TransitWhite,
+                            fontSize = 12.sp
+                        )
+                        Text(
+                            text = "Departure delay: ${timing.departureDelay ?: "unavailable"} · " +
+                                "Arrival delay: ${timing.arrivalDelay ?: "unavailable"}",
+                            color = TransitWhite,
+                            fontSize = 12.sp
+                        )
+                    }
+                    if (timing.alertsFreshAt(nowMillis)) {
+                        timing.alerts.forEach { alert ->
+                            Text("Service alert: $alert", color = TransitWhite, fontSize = 12.sp)
+                        }
+                        if (timing.skippedAlerts > 0) {
+                            Text("Some service alerts could not be mapped.", color = TransitWhite, fontSize = 12.sp)
+                        }
+                    } else if (timing.alertSourceStatus != null) {
+                        Text("Service alerts unavailable or stale.", color = TransitWhite, fontSize = 12.sp)
+                    }
+                }
+
+                if (timedLegs.size <= 1) ProposalButton("Start Trip", true, onStart)
 
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     ProposalButton(

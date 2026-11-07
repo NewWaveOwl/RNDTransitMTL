@@ -165,7 +165,8 @@ internal fun MainPlannerContent(
     origin: TripPoint? = TripPoint("Current location", 0.5f, 0.35f),
     onEditOrigin: () -> Unit = {},
     liveOriginLabel: String? = null,
-    onLoadStmTrip: (() -> Unit)? = null
+    onLoadStmTrip: (() -> Unit)? = null,
+    onLoadExoTrip: (() -> Unit)? = null
 ) {
     val liveLocation = LocalPlannerLocation.current
     // Expansion is presentation state, separate from transport and zone selections.
@@ -492,6 +493,14 @@ internal fun MainPlannerContent(
                                 onClick = onLoadStmTrip,
                                 modifier = Modifier.padding(horizontal = 16.dp)
                             ) { Text("Load STM test trip") }
+                        }
+                    }
+                    if (onLoadExoTrip != null) {
+                        item {
+                            androidx.compose.material3.Button(
+                                onClick = onLoadExoTrip,
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            ) { Text("Load STM + exo test trip") }
                         }
                     }
                     val summary = activeTripSummary ?: pendingReviewSummary

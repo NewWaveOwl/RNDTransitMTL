@@ -1,6 +1,6 @@
 # ADR - Real Montréal routes with simulated trip progress
 
-**Status** — Accepted. Implementation complete for the local Android debug prototype.
+**Status** - Accepted for the local Android routing investigation in #21.
 
 **Verification date** — November 7, 2026, Montréal time.
 
@@ -18,16 +18,23 @@ Use OpenTripPlanner (OTP) 2.10.0 on Java 25. Build one local graph from `Montrea
 | --- | --- |
 | OTP | Return ordered legs, modes, line IDs, geometry, distances, and scheduled or estimated times through `planConnection`. |
 | Local realtime bridge | Fetch and validate agency feeds, track predictions and alerts separately for each feed, and expose freshness to Android. Keep credentials in server-local configuration. |
-| Android debug loader | Request a fixed itinerary through `OtpRoutingService` at `POST /otp/gtfs/v1`, decode geometry, and create shared `Trip` and `RouteLeg` values. |
+| Shared routing and Android debug loader | Send `POST /otp/gtfs/v1` from the debug build. The shared `OtpRoutingService` implements the #27 `RoutingService` contract and returns ordered legs, line IDs, geometry, elapsed time, and wait time. The debug loader uses that result to build the trip. |
 | Trip Preview and Active Trip | Reuse the accepted route and `ActiveTripSimulation`. Preview shows provider travel time and distance, including transfer time for the mixed itinerary. Playback uses the existing 10-second clock. |
 
-The debug loader maps `BUS`, `SUBWAY`, `WALK`, and `RAIL` for the tested journeys. It uses the first and last geometry points as the trip endpoints, joins short platform offsets through the walking leg, and rejects missing or disconnected geometry. The debug actions load an STM bus or an STM-to-exo itinerary. The regular **GO** flow uses `FakeRoutingService`. [OTP planning query](https://docs.opentripplanner.org/api/dev-2.x/graphql-gtfs/queries/planConnection)
+The debug actions load a fixed STM bus or STM-to-exo itinerary. OTP provides `BUS`, `SUBWAY`, `WALK`, and `RAIL` legs for those demos. When the primary route fails, the loader requests direct `WALK` or `BICYCLE` routes between the same endpoints, in the order those modes are enabled in the planner. It preserves the provider's leg shapes and marks short endpoint and platform connections of up to 35 m as unrouted. Missing shapes and larger gaps produce a provider error. The regular **GO** flow uses `FakeRoutingService`. [OTP planning query](https://docs.opentripplanner.org/api/dev-2.x/graphql-gtfs/queries/planConnection)
 
 The bridge polls STM every 60 seconds and exo every 120 seconds. The exo portal showed no numeric quota during setup. A later HTTP 429 triggered backoff, and the feeds recovered. A stale alert feed hides its alerts independently of prediction freshness. If an itinerary requires stale or unavailable prediction data, the bridge falls back to the timetable. Preview retains scheduled times and displays estimates when OTP applies them. [STM open data](https://www.stm.info/a-propos/documents-donnees/donnees-ouvertes) · [exo open data](https://exo.quebec/fr/a-propos/donnees-ouvertes) · [Chrono SAEIV](https://portail-developpeur.chrono-saeiv.com/apis)
 
 ## Verification results
 
 Scheduled times below are local to Montréal. Distances are from OTP.
+
+| Static GTFS snapshot | Regular calendar range | Calendar exception range |
+| --- | --- | --- |
+| STM, saved November 6, 2026 in Montréal | August 24, 2026 to January 3, 2027 | September 7 to December 25, 2026 |
+| exo trains, downloaded November 7, 2026 in Montréal | October 19, 2026 to January 3, 2027 | December 25, 2026 to January 2, 2027 |
+
+These are the outer date ranges in the captured feeds. Individual trips follow their service calendars and date exceptions.
 
 | Check | Observed result |
 | --- | --- |
@@ -37,8 +44,11 @@ Scheduled times below are local to Montréal. Distances are from OTP.
 | Scheduled exo train | On November 7, line 11 Vaudreuil–Hudson departed Vendôme at 09:35 and arrived at Montréal-Ouest at 09:40:15. OTP returned 3,750 m and 30 geometry points. |
 | STM-to-exo transfer and Android playback | Orange Line 2 ran from Lionel-Groulx at 09:20 to Vendôme at 09:23. The walk reached the exo platform at 09:28:30, leaving 6 min 30 sec before the line 11 departure. The Pixel 9 emulator reached **Adventure complete** about 12 seconds after tapping **Start Trip**, including the screen transition. |
 | exo realtime | Both Chrono endpoints authenticated. OTP imported 22 live alerts and attached the Saint-Jérôme line 12 speed restriction to an affected itinerary. A controlled outage returned HTTP 503 for both exo feeds, routing fell back to the timetable, and both feeds recovered. OTP applied a simulated two-minute prediction, and the fixture verified stale-alert isolation and prediction recovery. |
+| Shared routing contract | Replaying the saved STM-to-exo response returned Metro, Walk, and Train in order with their decoded shapes, 6,033.57 m of routed distance, 20 min 15 sec elapsed, and 6 min 30 sec waiting. The 5 min 30 sec transfer walk is a separate leg. |
+| Walking and cycling fallback | Replaying each saved Old Montréal response after a no-route result produced a routed fallback only when that mode was enabled. The request kept both endpoints and selected one direct mode. |
+| Failure and retry | Invalid input was rejected before calling OTP. The adapter returned separate no-route and provider-unavailable outcomes for an OTP routing error and a simulated timeout. The planner test checked all three messages, unchanged selections, no active trip, and a second request from **Try again**. |
 
-The Android debug build and shared JVM tests passed. The adapter fixtures also passed identifier matching, independent feed freshness, and scheduled fallback checks. [Physical-phone STM alert screenshot](https://chatgpt.com/library?file_id=libfile_d10d942af92481918bd3914ef298ebc3&account_id=personal)
+The earlier Android debug build and device checks covered live STM and the mixed journey. The generated direct and mixed queries returned real routes when rerun against the saved Montréal graph. The #21 contract and fallback checks replay captured OTP responses, and the planner failure test exercises the Compose UI with injected outcomes. The realtime bridge fixtures cover identifier matching, independent feed freshness, and scheduled fallback. [Physical-phone STM alert screenshot](https://chatgpt.com/library?file_id=libfile_d10d942af92481918bd3914ef298ebc3&account_id=personal)
 
 The exo prediction integration is complete for the prototype. Chrono documents estimated stop arrivals in its TripUpdate feed. The authenticated feed was reachable, and the fixture confirmed that OTP can apply a prediction to a matching train trip. The sampled live feed contained no stop-time estimates, so applying a live prediction remains a field check. [ARTM feed catalogue](https://donnees.artm.quebec/catalogue/dataset/offre-de-service-en-temps-reel-de-transport-en-commun-gtfs-realtime-des-trains-et-a) · [OTP GTFS Realtime configuration](https://docs.opentripplanner.org/en/v2.10.0/GTFS-RT-Config/)
 
@@ -49,15 +59,24 @@ The graph, bridge scripts, and sanitized evidence live in `tools/otp-montreal` u
 | Evidence | Files relative to `tools/otp-montreal/` |
 | --- | --- |
 | Walking and cycling | `combined-query.graphql`, `combined-response.json`, `old-montreal-routes.geojson` |
+| Shared adapter queries rerun on the saved graph | `issue-21-otp-query-evidence.json` contains the queries, variables, and responses for both direct modes and the mixed itinerary. |
 | Scheduled STM | `stm-scheduled/stm-metro-query.graphql`, `stm-scheduled/stm-metro-response.json`, `stm-scheduled/stm-feed-source.json` |
 | STM realtime and phone checks | `stm-scheduled/realtime-live-verification-20261107T052830Z/test-summary.json` |
 | exo feed version and service calendar | `stm-scheduled/exo-trains-feed-source.json`, `stm-scheduled/exo-trains-calendar-evidence.json` |
 | Scheduled exo, mixed trip, realtime, and emulator checks | `stm-scheduled/exo-scheduled-verification-20261107/verification-summary.json`, with queries, responses, GeoJSON, and test logs in the same directory |
 
-## Remaining acceptance checks and scope
+Run the contract and planner regression tests from the repository root.
+
+```powershell
+.\gradlew.bat :shared:jvmTest --tests "*OtpRoutingServiceTest" --tests "*Trip33FlowTest"
+```
+
+All 173 compiled shared JVM tests passed under JUnit. Gradle workers could not connect over loopback in the verification environment. Running JUnit and compiling the generated Android `BuildConfig` directly let the tests and debug APK packaging finish. The APK signature verified.
+
+## Follow-up verification and scope
 
 - During exo service, confirm OTP applies a live Chrono stop-time estimate to a matching train trip and compare it with the scheduled itinerary. A live zero-delay estimate satisfies this check.
 - Record a device test of marker position along the route, pause and resume, and final arrival. The emulator completion test covered the screen flow and completion timing.
-- Verify invalid input, no itinerary, and provider timeout in the app, including preservation of planner selections. Walking and cycling routes were verified in OTP. Connecting those alternatives to the planner's fallback flow remains open.
+- Run the shared adapter build on Android against the live local bridge. The shared contract and debug failure screens were exercised in JVM tests.
 
 This ADR records the local prototype. Random destination selection within the requested time and transport modes remains tracked in [#38](https://github.com/NewWaveOwl/RNDTransitMTL/issues/38). The exo integration covers trains. Bus feeds would require a separate access and routing check.

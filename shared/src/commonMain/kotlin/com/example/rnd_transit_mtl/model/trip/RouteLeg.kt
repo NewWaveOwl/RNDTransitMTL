@@ -26,7 +26,8 @@ data class RouteLeg(
     val geometry: List<GeoPoint>,
     val distanceMeters: Double,
     val durationSeconds: Long,
-    val isRouted: Boolean
+    val isRouted: Boolean,
+    val transitTiming: TransitTiming? = null
 ) {
     init {
         require(geometry.size >= 2) { "A route leg needs at least a start and an end point." }
@@ -69,4 +70,36 @@ data class RouteLeg(
 
     /** Where this leg ends. */
     val end: GeoPoint get() = geometry.last()
+}
+
+/** Provider timing accepted together with this leg's geometry. Older trips have no timing. */
+@Serializable
+data class TransitTiming(
+    val scheduledDeparture: String,
+    val scheduledArrival: String,
+    val estimatedDeparture: String? = null,
+    val estimatedArrival: String? = null,
+    val departureDelay: String? = null,
+    val arrivalDelay: String? = null,
+    val realtimeApplied: Boolean = false,
+    val receivedAt: Long,
+    val alerts: List<String> = emptyList(),
+    val predictionSourceStatus: String? = null,
+    val predictionSourceTimestamp: Long? = null,
+    val alertSourceStatus: String? = null,
+    val alertSourceTimestamp: Long? = null,
+    val skippedAlerts: Int = 0,
+    val predictionMaxAgeSeconds: Long = 180,
+    val alertMaxAgeSeconds: Long = 600
+) {
+    fun predictionsFreshAt(nowMillis: Long): Boolean =
+        sourceFreshAt(predictionSourceStatus, predictionSourceTimestamp, nowMillis, predictionMaxAgeSeconds)
+
+    fun alertsFreshAt(nowMillis: Long): Boolean =
+        sourceFreshAt(alertSourceStatus, alertSourceTimestamp, nowMillis, alertMaxAgeSeconds)
+
+    private fun sourceFreshAt(status: String?, timestamp: Long?, nowMillis: Long, maxAgeSeconds: Long): Boolean {
+        if (status != "fresh" || timestamp == null || timestamp <= 0) return false
+        return maxAgeSeconds in 1L..3600L && nowMillis / 1000 - timestamp in -30L..maxAgeSeconds
+    }
 }

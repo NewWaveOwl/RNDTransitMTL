@@ -41,7 +41,7 @@ android {
     buildTypes {
         debug {
             val endpoint = providers.gradleProperty("stmOtpEndpoint")
-                .orElse("http://10.0.2.2:18084/otp/gtfs/v1").get()
+                .orElse("http://10.0.2.2:18086/otp/gtfs/v1").get()
             buildConfigField("String", "STM_OTP_ENDPOINT", "\"${endpoint.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
         }
         release {

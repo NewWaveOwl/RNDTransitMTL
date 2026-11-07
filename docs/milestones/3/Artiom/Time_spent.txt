@@ -10,4 +10,9 @@
 
 21:00 -> 22:30 worked on boot animation for the app
 
-22:30 -> 23:30 worked on path finding and STM/EXO api integration
+22:30 -> 2:00 am worked on path finding and STM/EXO api integration
+
+2026-11-07
+
+10:00 -> 11:00 fined test for issue Test Montréal routing and walking/cycling alternatives
+ #21
