@@ -28,9 +28,13 @@ internal class AndroidLocationSource(private val context: Context) : LocationSou
             return@callbackFlow
         }
         val manager = context.getSystemService(LocationManager::class.java)
+        val registered = mutableListOf<String>()
+        fun reportIfUnavailable() {
+            if (registered.none(manager::isProviderEnabled)) trySend(LocationUpdate.Unavailable)
+        }
         val listener = object : LocationListener {
             override fun onProviderEnabled(provider: String) = Unit
-            override fun onProviderDisabled(provider: String) = Unit
+            override fun onProviderDisabled(provider: String) = reportIfUnavailable()
             override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) = Unit
 
             override fun onLocationChanged(location: Location) {
@@ -40,15 +44,14 @@ internal class AndroidLocationSource(private val context: Context) : LocationSou
                 ))
             }
         }
-        val registered = listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
-            .filter { provider ->
-                runCatching {
-                    if (!manager.isProviderEnabled(provider)) return@runCatching false
-                    manager.requestLocationUpdates(provider, 2_000L, 2f, listener, Looper.getMainLooper())
-                    true
-                }.getOrDefault(false)
+        // Android keeps these listeners registered when location services are toggled.
+        for (provider in listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)) {
+            runCatching {
+                manager.requestLocationUpdates(provider, 2_000L, 2f, listener, Looper.getMainLooper())
+                registered.add(provider)
             }
-        if (registered.isEmpty()) trySend(LocationUpdate.Unavailable)
+        }
+        reportIfUnavailable()
         awaitClose { manager.removeUpdates(listener) }
     }
 }

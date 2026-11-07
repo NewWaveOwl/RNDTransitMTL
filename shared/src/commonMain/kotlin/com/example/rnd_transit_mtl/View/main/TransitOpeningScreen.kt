@@ -564,6 +564,7 @@ internal fun TransitOpeningScreen(
 
     val proposalScreenVisible =
         processingAction || proposal != null || failure != null
+    val pickingLiveOriginFromFailure = liveMap && failure != null && pickingOrigin
 
     val proposalBackState = rememberNavigationEventState(
         currentInfo = NavigationEventInfo.None
@@ -571,7 +572,7 @@ internal fun TransitOpeningScreen(
 
     NavigationBackHandler(
         state = proposalBackState,
-        isBackEnabled = isDestinationActive && proposalScreenVisible,
+        isBackEnabled = isDestinationActive && proposalScreenVisible && !pickingLiveOriginFromFailure,
         onBackCompleted = { closeCurrentProposalScreen() }
     )
 
@@ -588,7 +589,7 @@ internal fun TransitOpeningScreen(
         }
     }
 
-    if (failure != null && isDestinationActive) {
+    if (failure != null && isDestinationActive && !pickingLiveOriginFromFailure) {
         Trip33FallbackContent(
             failure = failure,
             detail = failureMessage,
@@ -598,7 +599,13 @@ internal fun TransitOpeningScreen(
             enabled = !processingAction,
             onChooseMap = {
                 pickingOrigin = true
-                failureMessage = ""
+                if (liveMap) {
+                    liveDraft = null
+                    originMessage = null
+                    originMode = "pick"
+                } else {
+                    failureMessage = ""
+                }
             },
             onConfirmOrigin = { point ->
                 plannerViewModel.setOrigin(point)
@@ -761,10 +768,8 @@ internal fun TransitOpeningScreen(
                 if (canChangeInputs() && (pin != null || draftOrigin != null)) {
                     if (pin != null) plannerViewModel.setOrigin(Place("Pinned location", pin))
                     else if (draftOrigin != null) plannerViewModel.setOrigin(draftOrigin)
-                    proposalJson = null
+                    closeProposalFlow()
                     clearValidation()
-                    originMode = "planner"
-                    originMessage = null
                 }
             },
             onSearch = {
@@ -795,7 +800,12 @@ internal fun TransitOpeningScreen(
                 originDraftX = null
                 originDraftY = null
                 originMessage = null
-                originMode = if (originMode == "pick") "options" else "planner"
+                if (pickingLiveOriginFromFailure) {
+                    pickingOrigin = false
+                    originMode = "planner"
+                } else {
+                    originMode = if (originMode == "pick") "options" else "planner"
+                }
             },
             liveMapData = if (liveMap) TransitMapData(
                 browsing = true,
@@ -898,7 +908,7 @@ internal fun TransitOpeningScreen(
             onControlsHidden = { finishPlannerExit() },
             onMapViewportReady = { generationBounds = it },
             origin = planner.origin,
-            liveOriginLabel = planner.originPlace?.label,
+            liveOrigin = planner.originPlace,
             onEditOrigin = {
                 if (canChangeInputs()) {
                     originMessage = null

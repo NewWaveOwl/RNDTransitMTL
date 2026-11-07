@@ -34,13 +34,16 @@ internal class AndroidPlannerMapSession(context: Context) : PlannerLocation {
     lateinit var askPermission: () -> Unit
     lateinit var hasPermission: () -> Boolean
     var permitted by mutableStateOf(false)
+    var locationAttempt by mutableIntStateOf(0)
+        private set
 
     override fun request(onResult: ((LocationUpdate.Fix?) -> Unit)?) {
         autoCenterPending = false
         pendingResult = onResult ?: { result -> if (result != null) recenter++ }
         permitted = hasPermission()
         if (permitted) {
-            fix?.let(::complete)
+            val currentFix = fix
+            if (currentFix != null) complete(currentFix) else locationAttempt++
         } else {
             askPermission()
         }
@@ -96,7 +99,7 @@ internal fun rememberAndroidPlannerMapSession(): AndroidPlannerMapSession {
             session.fix = null
         }
     }
-    LaunchedEffect(session.permitted, started) {
+    LaunchedEffect(session.permitted, started, session.locationAttempt) {
         if (session.permitted && started) source.updates.collect { update ->
             session.fix = update as? LocationUpdate.Fix
             session.complete(session.fix)

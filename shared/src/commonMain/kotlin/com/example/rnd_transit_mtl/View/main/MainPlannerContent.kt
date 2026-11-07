@@ -59,6 +59,7 @@ import com.example.rnd_transit_mtl.View.main.components.GoBoxCompactHeight
 import com.example.rnd_transit_mtl.View.main.components.PlannerPreferenceBands
 import com.example.rnd_transit_mtl.data.generation.TripGenerationBounds
 import com.example.rnd_transit_mtl.model.transport.TransportType
+import com.example.rnd_transit_mtl.model.trip.Place
 import com.example.rnd_transit_mtl.model.trip.TripPoint
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.plannerTripBounds
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.validMapSourceSize
@@ -165,7 +166,7 @@ internal fun MainPlannerContent(
     initialSheetPosition: PlannerSheetPosition = PlannerSheetPosition.Main,
     origin: TripPoint? = TripPoint("Current location", 0.5f, 0.35f),
     onEditOrigin: () -> Unit = {},
-    liveOriginLabel: String? = null,
+    liveOrigin: Place? = null,
     onLoadStmTrip: (() -> Unit)? = null,
     onLoadExoTrip: (() -> Unit)? = null
 ) {
@@ -285,7 +286,8 @@ internal fun MainPlannerContent(
                 bottomInset = if (controlsVisible) with(density) { (heightPx - goTop).toDp() } else 0.dp,
                 sharedTripFlow = true,
                 cameraInsetsReady = !showMapControls || originFieldHeight > 0,
-                browsing = true
+                browsing = true,
+                pin = liveOrigin?.point
             ),
             modifier = Modifier.fillMaxSize()
         ) {
@@ -320,7 +322,7 @@ internal fun MainPlannerContent(
             ) {
                 TripLabelValueField(
                     label = "Starting point",
-                    value = liveOriginLabel ?: origin?.label ?: "Search a place or address",
+                    value = liveOrigin?.label ?: origin?.label ?: "Search a place or address",
                     showLocationIcon = true,
                     modifier = Modifier.onSizeChanged { originFieldHeight = it.height }.clickable(
                         enabled = enabled && showMapControls,
