@@ -35,6 +35,7 @@ import com.example.rnd_transit_mtl.navigation.TripNavigation
 import com.example.rnd_transit_mtl.navigation.backStackConfig
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.rnd_transit_mtl.data.authentication.AccountSession
+import com.example.rnd_transit_mtl.data.authentication.AuthRepository
 import com.example.rnd_transit_mtl.data.authentication.LocalAccountSession
 import com.example.rnd_transit_mtl.data.authentication.LocalAuthRepository
 import com.example.rnd_transit_mtl.data.authentication.SupabaseAuthRepository
@@ -45,14 +46,12 @@ private data class TransportData(
 )
 
 /**
- * Owns one saved back stack, one Navigator, and one restorable TripsStore.
+ * Restores the account session and scopes navigation and trip data to the active identity.
  *
  * TripNavigation is recreated from those restored objects. Its temporary
  * callbacks are not part of saved state.
  *
  * MainLayout remains outside NavDisplay's destination transitions.
- * The introductory nickname gate uses memory-only process state. It neither
- * adds another back stack nor includes the nickname in restoration snapshots.
  */
 @Composable
 fun App(
@@ -60,6 +59,23 @@ fun App(
     openDebugStmPreview: Boolean = false,
     loadDebugExoTrip: DebugTripLoader? = null,
     openDebugExoPreview: Boolean = false
+) {
+    App(
+        authRepository = remember { SupabaseAuthRepository() },
+        loadDebugStmTrip = loadDebugStmTrip,
+        openDebugStmPreview = openDebugStmPreview,
+        loadDebugExoTrip = loadDebugExoTrip,
+        openDebugExoPreview = openDebugExoPreview,
+    )
+}
+
+@Composable
+internal fun App(
+    authRepository: AuthRepository,
+    loadDebugStmTrip: DebugTripLoader? = null,
+    openDebugStmPreview: Boolean = false,
+    loadDebugExoTrip: DebugTripLoader? = null,
+    openDebugExoPreview: Boolean = false,
 ) {
     var pendingDebugPreview by rememberSaveable {
         mutableStateOf(when {
@@ -69,9 +85,6 @@ fun App(
         })
     }
     val consumeDebugPreview = remember { { pendingDebugPreview = null } }
-    LaunchedEffect(pendingDebugPreview) {
-        if (pendingDebugPreview != null && appNicknameSession.nickname == null) appNicknameSession.signIn("Guest")
-    }
     var transportData by remember {
         mutableStateOf<TransportData?>(null)
     }
@@ -94,11 +107,13 @@ fun App(
         }
     }
 
-    val authRepository = remember { SupabaseAuthRepository() }
     val accountSession = authRepository.session.collectAsStateWithLifecycle(
         initialValue = AccountSession.Restoring,
     )
     var continueAsGuest by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(pendingDebugPreview) {
+        if (pendingDebugPreview != null) continueAsGuest = true
+    }
     val sessionStores = rememberSaveable(saver = SessionTripsStores.Saver) { SessionTripsStores() }
     var lastSignedIdentity by rememberSaveable { mutableStateOf<String?>(null) }
     val signedIdentity = (accountSession.value as? AccountSession.SignedIn)?.let { "account:${it.userId}" }

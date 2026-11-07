@@ -17,8 +17,11 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner
 import androidx.navigationevent.compose.rememberNavigationEventDispatcherOwner
+import com.example.rnd_transit_mtl.data.authentication.AccountSession
+import com.example.rnd_transit_mtl.data.authentication.AuthRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.yield
 import java.io.File
@@ -29,7 +32,15 @@ import kotlin.test.assertTrue
 /** Runs the whole App off screen: start a trip, cancel it, keep it, and find it in History. */
 @OptIn(ExperimentalComposeUiApi::class)
 class CancelAndSaveFlowTest {
+    private class GuestAuthRepository : AuthRepository {
+        override val session = MutableStateFlow<AccountSession>(AccountSession.Guest)
+        override suspend fun signIn(email: String, password: String): Unit = error("Unexpected sign-in")
+        override suspend fun signUp(email: String, password: String): Boolean = error("Unexpected signup")
+        override suspend fun signOut(): Unit = error("Unexpected sign-out")
+    }
+
     private class Host : AutoCloseable {
+        private val authRepository = GuestAuthRepository()
         private val lifecycleOwner = object : LifecycleOwner {
             override val lifecycle = LifecycleRegistry.createUnsafe(this).apply {
                 currentState = Lifecycle.State.RESUMED
@@ -44,7 +55,7 @@ class CancelAndSaveFlowTest {
                 LocalLifecycleOwner provides lifecycleOwner,
                 LocalViewModelStoreOwner provides models
             ) {
-                App()
+                App(authRepository = authRepository)
             }
         }
         private var time = 0L
@@ -72,11 +83,7 @@ class CancelAndSaveFlowTest {
             render()
         }
 
-        /** The welcome screen appears once per process, so later tests start on the planner. */
-        suspend fun continueAsGuestIfAsked() {
-            render(30)
-            if (has("Continue as guest")) click("Continue as guest")
-        }
+        suspend fun continueAsGuest() = click("Continue as guest")
 
         suspend fun await(label: String) {
             repeat(200) {
@@ -104,7 +111,7 @@ class CancelAndSaveFlowTest {
     @Test
     fun cancelledTripKeptByTheUserAppearsInHistoryAndDetails() = runBlocking(Dispatchers.Main) {
         Host().use { host ->
-            host.continueAsGuestIfAsked()
+            host.continueAsGuest()
             host.click("GO")
             host.click("Start Trip")
             host.click("Cancel")
@@ -137,7 +144,7 @@ class CancelAndSaveFlowTest {
     @Test
     fun cancelledTripTheUserDiscardsIsNotInHistory() = runBlocking(Dispatchers.Main) {
         Host().use { host ->
-            host.continueAsGuestIfAsked()
+            host.continueAsGuest()
             host.click("GO")
             host.click("Start Trip")
             host.click("Cancel")
