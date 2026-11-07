@@ -13,6 +13,10 @@ val supabaseVersion = "3.6.0"
 val ktorVersion = "3.4.3"
 
 kotlin {
+    compilerOptions {
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
+
     listOf(
         iosArm64(),
         iosSimulatorArm64()
@@ -83,6 +87,8 @@ kotlin {
         }
 
         androidMain.dependencies {
+            implementation(libs.maplibre.compose)
+            implementation(libs.androidx.activity.compose)
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.compose.uiTooling)
             implementation("io.ktor:ktor-client-okhttp:$ktorVersion")
@@ -107,6 +113,8 @@ kotlin {
 
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+            // runTest drives suspend generation and routing in shared tests.
+            implementation(libs.kotlinx.coroutinesTest)
         }
 
         jvmTest.dependencies {

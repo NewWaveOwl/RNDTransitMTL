@@ -13,6 +13,7 @@ fun main() = application {
         title = "RND_Transit_MTL",
         icon = painterResource("app_icon.png"),
     ) {
-        App()
+        // Restore App() after the Supabase sign-in test.
+        SupabaseTestScreen()
     }
 }
