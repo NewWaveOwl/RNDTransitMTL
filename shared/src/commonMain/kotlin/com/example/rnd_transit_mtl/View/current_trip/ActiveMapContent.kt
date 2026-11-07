@@ -1,5 +1,7 @@
 package com.example.rnd_transit_mtl.View.current_trip
 
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMap
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMapData
 import com.example.rnd_transit_mtl.data.assets.toSampleMapPoint
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -150,18 +152,30 @@ fun ActiveMapContent(
 
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxWidth().weight(1f)) {
-                MockTripMap(
-                    start = trip.origin.toSampleMapPoint(),
-                    destination = trip.destination.toSampleMapPoint(),
-                    legs = trip.toSampleMapLegs(),
-                    progress = retainedMapProgress,
-                    interactive = actionsEnabled && !confirmingCancel && !confirmingFinish,
-                    matchPlannerBackground = true,
-                    recenterRequest = recenterRequest,
-                    showControls = false,
-                    showPosition = locationState != TripLocationState.Missing,
+                val mapInteractive = actionsEnabled && !confirmingCancel && !confirmingFinish
+                TransitMap(
+                    data = TransitMapData(
+                        trip = trip,
+                        progress = retainedMapProgress.takeIf { locationState != TripLocationState.Missing },
+                        recenterRequest = recenterRequest,
+                        interactive = mapInteractive,
+                        topInset = 72.dp
+                    ),
                     modifier = Modifier.fillMaxSize()
-                )
+                ) {
+                    MockTripMap(
+                        start = trip.origin.toSampleMapPoint(),
+                        destination = trip.destination.toSampleMapPoint(),
+                        legs = trip.toSampleMapLegs(),
+                        progress = retainedMapProgress,
+                        interactive = mapInteractive,
+                        matchPlannerBackground = true,
+                        recenterRequest = recenterRequest,
+                        showControls = false,
+                        showPosition = locationState != TripLocationState.Missing,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
 
                 Column(
                     Modifier.align(Alignment.TopCenter).fillMaxWidth()

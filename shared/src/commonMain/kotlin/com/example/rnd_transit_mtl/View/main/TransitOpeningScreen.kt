@@ -24,6 +24,8 @@ import com.example.rnd_transit_mtl.View.current_trip.ActiveMapContent
 import com.example.rnd_transit_mtl.ViewModels.main.MainPlannerState
 import com.example.rnd_transit_mtl.ViewModels.main.MainPlannerViewModel
 import com.example.rnd_transit_mtl.data.generation.MockTripGenerator
+import com.example.rnd_transit_mtl.data.generation.oldMontrealSampleTrip
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.LocalTransitMap
 import com.example.rnd_transit_mtl.data.generation.TripGenerationBounds
 import com.example.rnd_transit_mtl.data.generation.TripGenerationInput
 import com.example.rnd_transit_mtl.data.generation.TripGenerationResult
@@ -67,6 +69,7 @@ internal fun TransitOpeningScreen(
 ) {
     val tripsStore = LocalTripsStore.current
     val generator = remember { MockTripGenerator() }
+    val useFixedSample = LocalTransitMap.current != null && sampleOutcome == Trip33Sample.Normal
     // Viewport is measured again after rotation; stored trip endpoints are unchanged.
     var generationBounds by remember { mutableStateOf<TripGenerationBounds?>(null) }
 
@@ -284,6 +287,19 @@ internal fun TransitOpeningScreen(
                 queueTripOpening(completedId)
             } else {
                 validationMessage = "Completed Trip navigation is unavailable."
+            }
+            return
+        }
+
+        if (useFixedSample) {
+            val token = proposalGuard.begin()
+            val trip = oldMontrealSampleTrip()
+            requestSummary = trip.description
+            failureName = null
+            failureMessage = ""
+            validationMessage = ""
+            if (proposalGuard.complete(token, trip.id)) {
+                proposalJson = Json.encodeToString(trip)
             }
             return
         }
@@ -747,7 +763,7 @@ internal fun TransitOpeningScreen(
                 (
                     activeState != null ||
                         pendingReviewId != null ||
-                        (generationBounds != null && planner.origin != null)
+                        (useFixedSample || (generationBounds != null && planner.origin != null))
                 ),
             inputsEnabled = canChangeInputs(),
             activeTripSummary = if (pendingOpenTripId != null) {

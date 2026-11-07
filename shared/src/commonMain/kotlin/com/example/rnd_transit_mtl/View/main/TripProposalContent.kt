@@ -1,5 +1,7 @@
 package com.example.rnd_transit_mtl.View.main
 
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMap
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMapData
 import com.example.rnd_transit_mtl.data.assets.toSampleMapPoint
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -10,6 +12,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.LocalTransitMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -208,19 +217,33 @@ internal fun TripProposalContent(
     onEditSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val liveMap = LocalTransitMap.current != null
+    val density = LocalDensity.current
+    var headerHeight by remember { mutableIntStateOf(0) }
+    var panelHeight by remember { mutableIntStateOf(0) }
     Box(modifier.fillMaxSize()) {
-        MockTripMap(
-            start = trip.origin.toSampleMapPoint(),
-            destination = trip.destination.toSampleMapPoint(),
-            legs = trip.toSampleMapLegs(),
-            progress = 0f,
-            matchPlannerBackground = true,
+        TransitMap(
+            data = TransitMapData(
+                trip = trip,
+                topInset = with(density) { headerHeight.toDp() },
+                bottomInset = with(density) { panelHeight.toDp() }
+            ),
             modifier = Modifier.fillMaxSize()
-        )
+        ) {
+            MockTripMap(
+                start = trip.origin.toSampleMapPoint(),
+                destination = trip.destination.toSampleMapPoint(),
+                legs = trip.toSampleMapLegs(),
+                progress = 0f,
+                matchPlannerBackground = true,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
 
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
+                .onSizeChanged { headerHeight = it.height }
                 .widthIn(max = ProposalPanelMaxWidth)
                 .fillMaxWidth()
                 .padding(16.dp),
@@ -247,10 +270,11 @@ internal fun TripProposalContent(
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
+                .onSizeChanged { panelHeight = it.height }
                 .widthIn(max = ProposalPanelMaxWidth)
                 .fillMaxWidth()
         ) {
-            MapAttribution(Modifier.padding(start = 8.dp))
+            if (!liveMap) MapAttribution(Modifier.padding(start = 8.dp))
 
             Column(
                 modifier = Modifier
@@ -284,7 +308,7 @@ internal fun TripProposalContent(
                     fontSize = 15.sp
                 )
                 Text(
-                    text = "Sample route · opening hours not confirmed",
+                    text = if (liveMap) trip.description else "Sample route · opening hours not confirmed",
                     color = TransitWhite,
                     fontSize = 12.sp
                 )

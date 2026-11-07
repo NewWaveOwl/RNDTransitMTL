@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">RND_Transit_MTL</string>
+    <string name="map_style_url" translatable="false">https://tiles.openfreemap.org/styles/liberty</string>
 </resources>

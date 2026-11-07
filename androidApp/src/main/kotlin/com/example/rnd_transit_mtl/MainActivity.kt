@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.ProvideAndroidTransitMap
 
 /**
  * Android entry activity for the shared transit application.
@@ -21,7 +22,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         setContent {
-            App()
+            ProvideAndroidTransitMap(styleUrl = getString(R.string.map_style_url)) { App() }
         }
     }
 }

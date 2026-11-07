@@ -1,5 +1,7 @@
 package com.example.rnd_transit_mtl.View.main
 
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMap
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMapData
 import com.example.rnd_transit_mtl.state.NullableTransportIdSaver
 import com.example.rnd_transit_mtl.model.ids.ZoneId
 import com.example.rnd_transit_mtl.model.ids.TransportId
@@ -255,12 +257,17 @@ internal fun MainPlannerContent(
             }
         }
 
-        FigmaOriginMap(
-            origin = origin,
-            enabled = enabled,
-            recenterRequest = recenterRequest,
+        TransitMap(
+            data = TransitMapData(recenterRequest = recenterRequest, interactive = enabled),
             modifier = Modifier.fillMaxSize()
-        )
+        ) {
+            FigmaOriginMap(
+                origin = origin,
+                enabled = enabled,
+                recenterRequest = recenterRequest,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
 
 
         // Move GO and the sheet together on trip opening; keep the map outside this layer.
