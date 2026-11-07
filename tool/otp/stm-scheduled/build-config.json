@@ -1,0 +1,15 @@
+{
+  "transitModelTimeZone": "America/Toronto",
+  "transitFeeds": [
+    {
+      "type": "gtfs",
+      "feedId": "STM",
+      "source": "stm-gtfs.zip"
+    },
+    {
+      "type": "gtfs",
+      "feedId": "EXO_TRAINS",
+      "source": "exo-trains-gtfs.zip"
+    }
+  ]
+}

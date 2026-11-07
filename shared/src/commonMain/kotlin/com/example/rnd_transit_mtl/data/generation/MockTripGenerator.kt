@@ -45,7 +45,8 @@ data class TripGenerationInput(
     val selectedZoneIds: List<ZoneId> = emptyList(),
     val selectedZonesByTransport: Map<TransportId, List<ZoneId>> = emptyMap(),
     val origin: TripPoint? = null,
-    val ownerId: UserId? = null
+    val ownerId: UserId? = null,
+    val originPlace: Place? = null
 )
 
 /**
@@ -205,8 +206,8 @@ class MockTripGenerator(
             destination = generateDestinationFromOrigin(start, bounds)
         }
 
-        // Endpoints are picked on the PNG, then stored as real places.
-        val origin = start.toSampleMapPlace()
+        // Live origins retain their exact coordinates. Bundled-map endpoints are projected from the PNG.
+        val origin = normalizedInput.originPlace ?: start.toSampleMapPlace()
         val destinationPlace = destination.toSampleMapPlace()
 
         val request = TripRequest(

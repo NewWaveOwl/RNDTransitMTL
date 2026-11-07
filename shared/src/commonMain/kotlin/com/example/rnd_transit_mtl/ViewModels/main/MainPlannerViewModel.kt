@@ -9,6 +9,7 @@ import com.example.rnd_transit_mtl.model.trip.Trip
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import com.example.rnd_transit_mtl.model.trip.Place
 import kotlinx.serialization.Serializable
 
 /**
@@ -42,7 +43,8 @@ data class MainPlannerState(
 
     // Supplied by a future permission adapter, or a labelled preview fixture.
     val locationAccessOff: Boolean = false,
-    val originIsManual: Boolean = false
+    val originIsManual: Boolean = false,
+    val originPlace: Place? = null
 ) {
     /** Returns independently saved zones, with legacy shared-zone fallback.
      * @param transportId Transit mode whose zones are requested.
@@ -85,7 +87,7 @@ class MainPlannerViewModel(
     /** Copies only the preferences actually recorded in a completed trip.
      * @param trip Saved trip; its identity, endpoints, and review are never changed.
      */
-    fun copyTripPreferences(trip: Trip) {
+    fun copyTripPreferences(trip: Trip, liveMap: Boolean = false) {
         mutableUiState.update {
             it.copy(
                 minutes = Trip.coercePlannedMinutes(trip.plannedMinutes),
@@ -98,7 +100,8 @@ class MainPlannerViewModel(
                         entry.value.toList()
                     },
                 intensity = trip.attractionIntensity,
-                origin = trip.origin.toSampleMapPoint(),
+                origin = if (liveMap) null else trip.origin.toSampleMapPoint(),
+                originPlace = trip.origin.takeIf { liveMap },
                 originIsManual = true
             )
         }
@@ -107,12 +110,16 @@ class MainPlannerViewModel(
     /** Updates the selected sample-map origin.
      * @param point Source-image coordinates and a nonblank display label.
      */
+    fun setOrigin(place: Place) {
+        mutableUiState.update { it.copy(origin = null, originPlace = place, originIsManual = true) }
+    }
+
     fun setOrigin(point: TripPoint) {
         val label = point.label.trim()
         if (label.isBlank()) return
 
         mutableUiState.update {
-            it.copy(origin = point.copy(label = label), originIsManual = true)
+            it.copy(origin = point.copy(label = label), originPlace = null, originIsManual = true)
         }
     }
 

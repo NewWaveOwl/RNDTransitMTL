@@ -3,6 +3,7 @@ package com.example.rnd_transit_mtl.data.routing
 import com.example.rnd_transit_mtl.model.geo.GeoPoint
 import com.example.rnd_transit_mtl.model.trip.RouteLeg
 import com.example.rnd_transit_mtl.model.trip.TripRequest
+import com.example.rnd_transit_mtl.model.trip.TripRouteSnapshot
 
 /**
  * Plans the legs of a trip. Screens never call it directly: the trip
@@ -27,10 +28,25 @@ interface RoutingService {
 
 /** Outcome of one routing request. */
 sealed class RoutingResult {
-    /** @property legs Ordered legs from origin to destination; never empty. */
-    data class Success(val legs: List<RouteLeg>) : RoutingResult() {
+    /**
+     * @property legs Ordered legs from origin to destination; never empty.
+     * @property durationSeconds Total itinerary time, including any waiting time.
+     * @property waitingTimeSeconds Time between legs while waiting for transit.
+     * @property routes Provider labels for transit lines used by the itinerary.
+     */
+    data class Success(
+        val legs: List<RouteLeg>,
+        val durationSeconds: Long,
+        val waitingTimeSeconds: Long,
+        val routes: List<TripRouteSnapshot>
+    ) : RoutingResult() {
+        constructor(legs: List<RouteLeg>) : this(legs, legs.sumOf { it.durationSeconds }, 0, emptyList())
+
         init {
             require(legs.isNotEmpty()) { "A route needs at least one leg." }
+            require(durationSeconds >= 0 && waitingTimeSeconds in 0..durationSeconds) {
+                "Invalid itinerary timing."
+            }
         }
     }
 

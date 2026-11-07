@@ -24,6 +24,7 @@ import com.example.rnd_transit_mtl.model.transport.TransportRoute
 import com.example.rnd_transit_mtl.model.transport.TransportType
 import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.model.review.TripReviewMode
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.LocalTransitMap
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.transitions.GO_TRIP_TRANSITION_MILLIS
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -181,6 +182,7 @@ fun Router(
 ) {
     val navigator = LocalNavigator.current
     val navigation = LocalTripNavigation.current
+    val sharedLiveMap = LocalTransitMap.current != null
     // Saved completion waits for the user's 100% action, including after restoration.
 
     NavDisplay(
@@ -195,6 +197,8 @@ fun Router(
         },
         entryProvider = entryProvider {
             entry<MainScreenKey>(clazzContentKey = { PLANNER_MAP_CONTENT_KEY }) {
+                // Only the foreground destination can place the shared map during the handoff.
+                if (sharedLiveMap && navigator.current is CurrentTripScreenKey) return@entry
                 MainScreen(
                     transportTypes = transportTypes,
                     transportRoutes = transportRoutes,
@@ -229,6 +233,7 @@ fun Router(
             entry<CurrentTripScreenKey>(
                 clazzContentKey = { key -> TRIP_MAP_CONTENT_KEY_PREFIX + key.trip.id }
             ) { key ->
+                if (sharedLiveMap && navigator.current == MainScreenKey) return@entry
                 CurrentTripScreen(
                     trip = key.trip,
                     isDestinationActive = navigator.current == key,
@@ -342,18 +347,11 @@ fun Router(
             }
         },
         transitionSpec = {
-            if (isPlannerToTripTransition(
-                    initialState.entries.lastOrNull()?.contentKey,
-                    targetState.entries.lastOrNull()?.contentKey
-                )
-            ) {
-                // Planner controls have already slid out before changing the stack.
+            val from = initialState.entries.lastOrNull()?.contentKey
+            val to = targetState.entries.lastOrNull()?.contentKey
+            if (isPlannerToTripTransition(from, to) || (sharedLiveMap && isPlannerMapTransition(from, to))) {
                 EnterTransition.None togetherWith ExitTransition.None
-            } else if (isPlannerMapTransition(
-                    initialState.entries.lastOrNull()?.contentKey,
-                    targetState.entries.lastOrNull()?.contentKey
-                )
-            ) {
+            } else if (isPlannerMapTransition(from, to)) {
                 // Returning to the planner crossfades over the stationary map.
                 (EnterTransition.None togetherWith fadeOut(tween(GO_TRIP_TRANSITION_MILLIS))).apply {
                     targetContentZIndex = -1f
@@ -364,18 +362,11 @@ fun Router(
             }
         },
         popTransitionSpec = {
-            if (isPlannerToTripTransition(
-                    initialState.entries.lastOrNull()?.contentKey,
-                    targetState.entries.lastOrNull()?.contentKey
-                )
-            ) {
-                // Planner controls have already slid out before changing the stack.
+            val from = initialState.entries.lastOrNull()?.contentKey
+            val to = targetState.entries.lastOrNull()?.contentKey
+            if (isPlannerToTripTransition(from, to) || (sharedLiveMap && isPlannerMapTransition(from, to))) {
                 EnterTransition.None togetherWith ExitTransition.None
-            } else if (isPlannerMapTransition(
-                    initialState.entries.lastOrNull()?.contentKey,
-                    targetState.entries.lastOrNull()?.contentKey
-                )
-            ) {
+            } else if (isPlannerMapTransition(from, to)) {
                 (EnterTransition.None togetherWith fadeOut(tween(GO_TRIP_TRANSITION_MILLIS))).apply {
                     targetContentZIndex = -1f
                 }
@@ -385,18 +376,11 @@ fun Router(
             }
         },
         predictivePopTransitionSpec = {
-            if (isPlannerToTripTransition(
-                    initialState.entries.lastOrNull()?.contentKey,
-                    targetState.entries.lastOrNull()?.contentKey
-                )
-            ) {
-                // Planner controls have already slid out before changing the stack.
+            val from = initialState.entries.lastOrNull()?.contentKey
+            val to = targetState.entries.lastOrNull()?.contentKey
+            if (isPlannerToTripTransition(from, to) || (sharedLiveMap && isPlannerMapTransition(from, to))) {
                 EnterTransition.None togetherWith ExitTransition.None
-            } else if (isPlannerMapTransition(
-                    initialState.entries.lastOrNull()?.contentKey,
-                    targetState.entries.lastOrNull()?.contentKey
-                )
-            ) {
+            } else if (isPlannerMapTransition(from, to)) {
                 (EnterTransition.None togetherWith fadeOut(tween(GO_TRIP_TRANSITION_MILLIS))).apply {
                     targetContentZIndex = -1f
                 }

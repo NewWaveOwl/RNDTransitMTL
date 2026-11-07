@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -81,6 +82,8 @@ private val TripMapControlSize = 48.dp
  * @param matchPlannerBackground Whether the initial image uses Crop rather than Fit.
  * @param controlsTopPadding Top inset of the optional zoom controls.
  * @param recenterRequest Increment to center the camera on the current position.
+ * @param followPosition Keep the camera centered as the visible position moves.
+ * @param onManualCameraMove Reports a user pan or zoom.
  * @param showControls Whether to render the legacy zoom/reset row.
  * @param showPosition Whether to draw the current position pointer.
  */
@@ -96,7 +99,9 @@ fun MockTripMap(
     controlsTopPadding: Dp = 10.dp,
     recenterRequest: Int = 0,
     showControls: Boolean = true,
-    showPosition: Boolean = true
+    showPosition: Boolean = true,
+    followPosition: Boolean = false,
+    onManualCameraMove: () -> Unit = {}
 ) {
     val mapPainter = painterResource(Res.drawable.map_sample)
     val startPainter = painterResource(Res.drawable.start_point_marker)
@@ -105,6 +110,8 @@ fun MockTripMap(
     val pointerPainter = painterResource(Res.drawable.map_user_pointer_marker)
     val sourceSize = validMapSourceSize(mapPainter.intrinsicSize)
     val boundedProgress = boundedTripProgress(progress)
+    val latestManualCameraMove by rememberUpdatedState(onManualCameraMove)
+    val followedProgress = boundedProgress.takeIf { followPosition && showPosition }
     val percentage = tripProgressPercentage(boundedProgress)
     val markerInset = with(LocalDensity.current) { TripMapMarkerInset.toPx() }
     var viewport by remember { mutableStateOf(Size.Zero) }
@@ -137,8 +144,8 @@ fun MockTripMap(
         panY = boundedPan.y / viewport.height
     }
 
-    LaunchedEffect(recenterRequest, viewport, start, destination, legs) {
-        if (recenterRequest > 0 &&
+    LaunchedEffect(recenterRequest, viewport, start, destination, legs, followedProgress) {
+        if ((recenterRequest > 0 || followedProgress != null) &&
             viewport.width > 0f &&
             viewport.height > 0f &&
             baseRect.width > 0f
@@ -178,6 +185,7 @@ fun MockTripMap(
                     if (!interactive) return@pointerInput
                     detectTransformGestures { centroid, pan, zoomChange, _ ->
                         if (viewport.width > 0f && viewport.height > 0f) {
+                            latestManualCameraMove()
                             val oldZoom = zoom.coerceIn(minimumZoom, 4f)
                             val nextZoom = (oldZoom * zoomChange).coerceIn(minimumZoom, 4f)
                             val ratio = nextZoom / oldZoom
@@ -229,6 +237,8 @@ fun MockTripMap(
                     )
                 }
             }
+            drawAnchoredTripEndpoint(startPainter, startPosition, endpointSize)
+            drawAnchoredTripEndpoint(endPainter, endPosition, endpointSize)
             if (showPosition) {
                 val direction = current.direction.takeUnless { it == Offset.Zero }
                     ?: (endPosition - startPosition)
@@ -237,8 +247,6 @@ fun MockTripMap(
                     tripPointerRotation(Offset.Zero, direction)
                 )
             }
-            drawAnchoredTripEndpoint(startPainter, startPosition, endpointSize)
-            drawAnchoredTripEndpoint(endPainter, endPosition, endpointSize)
         }
 
         if (interactive && showControls) {

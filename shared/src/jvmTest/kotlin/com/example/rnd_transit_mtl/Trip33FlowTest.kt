@@ -31,6 +31,15 @@ import kotlinx.coroutines.delay
 import java.io.File
 import kotlin.test.*
 import com.example.rnd_transit_mtl.data.assets.toSampleMapPlace
+import com.example.rnd_transit_mtl.data.generation.TripGenerationResult
+import com.example.rnd_transit_mtl.data.location.LocalPlannerLocation
+import com.example.rnd_transit_mtl.data.location.LocationUpdate
+import com.example.rnd_transit_mtl.data.location.PlannerLocation
+import com.example.rnd_transit_mtl.data.routing.DebugTripLoader
+import com.example.rnd_transit_mtl.model.geo.GeoPoint
+import com.example.rnd_transit_mtl.model.trip.Place
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.LocalTransitMap
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMapData
 
 /** Runs the real planner coordinator with explicit outcomes and an isolated store. */
 @OptIn(ExperimentalComposeUiApi::class)
@@ -39,8 +48,21 @@ class Trip33FlowTest {
         fun back() = dispatchOnBackCompleted()
     }
 
-    private class Host(initialOutcome: Trip33Sample) : AutoCloseable {
+    private class Host(
+        initialOutcome: Trip33Sample,
+        liveMap: Boolean = false,
+        debugLoader: DebugTripLoader? = null
+    ) : AutoCloseable {
         var outcome by mutableStateOf(initialOutcome)
+        var mapData = TransitMapData()
+            private set
+        private val location = object : PlannerLocation {
+            override val fix: LocationUpdate.Fix? = null
+            override val containsPoint: (GeoPoint) -> Boolean = { true }
+            override fun request(onResult: ((LocationUpdate.Fix?) -> Unit)?) {
+                onResult?.invoke(null)
+            }
+        }
         private val lifecycleOwner = object : LifecycleOwner {
             override val lifecycle = LifecycleRegistry.createUnsafe(this).apply {
                 currentState = Lifecycle.State.RESUMED
@@ -63,7 +85,10 @@ class Trip33FlowTest {
                 LocalViewModelStoreOwner provides models,
                 LocalTripsStore provides store,
                 LocalNavigator provides navigator,
-                LocalTripNavigation provides navigation
+                LocalTripNavigation provides navigation,
+                LocalDebugStmTripLoader provides debugLoader,
+                LocalPlannerLocation provides location.takeIf { liveMap },
+                LocalTransitMap provides if (liveMap) ({ data, _ -> SideEffect { mapData = data } }) else null
             ) {
                 RNDTransitTheme {
                     TransitOpeningScreen(listOf(TransportType(TransportId("walk"), "Walk", false)), emptyList(),
@@ -113,6 +138,71 @@ class Trip33FlowTest {
         override fun close() {
             scene.close()
             models.viewModelStore.clear()
+        }
+    }
+
+    @Test
+    fun liveErrorPickerKeepsTheOldOriginOnBackAndShowsTheConfirmedPin() = runBlocking(Dispatchers.Main) {
+        val oldOrigin = Place("Previous origin", GeoPoint(45.50, -73.58))
+        val newPoint = GeoPoint(45.52, -73.56)
+        Host(Trip33Sample.Normal, liveMap = true).use { host ->
+            host.render()
+            host.planner.setOrigin(oldOrigin)
+            val walking = TransportId("walk")
+            host.planner.toggleTransport(walking, setOf(walking))
+            host.render()
+            host.click("GO")
+            host.await("Check your trip settings")
+
+            host.click("Starting point")
+            host.render()
+            assertTrue(host.mapData.pickerOpen)
+            assertNotNull(host.mapData.onPick).invoke(newPoint)
+            host.render()
+            host.back()
+            assertTrue(host.has("Check your trip settings"))
+            assertEquals(oldOrigin, host.planner.uiState.value.originPlace)
+
+            host.click("Starting point")
+            host.render()
+            assertNotNull(host.mapData.onPick).invoke(newPoint)
+            host.render()
+            host.click("Use this starting point")
+            host.await("GO")
+            assertEquals(Place("Pinned location", newPoint), host.planner.uiState.value.originPlace)
+            assertNull(host.planner.uiState.value.origin)
+            assertFalse(host.mapData.pickerOpen)
+            assertEquals(newPoint, host.mapData.pin)
+            host.click("GO")
+            host.await("Check your trip settings")
+        }
+    }
+
+    @Test
+    fun otpFailuresKeepPlannerSelectionsAndAllowRetry() = runBlocking(Dispatchers.Main) {
+        for ((outcome, heading) in listOf(
+            TripGenerationResult.InvalidInput("Start and destination must be different.") to "Check your trip settings",
+            TripGenerationResult.NoRoute to "No trip fits these choices",
+            TripGenerationResult.RoutingUnavailable("OTP connection timed out.") to "Routing service unavailable"
+        )) {
+            val attempts = mutableListOf<List<TransportId>>()
+            Host(Trip33Sample.NoRoute) { modes -> attempts.add(modes); outcome }.use { host ->
+                host.render()
+                host.planner.setMinutes(45)
+                host.render()
+                val before = host.planner.uiState.value
+                host.click("Load STM test trip")
+                host.await(heading)
+                assertNull(host.store.activeTrip)
+                assertEquals(before, host.planner.uiState.value)
+                assertEquals(listOf(before.selectedTransportIds), attempts)
+                if (outcome is TripGenerationResult.RoutingUnavailable) {
+                    host.click("Try again")
+                    host.await(heading)
+                    assertEquals(List(2) { before.selectedTransportIds }, attempts)
+                    assertEquals(before, host.planner.uiState.value)
+                }
+            }
         }
     }
 

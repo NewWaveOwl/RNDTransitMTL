@@ -81,6 +81,8 @@ kotlin {
         }
 
         androidMain.dependencies {
+            implementation(libs.maplibre.compose)
+            implementation(libs.androidx.activity.compose)
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.compose.uiTooling)
             implementation("io.ktor:ktor-client-okhttp:3.1.0")

@@ -18,14 +18,15 @@ import com.example.rnd_transit_mtl.model.trip.TripRequest
  * @param serviceArea Area this fake accepts.
  */
 class FakeRoutingService(
-    private val serviceArea: GeoBounds = SampleMapBounds
+    private val serviceArea: GeoBounds = SampleMapBounds,
+    private val containsPoint: ((GeoPoint) -> Boolean)? = null
 ) : RoutingService {
     override suspend fun route(request: TripRequest): RoutingResult {
         val destination = request.destination ?: return RoutingResult.NoRouteFound
         val mode = request.modes.firstOrNull() ?: return RoutingResult.NoRouteFound
 
         listOf(request.origin.point, destination.point)
-            .firstOrNull { !isInServiceArea(it) }
+            .firstOrNull { !(containsPoint?.invoke(it) ?: isInServiceArea(it)) }
             ?.let { return RoutingResult.OutsideServiceArea(it) }
 
         return RoutingResult.Success(

@@ -2,3 +2,20 @@
 19:00 -22:00 -> Migration to new design and MVVM
 22:00-1:00am -> Migration and tweaks of design added iconto the app
 1:00 - 2:00 -> Bug fixes for the app from issue #30 | Implmeted sub issue 32 and 33
+
+
+2026-11-06
+
+19:00 -> 21:00 implemting MapLibre in the project
+
+21:00 -> 22:30 worked on boot animation for the app
+
+22:30 -> 2:00 am worked on path finding and STM/EXO api integration
+
+2026-11-07
+
+10:00 -> 12:00 fined test for issue Test Montréal routing and walking/cycling alternatives
+ #21
+
+12 -> 13:00  Bug fixes and foek on decions for Add Android MapLibre and the Montréal routing prototype- #57
+#57
