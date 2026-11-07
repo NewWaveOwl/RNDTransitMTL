@@ -1,10 +1,15 @@
 package com.example.rnd_transit_mtl
 
+import android.animation.ValueAnimator
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.ProvideAndroidTransitMap
 
@@ -21,8 +26,15 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
+        val showStartup = savedInstanceState == null &&
+            (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || ValueAnimator.areAnimatorsEnabled())
         setContent {
-            ProvideAndroidTransitMap(styleUrl = getString(R.string.map_style_url)) { App() }
+            ProvideAndroidTransitMap(styleUrl = getString(R.string.map_style_url)) {
+                Box(Modifier.fillMaxSize()) {
+                    App()
+                    if (showStartup) AnimatedStartupOverlay()
+                }
+            }
         }
     }
 }
