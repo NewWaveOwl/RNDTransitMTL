@@ -1,6 +1,7 @@
 package com.example.rnd_transit_mtl
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.example.rnd_transit_mtl.data.routing.DebugTripLoader
 import androidx.compose.runtime.CompositionLocalProvider
@@ -71,24 +72,6 @@ fun App(
     LaunchedEffect(pendingDebugPreview) {
         if (pendingDebugPreview != null && appNicknameSession.nickname == null) appNicknameSession.signIn("Guest")
     }
-    val backStack = rememberNavBackStack(
-        backStackConfig,
-        MainScreenKey
-    )
-    val navigator = remember(backStack) {
-        Navigator(backStack)
-    }
-
-    val tripsStore = rememberSaveable(
-        saver = TripsStore.Saver
-    ) {
-        TripsStore()
-    }
-
-    val tripNavigation = remember(navigator, tripsStore) {
-        TripNavigation(navigator, tripsStore)
-    }
-
     var transportData by remember {
         mutableStateOf<TransportData?>(null)
     }
@@ -119,7 +102,16 @@ fun App(
     LaunchedEffect(accountSession.value) {
         if (accountSession.value is AccountSession.SignedIn) continueAsGuest = false
     }
+    val identity = when (val session = accountSession.value) {
+        is AccountSession.SignedIn -> "account:${session.userId}"
+        else -> "guest"
+    }
     RNDTransitTheme {
+      key(identity) {
+        val backStack = rememberNavBackStack(backStackConfig, MainScreenKey)
+        val navigator = remember(backStack) { Navigator(backStack) }
+        val tripsStore = rememberSaveable(identity, saver = TripsStore.Saver) { TripsStore() }
+        val tripNavigation = remember(navigator, tripsStore) { TripNavigation(navigator, tripsStore) }
         CompositionLocalProvider(
             LocalDebugStmTripLoader provides loadDebugStmTrip,
             LocalDebugExoTripLoader provides loadDebugExoTrip,
@@ -145,9 +137,6 @@ fun App(
                     }
                 }
                 else -> {
-                if (appNicknameSession.nickname == null) appNicknameSession.signIn(
-                    (accountSession.value as? AccountSession.SignedIn)?.email?.substringBefore("@") ?: "Guest"
-                )
                 MainLayout {
                     Router(
                         backStack = backStack,
@@ -158,6 +147,7 @@ fun App(
                 }
             }
         }
+      }
     }
 }
 }
