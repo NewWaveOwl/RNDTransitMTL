@@ -9,11 +9,10 @@ plugins {
     alias(libs.plugins.kotlinSerialization)
 }
 
-kotlin {
-    compilerOptions {
-        freeCompilerArgs.add("-Xexpect-actual-classes")
-    }
+val supabaseVersion = "3.6.0"
+val ktorVersion = "3.4.3"
 
+kotlin {
     listOf(
         iosArm64(),
         iosSimulatorArm64()
@@ -78,32 +77,36 @@ kotlin {
 
             implementation("io.coil-kt.coil3:coil-compose:3.6.3")
             implementation("io.coil-kt.coil3:coil-network-ktor3:3.6.3")
+
+            implementation("io.github.jan-tennert.supabase:auth-kt:$supabaseVersion")
+            implementation("io.github.jan-tennert.supabase:postgrest-kt:$supabaseVersion")
         }
 
         androidMain.dependencies {
-            implementation(libs.maplibre.compose)
-            implementation(libs.androidx.activity.compose)
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.compose.uiTooling)
-            implementation("io.ktor:ktor-client-okhttp:3.1.0")
+            implementation("io.ktor:ktor-client-okhttp:$ktorVersion")
         }
 
         jvmMain.dependencies {
-            implementation("io.ktor:ktor-client-okhttp:3.1.0")
+            implementation("io.ktor:ktor-client-okhttp:$ktorVersion")
         }
 
         iosMain.dependencies {
-            implementation("io.ktor:ktor-client-darwin:3.1.0")
+            implementation("io.ktor:ktor-client-darwin:$ktorVersion")
         }
 
         jsMain.dependencies {
             implementation(libs.wrappers.browser)
+            implementation("io.ktor:ktor-client-js:$ktorVersion")
+        }
+
+        wasmJsMain.dependencies {
+            implementation("io.ktor:ktor-client-cio:$ktorVersion")
         }
 
         commonTest.dependencies {
             implementation(libs.kotlin.test)
-            // runTest drives suspend generation and routing in shared tests.
-            implementation(libs.kotlinx.coroutinesTest)
         }
 
         jvmTest.dependencies {
