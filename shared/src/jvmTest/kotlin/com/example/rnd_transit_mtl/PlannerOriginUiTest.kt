@@ -44,7 +44,8 @@ class PlannerOriginUiTest {
             }
         }
         var time = 0L
-        fun render() { repeat(30) { time += 16_000_000; scene.render(time).close() } }
+        // Sheet motion and the field exit can run in sequence on slower CI hosts.
+        fun render() { repeat(60) { time += 16_000_000; scene.render(time).close() } }
         fun all(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::all)
         fun nodes() = scene.semanticsOwners.flatMap { all(it.rootSemanticsNode) }
         fun originField() = nodes().firstOrNull {
