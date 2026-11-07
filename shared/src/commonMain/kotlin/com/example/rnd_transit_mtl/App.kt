@@ -1,6 +1,8 @@
 package com.example.rnd_transit_mtl
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
+import com.example.rnd_transit_mtl.model.trip.Trip
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,7 +47,7 @@ private data class TransportData(
  * adds another back stack nor includes the nickname in restoration snapshots.
  */
 @Composable
-fun App() {
+fun App(loadDebugStmTrip: (suspend () -> Trip)? = null) {
     val backStack = rememberNavBackStack(
         backStackConfig,
         MainScreenKey
@@ -88,6 +90,7 @@ fun App() {
 
     RNDTransitTheme {
         CompositionLocalProvider(
+            LocalDebugStmTripLoader provides loadDebugStmTrip,
             LocalNavigator provides navigator,
             LocalTripsStore provides tripsStore,
             LocalTripNavigation provides tripNavigation,
@@ -108,3 +111,5 @@ fun App() {
         }
     }
 }
+
+internal val LocalDebugStmTripLoader = staticCompositionLocalOf<(suspend () -> Trip)?> { null }

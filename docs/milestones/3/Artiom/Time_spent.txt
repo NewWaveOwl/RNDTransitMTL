@@ -9,3 +9,5 @@
 19:00 -> 21:00 implemting MapLibre in the project
 
 21:00 -> 22:30 worked on boot animation for the app
+
+22:30 -> 23:30 worked on path finding and STM/EXO api integration

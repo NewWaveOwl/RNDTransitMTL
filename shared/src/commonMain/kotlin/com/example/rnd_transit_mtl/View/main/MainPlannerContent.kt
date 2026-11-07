@@ -164,7 +164,8 @@ internal fun MainPlannerContent(
     initialSheetPosition: PlannerSheetPosition = PlannerSheetPosition.Main,
     origin: TripPoint? = TripPoint("Current location", 0.5f, 0.35f),
     onEditOrigin: () -> Unit = {},
-    liveOriginLabel: String? = null
+    liveOriginLabel: String? = null,
+    onLoadStmTrip: (() -> Unit)? = null
 ) {
     val liveLocation = LocalPlannerLocation.current
     // Expansion is presentation state, separate from transport and zone selections.
@@ -485,6 +486,14 @@ internal fun MainPlannerContent(
                 }
 
                 LazyColumn(Modifier.fillMaxWidth().weight(1f), state = list, userScrollEnabled = enabled) {
+                    if (onLoadStmTrip != null) {
+                        item {
+                            androidx.compose.material3.Button(
+                                onClick = onLoadStmTrip,
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            ) { Text("Load STM test trip") }
+                        }
+                    }
                     val summary = activeTripSummary ?: pendingReviewSummary
                     if (summary != null || validationMessage.isNotEmpty()) {
                         item(key = "feedback") {

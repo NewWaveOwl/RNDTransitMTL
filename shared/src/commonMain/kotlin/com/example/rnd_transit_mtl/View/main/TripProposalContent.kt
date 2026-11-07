@@ -217,7 +217,8 @@ internal fun TripProposalContent(
     onStart: () -> Unit,
     onGenerateAnother: () -> Unit,
     onEditSettings: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    scheduled: Boolean = false
 ) {
     val liveMap = LocalTransitMap.current != null
     val density = LocalDensity.current
@@ -311,9 +312,19 @@ internal fun TripProposalContent(
                 )
 
                 // Round like the active, completion and details screens so one trip shows one distance.
-                val distance = (trip.distanceKm * 10).roundToInt() / 10.0
+                val distance = if (scheduled) {
+                    val hundredths = (trip.legs.sumOf { it.distanceMeters } / 10).roundToInt()
+                    "${hundredths / 100}.${(hundredths % 100).toString().padStart(2, '0')}"
+                } else {
+                    ((trip.distanceKm * 10).roundToInt() / 10.0).toString()
+                }
+                val duration = if (scheduled) {
+                    "${(trip.legs.sumOf { it.durationSeconds } / 60.0).roundToInt()} min scheduled"
+                } else {
+                    "${trip.plannedMinutes} min"
+                }
                 Text(
-                    text = "${trip.plannedMinutes} min · $distance km" +
+                    text = "$duration · $distance km" +
                         (if (trip.legs.all { it.isRouted }) "" else " straight line") + " · One way",
                     color = TransitWhite,
                     fontSize = 20.sp,

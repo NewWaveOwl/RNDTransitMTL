@@ -19,6 +19,7 @@ dependencies {
 
     implementation(libs.compose.uiToolingPreview)
     debugImplementation(libs.compose.uiTooling)
+    debugImplementation(libs.kotlinx.coroutinesCore)
 }
 
 android {
@@ -38,6 +39,11 @@ android {
         }
     }
     buildTypes {
+        debug {
+            val endpoint = providers.gradleProperty("stmOtpEndpoint")
+                .orElse("http://10.0.2.2:18084/otp/gtfs/v1").get()
+            buildConfigField("String", "STM_OTP_ENDPOINT", "\"${endpoint.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
@@ -52,5 +58,6 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }

@@ -1,4 +1,5 @@
 package com.example.rnd_transit_mtl.View.main
+import com.example.rnd_transit_mtl.LocalDebugStmTripLoader
 import com.example.rnd_transit_mtl.data.assets.toSampleMapPoint
 import com.example.rnd_transit_mtl.state.NullableTripIdSaver
 import com.example.rnd_transit_mtl.model.ids.TripId
@@ -71,6 +72,8 @@ internal fun TransitOpeningScreen(
     modifier: Modifier = Modifier,
     sampleOutcome: Trip33Sample = Trip33Sample.Normal
 ) {
+    val loadDebugStmTrip = LocalDebugStmTripLoader.current
+    var stmProposal by rememberSaveable { mutableStateOf(false) }
     val tripsStore = LocalTripsStore.current
     val liveMap = LocalTransitMap.current != null
     val location = LocalPlannerLocation.current
@@ -179,6 +182,7 @@ internal fun TransitOpeningScreen(
     }
 
     fun closeProposalFlow() {
+        stmProposal = false
         proposalGuard.cancel()
         generationJob?.cancel()
         generationJob = null
@@ -276,6 +280,7 @@ internal fun TransitOpeningScreen(
     }
 
     fun performPrimaryAction() {
+        stmProposal = false
         if (!latestDestinationActive ||
             processingAction ||
             pendingOpenTripId != null
@@ -490,6 +495,36 @@ internal fun TransitOpeningScreen(
         }
     }
 
+    fun requestStmTrip() {
+        val load = loadDebugStmTrip ?: return
+        if (!latestDestinationActive || processingAction || pendingOpenTripId != null ||
+            tripsStore.activeTrip != null || pendingReviewId != null
+        ) return
+
+        closeProposalFlow()
+        stmProposal = true
+        val token = proposalGuard.begin()
+        processingAction = true
+        generationJob = generationScope.launch {
+            try {
+                val trip = load()
+                val encoded = Json.encodeToString(trip)
+                if (latestDestinationActive && proposalGuard.complete(token, trip.id)) {
+                    proposalJson = encoded
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (proposalGuard.complete(token, null)) {
+                    failureName = Trip33Failure.ProviderUnavailable.name
+                    failureMessage = "Could not load the STM test trip. Check that OTP is running and try again."
+                }
+            } finally {
+                if (proposalGuard.isCurrent(token)) processingAction = false
+            }
+        }
+    }
+
     fun closeCurrentProposalScreen() {
         if (pickingOrigin) {
             pickingOrigin = false
@@ -541,8 +576,10 @@ internal fun TransitOpeningScreen(
                 closeProposalFlow()
             },
             onRetry = {
-                closeProposalFlow()
-                performPrimaryAction()
+                if (stmProposal) requestStmTrip() else {
+                    closeProposalFlow()
+                    performPrimaryAction()
+                }
             },
             onEditSettings = {
                 closeProposalFlow()
@@ -584,6 +621,7 @@ internal fun TransitOpeningScreen(
     if (proposal != null) {
         TripProposalContent(
             trip = proposal,
+            scheduled = stmProposal,
             onStart = {
                 if (latestDestinationActive &&
                     !processingAction &&
@@ -617,8 +655,10 @@ internal fun TransitOpeningScreen(
                 }
             },
             onGenerateAnother = {
-                closeProposalFlow()
-                performPrimaryAction()
+                if (stmProposal) requestStmTrip() else {
+                    closeProposalFlow()
+                    performPrimaryAction()
+                }
             },
             onEditSettings = { closeProposalFlow() },
             modifier = proposalModifier
@@ -810,6 +850,9 @@ internal fun TransitOpeningScreen(
                 completedSummary
             },
             onPrimaryAction = { performPrimaryAction() },
+            onLoadStmTrip = if (loadDebugStmTrip != null && activeState == null &&
+                pendingReviewId == null && pendingOpenTripId == null && isDestinationActive
+            ) ::requestStmTrip else null,
             onOpenDetailedSettings = {
                 if (canChangeInputs() && navigator.current == MainScreenKey) {
                     navigation.openSection(SettingsScreenKey)

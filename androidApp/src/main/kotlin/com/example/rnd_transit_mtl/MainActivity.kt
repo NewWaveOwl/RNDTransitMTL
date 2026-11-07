@@ -31,7 +31,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             ProvideAndroidTransitMap(styleUrl = getString(R.string.map_style_url)) {
                 Box(Modifier.fillMaxSize()) {
-                    App()
+                    App(loadDebugStmTrip = stmTripLoader())
                     if (showStartup) AnimatedStartupOverlay()
                 }
             }
