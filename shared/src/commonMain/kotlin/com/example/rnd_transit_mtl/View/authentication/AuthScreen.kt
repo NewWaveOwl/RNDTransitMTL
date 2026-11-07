@@ -62,10 +62,10 @@ internal fun AuthScreen(
             .verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        if (state.checkEmail) {
+        if (state.confirmationEmail != null) {
             Text("Check your email", color = TransitComplementary,
                 fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            Text("We sent a confirmation link to $email. Confirm your address, then sign in.",
+            Text("We sent a confirmation link to ${state.confirmationEmail}. Confirm your address, then sign in.",
                 color = TransitComplementary)
             OutlinedButton(onClick = {
                 viewModel.dismissCheckEmail()

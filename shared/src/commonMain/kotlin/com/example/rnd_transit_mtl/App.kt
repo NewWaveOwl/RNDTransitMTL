@@ -106,10 +106,11 @@ fun App(
     LaunchedEffect(accountSession.value) {
         if (accountSession.value is AccountSession.SignedIn) continueAsGuest = false
     }
-    val identity = when (accountSession.value) {
-        is AccountSession.SignedIn -> signedIdentity!!
-        AccountSession.Restoring, AccountSession.Unavailable -> lastSignedIdentity ?: "guest"
-        AccountSession.Guest -> "guest"
+    val identity = when {
+        accountSession.value is AccountSession.SignedIn -> signedIdentity!!
+        continueAsGuest -> "guest"
+        accountSession.value == AccountSession.Guest -> "guest"
+        else -> lastSignedIdentity ?: "guest"
     }
     var navigationOwner by rememberSaveable { mutableStateOf(identity) }
     RNDTransitTheme {

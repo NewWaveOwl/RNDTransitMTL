@@ -41,11 +41,12 @@ internal class SupabaseAuthRepository(
         }
     }
 
-    override suspend fun signUp(email: String, password: String) {
-        auth.signUpWith(Email) {
+    override suspend fun signUp(email: String, password: String): Boolean {
+        val user = auth.signUpWith(Email) {
             this.email = email.trim()
             this.password = password
         }
+        return user != null
     }
 
     override suspend fun signOut() {

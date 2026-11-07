@@ -11,7 +11,7 @@ import kotlinx.coroutines.launch
 internal data class AuthUiState(
     val submitting: Boolean = false,
     val error: String? = null,
-    val checkEmail: Boolean = false,
+    val confirmationEmail: String? = null,
 )
 
 internal class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
@@ -45,8 +45,10 @@ internal class AuthViewModel(private val repository: AuthRepository) : ViewModel
         mutableState.value = AuthUiState(submitting = true)
         viewModelScope.launch {
             try {
-                repository.signUp(email, password)
-                mutableState.value = AuthUiState(checkEmail = true)
+                val needsConfirmation = repository.signUp(email, password)
+                mutableState.value = AuthUiState(
+                    confirmationEmail = email.trim().takeIf { needsConfirmation },
+                )
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
