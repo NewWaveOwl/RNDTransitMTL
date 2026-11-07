@@ -6,7 +6,7 @@ The Android debug samples fetch real route geometry and timetable data from a lo
 
 Use PowerShell on the Windows PC running Android Studio. The scripts live in `tool/otp` at the repository root. A fresh checkout also needs the local runtime files. Place Java 25 under `tool/otp/java25`, the OTP 2.10.0 JAR at `tool/otp/otp.jar`, and the combined Montréal graph, GTFS feeds, and local STM configuration in `tool/otp/stm-scheduled`. The exo realtime token is needed only for live exo updates.
 
-Run this from the `RNDTransitMTL` repository root:
+Open PowerShell in the `RNDTransitMTL` repository root. Use the same PowerShell window for startup and installation so `$stackDir` is available.
 
 ```powershell
 $stackDir = (Resolve-Path '.\tool\otp\stm-scheduled').Path
@@ -22,9 +22,7 @@ Invoke-RestMethod "http://127.0.0.1:$($stack.adapterPort)/status"
 
 ## 2. Launch the Android debug build
 
-**Emulator.** Select the `androidApp` run configuration and the emulator in Android Studio, then click **Run**. The debug build reads the bridge port from the local stack state and connects to the host PC at `10.0.2.2`. It defaults to port `18086` when there is no stack state. If a restart picks a new port, click **Run** again to rebuild and reinstall the app.
-
-**Emulator over ADB.** If the app times out connecting to `10.0.2.2`, leave one emulator running and run the following in the same PowerShell session. The installer forwards the active bridge port through ADB, installs a debug build using `127.0.0.1`, and opens the app. Use this command for subsequent builds while using ADB forwarding.
+**Emulator.** Start one Android emulator and leave the routing stack running. Run the installer in PowerShell. It reads the active bridge port, sets up `adb reverse`, and builds, installs, and opens the debug app with a `127.0.0.1` endpoint.
 
 ```powershell
 & (Join-Path $stackDir 'Install-StmAndroid.ps1') -Emulator
@@ -35,6 +33,10 @@ Invoke-RestMethod "http://127.0.0.1:$($stack.adapterPort)/status"
 ```powershell
 & (Join-Path $stackDir 'Install-StmAndroid.ps1')
 ```
+
+Use the installer for subsequent builds over ADB. Rerun it if the device reconnects or the bridge port changes. The installer passes `stmOtpEndpoint` to Gradle, which puts the endpoint in the debug Android manifest.
+
+**Direct Android Studio run.** If your emulator can reach the host through `10.0.2.2`, you can also select `androidApp` and click **Run**. That build uses the port recorded by the local stack and defaults to `18086` when no port is recorded. To use ADB forwarding after an Android Studio run, rerun the installer with `-Emulator`.
 
 ## 3. Run a sample trip
 
@@ -48,8 +50,8 @@ The samples use the current Montréal departure time. Run the mixed sample durin
 
 | What you see | What to check |
 | --- | --- |
-| **Routing service unavailable** | Check the bridge status on the PC. On the emulator, open `http://10.0.2.2:PORT/status` in its browser, replacing `PORT` with the bridge port printed by the script. If the browser gets JSON but the app still fails after a port change, rebuild and reinstall the debug app. For the exception behind a failed routing request, filter Android Studio Logcat by `tag:RndTransitOtp`. On a USB phone, rerun the install script after reconnecting to restore `adb reverse`. |
-| Manually selecting an emulator endpoint | From the repository root, run `.\gradlew.bat :androidApp:installDebug "-PstmOtpEndpoint=http://10.0.2.2:PORT/otp/gtfs/v1"`, replacing `PORT`. This property overrides the port from the stack state for that build. |
+| **Routing service unavailable** | Check the bridge status on the PC using the command in step 1. If it responds, rerun the installer for your device to refresh the endpoint and ADB forwarding. Filter Android Studio Logcat by `tag:RndTransitOtp` to see the routing exception. |
+| `SocketTimeoutException` connecting to `10.0.2.2` | Use `Install-StmAndroid.ps1 -Emulator` to reach the bridge through ADB at `127.0.0.1`. |
 | Sample buttons are missing | Check that you're running the Android debug build. Finish or dismiss any active trip or pending review, then return to the planner. |
 | No transit route appears | Check the current service hours and that the graph's scheduled GTFS feeds cover today's date. |
 
