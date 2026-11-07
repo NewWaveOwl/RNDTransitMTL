@@ -16,3 +16,6 @@
 
 10:00 -> 12:00 fined test for issue Test Montréal routing and walking/cycling alternatives
  #21
+
+12 -> 13:00  Bug fixes and foek on decions for Add Android MapLibre and the Montréal routing prototype- #57
+#57
