@@ -5,6 +5,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.example.rnd_transit_mtl.model.geo.GeoPoint
 import com.example.rnd_transit_mtl.model.trip.Trip
 
 internal data class TransitMapData(
@@ -13,7 +14,11 @@ internal data class TransitMapData(
     val recenterRequest: Int = 0,
     val interactive: Boolean = true,
     val topInset: Dp = 0.dp,
-    val bottomInset: Dp = 0.dp
+    val bottomInset: Dp = 0.dp,
+    val browsing: Boolean = false,
+    val pickerOpen: Boolean = false,
+    val pin: GeoPoint? = null,
+    val onPick: ((GeoPoint) -> Unit)? = null
 )
 
 internal val LocalTransitMap = staticCompositionLocalOf<(@Composable (TransitMapData, Modifier) -> Unit)?> {

@@ -1,5 +1,14 @@
 package com.example.rnd_transit_mtl.ui.global_ui_ellements.map
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.movableContentOf
+import androidx.compose.runtime.SideEffect
+import com.example.rnd_transit_mtl.data.location.LocalPlannerLocation
+import org.maplibre.compose.camera.CameraMoveReason
+import org.maplibre.compose.interaction.ClickResult
+import org.maplibre.compose.map.CameraConstraints
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -55,17 +64,31 @@ fun ProvideAndroidTransitMap(
     if (LocalInspectionMode.current) {
         content()
     } else {
+        val session = rememberAndroidPlannerMapSession()
+        val browsingMap = remember(styleUrl, session) {
+            movableContentOf { data: TransitMapData, modifier: Modifier ->
+                AndroidTransitMap(data, styleUrl, session, modifier)
+            }
+        }
         CompositionLocalProvider(
-            LocalTransitMap provides { data, modifier -> AndroidTransitMap(data, styleUrl, modifier) },
+            LocalPlannerLocation provides session,
+            LocalTransitMap provides { data, modifier ->
+                if (data.browsing) browsingMap(data, modifier)
+                else AndroidTransitMap(data, styleUrl, session, modifier)
+            },
             content = content
         )
     }
 }
 
 @Composable
-private fun AndroidTransitMap(data: TransitMapData, styleUrl: String, modifier: Modifier) {
+private fun AndroidTransitMap(data: TransitMapData, styleUrl: String, session: AndroidPlannerMapSession, modifier: Modifier) {
     var attempt by remember(styleUrl) { mutableIntStateOf(0) }
     val trip = data.trip
+    val fix = session.fix.takeIf { data.browsing }
+    val region = MontrealBrowsingBounds
+    val regionalBounds = BoundingBox(west = region.west, south = region.south, east = region.east, north = region.north)
+    if (data.pickerOpen) SideEffect { session.autoCenterPending = false }
     val legs = trip?.legs.orEmpty()
     val bounds = remember(legs) {
         val points = legs.flatMap { it.geometry }
@@ -83,8 +106,13 @@ private fun AndroidTransitMap(data: TransitMapData, styleUrl: String, modifier: 
     key(styleUrl, attempt, trip?.id) {
         val map = rememberMapState(
             baseStyle = BaseStyle.Uri(styleUrl),
-            initialCameraPosition = MontrealCamera
+            initialCameraPosition = if (data.browsing) session.camera ?: MontrealCamera else MontrealCamera
         ) {
+            if (fix != null) {
+                if (fix.accuracyMeters > 0) AccuracyArea(fix.point, fix.accuracyMeters)
+                TripDot("device-location", fix.point, Color(0xFF1976D2), 7)
+            }
+            data.pin?.let { TripDot("origin-draft", it, Color(0xFFED7100), 10) }
             if (trip != null) {
                 val routeData = remember(legs) { GeoJsonData.JsonString(routeGeoJson(legs)) }
                 val route = rememberGeoJsonSource(routeData)
@@ -122,11 +150,55 @@ private fun AndroidTransitMap(data: TransitMapData, styleUrl: String, modifier: 
             }
         }
 
-        Box(modifier) {
+        if (data.browsing) {
+            LaunchedEffect(map) {
+                if (session.camera == null) {
+                    map.fitCameraToBounds(regionalBounds, CameraFit(fitPadding = DpPadding(24.dp, 24.dp, 24.dp, 24.dp)))
+                }
+                snapshotFlow { map.cameraMoveReason }.collect { reason ->
+                    if (reason == CameraMoveReason.Gesture) session.autoCenterPending = false
+                }
+            }
+            LaunchedEffect(map) {
+                snapshotFlow {
+                    if (map.viewport != null && !map.isCameraMoving) map.cameraPosition else null
+                }.collect { position -> if (position != null) session.saveCamera(position) }
+            }
+            LaunchedEffect(map, fix, session.recenter, data.pickerOpen) {
+                val point = fix?.point ?: return@LaunchedEffect
+                if (!session.containsPoint(point)) return@LaunchedEffect
+                val explicit = session.recenter != 0
+                if (!data.pickerOpen && (explicit ||
+                        (session.autoCenterPending && map.cameraMoveReason != CameraMoveReason.Gesture))) {
+                    session.autoCenterPending = false
+                    session.recenter = 0
+                    map.setCameraPosition(CameraPosition(center = Position(point.longitude, point.latitude), zoom = 13.0))
+                }
+            }
+        }
+
+        Box(modifier.background(Color(0xFFE9ECE8))) {
             MaplibreMap(
                 state = map,
                 modifier = Modifier.fillMaxSize(),
-                interactions = if (data.interactive) MapInteractions.Standard else MapInteractions.None,
+                cameraConstraints = if (data.browsing) CameraConstraints {
+                    boundingBox = regionalBounds
+                    minZoom = 7.0
+                } else CameraConstraints.Standard,
+                interactions = if (data.interactive) MapInteractions {
+                    callbacks {
+                        click {
+                            onEvent { event ->
+                                val point = event.position
+                                val onPick = data.onPick
+                                if (onPick != null && point != null && point.longitude in -180.0..180.0) {
+                                    onPick(GeoPoint(point.latitude, point.longitude))
+                                    ClickResult.Consume
+                                } else ClickResult.Pass
+                            }
+                        }
+                    }
+                } else MapInteractions.None,
                 overlay = {}
             )
 
@@ -160,7 +232,7 @@ private fun AndroidTransitMap(data: TransitMapData, styleUrl: String, modifier: 
                     }
                 }
                 else -> CircularProgressIndicator(
-                    modifier = Modifier.align(statusAlignment).padding(top = statusOffset).semantics { contentDescription = "Loading map" }
+                    modifier = Modifier.align(statusAlignment).padding(top = statusOffset).size(24.dp).semantics { contentDescription = "Loading map" }
                 )
             }
         }
@@ -180,6 +252,21 @@ private fun TripDot(id: String, point: GeoPoint, color: Color, radius: Int) {
         strokeColor = const(Color.White),
         strokeWidth = const(2.dp)
     )
+}
+
+@Composable
+private fun AccuracyArea(point: GeoPoint, meters: Double) {
+    val ring = (0..48).joinToString(",") { index ->
+        val angle = 2.0 * kotlin.math.PI * (index % 48) / 48
+        val latitude = point.latitude + meters * kotlin.math.sin(angle) / 111_320.0
+        val longitude = point.longitude + meters * kotlin.math.cos(angle) /
+            (111_320.0 * kotlin.math.cos(Math.toRadians(point.latitude)).coerceAtLeast(0.01))
+        "[$longitude,$latitude]"
+    }
+    val source = rememberGeoJsonSource(
+        GeoJsonData.JsonString("""{"type":"Polygon","coordinates":[[$ring]]}""")
+    )
+    org.maplibre.compose.layers.FillLayer(id = "device-accuracy", source = source, color = const(Color(0x331976D2)))
 }
 
 private fun GeoPoint.coordinates(): String = "[$longitude,$latitude]"

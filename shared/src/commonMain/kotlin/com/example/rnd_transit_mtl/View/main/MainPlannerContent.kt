@@ -1,6 +1,7 @@
 package com.example.rnd_transit_mtl.View.main
 
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMap
+import com.example.rnd_transit_mtl.data.location.LocalPlannerLocation
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMapData
 import com.example.rnd_transit_mtl.state.NullableTransportIdSaver
 import com.example.rnd_transit_mtl.model.ids.ZoneId
@@ -160,8 +161,10 @@ internal fun MainPlannerContent(
     onControlsHidden: () -> Unit = {},
     initialSheetPosition: PlannerSheetPosition = PlannerSheetPosition.Main,
     origin: TripPoint? = TripPoint("Current location", 0.5f, 0.35f),
-    onEditOrigin: () -> Unit = {}
+    onEditOrigin: () -> Unit = {},
+    liveOriginLabel: String? = null
 ) {
+    val liveLocation = LocalPlannerLocation.current
     // Expansion is presentation state, separate from transport and zone selections.
     var expandedTransportId by rememberSaveable(stateSaver = NullableTransportIdSaver) { mutableStateOf<TransportId?>(null) }
     var recenterRequest by rememberSaveable {
@@ -258,7 +261,7 @@ internal fun MainPlannerContent(
         }
 
         TransitMap(
-            data = TransitMapData(recenterRequest = recenterRequest, interactive = enabled),
+            data = TransitMapData(recenterRequest = recenterRequest, interactive = enabled, browsing = true),
             modifier = Modifier.fillMaxSize()
         ) {
             FigmaOriginMap(
@@ -302,7 +305,7 @@ internal fun MainPlannerContent(
             ) {
                 TripLabelValueField(
                     label = "Starting point",
-                    value = origin?.label ?: "Search a place or address",
+                    value = liveOriginLabel ?: origin?.label ?: "Search a place or address",
                     showLocationIcon = true,
                     modifier = Modifier.clickable(
                         enabled = enabled && showMapControls,
@@ -326,8 +329,10 @@ internal fun MainPlannerContent(
                 ).coerceAtLeast(0f)
 
                 FigmaRecenterButton(
-                    enabled = enabled && origin != null,
-                    onClick = { recenterRequest += 1 },
+                    enabled = enabled && (origin != null || liveLocation != null),
+                    onClick = {
+                        if (liveLocation != null) liveLocation.request() else recenterRequest += 1
+                    },
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(end = 16.dp * scale)

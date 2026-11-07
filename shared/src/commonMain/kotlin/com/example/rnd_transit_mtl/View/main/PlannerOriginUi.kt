@@ -1,5 +1,7 @@
 package com.example.rnd_transit_mtl.View.main
 
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMap
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMapData
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -315,7 +317,9 @@ internal fun OriginSelectionContent(
     onSearch: () -> Unit,
     onRetryLocation: () -> Unit,
     onBack: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    liveMapData: TransitMapData? = null,
+    draftLabel: String? = null
 ) {
     val backState = rememberNavigationEventState(
         currentInfo = NavigationEventInfo.None
@@ -348,7 +352,9 @@ internal fun OriginSelectionContent(
         val availablePanelHeight =
             (maxHeight - panelTop).coerceAtLeast(1.dp)
 
-        FigmaOriginMap(
+        if (liveMapData != null) {
+            TransitMap(liveMapData, Modifier.fillMaxSize()) {}
+        } else FigmaOriginMap(
             origin = if (picking) origin else null,
             enabled = enabled,
             onPick = if (picking) onPick else null,
@@ -387,7 +393,7 @@ internal fun OriginSelectionContent(
             }
         }
 
-        Text(
+        if (liveMapData == null) Text(
             "© OpenStreetMap contributors · Sample map",
             color = TransitComplementary,
             fontSize = 9.sp,
@@ -413,7 +419,7 @@ internal fun OriginSelectionContent(
             TripLabelValueField(
                 label = "Starting point",
                 value = if (picking) {
-                    origin?.label ?: "Choose a point on the map"
+                    draftLabel ?: origin?.label ?: "Choose a point on the map"
                 } else {
                     "Search a place or address"
                 },
@@ -429,7 +435,7 @@ internal fun OriginSelectionContent(
                 OriginAction(
                     label = "Use this starting point",
                     onClick = onConfirm,
-                    enabled = enabled && origin != null
+                    enabled = enabled && (origin != null || draftLabel != null)
                 )
                 OriginAction(
                     label = "Cancel",
@@ -438,7 +444,8 @@ internal fun OriginSelectionContent(
                     secondary = true
                 )
                 Text(
-                    "Tap the sample map, or focus it and use arrow keys.",
+                    if (liveMapData != null) "Tap the map to drop a pin."
+                    else "Tap the sample map, or focus it and use arrow keys.",
                     color = TransitComplementary,
                     fontSize = 12.sp
                 )
@@ -449,7 +456,7 @@ internal fun OriginSelectionContent(
                     enabled
                 )
                 OriginAction(
-                    "Try current location again",
+                    if (liveMapData != null) "Use my location" else "Try current location again",
                     onRetryLocation,
                     enabled,
                     secondary = true
