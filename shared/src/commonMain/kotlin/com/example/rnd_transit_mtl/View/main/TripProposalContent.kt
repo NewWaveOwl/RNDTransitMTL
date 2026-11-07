@@ -33,10 +33,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.rnd_transit_mtl.model.trip.Place
 import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.model.trip.TripPoint
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.MockTripMap
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.toSampleMapLegs
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.transitions.tripPanelEntrance
 import com.example.rnd_transit_mtl.ui.theme.*
 import org.jetbrains.compose.resources.painterResource
 import rnd_transit_mtl.shared.generated.resources.Res
@@ -142,18 +144,26 @@ internal fun TripLoadingContent(
             "Current location",
             0.5f,
             0.35f
-        )
+        ),
+    liveOrigin: Place? = null
 ) {
+    val liveMap = LocalTransitMap.current != null
     Box(modifier.fillMaxSize()) {
-        FigmaOriginMap(
-            origin = origin,
-            enabled = false,
+        TransitMap(
+            data = TransitMapData(
+                interactive = false,
+                sharedTripFlow = true,
+                browsing = true,
+                pin = liveOrigin?.point
+            ),
             modifier = Modifier.fillMaxSize()
-        )
+        ) {
+            FigmaOriginMap(origin = origin, enabled = false, modifier = Modifier.fillMaxSize())
+        }
 
         TripLabelValueField(
             label = "Starting point",
-            value = origin?.label ?: "Search a place or address",
+            value = liveOrigin?.label ?: origin?.label ?: "Search a place or address",
             showLocationIcon = true,
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -167,6 +177,7 @@ internal fun TripLoadingContent(
                 .widthIn(max = ProposalPanelMaxWidth)
                 .fillMaxWidth()
                 .heightIn(max = LoadingPanelMaximumHeight)
+                .tripPanelEntrance(liveMap)
                 .background(TransitComplementary)
                 .verticalScroll(rememberScrollState())
                 .padding(24.dp),
@@ -202,7 +213,7 @@ internal fun TripLoadingContent(
             )
         }
 
-        MapAttribution(
+        if (!liveMap) MapAttribution(
             Modifier.align(Alignment.TopStart).padding(top = 90.dp, start = 8.dp)
         )
     }
@@ -244,7 +255,9 @@ internal fun TripProposalContent(
                 progress = 0f,
                 recenterRequest = recenterRequest,
                 topInset = with(density) { headerHeight.toDp() },
-                bottomInset = with(density) { panelHeight.toDp() } + bottomGap
+                bottomInset = with(density) { panelHeight.toDp() } + bottomGap,
+                sharedTripFlow = true,
+                cameraInsetsReady = headerHeight > 0 && panelHeight > 0
             ),
             modifier = Modifier.fillMaxSize()
         ) {
@@ -264,6 +277,7 @@ internal fun TripProposalContent(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .onSizeChanged { headerHeight = it.height }
+                .tripPanelEntrance(liveMap, fromBottom = false)
                 .widthIn(max = ProposalPanelMaxWidth)
                 .fillMaxWidth()
                 .padding(16.dp),
@@ -301,6 +315,7 @@ internal fun TripProposalContent(
                 .align(Alignment.BottomCenter)
                 .padding(bottom = bottomGap)
                 .onSizeChanged { panelHeight = it.height }
+                .tripPanelEntrance(liveMap)
                 .widthIn(max = ProposalPanelMaxWidth)
                 .fillMaxWidth()
         ) {

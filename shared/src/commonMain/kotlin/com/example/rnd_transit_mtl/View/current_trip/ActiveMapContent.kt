@@ -18,6 +18,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
@@ -32,6 +34,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.MockTripMap
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.toSampleMapLegs
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.transitions.tripPanelEntrance
 import com.example.rnd_transit_mtl.ui.theme.*
 import kotlin.math.ceil
 import kotlin.math.roundToInt
@@ -148,23 +151,36 @@ fun ActiveMapContent(
         if (completed) confirmingCancel = false
     }
 
+    val liveMap = LocalTransitMap.current != null
+    val density = LocalDensity.current
+    var headerHeight by remember { mutableIntStateOf(0) }
+    var panelHeight by remember { mutableIntStateOf(0) }
+    var recenterRequest by remember(trip.id) { mutableIntStateOf(0) }
+
     BoxWithConstraints(modifier.fillMaxSize()) {
         val panelMaxHeight = maxHeight * ActiveMapPanelMaximumHeightFraction
+        val mapInteractive = actionsEnabled && !confirmingCancel && !confirmingFinish
+        if (liveMap) {
+            TransitMap(
+                data = TransitMapData(
+                    trip = trip,
+                    progress = retainedMapProgress.takeIf { locationState != TripLocationState.Missing },
+                    recenterRequest = recenterRequest,
+                    followPosition = followPosition,
+                    onManualCameraMove = { followPosition = false },
+                    interactive = mapInteractive,
+                    topInset = with(density) { headerHeight.toDp() },
+                    bottomInset = with(density) { panelHeight.toDp() },
+                    sharedTripFlow = true,
+                    cameraInsetsReady = headerHeight > 0 && panelHeight > 0
+                ),
+                modifier = Modifier.fillMaxSize()
+            ) {}
+        }
 
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxWidth().weight(1f)) {
-                val mapInteractive = actionsEnabled && !confirmingCancel && !confirmingFinish
-                TransitMap(
-                    data = TransitMapData(
-                        trip = trip,
-                        progress = retainedMapProgress.takeIf { locationState != TripLocationState.Missing },
-                        followPosition = followPosition,
-                        onManualCameraMove = { followPosition = false },
-                        interactive = mapInteractive,
-                        topInset = 72.dp
-                    ),
-                    modifier = Modifier.fillMaxSize()
-                ) {
+                if (!liveMap) {
                     MockTripMap(
                         start = trip.origin.toSampleMapPoint(),
                         destination = trip.destination.toSampleMapPoint(),
@@ -182,6 +198,8 @@ fun ActiveMapContent(
 
                 Column(
                     Modifier.align(Alignment.TopCenter).fillMaxWidth()
+                        .onSizeChanged { headerHeight = it.height }
+                        .tripPanelEntrance(liveMap, fromBottom = false)
                 ) {
                     if (!mainOverview) {
                         Row(
@@ -280,10 +298,11 @@ fun ActiveMapContent(
                             role = Role.Button
                         ) {
                             followPosition = true
+                            recenterRequest++
                         }
                 )
 
-                if (LocalTransitMap.current == null) Text(
+                if (!liveMap) Text(
                     "© OpenStreetMap contributors · Sample map",
                     color = TransitComplementary,
                     fontSize = 10.sp,
@@ -302,6 +321,8 @@ fun ActiveMapContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = panelMaxHeight)
+                    .onSizeChanged { panelHeight = it.height }
+                    .tripPanelEntrance(liveMap)
                     .background(TransitComplementary)
                     .verticalScroll(rememberScrollState())
                     .padding(ActiveMapPanelPadding),

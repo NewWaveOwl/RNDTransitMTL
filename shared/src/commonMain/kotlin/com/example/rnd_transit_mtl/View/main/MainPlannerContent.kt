@@ -87,6 +87,7 @@ private val PlannerMainSheetTop = 400f
 private val PlannerRoutesSheetTop = 256f
 private val PlannerPreferencesSheetTop = 100f
 private val PlannerShortWindowTopFraction = 0.3f
+private val PlannerGoCollapsedGap = 10f
 private val PlannerGoMainGap = 24f
 private val PlannerGoRoutesGap = 7f
 private val PlannerGoPreferencesGap = 12f
@@ -96,11 +97,11 @@ private const val PLANNER_SHEET_ANIMATION_DURATION_MILLIS = 300
 private const val PLANNER_ORIGIN_FIELD_ANIMATION_DURATION_MILLIS = 300
 // GO exit timing is shared with navigation/footer transitions: edit ui/global_ui_ellements/transitions/TripTransition.kt.
 
-/** Three resting positions corresponding to Figma main_screen, routes, and preferences. */
-internal enum class PlannerSheetPosition { Main, Routes, Preferences }
+/** The three Figma layouts plus a bottom stop that exposes the full map. */
+internal enum class PlannerSheetPosition { Main, Routes, Preferences, Collapsed }
 
 /**
- * Displays a pannable sample map and three draggable preference positions.
+ * Displays a pannable map and four draggable preference positions.
  *
  * GO follows the sheet. Expanded content scrolls after the sheet reaches its top stop.
  * Sheet position is presentation state; all editable choices belong to the caller.
@@ -207,9 +208,12 @@ internal fun MainPlannerContent(
         val panelWidth = maxWidth.coerceAtMost(PlannerSheetMaxWidth)
         val scale = (panelWidth.value / PlannerReferenceWidth).coerceIn(PlannerMinimumScale, PlannerMaximumScale)
         val heightPx = with(density) { maxHeight.toPx() }
-        val geometry = plannerSheetGeometry(heightPx, with(density) { scale.dp.toPx() })
+        val unitPx = with(density) { scale.dp.toPx() }
+        val dragStripHeight = PlannerDragStripHeight * scale
+        val geometry = plannerSheetGeometry(heightPx, unitPx)
         val anchors = remember(geometry) {
             DraggableAnchors {
+                PlannerSheetPosition.Collapsed at geometry.collapsed
                 PlannerSheetPosition.Main at geometry.main
                 PlannerSheetPosition.Routes at geometry.routes
                 PlannerSheetPosition.Preferences at geometry.preferences
@@ -264,8 +268,25 @@ internal fun MainPlannerContent(
             }
         }
 
+        val gapPx = geometry.goGap(sheetOffset)
+        val goHeightPx = with(density) { (GoBoxCompactHeight * scale).toPx() }
+        val goTop = (sheetOffset - goHeightPx - gapPx).coerceAtLeast(0f)
+        val showMapControls = controlsVisible && goTop >= 100f * unitPx
+        var originFieldHeight by remember { mutableIntStateOf(0) }
+        val visibleMapTop = if (showMapControls) {
+            (PlannerOriginFieldTopPadding * scale + with(density) { originFieldHeight.toDp() })
+                .coerceAtMost(with(density) { goTop.toDp() })
+        } else 0.dp
+
         TransitMap(
-            data = TransitMapData(recenterRequest = recenterRequest, interactive = enabled, browsing = true),
+            data = TransitMapData(
+                interactive = enabled,
+                topInset = visibleMapTop,
+                bottomInset = if (controlsVisible) with(density) { (heightPx - goTop).toDp() } else 0.dp,
+                sharedTripFlow = true,
+                cameraInsetsReady = !showMapControls || originFieldHeight > 0,
+                browsing = true
+            ),
             modifier = Modifier.fillMaxSize()
         ) {
             FigmaOriginMap(
@@ -281,16 +302,6 @@ internal fun MainPlannerContent(
         Box(Modifier.width(panelWidth).fillMaxHeight().graphicsLayer {
             translationY = exit.value * heightPx
         }) {
-            val gapPx = geometry.goGap(sheetOffset)
-            val goHeightPx = with(density) { (GoBoxCompactHeight * scale).toPx() }
-            val goTop = (sheetOffset - goHeightPx - gapPx).coerceAtLeast(0f)
-
-            val unitPx = with(density) { scale.dp.toPx() }
-
-            // Hide these controls as GO approaches the fully expanded position.
-            val showMapControls =
-                controlsVisible && goTop >= 100f * unitPx
-
             // Keep the field in the shared moving layer during GO's slide-down exit.
             // Sheet expansion hides it upward; pulling the sheet down reveals it smoothly.
             AnimatedVisibility(
@@ -311,7 +322,7 @@ internal fun MainPlannerContent(
                     label = "Starting point",
                     value = liveOriginLabel ?: origin?.label ?: "Search a place or address",
                     showLocationIcon = true,
-                    modifier = Modifier.clickable(
+                    modifier = Modifier.onSizeChanged { originFieldHeight = it.height }.clickable(
                         enabled = enabled && showMapControls,
                         role = Role.Button,
                         onClickLabel = "Choose starting point",
@@ -397,6 +408,7 @@ internal fun MainPlannerContent(
                 fun expandSheet() {
                     moveSheet(
                         when (sheet.targetValue) {
+                            PlannerSheetPosition.Collapsed -> PlannerSheetPosition.Main
                             PlannerSheetPosition.Main -> PlannerSheetPosition.Routes
                             PlannerSheetPosition.Routes -> PlannerSheetPosition.Preferences
                             PlannerSheetPosition.Preferences -> PlannerSheetPosition.Preferences
@@ -407,7 +419,7 @@ internal fun MainPlannerContent(
                 fun collapseSheet() {
                     moveSheet(
                         when (sheet.targetValue) {
-                            PlannerSheetPosition.Main -> PlannerSheetPosition.Main
+                            PlannerSheetPosition.Collapsed, PlannerSheetPosition.Main -> PlannerSheetPosition.Collapsed
                             PlannerSheetPosition.Routes -> PlannerSheetPosition.Main
                             PlannerSheetPosition.Preferences -> PlannerSheetPosition.Routes
                         }
@@ -417,7 +429,7 @@ internal fun MainPlannerContent(
                 Box(
                     Modifier
                         .fillMaxWidth()
-                        .height(PlannerDragStripHeight * scale)
+                        .height(dragStripHeight)
                         .background(TransitComplementary)
                         .onPreviewKeyEvent { event ->
                             if (!enabled || event.type != KeyEventType.KeyDown) {
@@ -433,7 +445,7 @@ internal fun MainPlannerContent(
                                         true
                                     }
                                     Key.MoveHome -> {
-                                        moveSheet(PlannerSheetPosition.Main)
+                                        moveSheet(PlannerSheetPosition.Collapsed)
                                         true
                                     }
                                     Key.MoveEnd -> {
@@ -451,9 +463,10 @@ internal fun MainPlannerContent(
                         ) {
                             moveSheet(
                                 when (sheet.targetValue) {
+                                    PlannerSheetPosition.Collapsed -> PlannerSheetPosition.Main
                                     PlannerSheetPosition.Main -> PlannerSheetPosition.Routes
                                     PlannerSheetPosition.Routes -> PlannerSheetPosition.Preferences
-                                    PlannerSheetPosition.Preferences -> PlannerSheetPosition.Main
+                                    PlannerSheetPosition.Preferences -> PlannerSheetPosition.Collapsed
                                 }
                             )
                         }
@@ -534,8 +547,9 @@ internal fun MainPlannerContent(
     }
 }
 
-/** Pixel positions of the three stops and GO gaps, independent of density. */
+/** Pixel positions of the sheet stops and GO gaps. */
 internal data class PlannerSheetGeometry(
+    val collapsed: Float,
     val main: Float,
     val routes: Float,
     val preferences: Float,
@@ -544,7 +558,10 @@ internal data class PlannerSheetGeometry(
     /** Interpolates the Figma spacing so GO follows the handle continuously.
      * @param offset Current sheet-handle offset in pixels.
      */
-    fun goGap(offset: Float): Float = if (offset >= routes) {
+    fun goGap(offset: Float): Float = if (offset >= main) {
+        val fraction = ((collapsed - offset) / (collapsed - main).coerceAtLeast(1f)).coerceIn(0f, 1f)
+        (PlannerGoCollapsedGap + (PlannerGoMainGap - PlannerGoCollapsedGap) * fraction) * scalePx
+    } else if (offset >= routes) {
         val fraction = ((offset - routes) / (main - routes)).coerceIn(0f, 1f)
         (PlannerGoRoutesGap + (PlannerGoMainGap - PlannerGoRoutesGap) * fraction) * scalePx
     } else {
@@ -559,9 +576,13 @@ internal data class PlannerSheetGeometry(
  */
 internal fun plannerSheetGeometry(heightPx: Float, scalePx: Float): PlannerSheetGeometry {
     val top = (PlannerPreferencesSheetTop * scalePx).coerceAtMost(heightPx * PlannerShortWindowTopFraction)
+    // Leave the handle visible at the bottom so the preferences can be reopened.
     val remaining = (heightPx - top).coerceAtLeast(1f)
+    val main = top + remaining * ((PlannerMainSheetTop - PlannerPreferencesSheetTop) /
+        (PlannerReferenceViewportHeight - PlannerPreferencesSheetTop))
     return PlannerSheetGeometry(
-        main = top + remaining * ((PlannerMainSheetTop - PlannerPreferencesSheetTop) / (PlannerReferenceViewportHeight - PlannerPreferencesSheetTop)),
+        collapsed = (heightPx - PlannerDragStripHeight.value * scalePx).coerceAtLeast(main),
+        main = main,
         routes = top + remaining * ((PlannerRoutesSheetTop - PlannerPreferencesSheetTop) / (PlannerReferenceViewportHeight - PlannerPreferencesSheetTop)),
         preferences = top,
         scalePx = scalePx

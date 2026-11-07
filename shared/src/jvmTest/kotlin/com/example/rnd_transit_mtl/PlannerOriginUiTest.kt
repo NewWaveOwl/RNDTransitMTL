@@ -19,6 +19,8 @@ import com.example.rnd_transit_mtl.View.main.FigmaOriginMap
 import com.example.rnd_transit_mtl.View.main.OriginSelectionContent
 import com.example.rnd_transit_mtl.View.main.MainPlannerContent
 import com.example.rnd_transit_mtl.model.trip.TripPoint
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.LocalTransitMap
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMapData
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.bundledMapSize
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.mapImageRect
 import com.example.rnd_transit_mtl.ui.theme.RNDTransitTheme
@@ -31,43 +33,55 @@ class PlannerOriginUiTest {
     @Test
     fun sheetAccessibilityActionsHideAndRestoreMapControls() {
         var edited = 0
+        var mapData = TransitMapData()
         val scene = ImageComposeScene(412, 800) {
-            RNDTransitTheme {
-                MainPlannerContent(30, {}, emptyList(), listOf(TransportId("walk")), emptyMap(), {}, { _, _ -> },
-                    "Amble", 18, {}, emptyList(), {}, {}, "", "GO", true, true,
-                    null, null, {}, {}, onEditOrigin = { edited++ })
+            CompositionLocalProvider(LocalTransitMap provides { data, _ -> SideEffect { mapData = data } }) {
+                RNDTransitTheme {
+                    MainPlannerContent(30, {}, emptyList(), listOf(TransportId("walk")), emptyMap(), {}, { _, _ -> },
+                        "Amble", 18, {}, emptyList(), {}, {}, "", "GO", true, true,
+                        null, null, {}, {}, onEditOrigin = { edited++ })
+                }
             }
         }
         var time = 0L
         fun render() { repeat(30) { time += 16_000_000; scene.render(time).close() } }
         fun all(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::all)
         fun nodes() = scene.semanticsOwners.flatMap { all(it.rootSemanticsNode) }
-        fun hasOrigin() = nodes().any {
+        fun originField() = nodes().firstOrNull {
             it.config.getOrNull(SemanticsActions.OnClick)?.label == "Choose starting point"
         }
+        fun control(description: String) = nodes().first {
+            it.config.getOrNull(SemanticsProperties.ContentDescription)?.contains(description) == true
+        }
         fun changeSheet(label: String) {
-            val handle = nodes().first {
-                it.config.getOrNull(SemanticsProperties.ContentDescription)?.contains("Trip preferences") == true
-            }
-            assertTrue(handle.config[SemanticsActions.CustomActions].first { it.label == label }.action())
+            assertTrue(control("Trip preferences").config[SemanticsActions.CustomActions]
+                .first { it.label == label }.action())
             render()
         }
         try {
             render()
-            assertTrue(hasOrigin())
-            val field = nodes().first { it.config.getOrNull(SemanticsActions.OnClick)?.label == "Choose starting point" }
-            field.config[SemanticsActions.OnClick].action!!.invoke()
+            assertNotNull(originField()).config[SemanticsActions.OnClick].action!!.invoke()
             assertEquals(1, edited)
             scene.render(time + 1).use { image ->
                 val folder = File("build/planner-previews").apply { mkdirs() }
                 image.encodeToData()!!.use { File(folder, "Origin-main.png").writeBytes(it.bytes) }
             }
             changeSheet("Expand preferences")
-            assertTrue(hasOrigin())
+            assertNotNull(originField())
             changeSheet("Expand preferences")
-            assertFalse(hasOrigin())
+            assertNull(originField())
             changeSheet("Collapse preferences")
-            assertTrue(hasOrigin())
+            assertNotNull(originField())
+            changeSheet("Collapse preferences")
+            changeSheet("Collapse preferences")
+            val goBounds = control("GO").boundsInRoot
+            val handleBounds = control("Trip preferences").boundsInRoot
+            assertEquals(10f, handleBounds.top - goBounds.bottom, 1f)
+            assertEquals(800f, handleBounds.bottom, 1f)
+            assertEquals(goBounds.top, 800f - mapData.bottomInset.value, 1f)
+            assertEquals(assertNotNull(originField()).boundsInRoot.bottom, mapData.topInset.value, 1f)
+            changeSheet("Expand preferences")
+            assertTrue(control("GO").boundsInRoot.bottom < goBounds.bottom)
         } finally { scene.close() }
     }
 

@@ -237,6 +237,8 @@ fun MockTripMap(
                     )
                 }
             }
+            drawAnchoredTripEndpoint(startPainter, startPosition, endpointSize)
+            drawAnchoredTripEndpoint(endPainter, endPosition, endpointSize)
             if (showPosition) {
                 val direction = current.direction.takeUnless { it == Offset.Zero }
                     ?: (endPosition - startPosition)
@@ -245,8 +247,6 @@ fun MockTripMap(
                     tripPointerRotation(Offset.Zero, direction)
                 )
             }
-            drawAnchoredTripEndpoint(startPainter, startPosition, endpointSize)
-            drawAnchoredTripEndpoint(endPainter, endPosition, endpointSize)
         }
 
         if (interactive && showControls) {

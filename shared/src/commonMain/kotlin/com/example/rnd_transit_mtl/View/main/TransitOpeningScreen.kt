@@ -293,6 +293,7 @@ internal fun TransitOpeningScreen(
         tripsStore.activeTrip?.let { active ->
             if (latestOpenCurrentTrip != null) {
                 queueTripOpening(active.id)
+                if (liveMap) finishPlannerExit()
             } else {
                 validationMessage = "Current Trip navigation is unavailable."
             }
@@ -637,6 +638,7 @@ internal fun TransitOpeningScreen(
     ) {
         TripLoadingContent(
             origin = planner.origin,
+            liveOrigin = planner.originPlace,
             minutes = boundedMinutes,
             transportSummary = transportTypes
                 .filter { it.id in selectedTransportIds }
@@ -662,6 +664,7 @@ internal fun TransitOpeningScreen(
                         TripActionResult.Applied -> {
                             proposalJson = null
                             queueTripOpening(proposal.id)
+                            if (liveMap) finishPlannerExit()
                         }
 
                         is TripActionResult.ActiveTripExists -> {

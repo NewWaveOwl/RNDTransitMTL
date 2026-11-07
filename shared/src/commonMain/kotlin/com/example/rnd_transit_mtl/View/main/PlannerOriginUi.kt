@@ -368,7 +368,7 @@ internal fun OriginSelectionContent(
             (maxHeight - panelTop).coerceAtLeast(1.dp)
 
         if (liveMapData != null) {
-            TransitMap(liveMapData, Modifier.fillMaxSize()) {}
+            TransitMap(liveMapData.copy(sharedTripFlow = true), Modifier.fillMaxSize()) {}
         } else FigmaOriginMap(
             origin = if (picking) origin else null,
             enabled = enabled,

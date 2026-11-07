@@ -15,6 +15,8 @@ internal data class TransitMapData(
     val interactive: Boolean = true,
     val topInset: Dp = 0.dp,
     val bottomInset: Dp = 0.dp,
+    val sharedTripFlow: Boolean = false,
+    val cameraInsetsReady: Boolean = true,
     val browsing: Boolean = false,
     val pickerOpen: Boolean = false,
     val pin: GeoPoint? = null,
