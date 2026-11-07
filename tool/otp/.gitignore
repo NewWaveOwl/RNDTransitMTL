@@ -1,0 +1,15 @@
+# Keep downloaded data, credentials, generated files, and logs local.
+/*
+!/.gitignore
+!/*.ps1
+!/*.graphql
+!/build-config.json
+!/bike-variables.json
+!/walk-variables.json
+!/stm-scheduled/
+/stm-scheduled/*
+!/stm-scheduled/*.ps1
+!/stm-scheduled/*.java
+!/stm-scheduled/*.py
+!/stm-scheduled/*.graphql
+!/stm-scheduled/build-config.json

@@ -1,3 +1,4 @@
+import groovy.json.JsonSlurper
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -40,9 +41,17 @@ android {
     }
     buildTypes {
         debug {
+            val stackState = rootProject.layout.projectDirectory.file(
+                "tool/otp/stm-scheduled/stm-stack-processes.json"
+            )
+            val bridgePort = providers.fileContents(stackState).asText.map { contents ->
+                val state = runCatching { JsonSlurper().parseText(contents) as? Map<*, *> }.getOrNull()
+                (state?.get("adapterPort") as? Int)?.takeIf { it in 1..65535 } ?: 18086
+            }.orElse(18086)
             val endpoint = providers.gradleProperty("stmOtpEndpoint")
-                .orElse("http://10.0.2.2:18086/otp/gtfs/v1").get()
-            buildConfigField("String", "STM_OTP_ENDPOINT", "\"${endpoint.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
+                .orElse(bridgePort.map { "http://10.0.2.2:$it/otp/gtfs/v1" })
+                .get()
+            manifestPlaceholders["stmOtpEndpoint"] = endpoint
         }
         release {
             isMinifyEnabled = false
@@ -58,6 +67,5 @@ android {
     }
     buildFeatures {
         compose = true
-        buildConfig = true
     }
 }

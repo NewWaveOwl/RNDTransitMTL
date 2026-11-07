@@ -1,5 +1,8 @@
 package com.example.rnd_transit_mtl
 
+import android.content.Context
+import android.content.pm.PackageManager
+import android.util.Log
 import com.example.rnd_transit_mtl.data.routing.DebugTripLoader
 import com.example.rnd_transit_mtl.data.routing.OtpTripDemo
 import kotlinx.coroutines.Dispatchers
@@ -11,17 +14,29 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
-internal fun stmTripLoader(): DebugTripLoader = debugLoader(OtpTripDemo.StmBus)
-internal fun exoTripLoader(): DebugTripLoader = debugLoader(OtpTripDemo.StmExo)
+internal fun stmTripLoader(context: Context): DebugTripLoader? = debugLoader(context, OtpTripDemo.StmBus)
+internal fun exoTripLoader(context: Context): DebugTripLoader? = debugLoader(context, OtpTripDemo.StmExo)
 
-private fun debugLoader(demo: OtpTripDemo): DebugTripLoader = demo.loader(::postToOtp) {
-    SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US).apply {
-        timeZone = TimeZone.getTimeZone("America/Toronto")
-    }.format(Date())
+private fun debugLoader(context: Context, demo: OtpTripDemo): DebugTripLoader {
+    val endpoint by lazy {
+        val application = context.packageManager.getApplicationInfo(context.packageName, PackageManager.GET_META_DATA)
+        checkNotNull(application.metaData?.getString("com.example.rnd_transit_mtl.STM_OTP_ENDPOINT")) {
+            "OTP endpoint is missing from the debug manifest."
+        }
+    }
+    return demo.loader(
+        post = { body -> postToOtp(endpoint, body) },
+        departure = {
+            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US).apply {
+                timeZone = TimeZone.getTimeZone("America/Toronto")
+            }.format(Date())
+        },
+        reportFailure = { Log.w("RndTransitOtp", "Failed to load ${demo.name}", it) }
+    )
 }
 
-private suspend fun postToOtp(body: String): String = withContext(Dispatchers.IO) {
-    val connection = URL(BuildConfig.STM_OTP_ENDPOINT).openConnection() as HttpURLConnection
+private suspend fun postToOtp(endpoint: String, body: String): String = withContext(Dispatchers.IO) {
+    val connection = URL(endpoint).openConnection() as HttpURLConnection
     try {
         connection.requestMethod = "POST"
         connection.connectTimeout = 5_000

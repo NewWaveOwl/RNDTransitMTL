@@ -54,9 +54,9 @@ The exo prediction integration is complete for the prototype. Chrono documents e
 
 ## Local setup and evidence
 
-The graph, bridge scripts, and sanitized evidence live in `tools/otp-montreal` under the App_Dev workspace. Start `stm-scheduled/Start-StmRealtimeStack.ps1` with the local feeds and credentials configured. The verified setup used OTP on `127.0.0.1:18085` and the bridge on port `18086`. The emulator defaults to `http://10.0.2.2:18086/otp/gtfs/v1`. For a USB phone, `stm-scheduled/Install-StmAndroid.ps1` sets up `adb reverse` and installs the debug build with a loopback endpoint. Then use **Load STM test trip** or **Load STM + exo test trip**.
+The graph, bridge scripts, and sanitized evidence live under `tool/otp` at the repository root. Follow the [simulation runbook](../../../RunTripSimulation.md) for startup and Android instructions. Start `stm-scheduled/Start-StmRealtimeStack.ps1` with the local feeds and credentials configured. The verified setup used OTP on `127.0.0.1:18085` and the bridge on port `18086`. The emulator defaults to `http://10.0.2.2:18086/otp/gtfs/v1`. For a USB phone, `stm-scheduled/Install-StmAndroid.ps1` sets up `adb reverse` and installs the debug build with a loopback endpoint. Then use **Load STM test trip** or **Load STM + exo test trip**.
 
-| Evidence | Files relative to `tools/otp-montreal/` |
+| Evidence | Files relative to `tool/otp/` |
 | --- | --- |
 | Walking and cycling | `combined-query.graphql`, `combined-response.json`, `old-montreal-routes.geojson` |
 | Shared adapter queries rerun on the saved graph | `issue-21-otp-query-evidence.json` contains the queries, variables, and responses for both direct modes and the mixed itinerary. |

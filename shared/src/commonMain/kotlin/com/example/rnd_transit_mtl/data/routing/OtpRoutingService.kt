@@ -10,6 +10,7 @@ import com.example.rnd_transit_mtl.model.trip.TripRouteSnapshot
 import com.example.rnd_transit_mtl.model.trip.TripTransportSnapshot
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.*
+import kotlin.math.roundToLong
 import kotlin.time.Clock
 
 internal enum class OtpMode(val otp: String, id: String, label: String, val street: Boolean = false) {
@@ -27,7 +28,8 @@ internal enum class OtpMode(val otp: String, id: String, label: String, val stre
 internal class OtpRoutingService(
     private val demo: OtpTripDemo,
     private val post: suspend (String) -> String,
-    private val departure: () -> String
+    private val departure: () -> String,
+    private val reportFailure: (Exception) -> Unit = {}
 ) : RoutingService {
     override suspend fun route(request: TripRequest): RoutingResult {
         val destination = requireNotNull(request.destination)
@@ -45,8 +47,10 @@ internal class OtpRoutingService(
             decodeRoute(response, request.origin.point, destination.point, modes)
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
-            RoutingResult.Unavailable("Could not get a route from OTP. Try again when the service is available.")
+        } catch (error: Exception) {
+            reportFailure(error)
+            val failureType = error::class.simpleName ?: "Unknown error"
+            RoutingResult.Unavailable("Could not get a route from OTP ($failureType). See RndTransitOtp in Logcat.")
         }
     }
 
@@ -97,7 +101,8 @@ internal class OtpRoutingService(
         destination: GeoPoint,
         modes: List<OtpMode>
     ): RoutingResult {
-        check(response.rows("errors").isEmpty()) { "OTP rejected the routing request." }
+        val graphQlError = response.rows("errors").firstOrNull()
+        check(graphQlError == null) { graphQlError?.text("message") ?: "OTP rejected the routing request." }
         val plan = requireNotNull(response.obj("data")?.obj("planConnection"))
         val errors = plan.rows("routingErrors")
         if (errors.isNotEmpty()) {
@@ -134,10 +139,13 @@ internal class OtpRoutingService(
             val shape = requireNotNull(leg.obj("legGeometry"))
             val geometry = decodePolyline(requireNotNull(shape.text("points")))
             check(geometry.size == shape.number("length")?.intOrNull && geometry.distinct().size >= 2)
+            val legDuration = leg.number("duration")?.doubleOrNull
+                ?.takeIf { it.isFinite() && it >= 0.0 }
+                ?.roundToLong()
             RouteLeg(
                 mode.id, routeId, geometry,
                 requireNotNull(leg.number("distance")?.doubleOrNull),
-                leg.number("duration")?.longOrNull ?: duration.takeIf { modes.size == 1 }
+                legDuration ?: duration.takeIf { modes.size == 1 }
                     ?: error("OTP omitted leg duration."),
                 isRouted = true, transitTiming = timing
             )

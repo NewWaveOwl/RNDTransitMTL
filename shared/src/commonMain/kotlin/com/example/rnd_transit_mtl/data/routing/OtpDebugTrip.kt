@@ -37,8 +37,12 @@ enum class OtpTripDemo(
         "STM:STATION_M132", "EXO_TRAINS:MTL1C", listOf("STM", "EXO_TRAINS")
     );
 
-    fun loader(post: suspend (String) -> String, departure: () -> String): DebugTripLoader {
-        val router = OtpRoutingService(this, post, departure)
+    fun loader(
+        post: suspend (String) -> String,
+        departure: () -> String,
+        reportFailure: (Exception) -> Unit = {}
+    ): DebugTripLoader {
+        val router = OtpRoutingService(this, post, departure, reportFailure)
         return { enabledModes -> loadOtpDebugTrip(request, enabledModes, router) }
     }
 }
