@@ -1,6 +1,19 @@
 package com.example.rnd_transit_mtl.ui.global_ui_ellements.map
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import com.example.rnd_transit_mtl.ui.theme.TransitWhite
+import com.example.rnd_transit_mtl.ui.theme.TransitComplementary
+import androidx.compose.ui.geometry.Offset
+import org.jetbrains.compose.resources.painterResource
+import org.maplibre.compose.overlay.ZoomButtons
+import rnd_transit_mtl.shared.generated.resources.Res
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import com.example.rnd_transit_mtl.ui.theme.TransitMain
+import rnd_transit_mtl.shared.generated.resources.map_user_pointer_marker
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.movableContentOf
@@ -26,6 +39,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -102,6 +116,15 @@ private fun AndroidTransitMap(data: TransitMapData, styleUrl: String, session: A
     val path = remember(legs) { legs.flatMap { it.geometry.zipWithNext() } }
     val distances = remember(path) { path.map { (from, to) -> from.distanceMetersTo(to) } }
     val marker = data.progress?.let { positionAlongRoute(path, distances, it) }
+    val travelled = remember(path, distances, marker, data.progress) {
+        val progress = data.progress?.coerceIn(0f, 1f) ?: 0f
+        var remaining = distances.sum() * progress
+        path.zip(distances).mapNotNull { (segment, distance) ->
+            if (remaining <= 0 || distance <= 0) return@mapNotNull null
+            remaining -= distance
+            listOf(segment.first, if (remaining >= 0) segment.second else marker ?: segment.second)
+        }
+    }
 
     key(styleUrl, attempt, trip?.id) {
         val map = rememberMapState(
@@ -112,18 +135,16 @@ private fun AndroidTransitMap(data: TransitMapData, styleUrl: String, session: A
                 if (fix.accuracyMeters > 0) AccuracyArea(fix.point, fix.accuracyMeters)
                 TripDot("device-location", fix.point, Color(0xFF1976D2), 7)
             }
-            data.pin?.let { TripDot("origin-draft", it, Color(0xFFED7100), 10) }
             if (trip != null) {
                 val routeData = remember(legs) { GeoJsonData.JsonString(routeGeoJson(legs)) }
                 val route = rememberGeoJsonSource(routeData)
-                LineLayer(id = "trip-route-outline", source = route, color = const(Color.White), width = const(8.dp))
-                LineLayer(id = "trip-route", source = route, color = const(Color(0xFF5943C1)), width = const(5.dp))
-                TripDot("trip-start", trip.origin.point, Color(0xFF16744A), 7)
-                TripDot("trip-destination", trip.destination.point, Color(0xFFB32436), 7)
-                legs.dropLast(1).forEachIndexed { index, leg ->
-                    key(index) { TripDot("trip-stop-$index", leg.end, Color(0xFF5943C1), 6) }
+                LineLayer(id = "trip-route-outline", source = route, color = const(Color.White), width = const(13.dp))
+                LineLayer(id = "trip-route", source = route, color = const(TransitMain), width = const(7.dp))
+                if (travelled.isNotEmpty()) {
+                    val travelledRoute = rememberGeoJsonSource(GeoJsonData.JsonString(linesGeoJson(travelled)))
+                    LineLayer(id = "trip-travelled", source = travelledRoute, color = const(Color(0xFFFFBA00)), width = const(7.dp))
                 }
-                if (marker != null) TripDot("trip-position", marker, Color(0xFFED7100), 9)
+                TripDot("trip-start", trip.origin.point, TransitMain, 7)
             }
         }
 
@@ -146,6 +167,20 @@ private fun AndroidTransitMap(data: TransitMapData, styleUrl: String, session: A
                             bottom = data.bottomInset + 24.dp
                         )
                     )
+                )
+            }
+        }
+
+        val onManualCameraMove by rememberUpdatedState(data.onManualCameraMove)
+        LaunchedEffect(map, data.followPosition) {
+            if (!data.followPosition) return@LaunchedEffect
+            snapshotFlow { map.isCameraMoving && map.cameraMoveReason == CameraMoveReason.Gesture }
+                .collect { moving -> if (moving) onManualCameraMove() }
+        }
+        LaunchedEffect(map, data.followPosition, marker, data.topInset) {
+            if (data.followPosition && marker != null) {
+                map.setCameraPosition(
+                    map.cameraPosition.copy(center = marker.position(), padding = DpPadding(top = data.topInset))
                 )
             }
         }
@@ -186,7 +221,9 @@ private fun AndroidTransitMap(data: TransitMapData, styleUrl: String, session: A
                     minZoom = 7.0
                 } else CameraConstraints.Standard,
                 interactions = if (data.interactive) MapInteractions {
-                    callbacks {
+                    if (data.onPick != null) callbacks {
+                        // Register a separate long press so releasing a hold cannot select a point.
+                        longClick { onEvent { ClickResult.Pass } }
                         click {
                             onEvent { event ->
                                 val point = event.position
@@ -199,18 +236,83 @@ private fun AndroidTransitMap(data: TransitMapData, styleUrl: String, session: A
                         }
                     }
                 } else MapInteractions.None,
-                overlay = {}
+                overlay = {
+                    data.pin?.let { pin ->
+                        val pointer = painterResource(Res.drawable.map_user_pointer_marker)
+                        Canvas(Modifier.placedAt(pin.position()).size(36.dp)) {
+                            drawDirectedTripPointer(pointer, center, size.width, rotationDegrees = 0f)
+                        }
+                    }
+                    if (trip != null && map.style.loadState == StyleLoadState.Ready) {
+                        if (marker != null) {
+                            val ahead = data.progress?.let {
+                                positionAlongRoute(path, distances, (it + 0.001f).coerceAtMost(1f))
+                            }
+                            val behind = data.progress?.let {
+                                positionAlongRoute(path, distances, (it - 0.001f).coerceAtLeast(0f))
+                            }
+                            val from = if (ahead == marker) behind else marker
+                            val to = ahead ?: marker
+                            val direction = if (from == null) Offset.Zero else Offset(
+                                ((to.longitude - from.longitude) *
+                                    kotlin.math.cos(Math.toRadians(marker.latitude))).toFloat(),
+                                (from.latitude - to.latitude).toFloat()
+                            )
+                            val pointer = painterResource(Res.drawable.map_user_pointer_marker)
+                            val rotation = tripPointerRotation(Offset.Zero, direction) -
+                                map.cameraPosition.bearing.toFloat()
+                            Canvas(Modifier.placedAt(marker.position()).size(36.dp)) {
+                                drawDirectedTripPointer(pointer, center, size.width, rotation)
+                            }
+                        }
+                        Canvas(Modifier.placedAt(trip.destination.point.position()).size(36.dp)) {
+                            drawCircle(Color(0xFFFFBA00))
+                            val flag = Path().apply {
+                                moveTo(12.dp.toPx(), 26.dp.toPx())
+                                lineTo(12.dp.toPx(), 11.dp.toPx())
+                                lineTo(18.dp.toPx(), 11.dp.toPx())
+                                lineTo(19.dp.toPx(), 13.dp.toPx())
+                                lineTo(25.dp.toPx(), 13.dp.toPx())
+                                lineTo(25.dp.toPx(), 20.dp.toPx())
+                                lineTo(19.dp.toPx(), 20.dp.toPx())
+                                lineTo(18.dp.toPx(), 18.dp.toPx())
+                                lineTo(12.dp.toPx(), 18.dp.toPx())
+                            }
+                            drawPath(flag, TransitComplementary, style = Stroke(2.dp.toPx()))
+                        }
+                    }
+                    if (data.interactive && map.style.loadState == StyleLoadState.Ready) {
+                        ZoomButtons(
+                            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 12.dp),
+                            onZoomIn = {
+                                if (data.browsing) session.autoCenterPending = false
+                                onManualCameraMove()
+                            },
+                            onZoomOut = {
+                                if (data.browsing) session.autoCenterPending = false
+                                onManualCameraMove()
+                            }
+                        )
+                    }
+                }
             )
 
-            val uriHandler = LocalUriHandler.current
-            Surface(
-                modifier = Modifier
-                    .align(if (trip == null) Alignment.TopStart else Alignment.BottomStart)
-                    .padding(start = 8.dp, top = 8.dp, bottom = data.bottomInset + 8.dp),
-                shape = MaterialTheme.shapes.small
-            ) {
-                TextButton(onClick = { uriHandler.openUri("https://openfreemap.org/quick_start/") }) {
-                    Text("OpenFreeMap · © OpenMapTiles · © OpenStreetMap", style = MaterialTheme.typography.labelSmall)
+            if (!data.browsing || data.pickerOpen) {
+                val uriHandler = LocalUriHandler.current
+                Surface(
+                    modifier = Modifier
+                        .align(if (trip == null) Alignment.TopStart else Alignment.BottomStart)
+                        .padding(start = 8.dp, top = 8.dp, bottom = data.bottomInset + 4.dp)
+                        .clickable { uriHandler.openUri("https://openfreemap.org/quick_start/") },
+                    color = TransitWhite,
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Text(
+                        "OpenFreeMap",
+                        color = TransitComplementary,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    )
                 }
             }
 
@@ -269,11 +371,15 @@ private fun AccuracyArea(point: GeoPoint, meters: Double) {
     org.maplibre.compose.layers.FillLayer(id = "device-accuracy", source = source, color = const(Color(0x331976D2)))
 }
 
+private fun GeoPoint.position(): Position = Position(longitude, latitude)
+
 private fun GeoPoint.coordinates(): String = "[$longitude,$latitude]"
 
-private fun routeGeoJson(legs: List<RouteLeg>): String {
-    val lines = legs.joinToString(",") { leg ->
-        leg.geometry.joinToString(",", prefix = "[", postfix = "]") { it.coordinates() }
+private fun routeGeoJson(legs: List<RouteLeg>): String = linesGeoJson(legs.map { it.geometry })
+
+private fun linesGeoJson(geometry: List<List<GeoPoint>>): String {
+    val lines = geometry.joinToString(",") { line ->
+        line.joinToString(",", prefix = "[", postfix = "]") { it.coordinates() }
     }
     return """{"type":"MultiLineString","coordinates":[$lines]}"""
 }

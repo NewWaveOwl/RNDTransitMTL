@@ -2,3 +2,8 @@
 19:00 -22:00 -> Migration to new design and MVVM
 22:00-1:00am -> Migration and tweaks of design added iconto the app
 1:00 - 2:00 -> Bug fixes for the app from issue #30 | Implmeted sub issue 32 and 33
+
+
+2026-11-06
+
+19:00 -> 21:00 implemting MapLibre in the project

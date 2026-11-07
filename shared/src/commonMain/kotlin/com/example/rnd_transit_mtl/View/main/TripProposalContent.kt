@@ -5,6 +5,7 @@ import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMapData
 import com.example.rnd_transit_mtl.data.assets.toSampleMapPoint
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -35,6 +36,7 @@ import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.toSampleMapLegs
 import com.example.rnd_transit_mtl.ui.theme.*
 import org.jetbrains.compose.resources.painterResource
 import rnd_transit_mtl.shared.generated.resources.Res
+import rnd_transit_mtl.shared.generated.resources.rnd_recenter
 import rnd_transit_mtl.shared.generated.resources.rnd_field_location
 import rnd_transit_mtl.shared.generated.resources.rnd_field_chevron
 import kotlin.math.roundToInt
@@ -221,12 +223,16 @@ internal fun TripProposalContent(
     val density = LocalDensity.current
     var headerHeight by remember { mutableIntStateOf(0) }
     var panelHeight by remember { mutableIntStateOf(0) }
+    var recenterRequest by remember(trip.id) { mutableIntStateOf(0) }
+    val bottomGap = 28.dp
     Box(modifier.fillMaxSize()) {
         TransitMap(
             data = TransitMapData(
                 trip = trip,
+                progress = 0f,
+                recenterRequest = recenterRequest,
                 topInset = with(density) { headerHeight.toDp() },
-                bottomInset = with(density) { panelHeight.toDp() }
+                bottomInset = with(density) { panelHeight.toDp() } + bottomGap
             ),
             modifier = Modifier.fillMaxSize()
         ) {
@@ -235,6 +241,8 @@ internal fun TripProposalContent(
                 destination = trip.destination.toSampleMapPoint(),
                 legs = trip.toSampleMapLegs(),
                 progress = 0f,
+                recenterRequest = recenterRequest,
+                showControls = false,
                 matchPlannerBackground = true,
                 modifier = Modifier.fillMaxSize()
             )
@@ -267,9 +275,19 @@ internal fun TripProposalContent(
             }
         }
 
+        Image(
+            painterResource(Res.drawable.rnd_recenter),
+            contentDescription = "Recenter on route preview",
+            modifier = Modifier.align(Alignment.BottomEnd)
+                .padding(end = 16.dp, bottom = with(density) { panelHeight.toDp() } + bottomGap + 12.dp)
+                .size(48.dp)
+                .clickable { recenterRequest++ }
+        )
+
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
+                .padding(bottom = bottomGap)
                 .onSizeChanged { panelHeight = it.height }
                 .widthIn(max = ProposalPanelMaxWidth)
                 .fillMaxWidth()

@@ -9,7 +9,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,6 +22,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.translate
@@ -36,6 +39,7 @@ import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
 import com.example.rnd_transit_mtl.model.trip.TripPoint
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.drawDirectedTripPointer
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.mapImageRect
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.validMapSourceSize
 import com.example.rnd_transit_mtl.ui.theme.*
@@ -43,10 +47,11 @@ import org.jetbrains.compose.resources.painterResource
 import rnd_transit_mtl.shared.generated.resources.Res
 import rnd_transit_mtl.shared.generated.resources.map_sample
 import rnd_transit_mtl.shared.generated.resources.rnd_origin_marker
+import rnd_transit_mtl.shared.generated.resources.map_user_pointer_marker
 import rnd_transit_mtl.shared.generated.resources.rnd_recenter
 import rnd_transit_mtl.shared.generated.resources.rnd_warning
 
-// Layout settings — dp dimensions and the Figma panel's reference-height fraction.
+// Layout settings ï¿½ dp dimensions and the Figma panel's reference-height fraction.
 private val OriginPanelMaxWidth = 620.dp
 private val OriginPanelHorizontalPadding = 24.dp
 private val OriginPanelSpacing = 16.dp
@@ -74,9 +79,11 @@ internal fun FigmaOriginMap(
     onPick: ((TripPoint) -> Unit)? = null
 ) {
     val map = painterResource(Res.drawable.map_sample)
-    val marker = painterResource(Res.drawable.rnd_origin_marker)
-    val source = validMapSourceSize(map.intrinsicSize)
     val picking = onPick != null
+    val marker = painterResource(
+        if (picking) Res.drawable.map_user_pointer_marker else Res.drawable.rnd_origin_marker
+    )
+    val source = validMapSourceSize(map.intrinsicSize)
 
     var viewport by remember { mutableStateOf(Size.Zero) }
     var cameraX by rememberSaveable {
@@ -182,7 +189,13 @@ internal fun FigmaOriginMap(
             .pointerInput(enabled, picking) {
                 if (!enabled || !picking) return@pointerInput
 
-                detectTapGestures { position ->
+                awaitEachGesture {
+                    val down = awaitFirstDown()
+                    val up = waitForUpOrCancellation() ?: return@awaitEachGesture
+                    if (up.uptimeMillis - down.uptimeMillis >= viewConfiguration.longPressTimeoutMillis) {
+                        return@awaitEachGesture
+                    }
+                    val position = up.position
                     val bounds = latestRect
                     if (bounds.width > 0f && bounds.height > 0f) {
                         latestPick?.invoke(
@@ -198,7 +211,7 @@ internal fun FigmaOriginMap(
                 }
             }
             .pointerInput(enabled, picking) {
-                if (!enabled || picking) return@pointerInput
+                if (!enabled) return@pointerInput
 
                 detectDragGestures { change, amount ->
                     val bounds = latestRect
@@ -225,9 +238,11 @@ internal fun FigmaOriginMap(
             val x = rect.left + point.x * rect.width
             val y = rect.top + point.y * rect.height
 
-            translate(x - markerSize / 2f, y - markerSize / 2f) {
-                with(marker) {
-                    draw(size = Size(markerSize, markerSize))
+            if (picking) {
+                drawDirectedTripPointer(marker, Offset(x, y), markerSize, rotationDegrees = 0f)
+            } else {
+                translate(x - markerSize / 2f, y - markerSize / 2f) {
+                    with(marker) { draw(size = Size(markerSize, markerSize)) }
                 }
             }
         }
@@ -357,7 +372,7 @@ internal fun OriginSelectionContent(
         } else FigmaOriginMap(
             origin = if (picking) origin else null,
             enabled = enabled,
-            onPick = if (picking) onPick else null,
+            onPick = onPick,
             modifier = Modifier.fillMaxSize()
         )
 
@@ -444,7 +459,7 @@ internal fun OriginSelectionContent(
                     secondary = true
                 )
                 Text(
-                    if (liveMapData != null) "Tap the map to drop a pin."
+                    if (liveMapData != null) "Tap to place a pin. Drag to move the map."
                     else "Tap the sample map, or focus it and use arrow keys.",
                     color = TransitComplementary,
                     fontSize = 12.sp

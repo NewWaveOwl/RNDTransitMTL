@@ -101,7 +101,7 @@ internal fun TransitOpeningScreen(
     var originMode by rememberSaveable {
         mutableStateOf("planner")
     }
-    var liveDraft by remember(originMode) { mutableStateOf<GeoPoint?>(null) }
+    var liveDraft by remember(originMode == "planner") { mutableStateOf<GeoPoint?>(null) }
     var originDraftX by rememberSaveable {
         mutableStateOf<Float?>(null)
     }
@@ -672,9 +672,12 @@ internal fun TransitOpeningScreen(
                 if (canChangeInputs()) {
                     originDraftX = point.x
                     originDraftY = point.y
+                    originMessage = null
+                    originMode = "pick"
                 }
             },
             onChooseMap = {
+                liveDraft = null
                 originDraftX = null
                 originDraftY = null
                 originMessage = null
@@ -715,6 +718,9 @@ internal fun TransitOpeningScreen(
                 }
             },
             onBack = {
+                liveDraft = null
+                originDraftX = null
+                originDraftY = null
                 originMessage = null
                 originMode = if (originMode == "pick") "options" else "planner"
             },
@@ -723,10 +729,11 @@ internal fun TransitOpeningScreen(
                 pickerOpen = true,
                 interactive = canChangeInputs(),
                 pin = liveDraft,
-                onPick = if (originMode == "pick" && canChangeInputs()) { point ->
+                onPick = if (canChangeInputs()) { point ->
                     if (location?.containsPoint?.invoke(point) == true) {
                         liveDraft = point
                         originMessage = null
+                        originMode = "pick"
                     } else {
                         originMessage = "Choose a point inside the supported area."
                     }

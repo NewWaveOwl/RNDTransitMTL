@@ -15,6 +15,8 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.platform.LocalUriHandler
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.LocalTransitMap
 import androidx.compose.foundation.gestures.AnchoredDraggableState
 import androidx.compose.foundation.gestures.DraggableAnchors
 import androidx.compose.foundation.gestures.Orientation
@@ -343,13 +345,19 @@ internal fun MainPlannerContent(
             }
 
             if (goTop > with(density) { 120.dp.toPx() }) {
+                val liveMap = LocalTransitMap.current != null
+                val uriHandler = LocalUriHandler.current
                 Surface(
                     modifier = Modifier.offset { IntOffset(0, (goTop - with(density) { 22.dp.toPx() }).roundToInt()) }
-                        .padding(start = 8.dp),
+                        .padding(start = 8.dp)
+                        .then(if (liveMap) Modifier.clickable {
+                            uriHandler.openUri("https://openfreemap.org/quick_start/")
+                        } else Modifier),
                     color = TransitWhite,
                     shape = RoundedCornerShape(4.dp)
                 ) {
-                    Text("© OpenStreetMap contributors · Sample map", color = TransitComplementary,
+                    Text(if (liveMap) "OpenFreeMap" else "© OpenStreetMap contributors · Sample map",
+                        color = TransitComplementary,
                         style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 4.dp))
                 }
             }

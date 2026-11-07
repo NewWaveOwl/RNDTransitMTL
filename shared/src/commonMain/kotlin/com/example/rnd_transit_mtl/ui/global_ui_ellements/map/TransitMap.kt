@@ -18,7 +18,9 @@ internal data class TransitMapData(
     val browsing: Boolean = false,
     val pickerOpen: Boolean = false,
     val pin: GeoPoint? = null,
-    val onPick: ((GeoPoint) -> Unit)? = null
+    val onPick: ((GeoPoint) -> Unit)? = null,
+    val followPosition: Boolean = false,
+    val onManualCameraMove: () -> Unit = {}
 )
 
 internal val LocalTransitMap = staticCompositionLocalOf<(@Composable (TransitMapData, Modifier) -> Unit)?> {

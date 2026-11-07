@@ -2,6 +2,7 @@ package com.example.rnd_transit_mtl.View.current_trip
 
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMap
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMapData
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.LocalTransitMap
 import com.example.rnd_transit_mtl.data.assets.toSampleMapPoint
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -117,8 +118,8 @@ fun ActiveMapContent(
     val completed = fraction >= 1f
     val reference = trip.id.value.takeLast(3)
 
-    var recenterRequest by rememberSaveable(trip.id) {
-        mutableStateOf(0)
+    var followPosition by rememberSaveable(trip.id) {
+        mutableStateOf(false)
     }
     var retainedMapProgress by rememberSaveable(trip.id) {
         mutableStateOf(fraction)
@@ -157,7 +158,8 @@ fun ActiveMapContent(
                     data = TransitMapData(
                         trip = trip,
                         progress = retainedMapProgress.takeIf { locationState != TripLocationState.Missing },
-                        recenterRequest = recenterRequest,
+                        followPosition = followPosition,
+                        onManualCameraMove = { followPosition = false },
                         interactive = mapInteractive,
                         topInset = 72.dp
                     ),
@@ -170,7 +172,8 @@ fun ActiveMapContent(
                         progress = retainedMapProgress,
                         interactive = mapInteractive,
                         matchPlannerBackground = true,
-                        recenterRequest = recenterRequest,
+                        followPosition = followPosition,
+                        onManualCameraMove = { followPosition = false },
                         showControls = false,
                         showPosition = locationState != TripLocationState.Missing,
                         modifier = Modifier.fillMaxSize()
@@ -276,11 +279,11 @@ fun ActiveMapContent(
                                 locationState != TripLocationState.Missing,
                             role = Role.Button
                         ) {
-                            recenterRequest += 1
+                            followPosition = true
                         }
                 )
 
-                Text(
+                if (LocalTransitMap.current == null) Text(
                     "© OpenStreetMap contributors · Sample map",
                     color = TransitComplementary,
                     fontSize = 10.sp,
