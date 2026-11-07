@@ -70,7 +70,7 @@ data object ProfileScreenKey : ScreenKey() {
 
 @Serializable
 @SerialName("com.example.rnd_transit_mtl.AuthScreenKey")
-data object AuthScreenKey : ScreenKey() {
+data class AuthScreenKey(val register: Boolean = false) : ScreenKey() {
     override val screenTitle = "Sign in"
 }
 
@@ -352,17 +352,17 @@ fun Router(
                 ProfileScreen()
             }
 
-            entry<AuthScreenKey> {
+            entry<AuthScreenKey> { key ->
                 val repository = LocalAuthRepository.current
                 val session = LocalAccountSession.current
-                val isCurrent = navigator.current == AuthScreenKey
+                val isCurrent = navigator.current == key
                 LaunchedEffect(session, isCurrent) {
-                    if (session is AccountSession.SignedIn && navigator.current == AuthScreenKey) {
+                    if (session is AccountSession.SignedIn && navigator.current == key) {
                         navigator.pop()
                     }
                 }
                 val authViewModel = viewModel { AuthViewModel(repository) }
-                AuthScreen(authViewModel)
+                AuthScreen(authViewModel, initiallyRegistering = key.register)
             }
 
             entry<AboutScreenKey> {

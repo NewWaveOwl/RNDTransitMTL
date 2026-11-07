@@ -20,7 +20,7 @@ import com.example.rnd_transit_mtl.model.transport.TransportType
 import com.example.rnd_transit_mtl.state.trip.LocalTripsStore
 import com.example.rnd_transit_mtl.state.user.LocalNicknameSession
 import com.example.rnd_transit_mtl.state.user.appNicknameSession
-import com.example.rnd_transit_mtl.state.trip.TripsStore
+import com.example.rnd_transit_mtl.state.trip.SessionTripsStores
 import com.example.rnd_transit_mtl.ui.theme.RNDTransitTheme
 import kotlinx.coroutines.CancellationException
 import com.example.rnd_transit_mtl.View.authentication.AuthScreen
@@ -99,19 +99,32 @@ fun App(
         initialValue = AccountSession.Restoring,
     )
     var continueAsGuest by rememberSaveable { mutableStateOf(false) }
+    val sessionStores = rememberSaveable(saver = SessionTripsStores.Saver) { SessionTripsStores() }
+    var lastSignedIdentity by rememberSaveable { mutableStateOf<String?>(null) }
+    val signedIdentity = (accountSession.value as? AccountSession.SignedIn)?.let { "account:${it.userId}" }
+    if (signedIdentity != null) lastSignedIdentity = signedIdentity
     LaunchedEffect(accountSession.value) {
         if (accountSession.value is AccountSession.SignedIn) continueAsGuest = false
     }
-    val identity = when (val session = accountSession.value) {
-        is AccountSession.SignedIn -> "account:${session.userId}"
-        else -> "guest"
+    val identity = when (accountSession.value) {
+        is AccountSession.SignedIn -> signedIdentity!!
+        AccountSession.Restoring, AccountSession.Unavailable -> lastSignedIdentity ?: "guest"
+        AccountSession.Guest -> "guest"
     }
+    var navigationOwner by rememberSaveable { mutableStateOf(identity) }
     RNDTransitTheme {
       key(identity) {
         val backStack = rememberNavBackStack(backStackConfig, MainScreenKey)
         val navigator = remember(backStack) { Navigator(backStack) }
-        val tripsStore = rememberSaveable(identity, saver = TripsStore.Saver) { TripsStore() }
+        val tripsStore = remember(sessionStores, identity) { sessionStores.forIdentity(identity) }
         val tripNavigation = remember(navigator, tripsStore) { TripNavigation(navigator, tripsStore) }
+        LaunchedEffect(identity, backStack) {
+            if (navigationOwner != identity) {
+                backStack.clear()
+                backStack.add(MainScreenKey)
+                navigationOwner = identity
+            }
+        }
         CompositionLocalProvider(
             LocalDebugStmTripLoader provides loadDebugStmTrip,
             LocalDebugExoTripLoader provides loadDebugExoTrip,
@@ -136,6 +149,7 @@ fun App(
                         })
                     }
                 }
+                navigationOwner != identity -> Unit
                 else -> {
                 MainLayout {
                     Router(

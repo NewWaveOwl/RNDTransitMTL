@@ -45,10 +45,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.rnd_transit_mtl.ViewModels.authentication.AuthViewModel
 
 @Composable
-internal fun AuthScreen(viewModel: AuthViewModel, onContinueAsGuest: () -> Unit = {}) {
+internal fun AuthScreen(
+    viewModel: AuthViewModel,
+    initiallyRegistering: Boolean = false,
+    onContinueAsGuest: (() -> Unit)? = null,
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    var registering by remember { mutableStateOf(false) }
-    var name by remember { mutableStateOf("") }
+    var registering by remember(initiallyRegistering) { mutableStateOf(initiallyRegistering) }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf("") }
@@ -59,6 +62,21 @@ internal fun AuthScreen(viewModel: AuthViewModel, onContinueAsGuest: () -> Unit 
             .verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        if (state.checkEmail) {
+            Text("Check your email", color = TransitComplementary,
+                fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text("We sent a confirmation link to $email. Confirm your address, then sign in.",
+                color = TransitComplementary)
+            OutlinedButton(onClick = {
+                viewModel.dismissCheckEmail()
+                registering = false
+                password = ""
+                confirmation = ""
+            }, modifier = Modifier.fillMaxWidth()) {
+                Text("Back to sign in")
+            }
+            return@Column
+        }
         Text(if (registering) "Create your account" else "Welcome back",
             color = TransitComplementary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
         Text(if (registering) "Enter your details to start planning trips."
@@ -73,12 +91,6 @@ internal fun AuthScreen(viewModel: AuthViewModel, onContinueAsGuest: () -> Unit 
             }
             Spacer(Modifier.height(8.dp))
         }
-        if (registering) OutlinedTextField(
-            value = name, onValueChange = { name = it }, label = { Text("Display name") },
-            placeholder = { Text("Explorer") },
-            singleLine = true, enabled = !state.submitting, modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp), colors = authFieldColors(),
-        )
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
@@ -117,7 +129,6 @@ internal fun AuthScreen(viewModel: AuthViewModel, onContinueAsGuest: () -> Unit 
                 validation = when {
                     !email.contains("@") -> "Enter a valid email address."
                     password.length < 6 -> "Password must be at least 6 characters."
-                    registering && name.isBlank() -> "Enter a display name."
                     registering && password != confirmation -> "Passwords do not match."
                     else -> null
                 }
@@ -135,7 +146,7 @@ internal fun AuthScreen(viewModel: AuthViewModel, onContinueAsGuest: () -> Unit 
             shape = RoundedCornerShape(18.dp)) {
             Text(if (registering) "Already registered? Sign in" else "Create an account", color = TransitMain)
         }
-        if (!registering) OutlinedButton(onClick = onContinueAsGuest, modifier = Modifier.fillMaxWidth(),
+        if (!registering && onContinueAsGuest != null) OutlinedButton(onClick = onContinueAsGuest, modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp)) {
             Text("Continue as guest", color = TransitMain)
         }

@@ -55,8 +55,8 @@ fun ProfileScreen() {
         Text(signedIn?.email ?: "Guest", color = TransitComplementary, fontSize = 12.sp)
         Spacer(Modifier.height(2.dp))
         if (signedIn == null) {
-            ProfileOutlineButton("Sign in", onClick = { navigator.navigate(AuthScreenKey) })
-            ProfileOutlineButton("Create an account", onClick = { navigator.navigate(AuthScreenKey) })
+            ProfileOutlineButton("Sign in", onClick = { navigator.navigate(AuthScreenKey()) })
+            ProfileOutlineButton("Create an account", onClick = { navigator.navigate(AuthScreenKey(register = true)) })
         }
         ProfileFilledButton("Your trip history", onClick = { navigator.navigate(HistoryScreenKey) })
         ProfileOutlineButton("About RND Transit", onClick = { navigator.navigate(AboutScreenKey) })
