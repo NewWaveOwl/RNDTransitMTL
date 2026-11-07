@@ -13,9 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.ProvideAndroidTransitMap
 
-// whether to run the supabase sign-in test
-private const val SHOW_SUPABASE_TEST = true
-
 /**
  * Android entry activity for the shared transit application.
  */
@@ -28,12 +25,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-
-        //override rest of app for debug
-        if (SHOW_SUPABASE_TEST) {
-            setContent { SupabaseTestScreen() }
-            return
-        }
 
         val showStartup = savedInstanceState == null &&
             (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || ValueAnimator.areAnimatorsEnabled())

@@ -22,7 +22,9 @@ import com.example.rnd_transit_mtl.state.user.appNicknameSession
 import com.example.rnd_transit_mtl.state.trip.TripsStore
 import com.example.rnd_transit_mtl.ui.theme.RNDTransitTheme
 import kotlinx.coroutines.CancellationException
-import com.example.rnd_transit_mtl.View.landing.LandingScreen
+import com.example.rnd_transit_mtl.View.authentication.AuthScreen
+import com.example.rnd_transit_mtl.ViewModels.authentication.AuthViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.rnd_transit_mtl.navigation.LocalNavigator
 import com.example.rnd_transit_mtl.navigation.LocalTripNavigation
 import com.example.rnd_transit_mtl.navigation.MainScreenKey
@@ -30,6 +32,11 @@ import com.example.rnd_transit_mtl.navigation.Navigator
 import com.example.rnd_transit_mtl.navigation.Router
 import com.example.rnd_transit_mtl.navigation.TripNavigation
 import com.example.rnd_transit_mtl.navigation.backStackConfig
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.rnd_transit_mtl.data.authentication.AccountSession
+import com.example.rnd_transit_mtl.data.authentication.LocalAccountSession
+import com.example.rnd_transit_mtl.data.authentication.LocalAuthRepository
+import com.example.rnd_transit_mtl.data.authentication.SupabaseAuthRepository
 
 private data class TransportData(
     val types: List<TransportType>,
@@ -104,6 +111,14 @@ fun App(
         }
     }
 
+    val authRepository = remember { SupabaseAuthRepository() }
+    val accountSession = authRepository.session.collectAsStateWithLifecycle(
+        initialValue = AccountSession.Restoring,
+    )
+    var continueAsGuest by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(accountSession.value) {
+        if (accountSession.value is AccountSession.SignedIn) continueAsGuest = false
+    }
     RNDTransitTheme {
         CompositionLocalProvider(
             LocalDebugStmTripLoader provides loadDebugStmTrip,
@@ -114,11 +129,25 @@ fun App(
             LocalNavigator provides navigator,
             LocalTripsStore provides tripsStore,
             LocalTripNavigation provides tripNavigation,
-            LocalNicknameSession provides appNicknameSession
+            LocalNicknameSession provides appNicknameSession,
+            LocalAuthRepository provides authRepository,
+            LocalAccountSession provides accountSession.value
         ) {
-            if (appNicknameSession.nickname == null) {
-                LandingScreen(onLogin = appNicknameSession::signIn)
-            } else {
+            when {
+                accountSession.value == AccountSession.Restoring -> androidx.compose.material3.CircularProgressIndicator()
+                accountSession.value !is AccountSession.SignedIn && !continueAsGuest -> {
+                    val authViewModel = viewModel { AuthViewModel(authRepository) }
+                    MainLayout {
+                        AuthScreen(authViewModel, onContinueAsGuest = {
+                            continueAsGuest = true
+                            appNicknameSession.signIn("Guest")
+                        })
+                    }
+                }
+                else -> {
+                if (appNicknameSession.nickname == null) appNicknameSession.signIn(
+                    (accountSession.value as? AccountSession.SignedIn)?.email?.substringBefore("@") ?: "Guest"
+                )
                 MainLayout {
                     Router(
                         backStack = backStack,
@@ -130,6 +159,7 @@ fun App(
             }
         }
     }
+}
 }
 
 internal val LocalDebugStmTripLoader = staticCompositionLocalOf<DebugTripLoader?> { null }

@@ -157,13 +157,13 @@ internal fun SharedTopBarContent(
                 }
 
                 HeaderAction(
-                    painter = painterResource(
-                        Res.drawable.rnd_header_settings
-                    ),
-                    label = "Settings",
-                    isSelected = currentKey == SettingsScreenKey,
+                        painter = painterResource(
+                            Res.drawable.rnd_header_profile
+                        ),
+                    label = "Profile",
+                    isSelected = currentKey == ProfileScreenKey,
                     onClick = {
-                        onOpenSection(SettingsScreenKey)
+                        onOpenSection(ProfileScreenKey)
                     },
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
