@@ -1,5 +1,15 @@
 package com.example.rnd_transit_mtl
 
+import com.example.rnd_transit_mtl.data.trips.CloudTrips
+import com.example.rnd_transit_mtl.data.trips.FinalTripOutbox
+import com.example.rnd_transit_mtl.data.trips.LocalCloudTrips
+import com.example.rnd_transit_mtl.data.trips.SupabaseTripRepository
+import com.example.rnd_transit_mtl.data.trips.TripRepository
+import com.example.rnd_transit_mtl.model.ids.UserId
+import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import com.example.rnd_transit_mtl.data.trips.tryCloudAction
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -62,6 +72,7 @@ fun App(
 ) {
     App(
         authRepository = remember { SupabaseAuthRepository() },
+        tripRepository = { SupabaseTripRepository(it) },
         loadDebugStmTrip = loadDebugStmTrip,
         openDebugStmPreview = openDebugStmPreview,
         loadDebugExoTrip = loadDebugExoTrip,
@@ -72,6 +83,7 @@ fun App(
 @Composable
 internal fun App(
     authRepository: AuthRepository,
+    tripRepository: ((UserId) -> TripRepository)? = null,
     loadDebugStmTrip: DebugTripLoader? = null,
     openDebugStmPreview: Boolean = false,
     loadDebugExoTrip: DebugTripLoader? = null,
@@ -114,12 +126,24 @@ internal fun App(
     LaunchedEffect(pendingDebugPreview) {
         if (pendingDebugPreview != null) continueAsGuest = true
     }
+    val outbox = remember(tripRepository != null) { tripRepository?.let { FinalTripOutbox() } }
     val sessionStores = rememberSaveable(saver = SessionTripsStores.Saver) { SessionTripsStores() }
     var lastSignedIdentity by rememberSaveable { mutableStateOf<String?>(null) }
     val signedIdentity = (accountSession.value as? AccountSession.SignedIn)?.let { "account:${it.userId}" }
     if (signedIdentity != null) lastSignedIdentity = signedIdentity
     LaunchedEffect(accountSession.value) {
-        if (accountSession.value is AccountSession.SignedIn) continueAsGuest = false
+        when (accountSession.value) {
+            is AccountSession.SignedIn -> {
+                sessionStores.clearAccountStores(except = signedIdentity)
+                continueAsGuest = false
+            }
+            AccountSession.Guest -> {
+                sessionStores.clearAccountStores()
+                outbox?.clear()
+                lastSignedIdentity = null
+            }
+            else -> Unit
+        }
     }
     val identity = when {
         accountSession.value is AccountSession.SignedIn -> signedIdentity!!
@@ -133,6 +157,14 @@ internal fun App(
         val backStack = rememberNavBackStack(backStackConfig, MainScreenKey)
         val navigator = remember(backStack) { Navigator(backStack) }
         val tripsStore = remember(sessionStores, identity) { sessionStores.forIdentity(identity) }
+        val owner = (accountSession.value as? AccountSession.SignedIn)?.userId
+        val cloudTrips = remember(owner, tripsStore) {
+            if (owner == null || tripRepository == null) null else {
+                tripsStore.restorePendingFinalTrips(outbox?.read(owner).orEmpty())
+                tripsStore.onPendingFinalTripsChanged = { pending -> outbox?.write(owner, pending) }
+                CloudTrips(tripRepository(UserId(owner)), tripsStore)
+            }
+        }
         val tripNavigation = remember(navigator, tripsStore) { TripNavigation(navigator, tripsStore) }
         LaunchedEffect(identity, backStack) {
             if (navigationOwner != identity) {
@@ -149,6 +181,7 @@ internal fun App(
             },
             LocalNavigator provides navigator,
             LocalTripsStore provides tripsStore,
+            LocalCloudTrips provides cloudTrips,
             LocalTripNavigation provides tripNavigation,
             LocalNicknameSession provides appNicknameSession,
             LocalAuthRepository provides authRepository,
@@ -168,12 +201,32 @@ internal fun App(
                 navigationOwner != identity -> Unit
                 else -> {
                 MainLayout {
-                    Router(
+                    Column {
+                        val pending = tripsStore.state.value.pendingFinalTripIds
+                        var retry by remember { mutableStateOf(0) }
+                        var saveFailed by remember { mutableStateOf(false) }
+                        LaunchedEffect(cloudTrips, pending, retry) {
+                            if (cloudTrips != null && pending.isNotEmpty()) {
+                                saveFailed = false
+                                saveFailed = !tryCloudAction { cloudTrips.flushFinalTrips() }
+                            }
+                        }
+                        if (cloudTrips != null && pending.isNotEmpty()) {
+                            if (saveFailed) {
+                                TextButton(onClick = { retry++ }) {
+                                    Text("Trip could not be saved. Retry")
+                                }
+                            } else {
+                                Text("Saving trip…")
+                            }
+                        }
+                        Router(
                         backStack = backStack,
                         transportTypes = transportData?.types,
                         transportRoutes = transportData?.routes,
                         loadingError = loadingError
-                    )
+                        )
+                    }
                 }
             }
         }
