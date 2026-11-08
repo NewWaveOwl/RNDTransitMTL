@@ -191,7 +191,6 @@ internal fun App(
       }
     }
 }
-}
 
 internal val LocalDebugStmTripLoader = staticCompositionLocalOf<DebugTripLoader?> { null }
 internal val LocalDebugExoTripLoader = staticCompositionLocalOf<DebugTripLoader?> { null }
