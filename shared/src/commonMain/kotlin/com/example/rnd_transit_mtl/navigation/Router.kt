@@ -10,6 +10,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -18,6 +19,7 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.ui.NavDisplay
 import androidx.savedstate.serialization.SavedStateConfiguration
 import com.example.rnd_transit_mtl.model.transport.TransportRoute
@@ -32,6 +34,11 @@ import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import com.example.rnd_transit_mtl.App
 import com.example.rnd_transit_mtl.View.about.AboutScreen
+import com.example.rnd_transit_mtl.View.authentication.AuthScreen
+import com.example.rnd_transit_mtl.ViewModels.authentication.AuthViewModel
+import com.example.rnd_transit_mtl.data.authentication.AccountSession
+import com.example.rnd_transit_mtl.data.authentication.LocalAccountSession
+import com.example.rnd_transit_mtl.data.authentication.LocalAuthRepository
 import com.example.rnd_transit_mtl.View.current_trip.CurrentTripScreen
 import com.example.rnd_transit_mtl.View.history.HistoryScreen
 import com.example.rnd_transit_mtl.View.main.MainScreen
@@ -59,6 +66,12 @@ data object MainScreenKey : ScreenKey() {
 @SerialName("com.example.rnd_transit_mtl.ProfileScreenKey")
 data object ProfileScreenKey : ScreenKey() {
     override val screenTitle = "user"
+}
+
+@Serializable
+@SerialName("com.example.rnd_transit_mtl.AuthScreenKey")
+data class AuthScreenKey(val register: Boolean = false) : ScreenKey() {
+    override val screenTitle = "Sign in"
 }
 
 @Serializable
@@ -145,6 +158,7 @@ val backStackConfig = SavedStateConfiguration {
         polymorphic(NavKey::class) {
             subclass(MainScreenKey::class, MainScreenKey.serializer())
             subclass(ProfileScreenKey::class, ProfileScreenKey.serializer())
+            subclass(AuthScreenKey::class, AuthScreenKey.serializer())
             subclass(AboutScreenKey::class, AboutScreenKey.serializer())
             subclass(SettingsScreenKey::class, SettingsScreenKey.serializer())
             subclass(HistoryScreenKey::class, HistoryScreenKey.serializer())
@@ -336,6 +350,19 @@ fun Router(
 
             entry<ProfileScreenKey> {
                 ProfileScreen()
+            }
+
+            entry<AuthScreenKey> { key ->
+                val repository = LocalAuthRepository.current
+                val session = LocalAccountSession.current
+                val isCurrent = navigator.current == key
+                LaunchedEffect(session, isCurrent) {
+                    if (session is AccountSession.SignedIn && navigator.current == key) {
+                        navigator.pop()
+                    }
+                }
+                val authViewModel = viewModel { AuthViewModel(repository) }
+                AuthScreen(authViewModel, initiallyRegistering = key.register)
             }
 
             entry<AboutScreenKey> {

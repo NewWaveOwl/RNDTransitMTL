@@ -1,64 +1,100 @@
 package com.example.rnd_transit_mtl.View.profile
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.rnd_transit_mtl.data.authentication.AccountSession
+import com.example.rnd_transit_mtl.data.authentication.LocalAccountSession
+import com.example.rnd_transit_mtl.data.authentication.LocalAuthRepository
+import com.example.rnd_transit_mtl.navigation.*
+import com.example.rnd_transit_mtl.state.user.LocalNicknameSession
 import com.example.rnd_transit_mtl.ui.theme.TransitComplementary
 import com.example.rnd_transit_mtl.ui.theme.TransitMain
-import com.example.rnd_transit_mtl.ui.theme.TransitWhite
-import com.example.rnd_transit_mtl.state.user.LocalNicknameSession
-import com.example.rnd_transit_mtl.App
-import com.example.rnd_transit_mtl.navigation.AboutScreenKey
-import com.example.rnd_transit_mtl.navigation.LocalNavigator
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import org.jetbrains.compose.resources.painterResource
+import rnd_transit_mtl.shared.generated.resources.Res
+import rnd_transit_mtl.shared.generated.resources.ic_account_circle
 
-/**
- * Displays the memory-only nickname, account placeholders, and About action.
- *
- * Uses the shared navigator supplied by App. Email and password labels are static placeholders.
- */
 @Composable
 fun ProfileScreen() {
-    /** Obtain the navigator shared by the application instead of creating a separate back stack. */
     val navigator = LocalNavigator.current
     val nickname = LocalNicknameSession.current.nickname.orEmpty()
+    val session = LocalAccountSession.current
+    val repository = LocalAuthRepository.current
+    val scope = rememberCoroutineScope()
+    val signedIn = session as? AccountSession.SignedIn
+    var signOutError by remember(signedIn?.userId) { mutableStateOf(false) }
+    var signingOut by remember(signedIn?.userId) { mutableStateOf(false) }
 
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        /** Scale the reference layout to the available width, bounded between 0.7 and 1.4. */
-        val layoutScale = (maxWidth.value / 402f).coerceIn(0.7f, 1.4f)
-
-        Column(Modifier.fillMaxSize().background(TransitComplementary)) {
-            Column(
-                modifier = Modifier.weight(1f).fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 12.dp * layoutScale, vertical = 24.dp * layoutScale),
-                verticalArrangement = Arrangement.spacedBy(16.dp * layoutScale)
-            ) {
-                Text("Nickname", color = TransitWhite, fontSize = 18.sp * layoutScale)
-                Text(nickname, color = TransitWhite, fontSize = 28.sp * layoutScale)
-                Text("Email", color = TransitWhite, fontSize = 18.sp * layoutScale)
-                Text("Change password", color = TransitWhite, fontSize = 18.sp * layoutScale)
-            }
-
-            /** Keep the About action below the scrollable account content and push its destination on tap. */
-            TextButton(
-                onClick = { navigator.navigate(AboutScreenKey) },
-                modifier = Modifier.fillMaxWidth().height(64.dp * layoutScale).background(TransitMain)
-            ) {
-                Text("about app", color = TransitWhite, fontSize = 26.sp * layoutScale)
-            }
+    Column(
+        Modifier.fillMaxSize().background(Color(0xFFF8F8F8))
+            .verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text("Your profile", color = TransitComplementary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(4.dp))
+        Icon(painterResource(Res.drawable.ic_account_circle), contentDescription = null,
+            tint = TransitMain, modifier = Modifier.size(56.dp))
+        Text(signedIn?.email?.substringBefore("@")?.ifBlank { null } ?: if (signedIn != null) "Account" else nickname.ifBlank { "Guest" },
+            color = TransitComplementary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Text(signedIn?.email ?: "Guest", color = TransitComplementary, fontSize = 12.sp)
+        Spacer(Modifier.height(2.dp))
+        if (signedIn == null) {
+            ProfileOutlineButton("Sign in", onClick = { navigator.navigate(AuthScreenKey()) })
+            ProfileOutlineButton("Create an account", onClick = { navigator.navigate(AuthScreenKey(register = true)) })
         }
+        ProfileFilledButton("Your trip history", onClick = { navigator.navigate(HistoryScreenKey) })
+        ProfileOutlineButton("About RND Transit", onClick = { navigator.navigate(AboutScreenKey) })
+        if (signedIn != null) {
+            if (signOutError) Text("Couldn’t sign out. Check your connection and try again.",
+                color = MaterialTheme.colorScheme.error)
+            ProfileOutlineButton(if (signingOut) "Signing out…" else "Sign out", onClick = {
+                if (!signingOut) scope.launch {
+                    signingOut = true
+                    signOutError = false
+                    try {
+                        repository.signOut()
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        signOutError = true
+                    } finally {
+                        signingOut = false
+                    }
+                }
+            })
+        }
+    }
+}
+
+@Composable
+private fun ProfileFilledButton(label: String, onClick: () -> Unit) {
+    Button(onClick = onClick, modifier = Modifier.fillMaxWidth().height(38.dp),
+        shape = RoundedCornerShape(18.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = TransitMain)) {
+        Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun ProfileOutlineButton(label: String, onClick: () -> Unit) {
+    OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth().height(38.dp),
+        shape = RoundedCornerShape(18.dp)) {
+        Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TransitMain)
     }
 }
