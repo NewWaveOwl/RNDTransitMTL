@@ -146,9 +146,16 @@ internal fun AuthScreen(
             shape = RoundedCornerShape(18.dp)) {
             Text(if (registering) "Already registered? Sign in" else "Create an account", color = TransitMain)
         }
-        if (!registering && onContinueAsGuest != null) OutlinedButton(onClick = onContinueAsGuest, modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp)) {
-            Text("Continue as guest", color = TransitMain)
+        if (!registering && onContinueAsGuest != null) {
+            OutlinedButton(
+                onClick = onContinueAsGuest,
+                enabled = !state.submitting,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = TransitMain),
+            ) {
+                Text("Continue as guest")
+            }
         }
         Text(if (registering) "You may need to confirm your email before signing in."
             else "Guests can generate basic trips. Groups and account changes require sign-in.",
