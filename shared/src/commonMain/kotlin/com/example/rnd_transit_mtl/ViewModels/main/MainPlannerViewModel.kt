@@ -107,13 +107,19 @@ class MainPlannerViewModel(
         }
     }
 
-    /** Updates the selected sample-map origin.
-     * @param point Source-image coordinates and a nonblank display label.
-     */
+    /** Installs the first usable fix while the planner still has no chosen origin. */
+    fun setDefaultOrigin(place: Place) {
+        mutableUiState.update { state ->
+            if (state.originPlace != null || state.originIsManual) state
+            else state.copy(origin = null, originPlace = place)
+        }
+    }
+
     fun setOrigin(place: Place) {
         mutableUiState.update { it.copy(origin = null, originPlace = place, originIsManual = true) }
     }
 
+    /** Updates the sample-map origin using source-image coordinates and a nonblank label. */
     fun setOrigin(point: TripPoint) {
         val label = point.label.trim()
         if (label.isBlank()) return

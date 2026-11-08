@@ -167,6 +167,8 @@ internal fun MainPlannerContent(
     origin: TripPoint? = TripPoint("Current location", 0.5f, 0.35f),
     onEditOrigin: () -> Unit = {},
     liveOrigin: Place? = null,
+    originIsManual: Boolean = true,
+    originStatus: String? = null,
     onLoadStmTrip: (() -> Unit)? = null,
     onLoadExoTrip: (() -> Unit)? = null
 ) {
@@ -288,7 +290,8 @@ internal fun MainPlannerContent(
                 attributionHandledByScreen = true,
                 cameraInsetsReady = !showMapControls || originFieldHeight > 0,
                 browsing = true,
-                pin = liveOrigin?.point
+                pin = liveOrigin?.point,
+                centerOnPin = originIsManual
             ),
             modifier = Modifier.fillMaxSize()
         ) {
@@ -317,17 +320,29 @@ internal fun MainPlannerContent(
                     .padding(horizontal = PlannerOriginFieldHorizontalPadding * scale)
                     .offset(y = PlannerOriginFieldTopPadding * scale)
             ) {
-                TripLabelValueField(
-                    label = "Starting point",
-                    value = liveOrigin?.label ?: origin?.label ?: "Search a place or address",
-                    showLocationIcon = true,
-                    modifier = Modifier.onSizeChanged { originFieldHeight = it.height }.clickable(
-                        enabled = enabled && showMapControls,
-                        role = Role.Button,
-                        onClickLabel = "Choose starting point",
-                        onClick = onEditOrigin
+                Column(Modifier.onSizeChanged { originFieldHeight = it.height }) {
+                    TripLabelValueField(
+                        label = "Starting point",
+                        value = liveOrigin?.label ?: origin?.label ?: "Search a place or address",
+                        showLocationIcon = true,
+                        modifier = Modifier.clickable(
+                            enabled = enabled && showMapControls,
+                            role = Role.Button,
+                            onClickLabel = "Choose starting point",
+                            onClick = onEditOrigin
+                        )
                     )
-                )
+                    if (originStatus != null) {
+                        Surface(color = TransitWhite, shape = RoundedCornerShape(4.dp)) {
+                            Text(
+                                originStatus,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                color = TransitComplementary,
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                    }
+                }
             }
 
             if (showMapControls) {

@@ -12,6 +12,7 @@ import com.example.rnd_transit_mtl.data.location.PlannerLocation
 import com.example.rnd_transit_mtl.model.geo.GeoBounds
 import com.example.rnd_transit_mtl.model.geo.GeoPoint
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filterNotNull
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.spatialk.geojson.Position
 import kotlin.math.PI
@@ -54,6 +55,15 @@ internal class AndroidPlannerMapSession(context: Context) : PlannerLocation {
     lateinit var askPermission: () -> Unit
     lateinit var hasPermission: () -> Boolean
     var permitted by mutableStateOf(false)
+    var permissionChecked by mutableStateOf(false)
+    var latestLocationUpdate by mutableStateOf<LocationUpdate?>(null)
+    override val automaticOriginUpdates = snapshotFlow {
+        when {
+            !permissionChecked -> null
+            !permitted -> LocationUpdate.PermissionDenied
+            else -> latestLocationUpdate
+        }
+    }.filterNotNull()
     var locationAttempt by mutableIntStateOf(0)
         private set
 
@@ -116,15 +126,18 @@ internal fun rememberAndroidPlannerMapSession(): AndroidPlannerMapSession {
     var started by remember { mutableStateOf(false) }
     LifecycleStartEffect(session) {
         session.permitted = source.hasPermission()
+        session.permissionChecked = true
         started = true
         onStopOrDispose {
             started = false
             session.fix = null
+            session.latestLocationUpdate = null
         }
     }
     LaunchedEffect(session.permitted, started, session.locationAttempt) {
         if (session.permitted && started) source.updates.collect { update ->
             session.fix = update as? LocationUpdate.Fix
+            session.latestLocationUpdate = update
             session.complete(session.fix)
         }
     }

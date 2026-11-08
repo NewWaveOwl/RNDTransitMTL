@@ -21,6 +21,7 @@ internal data class TransitMapData(
     val pickerOpen: Boolean = false,
     val attributionHandledByScreen: Boolean = false,
     val pin: GeoPoint? = null,
+    val centerOnPin: Boolean = true,
     val onPick: ((GeoPoint) -> Unit)? = null,
     val followPosition: Boolean = false,
     val onManualCameraMove: () -> Unit = {}

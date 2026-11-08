@@ -8,6 +8,8 @@ import com.example.rnd_transit_mtl.data.generation.MockTripGenerator
 import com.example.rnd_transit_mtl.data.generation.TripGenerationInput
 import com.example.rnd_transit_mtl.data.generation.TripGenerationResult
 import com.example.rnd_transit_mtl.model.transport.TransportType
+import com.example.rnd_transit_mtl.model.geo.GeoPoint
+import com.example.rnd_transit_mtl.model.trip.Place
 import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.model.trip.TripPoint
 import com.example.rnd_transit_mtl.data.generation.TripGenerationBounds
@@ -17,6 +19,7 @@ import kotlinx.serialization.json.Json
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import com.example.rnd_transit_mtl.data.assets.toSampleMapPlace
 import com.example.rnd_transit_mtl.data.assets.toSampleMapPoint
@@ -24,6 +27,24 @@ import kotlinx.coroutines.test.runTest
 
 /** Checks draft restoration and zone requests without geographic-routing assumptions. */
 class MainPlannerTest {
+    @Test
+    fun deviceOriginKeepsTheFirstFixAndNeverReplacesAManualPin() {
+        val planner = MainPlannerViewModel(MainPlannerState(origin = null))
+        val firstFix = Place("Current location", GeoPoint(45.5019, -73.5673))
+        val laterFix = Place("Current location", GeoPoint(45.51, -73.57))
+        val manualPin = Place("Pinned location", GeoPoint(45.52, -73.58))
+
+        planner.setDefaultOrigin(firstFix)
+        planner.setDefaultOrigin(laterFix)
+        assertEquals(firstFix, planner.uiState.value.originPlace)
+        assertFalse(planner.uiState.value.originIsManual)
+
+        planner.setOrigin(manualPin)
+        planner.setDefaultOrigin(laterFix)
+        assertEquals(manualPin, planner.uiState.value.originPlace)
+        assertTrue(planner.uiState.value.originIsManual)
+    }
+
     @Test
     fun restoredZeroMinuteDraftUsesFiveMinuteMinimum() {
         val planner = MainPlannerViewModel(MainPlannerState(minutes = 0))
