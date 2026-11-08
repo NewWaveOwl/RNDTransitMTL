@@ -210,52 +210,59 @@ As a **nice-to-have extension**, give the group a shared quest pool. Quests migh
 
 ### Inputs
 
-The generator receives a starting location, available one-way time, enabled transport modes, selectedZoneIds for transit, optional allowedRouteIds from detailed Settings, and applicable shared constraints. Rich interests, personalization, walking/cycling limits, and budget preferences are future extensions.
+New Trip or the main `GOBox` action starts generation. The generator uses the confirmed origin, departure time, available one-way time, enabled transport modes, selected transit zones, and any allowed route IDs. Time, mode, route, zone, and access restrictions are mandatory. Attraction preferences, novelty, and previous visits affect scoring.
 
-Supporting inputs include transit schedules and service conditions, place opening hours, typical visit durations, previous visits, personal and community reviews, and route data. Future inputs include weather, terrain/elevation, the optional points-of-interest list, and group preferences.
+### Candidate selection
 
-### Candidate selection and validation
+1. Validate the trip request before searching. Estimate the candidate search area from the available time and enabled modes. Use walking distance as an initial estimate and extend the search for cycling and transit where enabled.
+2. For transit candidates, use STM and exo schedules and available real-time data to estimate which stops are reachable. Account for the walk to the first stop, initial wait, transfers, and the walk from the last stop to the destination. Keep walking and cycling candidates when enabled.
+3. Sample buildings across the search area using an OpenStreetMap-derived dataset. For each building, find a nearby public road segment accessible by a permitted final travel mode. Place the destination on the road and retain its coordinates, the road segment ID, and the building ID. The trip does not require entering the building.
+4. Deduplicate road endpoints and skip segments with known restrictions or closures. If the data cannot establish public access, skip the candidate. The search area limits candidate discovery. OTP determines whether a particular candidate is reachable.
 
-The team's starting idea is to randomly select points near the user within a distance roughly walkable during the available minutes. The generator then compares those points with attraction preferences, time, and transportation choices to produce a final destination and path.
+### STM and exo routing data
 
-Use that walking-distance estimate as an initial candidate-search area, not as proof that a route fits. Roads, paths, barriers, visits, waiting, transfers, and an explicit timing allowance affect actual one-way travel time. When transit or cycling is enabled, reachable-area calculations can extend candidate search beyond the initial walking radius.
+Use STM and exo schedules as the routing baseline. Apply fresh trip updates and service alerts where available. Match reported vehicle positions to the scheduled trip where the provider supplies positions. Positions help assess service progress. Use stop-time predictions for departure and arrival estimates when available.
 
-The proposed generation process is:
+Request an OTP itinerary for each candidate using the planned departure time and allowed modes. If real-time predictions are missing or stale, use scheduled times and mark the itinerary as schedule-based. Continue to respect known cancellations, skipped stops, and closures. Keep API credentials in the backend or OTP feed configuration.
 
-1. Validate time, origin, transport choices, and required restrictions.
-2. Estimate a reachable area using the enabled modes and available time.
-3. Select candidate destinations, attractions, and interesting route sections, using core routing data; user-listed points of interest are a later extension.
-4. Remove closed, unavailable, inaccessible, over-budget, or otherwise incompatible places.
-5. Reduce the priority of recently visited or disliked places and sections.
-6. Calculate one-way routes to one or more candidates.
-7. Include travel, waiting, transfers, visits, and a timing buffer in the total estimate.
-8. Score valid routes for preference match, novelty, interestingness, and diversity.
-9. Randomly choose among high-scoring valid routes so the result still feels surprising.
-10. Recheck the chosen route against the full time budget and hard constraints, then return its geometry, stops, modes, and timing.
+### Trip verification
 
-If there is no valid route, explain the limiting constraints and offer regeneration after the user changes them. Do not silently ignore the user's time or accessibility requirements.
+`TripVerifier` checks each itinerary against the original request and approved candidate. Only trips that pass all checks enter the selection pool.
 
-### Scoring and exploration
+| Check | Verification |
+| --- | --- |
+| Reachability | OTP returned a complete itinerary from the confirmed origin to the candidate. |
+| Actual endpoint | The returned geometry ends on the approved road segment within the configured snap tolerance. Reject an endpoint on another segment or across a barrier, even if it is nearby. |
+| Building proximity | The actual endpoint is within the configured distance of the building footprint. |
+| Access | The endpoint is on a public road accessible by the final leg's mode at arrival. Reject known closures or access restrictions that affect any leg. Reject candidates whose endpoint access cannot be verified. Temporary closure coverage depends on the available data. |
+| Transit | Predicted or scheduled times leave enough time for transfers. Reject known cancelled services and skipped boarding or alighting stops. |
+| Time and restrictions | Count travel, initial waiting, transfers, required visit time, and the timing buffer once. Verify the total fits the one-way budget and that modes, routes, and zones comply with the request. |
 
-```text
-Route score = interestingness + novelty + preference match
-            + route diversity + community rating
-            - travel cost - repetition penalty
-```
+OTP can snap a requested coordinate to its network. Check the endpoint OTP actually returns before accepting a trip. Return a rejection reason and try another candidate within the configured attempt limit. Distinguish a routing service outage from a search that found no valid trip.
 
-Invalid routes are filtered before selection. Hard restrictions are not penalties that an attractive destination can outweigh. Score weights and the amount of randomness remain tunable design choices.
+### Scoring and selection
 
-Low exploration favors popular, highly rated places, main streets, and familiar transport connections. Medium exploration combines familiar places with lesser-known streets, parks, and neighbourhoods. High exploration increases novelty, unusual places, and varied transport combinations. Exploration intensity never overrides time, accessibility, availability, or route restrictions.
+Score verified routes for preference match, novelty, interestingness, and variety. Reduce the score of repeated or disliked places. Randomly choose among the highest-scoring verified routes. Personal feedback can influence results more than community ratings when enough data is available.
 
-Preference edits change filtering and scoring in later requests. Personal feedback should influence that user's results more than community popularity. Require enough feedback before making large community-score changes so isolated or manipulated ratings do not dominate.
+Return the selected trip's geometry, stops, modes, timing, and whether its transit timing uses schedules or real-time predictions. Refresh stale transit data and reverify the itinerary before starting the trip if the preview has been open past the configured refresh interval. If no candidate passes, explain the limiting constraint when known.
 
-### Data flow
+### Configuration and implementation
 
-New Trip or the main `GOBox` action starts generation. Stored preferences, reviews, visits, and external data support the generator; they do not start a new adventure by themselves.
+Keep tunable settings in `config/RNDPointChooser/`. Use named settings with explicit units, and comment why access, endpoint snapping, and feed freshness checks are needed.
+
+| File | Settings |
+| --- | --- |
+| `CandidateSearchConfig.kt` | Search area parameters, candidate count and spacing, and maximum OTP attempts. |
+| `TripVerifierConfig.kt` | Maximum distance to the building in metres, endpoint snap tolerance in metres, timing buffer, and allowed road categories. |
+| `TripScoringConfig.kt` | Scoring weights and the size of the pool used for random selection. |
+| `TransitRealtimeConfig.kt` | Feed freshness limits, transfer buffer, and preview refresh interval. |
+
+1. Build the road and building lookup with stable IDs and access data for a small Montréal test area.
+2. Implement `TripVerifier` and test it against map fixtures and OTP itinerary responses.
+3. Connect `RNDPointChooser` to OTP, then connect verified results to the existing Trip Preview.
+4. Test a valid public endpoint, a private driveway, a known closure, an endpoint snapped across a barrier, an over-budget route, a transit delay that breaks a transfer, stale feeds, and a routing outage. Use a fixed random seed in automated tests.
 
 ![Original trip generator data flow showing requests and supporting inputs](assets/main-design/generator-data-flow.png)
-
-The extended inputs add elevation information, an optional user-selected place list, and shared group constraints. The output remains a generated trip with route, timing, stops, and modes.
 
 ## Data model
 
