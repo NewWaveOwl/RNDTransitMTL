@@ -1,6 +1,10 @@
 package com.example.rnd_transit_mtl
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.LocalSharedTransitMapHost
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.example.rnd_transit_mtl.data.routing.DebugTripLoader
 import androidx.compose.runtime.CompositionLocalProvider
@@ -117,7 +121,11 @@ fun App(
             LocalNicknameSession provides appNicknameSession
         ) {
             if (appNicknameSession.nickname == null) {
-                LandingScreen(onLogin = appNicknameSession::signIn)
+                val mapHost = LocalSharedTransitMapHost.current
+                Box(Modifier.fillMaxSize()) {
+                    mapHost?.invoke(Modifier.matchParentSize(), false)
+                    LandingScreen(onLogin = appNicknameSession::signIn)
+                }
             } else {
                 MainLayout {
                     Router(

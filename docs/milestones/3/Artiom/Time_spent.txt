@@ -18,4 +18,11 @@
  #21
 
 12 -> 13:00  Bug fixes and foek on decions for Add Android MapLibre and the Montréal routing prototype- #57
+
+
+2026-11-9
+
+12:30-14:00 Worked on scrre aniamtions and map boudaries
+
+
 #57

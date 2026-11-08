@@ -1,18 +1,22 @@
 package com.example.rnd_transit_mtl.navigation
 
 import com.example.rnd_transit_mtl.model.ids.TripId
+import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.IntOffset
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
@@ -24,6 +28,7 @@ import com.example.rnd_transit_mtl.model.transport.TransportRoute
 import com.example.rnd_transit_mtl.model.transport.TransportType
 import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.model.review.TripReviewMode
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.LocalSharedTransitMapHost
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.LocalTransitMap
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.transitions.GO_TRIP_TRANSITION_MILLIS
 import kotlinx.serialization.Serializable
@@ -181,9 +186,26 @@ fun Router(
     loadingError: Boolean
 ) {
     val navigator = LocalNavigator.current
+    val mapHost = LocalSharedTransitMapHost.current
+    val destination = navigator.current
+
+    Box(Modifier.fillMaxSize()) {
+        mapHost?.invoke(Modifier.matchParentSize(), destination == MainScreenKey || destination is CurrentTripScreenKey)
+        DestinationDisplay(backStack, transportTypes, transportRoutes, loadingError)
+    }
+}
+
+@Composable
+private fun DestinationDisplay(
+    backStack: NavBackStack<NavKey>,
+    transportTypes: List<TransportType>?,
+    transportRoutes: List<TransportRoute>?,
+    loadingError: Boolean
+) {
+    val navigator = LocalNavigator.current
     val navigation = LocalTripNavigation.current
     val sharedLiveMap = LocalTransitMap.current != null
-    // Saved completion waits for the user's 100% action, including after restoration.
+    val hostedMap = LocalSharedTransitMapHost.current != null
 
     NavDisplay(
         modifier = Modifier.fillMaxSize(),
@@ -356,6 +378,8 @@ fun Router(
                 (EnterTransition.None togetherWith fadeOut(tween(GO_TRIP_TRANSITION_MILLIS))).apply {
                     targetContentZIndex = -1f
                 }
+            } else if (from == PLANNER_MAP_CONTENT_KEY || to == PLANNER_MAP_CONTENT_KEY) {
+                plannerTabSlide(enteringPlanner = to == PLANNER_MAP_CONTENT_KEY, hostedMap = hostedMap)
             } else {
                 slideInHorizontally(initialOffsetX = { it }) togetherWith
                     slideOutHorizontally(targetOffsetX = { -it })
@@ -370,6 +394,8 @@ fun Router(
                 (EnterTransition.None togetherWith fadeOut(tween(GO_TRIP_TRANSITION_MILLIS))).apply {
                     targetContentZIndex = -1f
                 }
+            } else if (from == PLANNER_MAP_CONTENT_KEY || to == PLANNER_MAP_CONTENT_KEY) {
+                plannerTabSlide(enteringPlanner = to == PLANNER_MAP_CONTENT_KEY, hostedMap = hostedMap)
             } else {
                 slideInHorizontally(initialOffsetX = { -it }) togetherWith
                     slideOutHorizontally(targetOffsetX = { it })
@@ -384,6 +410,8 @@ fun Router(
                 (EnterTransition.None togetherWith fadeOut(tween(GO_TRIP_TRANSITION_MILLIS))).apply {
                     targetContentZIndex = -1f
                 }
+            } else if (from == PLANNER_MAP_CONTENT_KEY || to == PLANNER_MAP_CONTENT_KEY) {
+                plannerTabSlide(enteringPlanner = to == PLANNER_MAP_CONTENT_KEY, hostedMap = hostedMap)
             } else {
                 slideInHorizontally(initialOffsetX = { -it }) togetherWith
                     slideOutHorizontally(targetOffsetX = { it })
@@ -404,3 +432,15 @@ private fun isPlannerMapTransition(initialKey: Any?, targetKey: Any?): Boolean =
 private fun isPlannerToTripTransition(initialKey: Any?, targetKey: Any?): Boolean =
     initialKey == PLANNER_MAP_CONTENT_KEY &&
         targetKey is String && targetKey.startsWith(TRIP_MAP_CONTENT_KEY_PREFIX)
+
+private fun plannerTabSlide(enteringPlanner: Boolean, hostedMap: Boolean): ContentTransform {
+    val slide = tween<IntOffset>(durationMillis = 480, easing = FastOutSlowInEasing)
+    return if (enteringPlanner) {
+        (EnterTransition.None togetherWith slideOutHorizontally(slide) { it }).apply {
+            targetContentZIndex = -1f
+        }
+    } else {
+        val exit = if (hostedMap) ExitTransition.None else slideOutHorizontally(slide) { -it }
+        slideInHorizontally(slide) { it } togetherWith exit
+    }
+}

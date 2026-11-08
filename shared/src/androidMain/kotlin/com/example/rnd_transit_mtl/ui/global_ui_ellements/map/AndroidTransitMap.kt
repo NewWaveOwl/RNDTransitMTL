@@ -23,6 +23,7 @@ import androidx.compose.runtime.SideEffect
 import com.example.rnd_transit_mtl.data.location.LocalPlannerLocation
 import org.maplibre.compose.camera.CameraMoveReason
 import org.maplibre.compose.interaction.ClickResult
+import org.maplibre.compose.map.AndroidRenderMode
 import org.maplibre.compose.map.CameraConstraints
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -51,6 +52,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
@@ -59,6 +61,9 @@ import com.example.rnd_transit_mtl.data.assets.SampleMapBounds
 import com.example.rnd_transit_mtl.model.geo.GeoPoint
 import com.example.rnd_transit_mtl.model.ids.TripId
 import com.example.rnd_transit_mtl.model.trip.RouteLeg
+import com.example.rnd_transit_mtl.navigation.CurrentTripScreenKey
+import com.example.rnd_transit_mtl.navigation.LocalNavigator
+import com.example.rnd_transit_mtl.navigation.MainScreenKey
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import org.jetbrains.compose.resources.imageResource
@@ -71,6 +76,7 @@ import org.maplibre.compose.interaction.MapInteractions
 import org.maplibre.compose.layers.CircleLayer
 import org.maplibre.compose.layers.LineLayer
 import org.maplibre.compose.layers.RasterLayer
+import org.maplibre.compose.map.MapUiOptions
 import org.maplibre.compose.map.MaplibreMap
 import org.maplibre.compose.map.StyleLoadState
 import org.maplibre.compose.map.rememberMapState
@@ -86,6 +92,10 @@ import org.maplibre.spatialk.geojson.Position
 import rnd_transit_mtl.shared.generated.resources.map_sample
 import rnd_transit_mtl.shared.generated.resources.rnd_origin_marker
 import kotlin.time.Duration.Companion.milliseconds
+
+// The shared map moves through Compose during navigation, so its native view must
+// respect Compose clipping and opacity when parked.
+private val SharedMapUiOptions = MapUiOptions(MapUiOptions.Standard) { renderMode = AndroidRenderMode.Texture }
 
 private val MontrealCamera = CameraPosition(
     center = Position(MontrealCenter.longitude, MontrealCenter.latitude),
@@ -108,22 +118,40 @@ private val OfflineCorners = with(SampleMapBounds) {
 @UiComposable
 fun ProvideAndroidTransitMap(
     styleUrl: String,
+    onMapReady: () -> Unit = {},
     content: @Composable @UiComposable () -> Unit
 ) {
     if (LocalInspectionMode.current) {
         content()
     } else {
         val session = rememberAndroidPlannerMapSession()
+        val latestMapReady by rememberUpdatedState(onMapReady)
         val tripFlowMap = remember(styleUrl, session) {
             movableContentOf { data: TransitMapData, modifier: Modifier ->
-                AndroidTransitMap(data, styleUrl, session, modifier)
+                AndroidTransitMap(data, styleUrl, session, modifier, onFirstFrame = { latestMapReady() })
             }
         }
+        var sharedMapData by remember(tripFlowMap) {
+            mutableStateOf(TransitMapData(sharedTripFlow = true, browsing = true, interactive = false))
+        }
         CompositionLocalProvider(
+            LocalSharedTransitMapHost provides { modifier, active ->
+                val data = sharedMapData
+                tripFlowMap(
+                    if (active) data else data.copy(interactive = false, onPick = null, followPosition = false),
+                    if (active) modifier else modifier.clearAndSetSemantics {}
+                )
+            },
             LocalPlannerLocation provides session,
             LocalTransitMap provides { data, modifier ->
-                if (data.sharedTripFlow) tripFlowMap(data, modifier)
-                else AndroidTransitMap(data, styleUrl, session, modifier)
+                if (data.sharedTripFlow) {
+                    val destination = LocalNavigator.current.current
+                    if (destination == MainScreenKey || destination is CurrentTripScreenKey) {
+                        SideEffect { sharedMapData = data }
+                    }
+                } else {
+                    AndroidTransitMap(data, styleUrl, session, modifier)
+                }
             },
             content = content
         )
@@ -132,7 +160,13 @@ fun ProvideAndroidTransitMap(
 
 @Composable
 @UiComposable
-private fun AndroidTransitMap(data: TransitMapData, styleUrl: String, session: AndroidPlannerMapSession, modifier: Modifier) {
+private fun AndroidTransitMap(
+    data: TransitMapData,
+    styleUrl: String,
+    session: AndroidPlannerMapSession,
+    modifier: Modifier,
+    onFirstFrame: (() -> Unit)? = null
+) {
     val connectivity = LocalContext.current.getSystemService(ConnectivityManager::class.java)
     // Let MapLibre try its ambient cache before switching to the bundled image.
     var offline by remember(styleUrl) { mutableStateOf(false) }
@@ -197,6 +231,12 @@ private fun AndroidTransitMap(data: TransitMapData, styleUrl: String, session: A
         }
 
         val styleLoadState = map.style.loadState
+        if (onFirstFrame != null) {
+            LaunchedEffect(map) {
+                snapshotFlow { map.style.loadState == StyleLoadState.Ready && map.viewport != null }.first { it }
+                onFirstFrame()
+            }
+        }
         LaunchedEffect(map, styleLoadState) {
             if (offline || styleLoadState == StyleLoadState.Ready) return@LaunchedEffect
             if (styleLoadState is StyleLoadState.Failed) {
@@ -327,6 +367,7 @@ private fun AndroidTransitMap(data: TransitMapData, styleUrl: String, session: A
             MaplibreMap(
                 state = map,
                 modifier = Modifier.fillMaxSize(),
+                uiOptions = if (data.sharedTripFlow) SharedMapUiOptions else MapUiOptions.Standard,
                 cameraConstraints = if (data.browsing) CameraConstraints {
                     boundingBox = regionalBounds
                     minZoom = 7.0
@@ -374,7 +415,9 @@ private fun AndroidTransitMap(data: TransitMapData, styleUrl: String, session: A
                 }
             )
 
-            if (!offline && (!data.browsing || data.pickerOpen || !data.interactive)) {
+            if (!offline && !data.attributionHandledByScreen &&
+                (!data.browsing || data.pickerOpen || !data.interactive)
+            ) {
                 val uriHandler = LocalUriHandler.current
                 Surface(
                     modifier = Modifier

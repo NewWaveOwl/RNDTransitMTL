@@ -131,7 +131,7 @@ internal enum class PlannerSheetPosition { Main, Routes, Preferences, Collapsed 
  * @param modifier Layout supplied by the caller.
  * @param controlsVisible Whether planner controls should remain visible.
  * @param onMapViewportReady Reports normalized map-generation bounds.
- * @param onControlsHidden Runs only after the complete slide-down transition.
+ * @param onControlsHidden Runs after the controls fade out.
  * @param initialSheetPosition Initial position for previews or a new planner entry.
  * @param origin Selected sample-map starting point, or none.
  * @param onEditOrigin Opens the origin options without changing saved choices.
@@ -177,11 +177,11 @@ internal fun MainPlannerContent(
         mutableStateOf(0)
     }
 
-    val exit = remember { Animatable(if (controlsVisible) 0f else 1f) }
+    val controlsOpacity = remember { Animatable(if (controlsVisible) 1f else 0f) }
     val latestControlsHidden by rememberUpdatedState(onControlsHidden)
     LaunchedEffect(controlsVisible) {
-        if (controlsVisible) exit.snapTo(0f) else {
-            exit.animateTo(1f, tween(GO_TRIP_TRANSITION_MILLIS))
+        if (controlsVisible) controlsOpacity.snapTo(1f) else {
+            controlsOpacity.animateTo(0f, tween(GO_TRIP_TRANSITION_MILLIS))
             latestControlsHidden()
         }
     }
@@ -285,6 +285,7 @@ internal fun MainPlannerContent(
                 topInset = visibleMapTop,
                 bottomInset = if (controlsVisible) with(density) { (heightPx - goTop).toDp() } else 0.dp,
                 sharedTripFlow = true,
+                attributionHandledByScreen = true,
                 cameraInsetsReady = !showMapControls || originFieldHeight > 0,
                 browsing = true,
                 pin = liveOrigin?.point
@@ -300,12 +301,8 @@ internal fun MainPlannerContent(
         }
 
 
-        // Move GO and the sheet together on trip opening; keep the map outside this layer.
-        Box(Modifier.width(panelWidth).fillMaxHeight().graphicsLayer {
-            translationY = exit.value * heightPx
-        }) {
-            // Keep the field in the shared moving layer during GO's slide-down exit.
-            // Sheet expansion hides it upward; pulling the sheet down reveals it smoothly.
+        Box(Modifier.width(panelWidth).fillMaxHeight()) {
+            // Sheet expansion can hide the field while navigation leaves it in place.
             AnimatedVisibility(
                 visible = goTop >= 100f * unitPx,
                 enter = slideInVertically(
@@ -359,7 +356,7 @@ internal fun MainPlannerContent(
                 )
             }
 
-            if (goTop > with(density) { 120.dp.toPx() }) {
+            if (controlsVisible && goTop > with(density) { 120.dp.toPx() }) {
                 val liveMap = LocalTransitMap.current != null
                 val uriHandler = LocalUriHandler.current
                 Surface(
@@ -381,17 +378,19 @@ internal fun MainPlannerContent(
                 onMinutesChange = onMinutesChange,
                 onGo = onPrimaryAction,
                 actionLabel = actionLabel,
-                actionEnabled = actionEnabled,
-                minutesEnabled = inputsEnabled,
+                actionEnabled = actionEnabled && controlsVisible,
+                minutesEnabled = enabled,
                 layoutScale = scale,
                 compact = true,
                 modifier = Modifier.offset { IntOffset(0, goTop.roundToInt()) }
                     .fillMaxWidth().padding(horizontal = PlannerGoBoxHorizontalPadding * scale)
+                    .graphicsLayer { alpha = controlsOpacity.value }
             )
             Column(
                 Modifier.offset { IntOffset(0, sheetOffset.roundToInt()) }
                     .fillMaxWidth()
                     .height(with(density) { (heightPx - sheetOffset).coerceAtLeast(0f).toDp() })
+                    .graphicsLayer { alpha = controlsOpacity.value }
                     .background(TransitMain)
                     .nestedScroll(nestedScroll)
                     .anchoredDraggable(sheet, Orientation.Vertical, enabled = enabled)
