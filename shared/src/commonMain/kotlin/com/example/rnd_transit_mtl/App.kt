@@ -174,6 +174,7 @@ internal fun App(
                                 })
                             }
                         }
+                        else -> Unit
                     }
                 }
             } else {

@@ -90,7 +90,7 @@ import org.maplibre.compose.util.PreparedImage
 import org.maplibre.spatialk.geojson.BoundingBox
 import org.maplibre.spatialk.geojson.Position
 import rnd_transit_mtl.shared.generated.resources.map_sample
-import rnd_transit_mtl.shared.generated.resources.rnd_origin_marker
+import rnd_transit_mtl.shared.generated.resources.ellipse_starting
 import kotlin.time.Duration.Companion.milliseconds
 
 // The shared map moves through Compose during navigation, so its native view must
@@ -173,7 +173,7 @@ private fun AndroidTransitMap(
     var attempt by remember(styleUrl) { mutableIntStateOf(0) }
     val trip = data.trip
     val fix = session.fix.takeIf { data.browsing }
-    val confirmedPin = data.pin.takeUnless { data.pickerOpen }
+    val confirmedPin = data.pin.takeIf { !data.pickerOpen && data.centerOnPin }
     val region = MontrealBrowsingBounds
     val regionalBounds = BoundingBox(west = region.west, south = region.south, east = region.east, north = region.north)
     if (data.pickerOpen) SideEffect { session.autoCenterPending = false }
@@ -389,11 +389,9 @@ private fun AndroidTransitMap(
                     }
                 } else MapInteractions.None,
                 overlay = {
-                    if (fix != null && (fix.point != data.pin || !data.pickerOpen)) UserPointer(fix.point)
-                    data.pin?.let { point ->
-                        if (data.pickerOpen) UserPointer(point)
-                        else if (fix?.point != point) OriginMarker(point)
-                    }
+                    val selectedOrigin = data.pin.takeIf { data.pickerOpen || data.centerOnPin }
+                    if (fix != null && fix.point != selectedOrigin) UserPointer(fix.point)
+                    selectedOrigin?.let { OriginMarker(it) }
                     if (trip != null && map.style.loadState == StyleLoadState.Ready) {
                         DestinationMarker(trip.destination.point)
                         if (marker != null) {
@@ -535,9 +533,9 @@ private fun MapOverlayScope.UserPointer(point: GeoPoint, rotation: Float = 0f) {
 @Composable
 private fun MapOverlayScope.OriginMarker(point: GeoPoint) {
     Image(
-        painter = painterResource(Res.drawable.rnd_origin_marker),
+        painter = painterResource(Res.drawable.ellipse_starting),
         contentDescription = "Starting point",
-        modifier = Modifier.placedAt(point.position()).size(36.dp)
+        modifier = Modifier.placedAt(point.position()).size(16.dp)
     )
 }
 
