@@ -14,9 +14,30 @@ import com.example.rnd_transit_mtl.model.geo.GeoPoint
 import kotlinx.coroutines.delay
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.spatialk.geojson.Position
+import kotlin.math.PI
+import kotlin.math.asin
+import kotlin.math.cos
+import kotlin.math.sin
 
-// Provisional regional bounds until the official buffered territory can be bundled.
-internal val MontrealBrowsingBounds = GeoBounds(north = 46.11, south = 45.10, west = -74.54, east = -72.90)
+internal val MontrealCenter = GeoPoint(latitude = 45.5019, longitude = -73.5673)
+
+// Farthest CMM vertex from MontrealCenter in Québec's SDA 1:20,000 layer 4 (V2026-10).
+// https://servicescarto.mern.gouv.qc.ca/pes/rest/services/Territoire/SDA_WMS/MapServer/4
+private val farthestCmmPoint = GeoPoint(latitude = 45.98474970, longitude = -73.18629259)
+private val montrealServiceRadiusMeters = MontrealCenter.distanceMetersTo(farthestCmmPoint) + 5_000.0
+
+internal val MontrealBrowsingBounds = run {
+    val angularRadius = montrealServiceRadiusMeters / GeoPoint.EARTH_RADIUS_METERS
+    val latitudeOffset = angularRadius * 180.0 / PI
+    val centerLatitude = MontrealCenter.latitude * PI / 180.0
+    val longitudeOffset = asin(sin(angularRadius) / cos(centerLatitude)) * 180.0 / PI
+    GeoBounds(
+        north = MontrealCenter.latitude + latitudeOffset,
+        south = MontrealCenter.latitude - latitudeOffset,
+        west = MontrealCenter.longitude - longitudeOffset,
+        east = MontrealCenter.longitude + longitudeOffset
+    )
+}
 
 internal class AndroidPlannerMapSession(context: Context) : PlannerLocation {
     private val preferences = context.getSharedPreferences("planner_map", Context.MODE_PRIVATE)
@@ -26,8 +47,7 @@ internal class AndroidPlannerMapSession(context: Context) : PlannerLocation {
     var recenter by mutableIntStateOf(0)
     override var fix by mutableStateOf<LocationUpdate.Fix?>(null)
     override val containsPoint: (GeoPoint) -> Boolean = { point ->
-        point.latitude in MontrealBrowsingBounds.south..MontrealBrowsingBounds.north &&
-            point.longitude in MontrealBrowsingBounds.west..MontrealBrowsingBounds.east
+        MontrealCenter.distanceMetersTo(point) <= montrealServiceRadiusMeters
     }
 
     var pendingResult: ((LocationUpdate.Fix?) -> Unit)? by mutableStateOf(null)
@@ -39,7 +59,9 @@ internal class AndroidPlannerMapSession(context: Context) : PlannerLocation {
 
     override fun request(onResult: ((LocationUpdate.Fix?) -> Unit)?) {
         autoCenterPending = false
-        pendingResult = onResult ?: { result -> if (result != null) recenter++ }
+        pendingResult = onResult ?: { result ->
+            if (result != null && containsPoint(result.point)) recenter++
+        }
         permitted = hasPermission()
         if (permitted) {
             val currentFix = fix

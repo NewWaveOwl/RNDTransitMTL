@@ -85,7 +85,10 @@ import org.maplibre.spatialk.geojson.Position
 import rnd_transit_mtl.shared.generated.resources.map_sample
 import rnd_transit_mtl.shared.generated.resources.rnd_origin_marker
 
-private val MontrealCamera = CameraPosition(center = Position(-73.5673, 45.5019), zoom = 12.0)
+private val MontrealCamera = CameraPosition(
+    center = Position(MontrealCenter.longitude, MontrealCenter.latitude),
+    zoom = 12.0
+)
 private val OfflineBounds = with(SampleMapBounds) {
     BoundingBox(west = west, south = south, east = east, north = north)
 }
@@ -238,8 +241,11 @@ private fun AndroidTransitMap(data: TransitMapData, styleUrl: String, session: A
         }
 
         if (data.browsing) {
-            val fixBounds = if (offline) SampleMapBounds else region
-            val hasLocalFix = fix != null && fix.point in fixBounds
+            val localFix = fix?.point?.takeIf {
+                session.containsPoint(it) && (!offline || it in SampleMapBounds)
+            }
+            val latestLocalFix by rememberUpdatedState(localFix)
+            val hasLocalFix = localFix != null
             var centeredPin by remember {
                 mutableStateOf(confirmedPin.takeIf { !offline && session.camera != null })
             }
@@ -299,7 +305,7 @@ private fun AndroidTransitMap(data: TransitMapData, styleUrl: String, session: A
 
                 snapshotFlow { latestData.cameraInsetsReady }.first { it }
                 val viewport = map.awaitViewport()
-                val point = targetPin ?: session.fix?.point?.takeIf { it in fixBounds } ?: return@LaunchedEffect
+                val point = targetPin ?: latestLocalFix ?: return@LaunchedEffect
                 if (targetPin == null && request == 0 && !session.autoCenterPending) return@LaunchedEffect
                 centeredPin = confirmedPin
                 session.autoCenterPending = false

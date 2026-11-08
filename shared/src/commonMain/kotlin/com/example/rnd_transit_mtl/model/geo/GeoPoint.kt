@@ -44,10 +44,10 @@ data class GeoPoint(
         return 2 * EARTH_RADIUS_METERS * asin(sqrt(a.coerceIn(0.0, 1.0)))
     }
 
-    private companion object {
+    companion object {
         /** Mean Earth radius used by the haversine formula. */
-        const val EARTH_RADIUS_METERS = 6_371_008.8
+        internal const val EARTH_RADIUS_METERS = 6_371_008.8
 
-        fun Double.toRadians(): Double = this * PI / 180
+        private fun Double.toRadians(): Double = this * PI / 180
     }
 }
