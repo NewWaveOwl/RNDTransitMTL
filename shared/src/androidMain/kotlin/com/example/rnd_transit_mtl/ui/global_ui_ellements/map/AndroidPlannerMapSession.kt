@@ -78,6 +78,7 @@ internal class AndroidPlannerMapSession(context: Context) : PlannerLocation {
     }
 
     fun saveCamera(position: CameraPosition) {
+        if (camera?.center == position.center && camera?.zoom == position.zoom) return
         camera = position
         preferences.edit()
             .putString("longitude", position.center.longitude.toString())

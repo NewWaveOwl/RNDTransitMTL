@@ -59,6 +59,7 @@ import com.example.rnd_transit_mtl.data.assets.SampleMapBounds
 import com.example.rnd_transit_mtl.model.geo.GeoPoint
 import com.example.rnd_transit_mtl.model.ids.TripId
 import com.example.rnd_transit_mtl.model.trip.RouteLeg
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import org.jetbrains.compose.resources.imageResource
 import org.maplibre.compose.camera.CameraAnimation
@@ -132,7 +133,8 @@ fun ProvideAndroidTransitMap(
 @UiComposable
 private fun AndroidTransitMap(data: TransitMapData, styleUrl: String, session: AndroidPlannerMapSession, modifier: Modifier) {
     val connectivity = LocalContext.current.getSystemService(ConnectivityManager::class.java)
-    var offline by remember(styleUrl) { mutableStateOf(connectivity.activeNetwork == null) }
+    // Let MapLibre try its ambient cache before switching to the bundled image.
+    var offline by remember(styleUrl) { mutableStateOf(false) }
     var attempt by remember(styleUrl) { mutableIntStateOf(0) }
     val trip = data.trip
     val fix = session.fix.takeIf { data.browsing }
@@ -164,13 +166,14 @@ private fun AndroidTransitMap(data: TransitMapData, styleUrl: String, session: A
     }
 
     key(styleUrl, attempt, offline) {
+        val savedCamera = remember { session.camera.takeIf { data.browsing } }
         val offlineImage = if (offline) {
             val bitmap = imageResource(Res.drawable.map_sample)
             remember(bitmap) { PreparedImage.fromBitmap(bitmap) }
         } else null
         val map = rememberMapState(
             baseStyle = if (offline) BaseStyle.Empty else BaseStyle.Uri(styleUrl),
-            initialCameraPosition = if (data.browsing && !offline) session.camera ?: MontrealCamera else MontrealCamera
+            initialCameraPosition = savedCamera ?: MontrealCamera
         ) {
             if (offlineImage != null) {
                 val source = rememberImageSource(OfflineCorners, offlineImage)
@@ -192,9 +195,17 @@ private fun AndroidTransitMap(data: TransitMapData, styleUrl: String, session: A
             }
         }
 
-        val styleFailed = map.style.loadState is StyleLoadState.Failed
-        LaunchedEffect(styleFailed) {
-            if (styleFailed && !offline) offline = true
+        val styleLoadState = map.style.loadState
+        LaunchedEffect(map, styleLoadState) {
+            if (offline || styleLoadState == StyleLoadState.Ready) return@LaunchedEffect
+            if (styleLoadState is StyleLoadState.Failed) {
+                offline = true
+            } else if (connectivity.activeNetwork == null) {
+                delay(2_000)
+                if (connectivity.activeNetwork == null && map.style.loadState != StyleLoadState.Ready) {
+                    offline = true
+                }
+            }
         }
         val latestData by rememberUpdatedState(data)
         var fittedTripId by remember { mutableStateOf<TripId?>(null) }
@@ -241,48 +252,26 @@ private fun AndroidTransitMap(data: TransitMapData, styleUrl: String, session: A
         }
 
         if (data.browsing) {
-            val localFix = fix?.point?.takeIf {
-                session.containsPoint(it) && (!offline || it in SampleMapBounds)
-            }
+            val localFix = fix?.takeIf { session.containsPoint(it.point) }
             val latestLocalFix by rememberUpdatedState(localFix)
             val hasLocalFix = localFix != null
-            var centeredPin by remember {
-                mutableStateOf(confirmedPin.takeIf { !offline && session.camera != null })
-            }
-            LaunchedEffect(map, offline && data.pickerOpen) {
-                val centeringOnFix = hasLocalFix && (session.autoCenterPending || session.recenter != 0)
-                if (offline && (data.pickerOpen || (confirmedPin == null && !centeringOnFix))) {
-                    snapshotFlow { latestData.cameraInsetsReady }.first { it }
-                    val viewport = map.awaitViewport()
-                    map.fitCameraToBounds(
-                        OfflineBounds,
-                        CameraFit(cameraPadding = latestData.visibleMapPadding(viewport.size.height))
-                    )
-                }
-            }
+            var centeredPin by remember { mutableStateOf(confirmedPin.takeIf { savedCamera != null }) }
+            var cameraReady by remember { mutableStateOf(false) }
             LaunchedEffect(map) {
-                if (offline) return@LaunchedEffect
-                val saved = session.camera
-                val centeringOnFix = hasLocalFix &&
-                    (session.recenter != 0 || (session.autoCenterPending && confirmedPin == null))
-                if (!centeringOnFix && confirmedPin == centeredPin) {
-                    if (saved == null) {
-                        map.fitCameraToBounds(regionalBounds, CameraFit(fitPadding = DpPadding(24.dp, 24.dp, 24.dp, 24.dp)))
-                    } else if (saved != map.cameraPosition) {
-                        map.animateCamera(
-                            CameraUpdate(
-                                center = saved.center,
-                                zoom = saved.zoom,
-                                bearing = saved.bearing,
-                                pitch = saved.pitch,
-                                padding = saved.padding
-                            ),
-                            CameraAnimation.Ease.Standard
-                        )
+                val viewport = map.awaitViewport()
+                if (savedCamera == null && confirmedPin == null &&
+                    map.cameraMoveReason != CameraMoveReason.Gesture
+                ) {
+                    val fit = if (offline) {
+                        CameraFit(cameraPadding = latestData.visibleMapPadding(viewport.size.height))
+                    } else {
+                        CameraFit(fitPadding = DpPadding(24.dp, 24.dp, 24.dp, 24.dp))
                     }
+                    map.fitCameraToBounds(if (offline) OfflineBounds else regionalBounds, fit)
                 }
+                cameraReady = true
                 snapshotFlow {
-                    if (map.viewport != null && !map.isCameraMoving) map.cameraPosition else null
+                    if (!map.isCameraMoving) map.cameraPosition else null
                 }.collect { position -> if (position != null) session.saveCamera(position) }
             }
             LaunchedEffect(map) {
@@ -290,29 +279,38 @@ private fun AndroidTransitMap(data: TransitMapData, styleUrl: String, session: A
                     if (reason == CameraMoveReason.Gesture) session.autoCenterPending = false
                 }
             }
-            LaunchedEffect(map, hasLocalFix, session.recenter, data.pickerOpen, data.interactive, confirmedPin) {
+            LaunchedEffect(map, cameraReady, styleLoadState, hasLocalFix, session.recenter, data.pickerOpen, data.interactive, confirmedPin) {
                 if (data.pickerOpen) {
                     centeredPin = null
                     return@LaunchedEffect
                 }
-                if (!data.interactive) return@LaunchedEffect
+                if (!cameraReady || styleLoadState != StyleLoadState.Ready || !data.interactive) return@LaunchedEffect
                 val request = session.recenter
                 val recenterOnFix = hasLocalFix && request != 0
                 val targetPin = confirmedPin?.takeIf { it != centeredPin && !recenterOnFix }
                 val centeringOnFix = recenterOnFix ||
-                    (hasLocalFix && session.autoCenterPending && confirmedPin == null)
+                    (hasLocalFix && session.autoCenterPending)
                 if (targetPin == null && !centeringOnFix) return@LaunchedEffect
 
                 snapshotFlow { latestData.cameraInsetsReady }.first { it }
                 val viewport = map.awaitViewport()
-                val point = targetPin ?: latestLocalFix ?: return@LaunchedEffect
-                if (targetPin == null && request == 0 && !session.autoCenterPending) return@LaunchedEffect
+                val point = targetPin ?: latestLocalFix?.point ?: return@LaunchedEffect
+                val automatic = targetPin == null && request == 0
+                if (automatic && (!session.autoCenterPending || map.cameraMoveReason == CameraMoveReason.Gesture)) {
+                    return@LaunchedEffect
+                }
                 centeredPin = confirmedPin
                 session.autoCenterPending = false
+                val camera = map.cameraPosition
+                val center = GeoPoint(camera.center.latitude, camera.center.longitude)
+                if (automatic && savedCamera != null &&
+                    center.distanceMetersTo(point) <= maxOf(50.0, latestLocalFix?.accuracyMeters ?: 0.0)
+                ) return@LaunchedEffect
+
                 map.animateCamera(
                     CameraUpdate(
                         center = point.position(),
-                        zoom = maxOf(13.0, map.cameraPosition.zoom),
+                        zoom = if (automatic && savedCamera != null) camera.zoom else maxOf(13.0, camera.zoom),
                         padding = latestData.visibleMapPadding(viewport.size.height)
                     ),
                     CameraAnimation.Ease.Standard
@@ -326,7 +324,7 @@ private fun AndroidTransitMap(data: TransitMapData, styleUrl: String, session: A
                 state = map,
                 modifier = Modifier.fillMaxSize(),
                 cameraConstraints = if (data.browsing) CameraConstraints {
-                    boundingBox = if (offline && data.pickerOpen) OfflineBounds else regionalBounds
+                    boundingBox = regionalBounds
                     minZoom = 7.0
                 } else CameraConstraints.Standard,
                 interactions = if (data.interactive) MapInteractions {
@@ -430,7 +428,7 @@ private fun AndroidTransitMap(data: TransitMapData, styleUrl: String, session: A
                     ) {
                         Text("Couldn’t load the map")
                         TextButton(onClick = {
-                            offline = connectivity.activeNetwork == null
+                            offline = false
                             attempt++
                         }) { Text("Retry") }
                     }
