@@ -85,6 +85,7 @@ import org.maplibre.spatialk.geojson.BoundingBox
 import org.maplibre.spatialk.geojson.Position
 import rnd_transit_mtl.shared.generated.resources.map_sample
 import rnd_transit_mtl.shared.generated.resources.rnd_origin_marker
+import kotlin.time.Duration.Companion.milliseconds
 
 private val MontrealCamera = CameraPosition(
     center = Position(MontrealCenter.longitude, MontrealCenter.latitude),
@@ -294,8 +295,10 @@ private fun AndroidTransitMap(data: TransitMapData, styleUrl: String, session: A
 
                 snapshotFlow { latestData.cameraInsetsReady }.first { it }
                 val viewport = map.awaitViewport()
-                val point = targetPin ?: latestLocalFix?.point ?: return@LaunchedEffect
                 val automatic = targetPin == null && request == 0
+                if (automatic && savedCamera != null) delay(1_200)
+
+                val point = targetPin ?: latestLocalFix?.point ?: return@LaunchedEffect
                 if (automatic && (!session.autoCenterPending || map.cameraMoveReason == CameraMoveReason.Gesture)) {
                     return@LaunchedEffect
                 }
@@ -313,7 +316,8 @@ private fun AndroidTransitMap(data: TransitMapData, styleUrl: String, session: A
                         zoom = if (automatic && savedCamera != null) camera.zoom else maxOf(13.0, camera.zoom),
                         padding = latestData.visibleMapPadding(viewport.size.height)
                     ),
-                    CameraAnimation.Ease.Standard
+                    if (automatic) CameraAnimation.Ease { duration = 1_800.milliseconds }
+                    else CameraAnimation.Ease.Standard
                 )
                 if (session.recenter == request) session.recenter = 0
             }
