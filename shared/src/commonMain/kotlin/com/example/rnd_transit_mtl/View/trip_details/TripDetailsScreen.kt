@@ -78,9 +78,12 @@ fun TripDetailsScreen(
     }
 
     val snapshot by tripsStore.state
-    val trip = if (cloud != null) storedTrip else snapshot.completedTrips.firstOrNull {
-        it.id == tripId
-    } ?: snapshot.cancelledTrips.firstOrNull { it.id == tripId }
+    val trip = if (cloud != null) {
+        storedTrip
+    } else {
+        snapshot.completedTrips.firstOrNull { it.id == tripId }
+            ?: snapshot.cancelledTrips.firstOrNull { it.id == tripId }
+    }
 
     val latestDestinationActive by rememberUpdatedState(
         isDestinationActive

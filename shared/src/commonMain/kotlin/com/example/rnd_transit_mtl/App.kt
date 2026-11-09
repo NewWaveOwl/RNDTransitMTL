@@ -139,7 +139,6 @@ internal fun App(
             }
             AccountSession.Guest -> {
                 sessionStores.clearAccountStores()
-                outbox?.clear()
                 lastSignedIdentity = null
             }
             else -> Unit
@@ -199,8 +198,7 @@ internal fun App(
                     }
                 }
                 navigationOwner != identity -> Unit
-                else -> {
-                MainLayout {
+                else -> MainLayout {
                     Column {
                         val pending = tripsStore.state.value.pendingFinalTripIds
                         var retry by remember { mutableStateOf(0) }
@@ -221,10 +219,10 @@ internal fun App(
                             }
                         }
                         Router(
-                        backStack = backStack,
-                        transportTypes = transportData?.types,
-                        transportRoutes = transportData?.routes,
-                        loadingError = loadingError
+                            backStack = backStack,
+                            transportTypes = transportData?.types,
+                            transportRoutes = transportData?.routes,
+                            loadingError = loadingError,
                         )
                     }
                 }
@@ -232,7 +230,6 @@ internal fun App(
         }
       }
     }
-}
 }
 
 internal val LocalDebugStmTripLoader = staticCompositionLocalOf<DebugTripLoader?> { null }

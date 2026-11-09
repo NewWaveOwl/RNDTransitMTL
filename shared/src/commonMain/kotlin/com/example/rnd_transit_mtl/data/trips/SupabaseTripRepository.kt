@@ -17,6 +17,7 @@ import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.model.trip.TripStatus
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -55,12 +56,7 @@ internal class SupabaseTripRepository(
         val stored = checkNotNull(getTrip(trip.id)) {
             "The saved trip could not be read back."
         }
-        val originalFields = stored.copy(
-            title = ownedTrip.title,
-            description = ownedTrip.description,
-            review = null,
-        )
-        check(originalFields == ownedTrip.copy(review = null)) {
+        check(stored.copy(review = null) == ownedTrip.copy(review = null)) {
             "The trip ID is already associated with a different record."
         }
         return stored
@@ -111,19 +107,13 @@ internal class SupabaseTripRepository(
     }
 
     override suspend fun saveReview(tripId: TripId, review: TripReview): TripReview {
-        check(getTrip(tripId)?.status == TripStatus.Completed) { "Completed trip unavailable." }
         val fields = writeJson.encodeToJsonElement(
             TripReviewDto(review.overall, review.quality, review.interesting, review.`fun`, review.comment, review.imageUrl)
         ).jsonObject
-        // The foreign key is immutable. On conflict update only the feedback fields.
-        client.from("reviews").upsert(JsonObject(fields + ("trip_id" to JsonPrimitive(tripId.value)))) {
-            onConflict = "trip_id"
-            ignoreDuplicates = true
-        }
-        val stored = client.from("reviews").update(JsonObject(fields)) {
-            filter { eq("trip_id", tripId.value) }
-            select(Columns.raw("overall,quality,interesting,fun,comment,image_url"))
-        }.decodeSingle<TripReviewDto>()
+        val stored = client.postgrest.rpc(
+            "save_trip_review",
+            JsonObject(mapOf("p_trip_id" to JsonPrimitive(tripId.value), "p_review" to fields)),
+        ).decodeSingle<TripReviewDto>()
         return TripReview(stored.overall, stored.quality, stored.interesting, stored.funRating, stored.comment, stored.imageUrl)
     }
 

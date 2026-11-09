@@ -109,7 +109,7 @@ kotlin {
         }
 
         wasmJsMain.dependencies {
-            implementation("io.ktor:ktor-client-cio:$ktorVersion")
+            implementation("io.ktor:ktor-client-js:$ktorVersion")
         }
 
         commonTest.dependencies {
