@@ -2,7 +2,21 @@
 
 The Android debug samples fetch real route geometry and timetable data from a local OpenTripPlanner (OTP) stack. After the route loads, the app simulates progress along it in about 10 seconds. The regular **GO** flow uses the app's built-in sample routing and can run without the server.
 
-## 1. Start the local routing stack
+## Quick start for the STM bus sample
+
+On Windows, clone the repository and open PowerShell in its root. For Android, install the project's Android SDK and Platform-Tools in Android Studio and start one emulator. Then run:
+
+```powershell
+.\tool\otp\stm-scheduled\Run-StmTestTrip.ps1 -Emulator
+```
+
+Use `-Phone` instead for an authorized USB device. Omit the device flag to run only the backend smoke test. Set `ANDROID_HOME` for a custom Android SDK location and `JAVA_HOME` if Gradle needs a different JDK.
+
+The first run downloads any missing Java 25, OTP 2.10.0, Montreal map data, and STM timetable, then builds the local graph. It starts OTP on `127.0.0.1:18087`, checks that the STM sample returns a bus route with geometry, and prints `PASS`. With a device flag, it then installs and opens the debug build. In the app, open **Map**, expand the planner, and tap **Load STM test trip**. The smoke test uses noon in Montreal, while the app uses the current departure time.
+
+The quick start uses scheduled STM service and requires no API key. Its graph and logs are in `tool/otp/stm-demo`. Use `-RefreshTimetable` to download the latest STM schedule and rebuild the graph if the cached timetable expires. If port `18087` is busy, pass `-Port` with a free port.
+
+## 1. Start the STM realtime and exo stack
 
 Use PowerShell on the Windows PC running Android Studio. The scripts live in `tool/otp` at the repository root. A fresh checkout also needs the local runtime files. Place Java 25 under `tool/otp/java25`, the OTP 2.10.0 JAR at `tool/otp/otp.jar`, and the combined Montréal graph, GTFS feeds, and local STM configuration in `tool/otp/stm-scheduled`. The exo realtime token is needed only for live exo updates.
 
