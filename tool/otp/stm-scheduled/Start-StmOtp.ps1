@@ -1,9 +1,16 @@
-param([int]$Port = 18084, [switch]$Rebuild, [string]$LogPath)
+param(
+    [int]$Port = 18084,
+    [switch]$Rebuild,
+    [string]$LogPath,
+    [string]$DataDirectory = $PSScriptRoot,
+    [switch]$BuildOnly
+)
 $ErrorActionPreference = 'Stop'
-if (!$LogPath) { $LogPath = Join-Path $PSScriptRoot "stm-otp-$Port.log" }
-Set-Location -LiteralPath $PSScriptRoot
+$DataDirectory = (Resolve-Path -LiteralPath $DataDirectory).Path
+if (!$LogPath) { $LogPath = Join-Path $DataDirectory "stm-otp-$Port.log" }
+Set-Location -LiteralPath $DataDirectory
 $root = Split-Path -Parent $PSScriptRoot
-$zip = Join-Path $PSScriptRoot 'stm-gtfs.zip'
+$zip = Join-Path $DataDirectory 'stm-gtfs.zip'
 $url = 'https://www.stm.info/getContentAsset/38dcb679-4237-4c02-b6f4-5f8434665e5c/dfc3d011-8f63-43f6-9ed8-4b444333a1d0/GTFS_STM.zip?language=fr'
 
 if (!(Test-Path -LiteralPath $zip)) {
@@ -32,13 +39,19 @@ $java = Get-ChildItem -LiteralPath (Join-Path $root 'java25') -Recurse -Filter j
 if (!$java) { throw 'Java 25 executable was not found.' }
 $ErrorActionPreference = 'Continue'
 $jar = Join-Path $root 'otp.jar'
-if ($Rebuild -or !(Test-Path -LiteralPath (Join-Path $PSScriptRoot 'graph.obj'))) {
+$graph = Join-Path $DataDirectory 'graph.obj'
+if ($Rebuild -or !(Test-Path -LiteralPath $graph)) {
     & $java -Xmx4G -jar $jar --build --save . 2>&1 | ForEach-Object { $_.ToString() } | Tee-Object -FilePath 'stm-build.log'
-    if ($LASTEXITCODE -ne 0) { throw "OTP build exited with code $LASTEXITCODE." }
+    if ($LASTEXITCODE -ne 0) {
+        if ($BuildOnly -and (Test-Path -LiteralPath $graph)) { Remove-Item -LiteralPath $graph -ErrorAction Stop }
+        throw "OTP build exited with code $LASTEXITCODE."
+    }
+    if (!(Test-Path -LiteralPath $graph)) { throw 'OTP did not save graph.obj. See stm-build.log.' }
 }
+if ($BuildOnly) { return }
 # OTP startup can echo configuration. Redact header values before writing logs.
 $headerSecrets = @()
-$routerPath = Join-Path $PSScriptRoot 'router-config.json'
+$routerPath = Join-Path $DataDirectory 'router-config.json'
 if (Test-Path -LiteralPath $routerPath) {
     $router = Get-Content -LiteralPath $routerPath -Raw | ConvertFrom-Json
     foreach ($updater in $router.updaters) {
