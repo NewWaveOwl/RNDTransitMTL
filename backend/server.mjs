@@ -1,8 +1,9 @@
 import http from 'node:http';
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 import { RandomPointGenerator, loadDestinations } from './candidates.mjs';
 import { createOtpClient, ProviderError } from './otp.mjs';
 import { TripGenerationService, InputError } from './generation.mjs';
+import { loadFareZones, loadRouteCatalogue, lineResolver, itineraryPolicy, validateRestrictions } from './restrictions.mjs';
 
 /** Local by default. Hosted deployments require Supabase authentication and HTTPS termination. */
 export function createServer({ generation, authorize = async () => true, maxConcurrent = 4 }) {
@@ -64,8 +65,17 @@ async function main() {
   if (!['127.0.0.1', '::1', 'localhost'].includes(host) && !authenticated) {
     throw new Error('Public binding requires SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY.');
   }
-  const pool = await loadDestinations(endpoint, { signal: AbortSignal.timeout(30_000) });
-  const generation = new TripGenerationService({ candidates: new RandomPointGenerator(pool), route: createOtpClient(endpoint) });
+  const [pool, fareZones, routes] = await Promise.all([
+    loadDestinations(endpoint, { signal: AbortSignal.timeout(30_000) }),
+    loadFareZones(process.env.FARE_ZONES_FILE ?? fileURLToPath(new URL('./data/fare-zones-2026.geojson', import.meta.url))),
+    loadRouteCatalogue(endpoint),
+  ]);
+  const resolveLines = lineResolver(routes);
+  const generation = new TripGenerationService({
+    candidates: new RandomPointGenerator(pool), route: createOtpClient(endpoint),
+    prepare: input => { validateRestrictions(input); return resolveLines(input); },
+    accept: itineraryPolicy(fareZones, resolveLines),
+  });
   const server = createServer({ generation, authorize: authenticated ?
     supabaseAuthorizer(process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY) : undefined });
   server.requestTimeout = 20_000;

@@ -83,7 +83,7 @@ export class TripGenerationService {
     });
     let attempts = 0, providerFailures = 0;
     try {
-      for (const candidate of candidates) {
+      for (const candidate of candidates.slice(0, this.maxAttempts)) {
         signal.throwIfAborted();
         attempts++;
         let body;

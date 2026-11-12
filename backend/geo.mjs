@@ -25,6 +25,9 @@ export function inPolygon(point, geometry) {
     const x = point.longitude, y = point.latitude;
     for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
       const [xi, yi] = ring[i], [xj, yj] = ring[j];
+      const cross = (x - xi) * (yj - yi) - (y - yi) * (xj - xi);
+      if (Math.abs(cross) < 1e-12 && x >= Math.min(xi, xj) && x <= Math.max(xi, xj) &&
+          y >= Math.min(yi, yj) && y <= Math.max(yi, yj)) return true;
       if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
     }
     return inside;
