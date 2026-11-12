@@ -16,6 +16,22 @@ import kotlin.test.assertTrue
 
 class OtpRoutingServiceTest {
     @Test
+    fun coordinateSearchAcceptsVariableTransitLegsAndWalkingConnections() = runTest {
+        val request = OtpTripDemo.StmExo.request.copy(modes = listOf(OtpMode.Bus.id, OtpMode.Metro.id, OtpMode.Train.id))
+        val router = OtpRoutingService(post = { body ->
+            val variables = Json.parseToJsonElement(body).jsonObject.getValue("variables").jsonObject
+            assertEquals(request.origin.point.latitude.toString(), variables.getValue("originLat").jsonPrimitive.content)
+            assertEquals(departure, variables.getValue("departure").jsonPrimitive.content)
+            assertTrue(!variables.containsKey("origin"))
+            mixedResponse
+        }, departure = { departure })
+        val result = assertIs<RoutingResult.Success>(router.route(request))
+        assertEquals(listOf(OtpMode.Metro.id, OtpMode.Walk.id, OtpMode.Train.id),
+            result.legs.filter { it.isRouted }.map { it.transportId })
+        assertEquals(1215L, result.durationSeconds)
+    }
+
+    @Test
     fun mapsTheCapturedStmExoRouteThroughTheSharedContract() = runTest {
         val demo = OtpTripDemo.StmExo
         val router: RoutingService = OtpRoutingService(demo, { mixedResponse }, { departure })

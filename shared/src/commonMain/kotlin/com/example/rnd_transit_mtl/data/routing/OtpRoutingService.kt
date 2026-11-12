@@ -24,9 +24,9 @@ internal enum class OtpMode(val otp: String, id: String, label: String, val stre
     val snapshot = TripTransportSnapshot(this.id, label, !street)
 }
 
-/** Maps OTP's fixed transit demos and direct street alternatives to the shared routing contract. */
+/** Maps coordinate-based OTP itineraries and the retained debug journeys to shared route legs. */
 internal class OtpRoutingService(
-    private val demo: OtpTripDemo,
+    private val demo: OtpTripDemo? = null,
     private val post: suspend (String) -> String,
     private val departure: () -> String,
     private val reportFailure: (Exception) -> Unit = {}
@@ -37,7 +37,7 @@ internal class OtpRoutingService(
             OtpMode.entries.firstOrNull { it.id == id } ?: return RoutingResult.NoRouteFound
         }
         val direct = modes.singleOrNull()?.takeIf { it.street }
-        if (direct == null && (request.origin != demo.request.origin ||
+        if (demo != null && direct == null && (request.origin != demo.request.origin ||
                 destination != demo.request.destination || request.modes != demo.request.modes)
         ) return RoutingResult.NoRouteFound
 
@@ -60,14 +60,15 @@ internal class OtpRoutingService(
         modes: List<OtpMode>,
         direct: OtpMode?
     ) = buildJsonObject {
-        put("query", otpQuery(direct != null, demo == OtpTripDemo.StmExo))
+        put("query", otpQuery(direct != null, demo == OtpTripDemo.StmExo, demo == null))
         putJsonObject("variables") {
             put("excludeRealtime", direct != null)
-            if (direct != null) {
+            if (direct != null || demo == null) {
                 put("originLat", origin.latitude)
                 put("originLon", origin.longitude)
                 put("destinationLat", destination.latitude)
                 put("destinationLon", destination.longitude)
+                if (demo == null) put("departure", departure())
             } else {
                 put("origin", demo.originStop)
                 put("destination", demo.destinationStop)
@@ -78,8 +79,11 @@ internal class OtpRoutingService(
                     put("directOnly", true)
                     putJsonArray("direct") { add(direct.otp) }
                 } else {
-                    put("transitOnly", true)
+                    put("transitOnly", modes.none { it.street })
+                    putJsonArray("direct") { modes.filter { it.street }.forEach { add(it.otp) } }
                     putJsonObject("transit") {
+                        putJsonArray("access") { add("WALK") }
+                        putJsonArray("egress") { add("WALK") }
                         putJsonArray("transit") {
                             modes.filterNot { it.street }.forEach { mode ->
                                 add(buildJsonObject { put("mode", mode.otp) })
@@ -91,8 +95,18 @@ internal class OtpRoutingService(
             }
         }
         if (direct == null) {
-            putJsonObject("extensions") { putJsonArray("realtimeFeeds") { demo.feeds.forEach { add(it) } } }
+            putJsonObject("extensions") {
+                putJsonArray("realtimeFeeds") { (demo?.feeds ?: listOf("STM", "EXO_TRAINS")).forEach { add(it) } }
+            }
         }
+    }
+
+    /** Decodes an already accepted backend itinerary without making another routing request. */
+    fun decodeResponse(response: JsonObject, request: TripRequest): RoutingResult = try {
+        decodeRoute(response, request.origin.point, requireNotNull(request.destination).point,
+            request.modes.mapNotNull { id -> OtpMode.entries.firstOrNull { it.id == id } })
+    } catch (_: Exception) {
+        RoutingResult.Unavailable("The routing service returned an invalid itinerary.")
     }
 
     private fun decodeRoute(
@@ -117,13 +131,17 @@ internal class OtpRoutingService(
         val expected = modes.map { it.otp }
         check(plan["edges"] is JsonArray) { "OTP omitted the itinerary list." }
         val itinerary = plan.rows("edges").mapNotNull { it.obj("node") }
-            .firstOrNull { node -> node.rows("legs").map { it.text("mode") } == expected }
+            .firstOrNull { node ->
+                val actual = node.rows("legs").map { it.text("mode") }
+                actual.isNotEmpty() && if (demo != null) actual == expected else
+                    actual.all { it in expected || (it == "WALK" && modes.any { mode -> !mode.street }) }
+            }
             ?: return RoutingResult.NoRouteFound
         val duration = requireNotNull(itinerary.number("duration")?.longOrNull)
         val health = response.obj("extensions")
         val routes = mutableListOf<TripRouteSnapshot>()
-        val rawLegs = itinerary.rows("legs").mapIndexed { index, leg ->
-            val mode = modes[index]
+        val rawLegs = itinerary.rows("legs").map { leg ->
+            val mode = OtpMode.entries.first { it.otp == leg.text("mode") }
             val route = leg.obj("route")
             val routeId = route?.text("gtfsId")?.let(::RouteId)
             if (!mode.street) checkNotNull(routeId)
@@ -145,7 +163,7 @@ internal class OtpRoutingService(
             RouteLeg(
                 mode.id, routeId, geometry,
                 requireNotNull(leg.number("distance")?.doubleOrNull),
-                legDuration ?: duration.takeIf { modes.size == 1 }
+                legDuration ?: duration.takeIf { itinerary.rows("legs").size == 1 }
                     ?: error("OTP omitted leg duration."),
                 isRouted = true, transitTiming = timing
             )
@@ -249,15 +267,17 @@ private fun decodePolyline(encoded: String): List<GeoPoint> {
     }
 }
 
-private fun otpQuery(direct: Boolean, mixed: Boolean): String {
-    val parameters = if (direct) {
+private fun otpQuery(direct: Boolean, mixed: Boolean, coordinates: Boolean = false): String {
+    val parameters = if (direct || coordinates) {
         "${'$'}originLat: CoordinateValue!, ${'$'}originLon: CoordinateValue!, " +
-            "${'$'}destinationLat: CoordinateValue!, ${'$'}destinationLon: CoordinateValue!"
+            "${'$'}destinationLat: CoordinateValue!, ${'$'}destinationLon: CoordinateValue!" +
+            if (coordinates) ", ${'$'}departure: OffsetDateTime!" else ""
     } else "${'$'}origin: String!, ${'$'}destination: String!, ${'$'}departure: OffsetDateTime!"
-    val locations = if (direct) {
+    val locations = if (direct || coordinates) {
         """
         origin: {location: {coordinate: {latitude: ${'$'}originLat, longitude: ${'$'}originLon}}}
         destination: {location: {coordinate: {latitude: ${'$'}destinationLat, longitude: ${'$'}destinationLon}}}
+        ${if (coordinates) "dateTime: {earliestDeparture: ${'$'}departure}" else ""}
         """.trimIndent()
     } else {
         """
@@ -272,7 +292,7 @@ private fun otpQuery(direct: Boolean, mixed: Boolean): String {
             $locations
             modes: ${'$'}modes
             preferences: {transit: {timetable: {excludeRealTimeUpdates: ${'$'}excludeRealtime}}}
-            ${if (!direct && mixed) "searchWindow: \"PT18H\" first: 4" else "first: 1"}
+            ${if (!direct && mixed) "searchWindow: \"PT18H\" first: 4" else "first: 4"}
           ) {
             routingErrors { code inputField }
             edges { node {
