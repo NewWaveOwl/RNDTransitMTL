@@ -28,6 +28,7 @@ import com.example.rnd_transit_mtl.View.current_trip.ActiveMapContent
 import com.example.rnd_transit_mtl.ViewModels.main.MainPlannerState
 import com.example.rnd_transit_mtl.ViewModels.main.MainPlannerViewModel
 import com.example.rnd_transit_mtl.data.generation.MockTripGenerator
+import com.example.rnd_transit_mtl.data.generation.LocalBackendTripGenerator
 import com.example.rnd_transit_mtl.data.location.LocalPlannerLocation
 import com.example.rnd_transit_mtl.data.location.LocationUpdate
 import com.example.rnd_transit_mtl.data.fake.FakeRoutingService
@@ -84,6 +85,8 @@ internal fun TransitOpeningScreen(
     val tripsStore = LocalTripsStore.current
     val liveMap = LocalTransitMap.current != null
     val location = LocalPlannerLocation.current
+    val backendGenerator = LocalBackendTripGenerator.current
+    var previousDestinations by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     val generator = remember(location?.containsPoint) {
         MockTripGenerator(routingService = FakeRoutingService(containsPoint = location?.containsPoint))
     }
@@ -408,7 +411,7 @@ internal fun TransitOpeningScreen(
 
                 val input = TripGenerationInput(
                     title = "Trip ${tripsStore.completedTrips.size + 1}",
-                    description = "Random mock route with $boundedMinutes planned minutes.",
+                    description = "Random route with $boundedMinutes planned minutes.",
                     imageUrl = "",
                     plannedMinutes = boundedMinutes,
                     selectedTransportIds = planner.selectedTransportIds.toList(),
@@ -440,7 +443,12 @@ internal fun TransitOpeningScreen(
                 }
 
                 val generated = withContext(Dispatchers.Default) {
-                    generator.generate(
+                    if (liveMap || backendGenerator != null) {
+                        backendGenerator?.generate(
+                            input = input, transportTypes = transportTypes, existingTripIds = existingIds,
+                            excludedDestinations = previousDestinations.map { Json.decodeFromString<GeoPoint>(it) }
+                        ) ?: TripGenerationResult.RoutingUnavailable("The trip planner is not configured. Please try again later.")
+                    } else generator.generate(
                         input = input,
                         transportTypes = transportTypes,
                         transportRoutes = transportRoutes,
@@ -456,6 +464,7 @@ internal fun TransitOpeningScreen(
                         if (latestDestinationActive &&
                             proposalGuard.complete(token, generated.trip.id)
                         ) {
+                            previousDestinations = (previousDestinations + Json.encodeToString(generated.trip.destination.point)).takeLast(10)
                             proposalJson = encoded
                         }
                     }
@@ -485,11 +494,9 @@ internal fun TransitOpeningScreen(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                // An unexpected mock-generation exception is not evidence
-                // that a real routing provider is unavailable.
                 fail(
-                    Trip33Failure.InvalidInput,
-                    "The sample request could not finish. Please try again."
+                    Trip33Failure.ProviderUnavailable,
+                    "The trip request could not finish. Please try again."
                 )
             } finally {
                 if (proposalGuard.isCurrent(token)) {

@@ -93,9 +93,16 @@ data class Trip(
     /** Transit-zone constraints recorded when this trip was generated. */
     val selectedZoneIds: List<ZoneId> = emptyList(),
     /** Independent zone constraints recorded for each selected transit mode; empty on older trips. */
-    val selectedZonesByTransport: Map<TransportId, List<ZoneId>> = emptyMap()
+    val selectedZonesByTransport: Map<TransportId, List<ZoneId>> = emptyMap(),
+    /** Time from requested departure through arrival, including initial waiting. */
+    val routedDurationSeconds: Long? = null,
+    /** Provider transfer waiting time, separate from the fixed playback clock. */
+    val waitingTimeSeconds: Long? = null
 ) {
     init {
+        require(routedDurationSeconds == null || routedDurationSeconds > 0)
+        require(waitingTimeSeconds == null || waitingTimeSeconds >= 0)
+        require(routedDurationSeconds == null || waitingTimeSeconds == null || waitingTimeSeconds <= routedDurationSeconds)
         validatePlannerValues(
             title = title,
             description = description,

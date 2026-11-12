@@ -348,7 +348,7 @@ internal fun TripProposalContent(
                 }
                 val timedLegs = trip.legs.filter { it.transitTiming != null }
                 val estimates = timedLegs.mapNotNull { it.transitTiming }.filter { it.realtimeApplied }
-                val elapsedSeconds = if (timedLegs.size > 1) {
+                val elapsedSeconds = trip.routedDurationSeconds ?: if (timedLegs.size > 1) {
                     val first = requireNotNull(timedLegs.first().transitTiming)
                     val last = requireNotNull(timedLegs.last().transitTiming)
                     val departure = first.estimatedDeparture.takeIf { first.realtimeApplied } ?: first.scheduledDeparture

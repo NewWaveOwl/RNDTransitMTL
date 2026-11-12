@@ -8,6 +8,8 @@ import androidx.compose.ui.Modifier
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.LocalSharedTransitMapHost
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.example.rnd_transit_mtl.data.routing.DebugTripLoader
+import com.example.rnd_transit_mtl.data.generation.LocalBackendTripGenerator
+import com.example.rnd_transit_mtl.data.generation.rememberBackendTripGenerator
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -62,7 +64,8 @@ fun App(
     loadDebugStmTrip: DebugTripLoader? = null,
     openDebugStmPreview: Boolean = false,
     loadDebugExoTrip: DebugTripLoader? = null,
-    openDebugExoPreview: Boolean = false
+    openDebugExoPreview: Boolean = false,
+    generationEndpoint: String? = null
 ) {
     App(
         authRepository = remember { SupabaseAuthRepository() },
@@ -70,6 +73,7 @@ fun App(
         openDebugStmPreview = openDebugStmPreview,
         loadDebugExoTrip = loadDebugExoTrip,
         openDebugExoPreview = openDebugExoPreview,
+        generationEndpoint = generationEndpoint,
     )
 }
 
@@ -80,7 +84,9 @@ internal fun App(
     openDebugStmPreview: Boolean = false,
     loadDebugExoTrip: DebugTripLoader? = null,
     openDebugExoPreview: Boolean = false,
+    generationEndpoint: String? = null,
 ) {
+    val backendGenerator = rememberBackendTripGenerator(generationEndpoint)
     var pendingDebugPreview by rememberSaveable {
         mutableStateOf(when {
             openDebugExoPreview && loadDebugExoTrip != null -> DebugTripSource.Exo.name
@@ -146,6 +152,7 @@ internal fun App(
             }
         }
         CompositionLocalProvider(
+            LocalBackendTripGenerator provides backendGenerator,
             LocalDebugStmTripLoader provides loadDebugStmTrip,
             LocalDebugExoTripLoader provides loadDebugExoTrip,
             LocalDebugTripLaunch provides pendingDebugPreview?.let {

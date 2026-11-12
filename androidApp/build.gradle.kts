@@ -34,6 +34,7 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
         versionName = "1.0"
+        manifestPlaceholders["generationEndpoint"] = providers.gradleProperty("generationEndpoint").orElse("").get()
     }
     packaging {
         resources {
@@ -53,6 +54,8 @@ android {
                 .orElse(bridgePort.map { "http://10.0.2.2:$it/otp/gtfs/v1" })
                 .get()
             manifestPlaceholders["stmOtpEndpoint"] = endpoint
+            manifestPlaceholders["generationEndpoint"] = providers.gradleProperty("generationEndpoint")
+                .orElse("http://10.0.2.2:18088/v1/trips/generate").get()
         }
         release {
             isMinifyEnabled = false
