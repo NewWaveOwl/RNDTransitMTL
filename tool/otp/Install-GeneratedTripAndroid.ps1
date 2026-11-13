@@ -15,11 +15,16 @@ $device = if ($Phone) { '-d' } else { '-e' }
 & $adb $device reverse "tcp:$Port" "tcp:$Port"
 if ($LASTEXITCODE -ne 0) { throw 'Start one emulator or connect and authorize one USB phone.' }
 Push-Location -LiteralPath $repo
+$previousAndroidHome = $env:ANDROID_HOME
 try {
+    $env:ANDROID_HOME = $sdk
     & .\gradlew.bat :androidApp:assembleDebug "-PgenerationEndpoint=http://127.0.0.1:$Port/v1/trips/generate"
     if ($LASTEXITCODE -ne 0) { throw 'Android build failed.' }
     & $adb $device install -r (Join-Path $repo 'androidApp\build\outputs\apk\debug\androidApp-debug.apk')
     if ($LASTEXITCODE -ne 0) { throw 'APK installation failed.' }
     & $adb $device shell am start -n 'com.example.rnd_transit_mtl/.MainActivity'
     if ($LASTEXITCODE -ne 0) { throw 'Could not open the app.' }
-} finally { Pop-Location }
+} finally {
+    $env:ANDROID_HOME = $previousAndroidHome
+    Pop-Location
+}

@@ -111,6 +111,10 @@ Use `-Phone` for an authorized USB phone. Installation uses `adb reverse` and em
 reconnection. Android Studio's ordinary debug build defaults to the emulator host
 `http://10.0.2.2:18088/v1/trips/generate`.
 
+The installer uses `ANDROID_HOME`, or the default Windows SDK at
+`%LOCALAPPDATA%\Android\Sdk`, and passes that location to Gradle for the build.
+For a custom SDK installation, set `ANDROID_HOME` before running it.
+
 The smoke test accepts `-Mode bus`, `-Mode metro`, `-Mode train` or `-Mode bike`, and
 `-WalkingPreference Amble`, `Walk` or `Dash` (default `Amble`).
 Transit results depend on the current timetable and service hours; increasing
