@@ -287,14 +287,14 @@ internal fun TripProposalContent(
         ) {
             TripLabelValueField(
                 label = "Trip destination",
-                value = trip.title
+                value = if (trip.routedDurationSeconds != null) trip.destination.label else trip.title
             )
             Surface(
                 shape = RoundedCornerShape(16.dp),
                 color = TransitWhite
             ) {
                 Text(
-                    text = "Sample trip · #${trip.id.value.takeLast(3)}",
+                    text = "${if (trip.routedDurationSeconds != null) "Generated trip" else "Sample trip"} · #${trip.id.value.takeLast(3)}",
                     color = TransitMain,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,

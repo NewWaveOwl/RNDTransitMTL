@@ -24,6 +24,17 @@ export function validateRequest(input) {
     throw new InputError('Too many previous destinations.');
   }
   try { (input.excludedDestinations ?? []).forEach(geoPoint); } catch { throw new InputError('Invalid previous destination.'); }
+  const reference = input.origin.osmReference;
+  if (reference != null && (!['Node', 'Way', 'Relation'].includes(reference.type) ||
+      !Number.isSafeInteger(reference.id) || reference.id <= 0)) throw new InputError('Invalid origin reference.');
+  // Discard client-supplied filters, endpoints, attempt limits and derived policy fields.
+  return {
+    origin: { label: input.origin.label, point: geoPoint(input.origin.point),
+      ...(reference == null ? {} : { osmReference: { type: reference.type, id: reference.id } }) },
+    plannedMinutes: input.plannedMinutes, modes: [...input.modes],
+    zonesByTransport: input.zonesByTransport, selectedRouteIds: input.selectedRouteIds,
+    excludedDestinations: input.excludedDestinations ?? [],
+  };
 }
 
 /** Decode enough of the geometry to reject missing, malformed or disconnected provider legs. */
@@ -69,7 +80,7 @@ export class TripGenerationService {
   }
 
   async generate(input, clientSignal = new AbortController().signal) {
-    validateRequest(input);
+    input = validateRequest(input);
     const startedAt = this.now();
     const departure = new Date(startedAt).toISOString();
     const deadline = AbortSignal.timeout(this.timeoutMillis);

@@ -154,3 +154,17 @@ See the [decision log](ML3-AI-Decision-Log.md) for full prompts and source cover
 | Time | [Not documented]. |
 | Outcome | Branch merged with main; #29 and #27 gaps identified; PNG map calibrated from three student-supplied landmarks; `GeoPoint`, `GeoBounds`, `MapProjection` and sample-map calibration implemented; trip models (`Place`, `RouteLeg` â€” first named `RouteSegment`, `TripStatus`, `TripRequest`) and backend DTOs added; 22 new JVM tests passing; `Trip` migrated to places, legs, status and owner with 134 JVM tests passing; `TripDto` added (137 tests) and the trip flow verified in the running desktop app. |
 | Productivity / learning reflection | [Student reflection needed]. |
+
+### M3-A8 — Iterative backend integration and verification
+
+**Challenge:** Replace fixed OTP demonstrations with request-driven generation while preserving confirmed origins, routed geometry, failure distinctions and the existing trip lifecycle.
+
+**Approach:** Inspected the branch and official STM/exo/OTP documentation; split work into the six user-approved stages with separate commits. Used seeded candidates, controlled provider responses, HTTP request streams, captured bridge regression fixtures and headless Compose interactions.
+
+**Iteration:** Found that agency GTFS zone IDs do not directly represent ARTM A/B/C/D. Added official polygon loading and checked intermediate transit geometry. Retained the bridge's `excludeRealtime` contract and scoped alerts. Corrected an incorrectly encoded test polyline and restored input validation before backend availability checks.
+
+**Environment:** Standard Gradle execution could not write its cache or connect to daemon/test-worker loopback sockets. Used a writable copied dependency cache and an in-process Gradle launch for compilation/lint, then ran compiled JUnit tests directly. Set a writable Skiko data directory for headless UI tests. These are verification-environment adjustments, not app features.
+
+**Use of output:** Implementation accepted for validation under the user's selected architecture. The final test results and remaining live-device checks are recorded in `docs/BackendTripGeneration.md`.
+
+**Actual interaction time / AI percentage:** Not measured; no estimate claimed. Conversation reference: this issue #67 integration conversation.

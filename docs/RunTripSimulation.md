@@ -1,6 +1,6 @@
 # Run the Montréal routing simulation
 
-The Android debug samples fetch real route geometry and timetable data from a local OpenTripPlanner (OTP) stack. After the route loads, the app simulates progress along it in about 10 seconds. The regular **GO** flow uses the app's built-in sample routing and can run without the server.
+The Android debug samples fetch real route geometry and timetable data from a local OpenTripPlanner (OTP) stack. After the route loads, the app simulates progress along it in about 10 seconds. Regular Android **GO** now uses backend destination generation and OTP routing: follow [BackendTripGeneration.md](BackendTripGeneration.md). The fixed sample buttons below remain available for provider diagnostics.
 
 ## Quick start for the STM bus sample
 

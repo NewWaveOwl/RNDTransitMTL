@@ -32,6 +32,13 @@ import java.io.File
 import kotlin.test.*
 import com.example.rnd_transit_mtl.data.assets.toSampleMapPlace
 import com.example.rnd_transit_mtl.data.generation.TripGenerationResult
+import com.example.rnd_transit_mtl.data.generation.BackendTripGenerator
+import com.example.rnd_transit_mtl.data.generation.BackendGenerationRequest
+import com.example.rnd_transit_mtl.data.generation.BackendGenerationResponse
+import com.example.rnd_transit_mtl.data.generation.LocalBackendTripGenerator
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import com.example.rnd_transit_mtl.data.location.LocalPlannerLocation
 import com.example.rnd_transit_mtl.data.location.LocationUpdate
 import com.example.rnd_transit_mtl.data.location.PlannerLocation
@@ -51,6 +58,7 @@ class Trip33FlowTest {
     private class Host(
         initialOutcome: Trip33Sample,
         liveMap: Boolean = false,
+        backend: BackendTripGenerator? = null,
         debugLoader: DebugTripLoader? = null
     ) : AutoCloseable {
         var outcome by mutableStateOf(initialOutcome)
@@ -87,6 +95,7 @@ class Trip33FlowTest {
                 LocalNavigator provides navigator,
                 LocalTripNavigation provides navigation,
                 LocalDebugStmTripLoader provides debugLoader,
+                LocalBackendTripGenerator provides backend,
                 LocalPlannerLocation provides location.takeIf { liveMap },
                 LocalTransitMap provides if (liveMap) ({ data, _ -> SideEffect { mapData = data } }) else null
             ) {
@@ -138,6 +147,49 @@ class Trip33FlowTest {
         override fun close() {
             scene.close()
             models.viewModelStore.clear()
+        }
+    }
+
+    @Test
+    fun goGeneratesTwoBackendProposalsFromTheSamePinAndStartsTheAcceptedRoute() = runBlocking(Dispatchers.Main) {
+        val origin = Place("Confirmed origin", GeoPoint(45.5, -73.6))
+        val requests = mutableListOf<BackendGenerationRequest>()
+        val backend = BackendTripGenerator(post = { body ->
+            val request = Json.decodeFromString<BackendGenerationRequest>(body)
+            requests.add(request)
+            val destination = Place("Destination ${requests.size}", GeoPoint(45.5 + requests.size * .005, -73.6))
+            val delta = if (requests.size == 1) "g^" else "o}@"
+            val otp = Json.parseToJsonElement("""
+                {"data":{"planConnection":{"routingErrors":[],"edges":[{"node":{
+                  "duration":600,"waitingTime":0,"legs":[{"mode":"WALK","distance":1000,"duration":600,
+                    "legGeometry":{"length":2,"points":"_vutG~~e`M$delta?"}}]
+                }}]}}}
+            """.trimIndent()).jsonObject
+            Json.encodeToString(BackendGenerationResponse("success", origin = request.origin,
+                destination = destination, elapsedSeconds = 600, otp = otp))
+        })
+        Host(Trip33Sample.Normal, liveMap = true, backend = backend).use { host ->
+            host.render()
+            host.planner.setOrigin(origin)
+            host.render()
+            host.click("GO")
+            host.await("Start Trip")
+            val first = assertNotNull(host.mapData.trip)
+            assertEquals(origin, first.origin)
+            assertTrue(first.legs.any { it.isRouted })
+            assertNull(host.store.activeTrip)
+            host.snapshot("Backend-first-proposal.png")
+            host.click("Generate another")
+            host.await("Destination 2")
+            val second = assertNotNull(host.mapData.trip)
+            assertEquals(origin, second.origin)
+            assertNotEquals(first.destination, second.destination)
+            assertEquals(listOf(first.destination.point), requests.last().excludedDestinations)
+            host.snapshot("Backend-second-proposal.png")
+            host.click("Start Trip")
+            host.render(20)
+            assertEquals(second.copy(status = com.example.rnd_transit_mtl.model.trip.TripStatus.Active), host.store.activeTrip)
+            assertEquals(2, requests.size)
         }
     }
 

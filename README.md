@@ -14,7 +14,7 @@ The current prototype includes a nickname introduction, a map-based trip planner
 4. At completion, tap the 100% progress bar to open the review. Give an overall rating, optionally answer the other questions, add a comment or an HTTPS image link, then save or skip.
 5. Open History to filter completed trips, expand saved feedback, view details, edit a review, or remove a trip. Review photos load when saved feedback is displayed, with retry and browser fallback controls.
 
-The regular GO flow simulates trips using built-in sample routes and runs without a routing backend. Trips and review drafts support saved-state restoration, but there is no permanent database. A fresh session without restored state starts with empty History. The nickname stays only in process memory.
+Android GO generates real routes through a Node backend and the local or hosted OTP stack. Start it using the [backend generation guide](docs/BackendTripGeneration.md), then choose an origin and press GO. The returned route is reused for Preview and simulated Active Trip playback. Desktop/Web previews retain their built-in samples unless configured with a generation endpoint. Trips and review drafts support saved-state restoration; this change does not add permanent trip storage.
 
 This flow is imported from [Artiom's Assignment 3 repository](https://github.com/NewWaveOwl/As3_APPDEV2_RND_Tranzit_Sova/tree/8b1b538), including its shared state, navigation, resources, previews, and regression tests. The destination's design documents and earlier screenshots remain historical planning material.
 

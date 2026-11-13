@@ -602,3 +602,19 @@ as a lats feature lets make the trip card in the history only show 1 or 2 lines 
 **Implemented result:** `TripHistoryCard` now shows, collapsed, the title and status badge plus two lines: "<origin> to <destination>" and a summary ("30 min · 0.77 km · 2026-11-02", with " · ★ 4/5" when reviewed), and a small "More ▾ / Less ▴" button using the existing `ic_arrow_drop_down` / `ic_arrow_drop_up` icons. Expanded (animated) it shows coordinates, transport, routes, the completion or cancellation time, and the full review (or the not-reviewed / cancelled message). The existing per-trip `expanded` state was reused, so the separate "Read full review" toggle was removed; the Details/Actions row is unchanged. A duplicated "planned minutes · demo distance" line was dropped from the expanded part. Card sizes moved into a `// Layout settings` block as the coding guide requires. `firstReviewSentence` is no longer used by the app (still covered by its existing test). New helper `historyCardSummaryLine` with a unit test; `CancelAndSaveFlowTest` now checks the collapsed card and expands it with "More".
 **Debugging:** A bash heredoc failed on quote characters in the inline script; the script was written to a scratchpad file instead. First headless screenshots were taken mid-animation; the test now renders extra frames before the expanded screenshot.
 **Verification:** `:shared:jvmTest` 156 tests, 0 failures; `:shared:compileAndroidMain` succeeded; headless screenshots `shared/build/planner-previews/Cancel-flow-history.png` and `Cancel-flow-history-expanded.png`. Not checked on a real window. Changes uncommitted.
+
+### M3-A8 — Backend destination generation and OTP integration (#67)
+
+**Decision:** Run random destination selection and bounded itinerary search in a small backend; use OTP for street/transit routing, the existing bridge for realtime freshness, and shared Kotlin decoding for accepted trip geometry.
+
+**Context:** The regular Android GO flow still used sample routing. The STM/exo demonstrations used fixed stops and an exact sequence of transport legs.
+
+**Options considered:** Generate on the phone and call hosted OTP; generate in a backend beside OTP; keep the existing PC-only demonstration stack.
+
+**User decision:** The user selected option 2, “Generate in a backend; backend calls OTP,” and requested a commit after each of the six proposed steps.
+
+**AI contribution:** Implemented coordinate-based queries and variable legs, backend candidate selection/search, line and ARTM zone checks, Android GO wiring, timing persistence, tests, scripts and documentation.
+
+**Consequences:** OTP remains a long-running service. Generation runs only on demand. Public-stop candidates are a practical first destination pool, not a POI-ranking system. Guest access works locally; hosted mode requires an existing Supabase session. REM, exo bus feeds, live GPS trip tracking and permanent trip storage remain outside this implementation.
+
+**Related files:** `backend/`, `docs/BackendTripGeneration.md`, `BackendTripGenerator.kt`, `TransitOpeningScreen.kt`, `tool/otp/*Trip*.ps1`. Conversation reference: this issue #67 integration conversation.

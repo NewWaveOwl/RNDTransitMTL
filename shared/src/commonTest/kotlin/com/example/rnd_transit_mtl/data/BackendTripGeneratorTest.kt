@@ -30,7 +30,7 @@ class BackendTripGeneratorTest {
             {"data":{"planConnection":{"routingErrors":[],"edges":[{"node":{
               "duration":600,"waitingTime":0,"legs":[{
                 "mode":"WALK","distance":560,"duration":600,
-                "legGeometry":{"length":2,"points":"_atqG~~e`Mg^?"}
+                "legGeometry":{"length":2,"points":"_vutG~~e`Mg^?"}
               }]
             }}]}}}
         """.trimIndent()))
@@ -45,13 +45,13 @@ class BackendTripGeneratorTest {
             assertEquals(origin, request.origin)
             assertEquals(listOf(destination.point), request.excludedDestinations)
             response()
-        })
+        }, reportFailure = { throw AssertionError(it) })
         val trip = assertIs<TripGenerationResult.Success>(generator.generate(input, modes, emptySet(), listOf(destination.point))).trip
         assertEquals(1, calls)
         assertEquals(origin, trip.origin)
         assertEquals(destination, trip.destination)
         assertEquals(30, trip.plannedMinutes)
-        assertEquals(600, trip.routedDurationSeconds)
+        assertEquals(600L, trip.routedDurationSeconds)
         assertTrue(trip.legs.any { it.isRouted })
         assertEquals(origin.point, trip.legs.first().start)
         assertEquals(destination.point, trip.legs.last().end)

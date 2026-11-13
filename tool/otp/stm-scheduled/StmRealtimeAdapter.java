@@ -348,7 +348,15 @@ public class StmRealtimeAdapter {
         byte[] input = exchange.getRequestBody().readNBytes(262145);
         if (input.length > 262144) throw new IOException("Request too large");
         ObjectNode body = (ObjectNode) JSON.readTree(input);
-        // This endpoint serves the Android debug query, which declares this variable explicitly.
+        // Catalogue queries have no journey estimates or alerts to filter for freshness.
+        if (!body.path("query").asText().contains("planConnection")) {
+            body.remove("extensions");
+            var metadata = http.send(otpRequest(body), HttpResponse.BodyHandlers.ofByteArray());
+            var result = otpResponse(metadata.statusCode(), metadata.body());
+            send(exchange, metadata.statusCode(), "application/json", JSON.writeValueAsBytes(result));
+            return;
+        }
+        // Planning queries declare this variable so a stale feed can force scheduled routing.
         Set<String> feeds = new HashSet<>();
         for (JsonNode feed : body.path("extensions").path("realtimeFeeds")) feeds.add(feed.asText());
         if (feeds.isEmpty()) feeds.add("STM"); // Legacy STM debug requests.

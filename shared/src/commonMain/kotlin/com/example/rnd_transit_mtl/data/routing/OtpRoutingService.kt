@@ -105,7 +105,8 @@ internal class OtpRoutingService(
     fun decodeResponse(response: JsonObject, request: TripRequest): RoutingResult = try {
         decodeRoute(response, request.origin.point, requireNotNull(request.destination).point,
             request.modes.mapNotNull { id -> OtpMode.entries.firstOrNull { it.id == id } })
-    } catch (_: Exception) {
+    } catch (error: Exception) {
+        reportFailure(error)
         RoutingResult.Unavailable("The routing service returned an invalid itinerary.")
     }
 

@@ -30,3 +30,6 @@
 2026-11-12 18:21 -05:00 (America/Toronto)
 Start -> work on the OTP/STM/EXO full integration
 Issue #67 | branch: feature/67-otp-stm-exo-integration
+
+2026-11-12 19:25 -05:00 (America/Toronto)
+Checkpoint -> OTP/STM/EXO backend integration: six implementation stages; 20 backend tests, 180 shared JVM tests, Android build/lint and bridge fixtures passed. Live device/provider checks pending.

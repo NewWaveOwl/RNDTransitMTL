@@ -4,13 +4,15 @@ export const modeNames = Object.freeze({ walk: 'WALK', bike: 'BICYCLE', bus: 'BU
 export const query = `query GenerateTrip(
   $originLat: CoordinateValue!, $originLon: CoordinateValue!,
   $destinationLat: CoordinateValue!, $destinationLon: CoordinateValue!,
-  $departure: OffsetDateTime!, $modes: PlanModesInput!, $preferences: PlanPreferencesInput!
+  $departure: OffsetDateTime!, $modes: PlanModesInput!, $filters: [TransitFilterInput!], $excludeRealtime: Boolean!
 ) {
   planConnection(
     origin: {location: {coordinate: {latitude: $originLat, longitude: $originLon}}}
     destination: {location: {coordinate: {latitude: $destinationLat, longitude: $destinationLon}}}
     dateTime: {earliestDeparture: $departure}
-    modes: $modes preferences: $preferences first: 4
+    modes: $modes
+    preferences: {transit: {filters: $filters, timetable: {excludeRealTimeUpdates: $excludeRealtime}}}
+    first: 4
   ) {
     routingErrors { code inputField }
     edges { node {
@@ -21,6 +23,7 @@ export const query = `query GenerateTrip(
         start { scheduledTime estimated { time delay } }
         end { scheduledTime estimated { time delay } }
         alerts { alertHash alertHeaderText alertDescriptionText activityPeriods { start end } }
+        trip { pattern { code alerts { alertHash alertHeaderText alertDescriptionText activityPeriods { start end } } } }
         legGeometry { length points }
       }
     } }
@@ -39,14 +42,17 @@ export function otpRequest({ origin, destination, modes, departure, filters }) {
       departure,
       modes: {
         direct, directOnly: transit.length === 0, transitOnly: direct.length === 0,
-        transit: {
+        ...(transit.length ? { transit: {
           access: ['WALK'], egress: ['WALK'], transfer: ['WALK'],
           transit: transit.map(mode => ({ mode: modeNames[mode] })),
-        },
+        } } : {}),
       },
-      preferences: { transit: { ...(filters ? { filters } : {}) } },
+      filters: filters ?? null, excludeRealtime: transit.length === 0,
     },
-    extensions: { realtimeFeeds: ['STM', 'EXO_TRAINS'] },
+    extensions: { realtimeFeeds: [
+      ...(transit.some(mode => mode === 'bus' || mode === 'metro') ? ['STM'] : []),
+      ...(transit.includes('train') ? ['EXO_TRAINS'] : []),
+    ] },
   };
 }
 

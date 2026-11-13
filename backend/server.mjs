@@ -58,6 +58,7 @@ export function supabaseAuthorizer(url, publishableKey, fetchImpl = fetch) {
 
 async function main() {
   const endpoint = process.env.OTP_URL ?? 'http://127.0.0.1:18086/otp/gtfs/v1';
+  const catalogueEndpoint = process.env.OTP_CATALOGUE_URL ?? endpoint;
   const host = process.env.HOST ?? '127.0.0.1';
   const port = Number(process.env.PORT ?? 18088);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Invalid PORT.');
@@ -66,9 +67,9 @@ async function main() {
     throw new Error('Public binding requires SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY.');
   }
   const [pool, fareZones, routes] = await Promise.all([
-    loadDestinations(endpoint, { signal: AbortSignal.timeout(30_000) }),
+    loadDestinations(catalogueEndpoint, { signal: AbortSignal.timeout(30_000) }),
     loadFareZones(process.env.FARE_ZONES_FILE ?? fileURLToPath(new URL('./data/fare-zones-2026.geojson', import.meta.url))),
-    loadRouteCatalogue(endpoint),
+    loadRouteCatalogue(catalogueEndpoint),
   ]);
   const resolveLines = lineResolver(routes);
   const generation = new TripGenerationService({

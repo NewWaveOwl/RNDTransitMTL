@@ -393,6 +393,11 @@ internal fun TransitOpeningScreen(
                     it.usesRoutes && it.id in planner.selectedTransportIds
                 }
 
+                if (planner.selectedTransportIds.isEmpty()) {
+                    fail(Trip33Failure.InvalidInput, "Choose at least one transport type.")
+                    return@launch
+                }
+
                 val zones = transitModes.associate {
                     it.id to planner.zonesForTransport(it.id).toList()
                 }
@@ -701,7 +706,7 @@ internal fun TransitOpeningScreen(
     if (proposal != null) {
         TripProposalContent(
             trip = proposal,
-            scheduled = debugProposalSource != null,
+            scheduled = debugProposalSource != null || proposal.routedDurationSeconds != null,
             onStart = {
                 if (latestDestinationActive &&
                     !processingAction &&

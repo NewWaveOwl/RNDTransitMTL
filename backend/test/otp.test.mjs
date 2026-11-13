@@ -16,6 +16,8 @@ test('arbitrary coordinates, departure and allowed modes reach OTP', () => {
   assert.deepEqual(variables.modes.transit.access, ['WALK']);
   assert.equal(variables.modes.transitOnly, false);
   assert.ok(!query.includes('stopLocationId'));
+  assert.ok(query.replaceAll(/\s/g, '').includes('excludeRealTimeUpdates:$excludeRealtime'));
+  assert.equal(variables.excludeRealtime, false);
 });
 
 test('street-only search does not force transit', () => {

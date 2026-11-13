@@ -28,6 +28,16 @@ test('initial waiting counts even when OTP itinerary duration is short', async (
   assert.equal((await service({ route: async () => response(40, 300) }).generate(input)).status, 'no_trip');
 });
 
+test('preserves an OSM origin reference and discards client-injected routing controls', async () => {
+  const origin = { ...input.origin, osmReference: { type: 'Node', id: 12345 } };
+  const result = await service({ route: async request => {
+    assert.equal(request.filters, undefined);
+    assert.equal(request.allowedRouteIds, undefined);
+    return response(20);
+  } }).generate({ ...input, origin, filters: ['injected'], allowedRouteIds: ['injected'], maxAttempts: 100000 });
+  assert.deepEqual(result.origin, origin);
+});
+
 test('caps candidate attempts and distinguishes provider failure', async () => {
   const result = await service({ maxAttempts: 2, candidates: { generate: (_, options) => candidates.generate().slice(0, options.limit) },
     route: async () => response(40) }).generate(input);

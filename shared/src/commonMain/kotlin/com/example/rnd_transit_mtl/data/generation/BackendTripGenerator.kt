@@ -37,15 +37,26 @@ internal data class BackendGenerationResponse(
     val otp: JsonObject? = null
 )
 
-/** One GO request. Destination search and OTP calls execute exclusively on the backend. */
+/** One GO request. Destination search and OTP calls execute exclusively on the backend.
+ * @param post Cancellable JSON transport to the generation endpoint.
+ * @param idFactory Creates IDs for the local trip store.
+ * @param now Current epoch milliseconds for the saved trip record.
+ * @param reportFailure Optional diagnostics; never handles cancellation.
+ */
 internal class BackendTripGenerator(
     private val post: suspend (String) -> String,
     private val idFactory: () -> String = { Uuid.random().toString() },
-    private val now: () -> Long = { Clock.System.now().toEpochMilliseconds() }
+    private val now: () -> Long = { Clock.System.now().toEpochMilliseconds() },
+    private val reportFailure: (Exception) -> Unit = {}
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
-    /** Preserve exact origin and accepted provider geometry; never regenerate when opening a trip. */
+    /** Preserve exact origin and accepted provider geometry; never regenerate when opening a trip.
+     * @param input Confirmed origin and planner choices.
+     * @param transportTypes Supported app catalogue used for request validation.
+     * @param existingTripIds IDs already reserved in the current store.
+     * @param excludedDestinations Previous proposals to avoid repeating.
+     */
     suspend fun generate(
         input: TripGenerationInput,
         transportTypes: List<TransportType>,
@@ -85,7 +96,8 @@ internal class BackendTripGenerator(
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            reportFailure(error)
             TripGenerationResult.RoutingUnavailable("Could not reach the trip planner. Try again.")
         }
     }
@@ -99,7 +111,8 @@ internal class BackendTripGenerator(
         require(elapsed in 1..input.plannedMinutes * 60L)
         val request = TripRequest(input.ownerId, origin, destination, input.plannedMinutes, input.selectedTransportIds,
             input.selectedZonesByTransport)
-        val decoder = OtpRoutingService(post = { error("An accepted trip must never be routed again.") }, departure = { "" })
+        val decoder = OtpRoutingService(post = { error("An accepted trip must never be routed again.") },
+            departure = { "" }, reportFailure = reportFailure)
         val route = decoder.decodeResponse(requireNotNull(response.otp), request)
         if (route !is RoutingResult.Success) return TripGenerationResult.RoutingUnavailable("The trip planner returned an invalid route.")
         require(route.durationSeconds <= elapsed)
