@@ -7,11 +7,6 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
-$node = (Get-Command node.exe -ErrorAction Stop).Source
-$nodeVersion = & $node --version
-$nodeVersionMatch = [regex]::Match([string]$nodeVersion, '^v(\d+)\.')
-if ($LASTEXITCODE -ne 0 -or !$nodeVersionMatch.Success) { throw 'Could not read the Node.js version.' }
-if ([int]$nodeVersionMatch.Groups[1].Value -lt 22) { throw 'Install Node.js 22 or later.' }
 if (!$OtpEndpoint) {
     $stateFile = Join-Path $StackDirectory 'stm-stack-processes.json'
     if (!(Test-Path -LiteralPath $stateFile)) {
@@ -30,7 +25,8 @@ try {
     $env:OTP_CATALOGUE_URL = $CatalogueEndpoint
     $env:PORT = "$Port"
     Write-Host "Planning via $OtpEndpoint; catalogue via $CatalogueEndpoint"
-    & $node (Join-Path $repo 'backend\server.mjs')
+    Push-Location -LiteralPath $repo
+    try { & .\gradlew.bat :backend:run --console=plain } finally { Pop-Location }
     if ($LASTEXITCODE -ne 0) { throw 'Trip backend stopped. Read the startup error above.' }
 } finally {
     $env:OTP_URL = $previousOtp

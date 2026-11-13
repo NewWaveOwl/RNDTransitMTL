@@ -1,0 +1,12 @@
+.git
+**/.gradle
+**/.kotlin
+**/build
+**/local.properties
+**/.idea
+**/node_modules
+**/*.log
+**/*.local.json
+**/*.geojson
+tool/otp
+backend/otp

@@ -1,7 +1,7 @@
 # Backend trip generation (#67)
 
 Android **GO** sends the confirmed WGS84 origin, time budget, allowed modes and
-per-mode transit zones and walking pace to a Node.js service. The backend samples
+per-mode transit zones and walking pace to a Kotlin/Ktor service. The backend samples
 arbitrary geographic destinations, including park interiors, validates routes through OTP, and returns
 one accepted itinerary. The app decodes that itinerary once and reuses its geometry
 in Preview, Active Trip and saved state. Android does not fall back to invented routes
@@ -12,7 +12,7 @@ flow unless supplied a generation endpoint.
 
 | Component | Responsibility |
 | --- | --- |
-| Generation backend (Node.js 22+) | Candidate selection, request validation, OTP calls, time/line/zone checks, cancellation and concurrency cap |
+| Generation backend (Kotlin/JVM 21, Ktor 3.4.3) | Candidate selection, request validation, OTP calls, time/line/zone checks, cancellation and concurrency cap |
 | OTP 2.10 / Java 25 | Streets from OSM, scheduled STM/exo trains, routing and realtime updates |
 | Existing realtime bridge | Credentials, source freshness, scoped alerts and scheduled fallback |
 | Supabase | Account authentication; local prototype trips continue using the existing saved-state store |
@@ -161,7 +161,7 @@ indicates the server loaded its catalogues; it is not a live upstream-health gua
 ## Hosting
 
 One VM can initially run OTP, the bridge and the backend as separate processes or
-containers. Build the backend container with `docker build -t rnd-generation backend`.
+containers. Build the backend container with `docker build -f backend/Dockerfile -t rnd-generation .`.
 Keep OTP and the credential-bearing bridge private. Terminate HTTPS at a reverse
 proxy in front of the generation API. Measure the graph's memory and concurrent
 search load before choosing production machine capacity.
@@ -186,7 +186,7 @@ hostname is created by this change.
 ## Automated checks
 
 ```powershell
-node --test backend/test/*.test.mjs
+.\gradlew.bat :backend:test
 .\gradlew.bat :shared:jvmTest :androidApp:assembleDebug :androidApp:lintDebug
 ```
 
@@ -236,3 +236,13 @@ and `git diff --check` passed. Coverage includes park-interior sampling without 
 stop catalogue, named pace conversion, short-budget search bounds, the exact budget
 boundary, mixed-leg distance reserves and pace/reserve DTO restoration. Live-provider,
 physical-device and deployment checks remain pending as described above.
+
+## Kotlin/Ktor migration
+
+The generation service now runs as the Gradle `:backend` JVM application. It keeps
+the existing HTTP contract, bounded searches, walking paces, orientation allowance,
+ARTM zone/line checks and realtime-bridge requests. Node.js sources and their tests
+are removed; regression coverage lives in `backend/src/test/kotlin`. The Node counts
+above record historical verification, not the current suite. Use JDK 21 for Ktor;
+OTP retains its own Java runtime. Configure `PUBLIC_API=true` and Supabase credentials
+when publishing a loopback backend through a tunnel.
