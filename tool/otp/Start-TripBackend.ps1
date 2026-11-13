@@ -8,7 +8,10 @@ param(
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $node = (Get-Command node.exe -ErrorAction Stop).Source
-if ([int](& $node -p 'process.versions.node.split(".")[0]') -lt 22) { throw 'Install Node.js 22 or later.' }
+$nodeVersion = & $node --version
+$nodeVersionMatch = [regex]::Match([string]$nodeVersion, '^v(\d+)\.')
+if ($LASTEXITCODE -ne 0 -or !$nodeVersionMatch.Success) { throw 'Could not read the Node.js version.' }
+if ([int]$nodeVersionMatch.Groups[1].Value -lt 22) { throw 'Install Node.js 22 or later.' }
 if (!$OtpEndpoint) {
     $stateFile = Join-Path $StackDirectory 'stm-stack-processes.json'
     if (!(Test-Path -LiteralPath $stateFile)) {
