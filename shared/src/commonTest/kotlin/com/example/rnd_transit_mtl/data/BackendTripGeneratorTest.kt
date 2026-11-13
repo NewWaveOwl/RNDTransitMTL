@@ -31,6 +31,9 @@ class BackendTripGeneratorTest {
             {"data":{"planConnection":{"routingErrors":[],"edges":[{"node":{
               "duration":600,"waitingTime":0,"legs":[{
                 "mode":"WALK","distance":560,"duration":600,
+                "from":{"name":"Start"},"to":{"name":"Public stop"},
+                "steps":[{"relativeDirection":"DEPART","streetName":"Rue Sherbrooke","distance":280},
+                  {"relativeDirection":"LEFT","streetName":"Rue Saint-Denis","distance":280}],
                 "legGeometry":{"length":2,"points":"_vutG~~e`Mg^?"}
               }]
             }}]}}}
@@ -54,10 +57,41 @@ class BackendTripGeneratorTest {
         assertEquals(30, trip.plannedMinutes)
         assertEquals(600L, trip.routedDurationSeconds)
         assertTrue(trip.legs.any { it.isRouted })
+        val navigation = assertNotNull(trip.legs.first { it.isRouted }.navigation)
+        assertEquals("Public stop", navigation.toName)
+        assertEquals("Rue Saint-Denis", navigation.steps.last().streetName)
+        assertEquals("LEFT", navigation.steps.last().relativeDirection)
         assertEquals(origin.point, trip.legs.first().start)
         assertEquals(destination.point, trip.legs.last().end)
         assertEquals(trip, Json.decodeFromString<Trip>(Json.encodeToString(trip)))
         assertEquals(trip, trip.toDto().toDomainOrNull())
+    }
+
+    @Test
+    fun transitInstructionsKeepTheRouteNumberWhenTheCatalogueLabelIsAStreetName() = runTest {
+        val numberedResponse = Json.parseToJsonElement(response()).jsonObject
+        val otp = numberedResponse.getValue("otp").jsonObject
+        val plan = otp.getValue("data").jsonObject.getValue("planConnection").jsonObject
+        val node = plan.getValue("edges").jsonArray.single().jsonObject.getValue("node").jsonObject
+        val leg = node.getValue("legs").jsonArray.single().jsonObject
+        val transit = JsonObject(leg + mapOf(
+            "mode" to JsonPrimitive("BUS"),
+            "route" to buildJsonObject { put("gtfsId", "STM:24"); put("shortName", "24"); put("longName", "Sherbrooke") },
+            "headsign" to JsonPrimitive("East"),
+            "start" to buildJsonObject { put("scheduledTime", "2026-11-13T10:00:00-05:00") },
+            "end" to buildJsonObject { put("scheduledTime", "2026-11-13T10:10:00-05:00") },
+            "steps" to JsonArray(emptyList())
+        ))
+        val updatedNode = JsonObject(node + ("legs" to JsonArray(listOf(transit))))
+        val updatedPlan = JsonObject(plan + ("edges" to JsonArray(listOf(buildJsonObject { put("node", updatedNode) }))))
+        val body = JsonObject(numberedResponse + ("otp" to buildJsonObject { put("data", buildJsonObject { put("planConnection", updatedPlan) }) }))
+        val bus = TransportId("bus")
+        val trip = assertIs<TripGenerationResult.Success>(BackendTripGenerator(post = { body.toString() })
+            .generate(input.copy(selectedTransportIds = listOf(bus)), listOf(TransportType(bus, "Bus", true)), emptySet())).trip
+        val navigation = assertNotNull(trip.legs.first { it.isRouted }.navigation)
+        assertEquals("24", navigation.routeShortName)
+        assertEquals("East", navigation.headsign)
+        assertEquals("Sherbrooke", trip.selectedRoutes.single().label)
     }
 
     @Test

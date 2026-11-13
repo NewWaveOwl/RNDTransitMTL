@@ -5,6 +5,7 @@ import com.example.rnd_transit_mtl.model.ids.RouteId
 import com.example.rnd_transit_mtl.model.ids.TransportId
 import com.example.rnd_transit_mtl.model.trip.RouteLeg
 import com.example.rnd_transit_mtl.model.trip.TransitTiming
+import com.example.rnd_transit_mtl.model.trip.LegNavigation
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -35,7 +36,8 @@ data class RouteLegDto(
     @SerialName("distance_meters") val distanceMeters: Double,
     @SerialName("duration_seconds") val durationSeconds: Long,
     @SerialName("is_routed") val isRouted: Boolean,
-    @SerialName("transit_timing") val transitTiming: TransitTiming? = null
+    @SerialName("transit_timing") val transitTiming: TransitTiming? = null,
+    val navigation: LegNavigation? = null
 )
 
 /** Converts a leg into its backend form. */
@@ -49,7 +51,8 @@ fun RouteLeg.toDto(): RouteLegDto = RouteLegDto(
     distanceMeters = distanceMeters,
     durationSeconds = durationSeconds,
     isRouted = isRouted,
-    transitTiming = transitTiming
+    transitTiming = transitTiming,
+    navigation = navigation
 )
 
 /**
@@ -70,6 +73,7 @@ fun RouteLegDto.toDomainOrNull(): RouteLeg? = runCatchingInvalid {
         distanceMeters = distanceMeters,
         durationSeconds = durationSeconds,
         isRouted = isRouted,
-        transitTiming = transitTiming
+        transitTiming = transitTiming,
+        navigation = navigation
     )
 }

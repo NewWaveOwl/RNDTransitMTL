@@ -17,6 +17,10 @@ query GenerateTrip(
       legs {
         mode distance duration realTime
         route { gtfsId shortName longName }
+        headsign
+        from { name }
+        to { name }
+        steps { relativeDirection streetName distance bogusName exit }
         start { scheduledTime estimated { time delay } }
         end { scheduledTime estimated { time delay } }
         alerts { alertHash alertHeaderText alertDescriptionText activityPeriods { start end } }

@@ -15,6 +15,7 @@ import rnd_transit_mtl.shared.generated.resources.Res
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import com.example.rnd_transit_mtl.ui.theme.TransitMain
+import com.example.rnd_transit_mtl.ui.theme.tripLegColor
 import rnd_transit_mtl.shared.generated.resources.map_user_pointer_marker
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.snapshotFlow
@@ -221,10 +222,14 @@ private fun AndroidTransitMap(
                 val routeData = remember(legs) { GeoJsonData.JsonString(routeGeoJson(legs)) }
                 val route = rememberGeoJsonSource(routeData)
                 LineLayer(id = "trip-route-outline", source = route, color = const(Color.White), width = const(13.dp))
-                LineLayer(id = "trip-route", source = route, color = const(TransitMain), width = const(7.dp))
+                legs.forEachIndexed { index, leg ->
+                    val legData = remember(leg) { GeoJsonData.JsonString(routeGeoJson(listOf(leg))) }
+                    val legSource = rememberGeoJsonSource(legData)
+                    LineLayer(id = "trip-leg-$index", source = legSource, color = const(tripLegColor(index)), width = const(7.dp))
+                }
                 if (travelled.isNotEmpty()) {
                     val travelledRoute = rememberGeoJsonSource(GeoJsonData.JsonString(linesGeoJson(travelled)))
-                    LineLayer(id = "trip-travelled", source = travelledRoute, color = const(Color(0xFFFFBA00)), width = const(7.dp))
+                    LineLayer(id = "trip-travelled", source = travelledRoute, color = const(Color.White.copy(alpha = 0.5f)), width = const(2.dp))
                 }
                 TripDot("trip-start", trip.origin.point, TransitMain, 7)
             }

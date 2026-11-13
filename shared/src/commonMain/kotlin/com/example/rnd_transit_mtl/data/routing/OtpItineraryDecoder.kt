@@ -4,6 +4,8 @@ import com.example.rnd_transit_mtl.model.geo.GeoPoint
 import com.example.rnd_transit_mtl.model.ids.RouteId
 import com.example.rnd_transit_mtl.model.ids.TransportId
 import com.example.rnd_transit_mtl.model.trip.RouteLeg
+import com.example.rnd_transit_mtl.model.trip.LegNavigation
+import com.example.rnd_transit_mtl.model.trip.NavigationStep
 import com.example.rnd_transit_mtl.model.trip.TransitTiming
 import com.example.rnd_transit_mtl.model.trip.TripRequest
 import com.example.rnd_transit_mtl.model.trip.TripRouteSnapshot
@@ -89,7 +91,22 @@ internal class OtpItineraryDecoder(private val reportFailure: (Exception) -> Uni
                 requireNotNull(leg.number("distance")?.doubleOrNull),
                 legDuration ?: duration.takeIf { itinerary.rows("legs").size == 1 }
                     ?: error("OTP omitted leg duration."),
-                isRouted = true, transitTiming = timing
+                isRouted = true, transitTiming = timing,
+                navigation = LegNavigation(
+                    routeShortName = route?.text("shortName"),
+                    headsign = leg.text("headsign"),
+                    fromName = leg.obj("from")?.text("name"),
+                    toName = leg.obj("to")?.text("name"),
+                    steps = leg.rows("steps").map { step ->
+                        NavigationStep(
+                            relativeDirection = step.text("relativeDirection") ?: "CONTINUE",
+                            streetName = step.text("streetName"),
+                            distanceMeters = requireNotNull(step.number("distance")?.doubleOrNull),
+                            bogusName = step.number("bogusName")?.booleanOrNull == true,
+                            exit = step.text("exit")
+                        )
+                    }
+                )
             )
         }
         check(duration > 0 && rawLegs.sumOf { it.distanceMeters } > 0)
