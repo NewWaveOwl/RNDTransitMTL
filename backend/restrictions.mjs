@@ -123,11 +123,18 @@ export function itineraryPolicy(fareZones, resolveLines = value => value) {
 }
 
 export async function loadRouteCatalogue(endpoint, fetchImpl = fetch) {
-  const response = await fetchImpl(endpoint, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(30_000),
-    body: JSON.stringify({ query: 'query RoutingLines { routes { gtfsId mode shortName longName } }' }),
-  });
-  const body = await response.json();
-  if (!response.ok || body.errors?.length || !Array.isArray(body.data?.routes)) throw new Error('OTP line catalogue unavailable.');
-  return body.data.routes;
+  try {
+    const response = await fetchImpl(endpoint, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(30_000),
+      body: JSON.stringify({ query: 'query RoutingLines { routes { gtfsId mode shortName longName } }' }),
+    });
+    if (!response.ok) throw new Error(`OTP returned HTTP ${response.status}.`);
+    const body = await response.json();
+    if (body.errors?.length || !Array.isArray(body.data?.routes)) throw new Error('OTP returned an invalid line catalogue.');
+    return body.data.routes;
+  } catch (cause) {
+    throw new Error(`Could not load the OTP route catalogue at ${endpoint}. ` +
+      'Start Start-StmRealtimeStack.ps1 first, wait for it to be ready, then restart this backend. ' +
+      'Saved ports in stm-stack-processes.json do not mean the servers are running.', { cause });
+  }
 }

@@ -1,10 +1,25 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FareZones, itineraryPolicy, lineResolver, validateRestrictions } from '../restrictions.mjs';
+import { FareZones, itineraryPolicy, lineResolver, validateRestrictions, loadRouteCatalogue } from '../restrictions.mjs';
 
 const origin = { latitude: 45.5, longitude: -73.6 };
 const end = { latitude: 45.51, longitude: -73.6 };
 const input = { origin: { point: origin }, modes: ['bus'], zonesByTransport: { bus: ['A'] } };
+
+test('catalogue startup failures identify the endpoint and preserve the network cause', async () => {
+  const endpoint = 'http://127.0.0.1:61719/otp/gtfs/v1';
+  const cause = new TypeError('fetch failed', { cause: Object.assign(new Error('connect refused'), { code: 'ECONNREFUSED' }) });
+  await assert.rejects(loadRouteCatalogue(endpoint, async () => { throw cause; }), error => {
+    assert.ok(error.message.includes(endpoint));
+    assert.match(error.message, /Start-StmRealtimeStack.ps1/);
+    assert.equal(error.cause, cause);
+    return true;
+  });
+  await assert.rejects(loadRouteCatalogue(endpoint, async () => ({ ok: false, status: 503 })), error => {
+    assert.match(error.cause.message, /HTTP 503/);
+    return true;
+  });
+});
 export function encode(points) {
   let lat = 0, lon = 0;
   function delta(value) {

@@ -78,6 +78,14 @@ queries go directly to the same OTP graph; planning uses the freshness-aware bri
 The backend downloads and caches the official ARTM zone polygons on first start.
 An offline installation needs that file prepared beforehand (`FARE_ZONES_FILE`).
 
+Restart the stack after a PC reboot or after its processes stop. Its
+`stm-stack-processes.json` file persists and may still contain old ports; it is not a
+readiness check. If backend startup reports an unavailable OTP route catalogue,
+start the stack again, wait for the startup script to finish successfully, then
+restart the backend so it reads the newly recorded ports. Startup errors identify
+OTP catalogue failures separately from ARTM fare-zone loading failures and print
+their underlying network error.
+
 If the existing combined stack lives in another checkout, reuse it without copying
 the graph or credentials:
 

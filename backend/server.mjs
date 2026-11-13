@@ -67,7 +67,8 @@ async function main() {
     throw new Error('Public binding requires SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY.');
   }
   const [fareZones, routes] = await Promise.all([
-    loadFareZones(process.env.FARE_ZONES_FILE ?? fileURLToPath(new URL('./data/fare-zones-2026.geojson', import.meta.url))),
+    loadFareZones(process.env.FARE_ZONES_FILE ?? fileURLToPath(new URL('./data/fare-zones-2026.geojson', import.meta.url)))
+      .catch(cause => { throw new Error('Could not load ARTM fare-zone data. Check the cached file or download connection.', { cause }); }),
     loadRouteCatalogue(catalogueEndpoint),
   ]);
   const resolveLines = lineResolver(routes);
@@ -85,5 +86,11 @@ async function main() {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch(error => { console.error(error.message); process.exitCode = 1; });
+  main().catch(error => {
+    console.error(error.message);
+    for (let cause = error.cause, depth = 0; cause && depth < 4; cause = cause.cause, depth++) {
+      console.error(`Cause: ${cause.code ? `${cause.code}: ` : ''}${cause.message}`);
+    }
+    process.exitCode = 1;
+  });
 }
