@@ -6,8 +6,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.LocalSharedTransitMapHost
-import androidx.compose.runtime.staticCompositionLocalOf
-import com.example.rnd_transit_mtl.data.routing.DebugTripLoader
 import com.example.rnd_transit_mtl.data.generation.LocalBackendTripGenerator
 import com.example.rnd_transit_mtl.data.generation.rememberBackendTripGenerator
 import androidx.compose.runtime.CompositionLocalProvider
@@ -61,18 +59,10 @@ private data class TransportData(
  */
 @Composable
 fun App(
-    loadDebugStmTrip: DebugTripLoader? = null,
-    openDebugStmPreview: Boolean = false,
-    loadDebugExoTrip: DebugTripLoader? = null,
-    openDebugExoPreview: Boolean = false,
     generationEndpoint: String? = null
 ) {
     App(
         authRepository = remember { SupabaseAuthRepository() },
-        loadDebugStmTrip = loadDebugStmTrip,
-        openDebugStmPreview = openDebugStmPreview,
-        loadDebugExoTrip = loadDebugExoTrip,
-        openDebugExoPreview = openDebugExoPreview,
         generationEndpoint = generationEndpoint,
     )
 }
@@ -80,21 +70,9 @@ fun App(
 @Composable
 internal fun App(
     authRepository: AuthRepository,
-    loadDebugStmTrip: DebugTripLoader? = null,
-    openDebugStmPreview: Boolean = false,
-    loadDebugExoTrip: DebugTripLoader? = null,
-    openDebugExoPreview: Boolean = false,
     generationEndpoint: String? = null,
 ) {
     val backendGenerator = rememberBackendTripGenerator(generationEndpoint)
-    var pendingDebugPreview by rememberSaveable {
-        mutableStateOf(when {
-            openDebugExoPreview && loadDebugExoTrip != null -> DebugTripSource.Exo.name
-            openDebugStmPreview && loadDebugStmTrip != null -> DebugTripSource.Stm.name
-            else -> null
-        })
-    }
-    val consumeDebugPreview = remember { { pendingDebugPreview = null } }
     var transportData by remember {
         mutableStateOf<TransportData?>(null)
     }
@@ -121,9 +99,6 @@ internal fun App(
         initialValue = AccountSession.Restoring,
     )
     var continueAsGuest by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(pendingDebugPreview) {
-        if (pendingDebugPreview != null) continueAsGuest = true
-    }
     val sessionStores = rememberSaveable(saver = SessionTripsStores.Saver) { SessionTripsStores() }
     var lastSignedIdentity by rememberSaveable { mutableStateOf<String?>(null) }
     val signedIdentity = (accountSession.value as? AccountSession.SignedIn)?.let { "account:${it.userId}" }
@@ -153,11 +128,6 @@ internal fun App(
         }
         CompositionLocalProvider(
             LocalBackendTripGenerator provides backendGenerator,
-            LocalDebugStmTripLoader provides loadDebugStmTrip,
-            LocalDebugExoTripLoader provides loadDebugExoTrip,
-            LocalDebugTripLaunch provides pendingDebugPreview?.let {
-                DebugTripLaunch(DebugTripSource.valueOf(it), consumeDebugPreview)
-            },
             LocalNavigator provides navigator,
             LocalTripsStore provides tripsStore,
             LocalTripNavigation provides tripNavigation,
@@ -198,9 +168,3 @@ internal fun App(
       }
     }
 }
-
-internal val LocalDebugStmTripLoader = staticCompositionLocalOf<DebugTripLoader?> { null }
-internal val LocalDebugExoTripLoader = staticCompositionLocalOf<DebugTripLoader?> { null }
-internal enum class DebugTripSource { Stm, Exo }
-internal data class DebugTripLaunch(val source: DebugTripSource, val consume: () -> Unit)
-internal val LocalDebugTripLaunch = staticCompositionLocalOf<DebugTripLaunch?> { null }

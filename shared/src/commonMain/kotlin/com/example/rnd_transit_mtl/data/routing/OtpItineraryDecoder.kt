@@ -8,7 +8,6 @@ import com.example.rnd_transit_mtl.model.trip.TransitTiming
 import com.example.rnd_transit_mtl.model.trip.TripRequest
 import com.example.rnd_transit_mtl.model.trip.TripRouteSnapshot
 import com.example.rnd_transit_mtl.model.trip.TripTransportSnapshot
-import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.*
 import kotlin.math.roundToLong
 import kotlin.time.Clock
@@ -24,83 +23,8 @@ internal enum class OtpMode(val otp: String, id: String, label: String, val stre
     val snapshot = TripTransportSnapshot(this.id, label, !street)
 }
 
-/** Maps coordinate-based OTP itineraries and the retained debug journeys to shared route legs. */
-internal class OtpRoutingService(
-    private val demo: OtpTripDemo? = null,
-    private val post: suspend (String) -> String,
-    private val departure: () -> String,
-    private val reportFailure: (Exception) -> Unit = {}
-) : RoutingService {
-    override suspend fun route(request: TripRequest): RoutingResult {
-        val destination = requireNotNull(request.destination)
-        val modes = request.modes.map { id ->
-            OtpMode.entries.firstOrNull { it.id == id } ?: return RoutingResult.NoRouteFound
-        }
-        val direct = modes.singleOrNull()?.takeIf { it.street }
-        if (demo != null && direct == null && (request.origin != demo.request.origin ||
-                destination != demo.request.destination || request.modes != demo.request.modes)
-        ) return RoutingResult.NoRouteFound
-
-        return try {
-            val body = buildRequest(request.origin.point, destination.point, modes, direct)
-            val response = Json.parseToJsonElement(post(body.toString())).jsonObject
-            decodeRoute(response, request.origin.point, destination.point, modes)
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (error: Exception) {
-            reportFailure(error)
-            val failureType = error::class.simpleName ?: "Unknown error"
-            RoutingResult.Unavailable("Could not get a route from OTP ($failureType). See RndTransitOtp in Logcat.")
-        }
-    }
-
-    private fun buildRequest(
-        origin: GeoPoint,
-        destination: GeoPoint,
-        modes: List<OtpMode>,
-        direct: OtpMode?
-    ) = buildJsonObject {
-        put("query", otpQuery(direct != null, demo == OtpTripDemo.StmExo, demo == null))
-        putJsonObject("variables") {
-            put("excludeRealtime", direct != null)
-            if (direct != null || demo == null) {
-                put("originLat", origin.latitude)
-                put("originLon", origin.longitude)
-                put("destinationLat", destination.latitude)
-                put("destinationLon", destination.longitude)
-                if (demo == null) put("departure", departure())
-            } else {
-                put("origin", demo.originStop)
-                put("destination", demo.destinationStop)
-                put("departure", departure())
-            }
-            putJsonObject("modes") {
-                if (direct != null) {
-                    put("directOnly", true)
-                    putJsonArray("direct") { add(direct.otp) }
-                } else {
-                    put("transitOnly", modes.none { it.street })
-                    putJsonArray("direct") { modes.filter { it.street }.forEach { add(it.otp) } }
-                    putJsonObject("transit") {
-                        putJsonArray("access") { add("WALK") }
-                        putJsonArray("egress") { add("WALK") }
-                        putJsonArray("transit") {
-                            modes.filterNot { it.street }.forEach { mode ->
-                                add(buildJsonObject { put("mode", mode.otp) })
-                            }
-                        }
-                        putJsonArray("transfer") { add("WALK") }
-                    }
-                }
-            }
-        }
-        if (direct == null) {
-            putJsonObject("extensions") {
-                putJsonArray("realtimeFeeds") { (demo?.feeds ?: listOf("STM", "EXO_TRAINS")).forEach { add(it) } }
-            }
-        }
-    }
-
+/** Decodes the backend's accepted OTP itinerary; never contacts OTP from the phone. */
+internal class OtpItineraryDecoder(private val reportFailure: (Exception) -> Unit = {}) {
     /** Decodes an already accepted backend itinerary without making another routing request. */
     fun decodeResponse(response: JsonObject, request: TripRequest): RoutingResult = try {
         decodeRoute(response, request.origin.point, requireNotNull(request.destination).point,
@@ -134,8 +58,7 @@ internal class OtpRoutingService(
         val itinerary = plan.rows("edges").mapNotNull { it.obj("node") }
             .firstOrNull { node ->
                 val actual = node.rows("legs").map { it.text("mode") }
-                actual.isNotEmpty() && if (demo != null) actual == expected else
-                    actual.all { it in expected || (it == "WALK" && modes.any { mode -> !mode.street }) }
+                actual.isNotEmpty() && actual.all { it in expected || (it == "WALK" && modes.any { mode -> !mode.street }) }
             }
             ?: return RoutingResult.NoRouteFound
         val duration = requireNotNull(itinerary.number("duration")?.longOrNull)
@@ -266,51 +189,4 @@ private fun decodePolyline(encoded: String): List<GeoPoint> {
             add(GeoPoint(latitude / 100_000.0, longitude / 100_000.0))
         }
     }
-}
-
-private fun otpQuery(direct: Boolean, mixed: Boolean, coordinates: Boolean = false): String {
-    val parameters = if (direct || coordinates) {
-        "${'$'}originLat: CoordinateValue!, ${'$'}originLon: CoordinateValue!, " +
-            "${'$'}destinationLat: CoordinateValue!, ${'$'}destinationLon: CoordinateValue!" +
-            if (coordinates) ", ${'$'}departure: OffsetDateTime!" else ""
-    } else "${'$'}origin: String!, ${'$'}destination: String!, ${'$'}departure: OffsetDateTime!"
-    val locations = if (direct || coordinates) {
-        """
-        origin: {location: {coordinate: {latitude: ${'$'}originLat, longitude: ${'$'}originLon}}}
-        destination: {location: {coordinate: {latitude: ${'$'}destinationLat, longitude: ${'$'}destinationLon}}}
-        ${if (coordinates) "dateTime: {earliestDeparture: ${'$'}departure}" else ""}
-        """.trimIndent()
-    } else {
-        """
-        origin: {location: {stopLocation: {stopLocationId: ${'$'}origin}}}
-        destination: {location: {stopLocation: {stopLocationId: ${'$'}destination}}}
-        dateTime: {earliestDeparture: ${'$'}departure}
-        """.trimIndent()
-    }
-    return """
-        query TransitTestTrip($parameters, ${'$'}modes: PlanModesInput!, ${'$'}excludeRealtime: Boolean!) {
-          planConnection(
-            $locations
-            modes: ${'$'}modes
-            preferences: {transit: {timetable: {excludeRealTimeUpdates: ${'$'}excludeRealtime}}}
-            ${if (!direct && mixed) "searchWindow: \"PT18H\" first: 4" else "first: 4"}
-          ) {
-            routingErrors { code inputField }
-            edges { node {
-              duration waitingTime
-              legs {
-                mode distance duration realTime
-                route { gtfsId shortName longName }
-                start { scheduledTime estimated { time delay } }
-                end { scheduledTime estimated { time delay } }
-                alerts { alertHash alertHeaderText alertDescriptionText activityPeriods { start end } }
-                trip { pattern { code alerts {
-                  alertHash alertHeaderText alertDescriptionText activityPeriods { start end }
-                } } }
-                legGeometry { length points }
-              }
-            } }
-          }
-        }
-    """.trimIndent()
 }

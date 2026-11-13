@@ -50,19 +50,23 @@ adb shell am start -n com.example.rnd_transit_mtl/.MainActivity
 
 For a physical device, enable USB debugging. If `adb` is not on your PATH, run it from your Android SDK's `platform-tools` folder.
 
-### Run the STM test trip on Windows
+### Run generated trips with OTP, STM and exo
 
-Start an Android emulator, then run this from the repository root in PowerShell:
+Start the configured combined OTP/realtime stack, then the Ktor generation backend
+in another PowerShell window. Install the app into your running emulator:
 
 ```powershell
-.\tool\otp\stm-scheduled\Run-StmTestTrip.ps1 -Emulator
+.\tool\otp\stm-scheduled\Start-StmRealtimeStack.ps1
+# In another window:
+.\tool\otp\Start-TripBackend.ps1
+# In a third window:
+.\tool\otp\Install-GeneratedTripAndroid.ps1 -Emulator
 ```
 
-The first run downloads any missing routing dependencies and builds a Montréal graph. The script starts OpenTripPlanner, checks that the scheduled STM sample returns a bus route with geometry, and installs and opens the debug app. It requires no STM API key.
-
-In the app, open **Map**, expand the planner, and tap **Load STM test trip**. Tap **Start Trip** in the preview to run the simulation.
-
-Use `-Phone` for an authorized USB device, or omit the device flag to run just the backend check. See the [routing simulation guide](docs/RunTripSimulation.md) for timetable refresh, troubleshooting, and the STM realtime and exo setup.
+In the app confirm an origin, choose time, transport and walking pace, and press
+**GO**. Fixed STM/exo test-trip buttons have been removed. See the
+[backend guide](docs/BackendTripGeneration.md) for prerequisites, a stack in another
+checkout, USB phones and hosting. Trip progress remains simulated.
 
 ### Build and launch a release
 

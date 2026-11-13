@@ -2,7 +2,7 @@ package com.example.rnd_transit_mtl.data.generation
 
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.example.rnd_transit_mtl.data.routing.OtpMode
-import com.example.rnd_transit_mtl.data.routing.OtpRoutingService
+import com.example.rnd_transit_mtl.data.routing.OtpItineraryDecoder
 import com.example.rnd_transit_mtl.data.routing.RoutingResult
 import com.example.rnd_transit_mtl.model.geo.GeoPoint
 import com.example.rnd_transit_mtl.model.ids.TripId
@@ -74,7 +74,7 @@ internal class BackendTripGenerator(
             require(input.selectedTransportIds.distinct().size == input.selectedTransportIds.size)
             require(input.walkingPreference in listOf("Amble", "Walk", "Dash")) { "Choose Amble, Walk or Dash." }
             require(input.selectedTransportIds.all { id -> OtpMode.entries.any { it.id == id } }) {
-                "Choose walking, cycling, STM bus/métro or exo train. REM routing is not available yet."
+                "Choose walking, cycling, STM bus/mГ©tro or exo train. REM routing is not available yet."
             }
             require(input.selectedTransportIds.all { id -> transportTypes.any { it.id == id } })
             Trip.validateTransportZones(
@@ -117,8 +117,7 @@ internal class BackendTripGenerator(
         response.travelTimeSeconds?.let { require(it > 0 && it + response.orientationBufferSeconds == elapsed) }
         val request = TripRequest(input.ownerId, origin, destination, input.plannedMinutes, input.selectedTransportIds,
             input.selectedZonesByTransport)
-        val decoder = OtpRoutingService(post = { error("An accepted trip must never be routed again.") },
-            departure = { "" }, reportFailure = reportFailure)
+        val decoder = OtpItineraryDecoder(reportFailure = reportFailure)
         val route = decoder.decodeResponse(requireNotNull(response.otp), request)
         if (route !is RoutingResult.Success) return TripGenerationResult.RoutingUnavailable("The trip planner returned an invalid route.")
         require(route.durationSeconds <= elapsed)

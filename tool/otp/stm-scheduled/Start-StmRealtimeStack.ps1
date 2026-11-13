@@ -1,8 +1,7 @@
 param(
     [int]$AdapterPort = 18086,
     [int]$OtpPort = 18085,
-    [switch]$RunTests,
-    [switch]$InstallAndroid
+    [switch]$RunTests
 )
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
@@ -155,7 +154,4 @@ do {
 if (!$ready) { throw "Stack did not start. Inspect logs in $session" }
 if ($RunTests) {
     & (Join-Path $PSScriptRoot 'Test-StmRealtimeStack.ps1') -Port $AdapterPort -OtpPort $OtpPort
-}
-if ($InstallAndroid) {
-    & (Join-Path $PSScriptRoot 'Install-StmAndroid.ps1') -Port $AdapterPort
 }

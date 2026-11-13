@@ -42,7 +42,6 @@ import kotlinx.serialization.json.jsonObject
 import com.example.rnd_transit_mtl.data.location.LocalPlannerLocation
 import com.example.rnd_transit_mtl.data.location.LocationUpdate
 import com.example.rnd_transit_mtl.data.location.PlannerLocation
-import com.example.rnd_transit_mtl.data.routing.DebugTripLoader
 import com.example.rnd_transit_mtl.model.geo.GeoPoint
 import com.example.rnd_transit_mtl.model.trip.Place
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.LocalTransitMap
@@ -58,8 +57,7 @@ class Trip33FlowTest {
     private class Host(
         initialOutcome: Trip33Sample,
         liveMap: Boolean = false,
-        backend: BackendTripGenerator? = null,
-        debugLoader: DebugTripLoader? = null
+        backend: BackendTripGenerator? = null
     ) : AutoCloseable {
         var outcome by mutableStateOf(initialOutcome)
         var mapData = TransitMapData()
@@ -94,7 +92,6 @@ class Trip33FlowTest {
                 LocalTripsStore provides store,
                 LocalNavigator provides navigator,
                 LocalTripNavigation provides navigation,
-                LocalDebugStmTripLoader provides debugLoader,
                 LocalBackendTripGenerator provides backend,
                 LocalPlannerLocation provides location.takeIf { liveMap },
                 LocalTransitMap provides if (liveMap) ({ data, _ -> SideEffect { mapData = data } }) else null
@@ -227,34 +224,6 @@ class Trip33FlowTest {
             assertEquals(newPoint, host.mapData.pin)
             host.click("GO")
             host.await("Check your trip settings")
-        }
-    }
-
-    @Test
-    fun otpFailuresKeepPlannerSelectionsAndAllowRetry() = runBlocking(Dispatchers.Main) {
-        for ((outcome, heading) in listOf(
-            TripGenerationResult.InvalidInput("Start and destination must be different.") to "Check your trip settings",
-            TripGenerationResult.NoRoute to "No trip fits these choices",
-            TripGenerationResult.RoutingUnavailable("OTP connection timed out.") to "Routing service unavailable"
-        )) {
-            val attempts = mutableListOf<List<TransportId>>()
-            Host(Trip33Sample.NoRoute) { modes -> attempts.add(modes); outcome }.use { host ->
-                host.render()
-                host.planner.setMinutes(45)
-                host.render()
-                val before = host.planner.uiState.value
-                host.click("Load STM test trip")
-                host.await(heading)
-                assertNull(host.store.activeTrip)
-                assertEquals(before, host.planner.uiState.value)
-                assertEquals(listOf(before.selectedTransportIds), attempts)
-                if (outcome is TripGenerationResult.RoutingUnavailable) {
-                    host.click("Try again")
-                    host.await(heading)
-                    assertEquals(List(2) { before.selectedTransportIds }, attempts)
-                    assertEquals(before, host.planner.uiState.value)
-                }
-            }
         }
     }
 

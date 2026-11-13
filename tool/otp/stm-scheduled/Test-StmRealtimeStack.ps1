@@ -1,4 +1,4 @@
-param([int]$Port = 0, [int]$OtpPort = 0, [switch]$InstallAndroid)
+param([int]$Port = 0, [int]$OtpPort = 0)
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
 . (Join-Path $PSScriptRoot 'Stop-StmManagedProcess.ps1')
@@ -225,7 +225,4 @@ try {
 } finally {
     try { Set-TestMode 'live' }
     catch { Write-Warning 'Could not restore live mode because the adapter is unavailable. Restart the stack.' }
-}
-if ($InstallAndroid) {
-    & (Join-Path $PSScriptRoot 'Install-StmAndroid.ps1') -Port $Port
 }

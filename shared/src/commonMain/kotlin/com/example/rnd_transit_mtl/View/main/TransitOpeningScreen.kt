@@ -1,8 +1,4 @@
 package com.example.rnd_transit_mtl.View.main
-import com.example.rnd_transit_mtl.LocalDebugStmTripLoader
-import com.example.rnd_transit_mtl.LocalDebugExoTripLoader
-import com.example.rnd_transit_mtl.LocalDebugTripLaunch
-import com.example.rnd_transit_mtl.DebugTripSource
 import com.example.rnd_transit_mtl.data.assets.toSampleMapPoint
 import com.example.rnd_transit_mtl.state.NullableTripIdSaver
 import com.example.rnd_transit_mtl.model.ids.TripId
@@ -79,9 +75,6 @@ internal fun TransitOpeningScreen(
     modifier: Modifier = Modifier,
     sampleOutcome: Trip33Sample = Trip33Sample.Normal
 ) {
-    val loadDebugStmTrip = LocalDebugStmTripLoader.current
-    val loadDebugExoTrip = LocalDebugExoTripLoader.current
-    var debugProposalSource by rememberSaveable { mutableStateOf<String?>(null) }
     val tripsStore = LocalTripsStore.current
     val liveMap = LocalTransitMap.current != null
     val location = LocalPlannerLocation.current
@@ -192,7 +185,6 @@ internal fun TransitOpeningScreen(
     }
 
     fun closeProposalFlow() {
-        debugProposalSource = null
         proposalGuard.cancel()
         generationJob?.cancel()
         generationJob = null
@@ -235,10 +227,10 @@ internal fun TransitOpeningScreen(
     val activeSummary = activeState?.let {
         val percentage = (it.elapsedMillis.toFloat() / TRIP_SIMULATION_DURATION_MILLIS * 100f)
             .toInt().coerceIn(0, 99)
-        "Unfinished: ${it.trip.title} · $percentage%"
+        "Unfinished: ${it.trip.title} В· $percentage%"
     }
     val completedSummary = pendingReviewTrip?.let {
-        "Completed: ${it.title} · tap 100% to open your trip"
+        "Completed: ${it.title} В· tap 100% to open your trip"
     }
 
     // Choosing another section cancels the opening intent, keeping the trip.
@@ -321,7 +313,6 @@ internal fun TransitOpeningScreen(
     }
 
     fun performPrimaryAction() {
-        debugProposalSource = null
         if (!latestDestinationActive ||
             processingAction ||
             pendingOpenTripId != null
@@ -358,7 +349,7 @@ internal fun TransitOpeningScreen(
             .joinToString(" + ") { it.label }
 
         requestSummary =
-            "$boundedMinutes minutes · $modes · " +
+            "$boundedMinutes minutes В· $modes В· " +
                 (planner.originPlace?.label ?: planner.origin?.label ?: "Choose starting point")
 
         generationJob = generationScope.launch {
@@ -547,60 +538,6 @@ internal fun TransitOpeningScreen(
         }
     }
 
-    fun requestDebugTrip(source: DebugTripSource) {
-        val load = (when (source) {
-            DebugTripSource.Stm -> loadDebugStmTrip
-            DebugTripSource.Exo -> loadDebugExoTrip
-        }) ?: return
-        if (!latestDestinationActive || processingAction || pendingOpenTripId != null ||
-            tripsStore.activeTrip != null || pendingReviewId != null
-        ) return
-
-        closeProposalFlow()
-        debugProposalSource = source.name
-        val enabledModes = planner.selectedTransportIds.toList()
-        val labels = transportTypes.filter { it.id in enabledModes }.joinToString(" + ") { it.label }
-        requestSummary = "$boundedMinutes minutes · $labels"
-        val token = proposalGuard.begin()
-        processingAction = true
-        generationJob = generationScope.launch {
-            fun fail(kind: Trip33Failure, detail: String = "") {
-                if (proposalGuard.complete(token, null)) {
-                    failureName = kind.name
-                    failureMessage = detail
-                }
-            }
-            try {
-                when (val result = load(enabledModes)) {
-                    is TripGenerationResult.Success -> {
-                        val encoded = Json.encodeToString(result.trip)
-                        if (latestDestinationActive && proposalGuard.complete(token, result.trip.id)) {
-                            proposalJson = encoded
-                        }
-                    }
-                    is TripGenerationResult.InvalidInput -> fail(Trip33Failure.InvalidInput, result.message)
-                    TripGenerationResult.NoRoute -> fail(Trip33Failure.NoRoute)
-                    is TripGenerationResult.RoutingUnavailable -> fail(Trip33Failure.ProviderUnavailable, result.message)
-                    TripGenerationResult.IdUnavailable -> fail(Trip33Failure.InvalidInput, "Try again to create a trip ID.")
-                }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                fail(Trip33Failure.ProviderUnavailable, "Could not load the test trip. Try again when OTP is available.")
-            } finally {
-                if (proposalGuard.isCurrent(token)) processingAction = false
-            }
-        }
-    }
-
-    val debugLaunch = LocalDebugTripLaunch.current
-    LaunchedEffect(debugLaunch?.source, isDestinationActive) {
-        if (debugLaunch != null && isDestinationActive) {
-            debugLaunch.consume()
-            requestDebugTrip(debugLaunch.source)
-        }
-    }
-
     fun closeCurrentProposalScreen() {
         if (pickingOrigin) {
             pickingOrigin = false
@@ -659,11 +596,8 @@ internal fun TransitOpeningScreen(
                 closeProposalFlow()
             },
             onRetry = {
-                val source = debugProposalSource?.let(DebugTripSource::valueOf)
-                if (source != null) requestDebugTrip(source) else {
-                    closeProposalFlow()
-                    performPrimaryAction()
-                }
+                closeProposalFlow()
+                performPrimaryAction()
             },
             onEditSettings = {
                 closeProposalFlow()
@@ -677,7 +611,7 @@ internal fun TransitOpeningScreen(
                 pickingOrigin = false
             },
             sampleLabel = if (sampleOutcome != Trip33Sample.Normal) {
-                "Sample · ${sampleOutcome.name}"
+                "Sample В· ${sampleOutcome.name}"
             } else {
                 null
             },
@@ -707,7 +641,7 @@ internal fun TransitOpeningScreen(
     if (proposal != null) {
         TripProposalContent(
             trip = proposal,
-            scheduled = debugProposalSource != null || proposal.routedDurationSeconds != null,
+            scheduled = proposal.routedDurationSeconds != null,
             onStart = {
                 if (latestDestinationActive &&
                     !processingAction &&
@@ -742,11 +676,8 @@ internal fun TransitOpeningScreen(
                 }
             },
             onGenerateAnother = {
-                val source = debugProposalSource?.let(DebugTripSource::valueOf)
-                if (source != null) requestDebugTrip(source) else {
-                    closeProposalFlow()
-                    performPrimaryAction()
-                }
+                closeProposalFlow()
+                performPrimaryAction()
             },
             onEditSettings = { closeProposalFlow() },
             modifier = proposalModifier
@@ -941,12 +872,7 @@ internal fun TransitOpeningScreen(
                 completedSummary
             },
             onPrimaryAction = { performPrimaryAction() },
-            onLoadStmTrip = if (loadDebugStmTrip != null && activeState == null &&
-                pendingReviewId == null && pendingOpenTripId == null && isDestinationActive
-            ) ({ requestDebugTrip(DebugTripSource.Stm) }) else null,
-            onLoadExoTrip = if (loadDebugExoTrip != null && activeState == null &&
-                pendingReviewId == null && pendingOpenTripId == null && isDestinationActive
-            ) ({ requestDebugTrip(DebugTripSource.Exo) }) else null,
+
             onOpenDetailedSettings = {
                 if (canChangeInputs() && navigator.current == MainScreenKey) {
                     navigation.openSection(SettingsScreenKey)
