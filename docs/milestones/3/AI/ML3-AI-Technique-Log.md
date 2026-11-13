@@ -183,3 +183,20 @@ shared DTO restoration. Official OTP docs confirm walking speed is in metres/sec
 and describes flat-ground maximum speed. Reused the existing in-process compilation
 and direct JUnit workflow; no subagents or live deployment. Final results are in
 `docs/BackendTripGeneration.md`; time and AI percentage were not measured.
+
+### M3-A8 follow-up - Replacing the server runtime
+
+Ported the generation policy and HTTP boundary to Kotlin/Ktor while retaining the
+existing phone contract and tested GraphQL query. Used controlled routes, seeded
+coordinates, zone holes/crossings, cancellation, timeout and concurrency fixtures
+to validate the replacement. Removed the direct OTP demo client and the associated
+fixed-position tests while retaining tests of the real backend and feed bridge.
+Updated CI from Node to Kotlin tests. Used existing writable caches, in-process
+Gradle and direct JUnit execution because normal worker sockets remain restricted.
+A stale demo reference in the decoder and a locally unescaped SDK path were caught
+and corrected during compilation/lint. No subagents were used.
+
+The independent server build also passed. Its offline Gradle plugin classpath used
+a validation-only annotation dependency substitution (cached 2.28.0 instead of
+2.27.0); this was confined to the temporary init script, not committed application
+dependencies. Docker execution and live device/tunnel checks remain unverified.

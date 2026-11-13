@@ -640,3 +640,23 @@ durations or weighted choice among high-scoring candidates from the full design.
 and lint passed; smoke script parsed and whitespace checks passed. Checked OTP's
 official walking preference and Speed scalar documentation. Live stack/device checks
 remain pending. Arbitrary-point sampling was committed separately as `3dda5ea`.
+
+### M3-A8 follow-up - Ktor migration and server consolidation
+
+**User decision:** Replace Node.js with Kotlin/Ktor, remove the obsolete backend,
+commit; remove fixed STM/exo map test trips and their tests, commit; consolidate
+backend code at the repository top level.
+
+**Implemented:** Ktor CIO service on JVM 21 retains the Android JSON contract,
+arbitrary destinations, pace bindings, distance allowance, mode/line/zone validation,
+search limits, provider failures and Supabase checks. Removed Node sources/tests,
+fixed journey controls/intents/loaders and preset-query scripts. Kept the production
+STM/exo bridge and its failure/freshness regression fixtures. Android only decodes
+accepted itineraries. All server code and tools live under `backend`; standalone
+Gradle builds and the container build avoid configuring Android.
+
+**Verification:** 15 backend Kotlin and 176 shared JVM tests passed using direct
+JUnit in this restricted session; Android APK assembly and lint passed. PowerShell
+scripts parsed; relocated Java feed fixtures compiled and were checked. Live device,
+agency polling, Docker runtime and public tunnel deployment are not claimed. See
+`backend/README.md` for setup and retained external runtime data.

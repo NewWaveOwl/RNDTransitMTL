@@ -64,13 +64,13 @@ Use the combined STM/exo graph and local credentials prepared for #21. See
 From the repository root, start it in one PowerShell window:
 
 ```powershell
-.\tool\otp\stm-scheduled\Start-StmRealtimeStack.ps1
+.\backend\otp\stm-scheduled\Start-StmRealtimeStack.ps1
 ```
 
 In a second PowerShell window, start the generation service and leave it running:
 
 ```powershell
-.\tool\otp\Start-TripBackend.ps1
+.\backend\scripts\Start-TripBackend.ps1
 ```
 
 This reads the actual OTP/bridge ports from `stm-stack-processes.json`. Metadata
@@ -90,20 +90,20 @@ If the existing combined stack lives in another checkout, reuse it without copyi
 the graph or credentials:
 
 ```powershell
-.\tool\otp\Start-TripBackend.ps1 -StackDirectory 'K:\CLASSES 26 FALL\APP_DEV\PRJ\RNDTransitMTL\tool\otp\stm-scheduled'
+.\backend\scripts\Start-TripBackend.ps1 -StackDirectory 'K:\CLASSES 26 FALL\APP_DEV\PRJ\RNDTransitMTL\tool\otp\stm-scheduled'
 ```
 
 Explicit endpoints are also supported:
 
 ```powershell
-.\tool\otp\Start-TripBackend.ps1 -OtpEndpoint 'http://127.0.0.1:18086/otp/gtfs/v1' -CatalogueEndpoint 'http://127.0.0.1:18085/otp/gtfs/v1'
+.\backend\scripts\Start-TripBackend.ps1 -OtpEndpoint 'http://127.0.0.1:18086/otp/gtfs/v1' -CatalogueEndpoint 'http://127.0.0.1:18085/otp/gtfs/v1'
 ```
 
 In a third window, test two generated walking trips, then install Android:
 
 ```powershell
-.\tool\otp\Test-GeneratedTrips.ps1
-.\tool\otp\Install-GeneratedTripAndroid.ps1 -Emulator
+.\backend\scripts\Test-GeneratedTrips.ps1
+.\backend\scripts\Install-GeneratedTripAndroid.ps1 -Emulator
 ```
 
 Use `-Phone` for an authorized USB phone. Installation uses `adb reverse` and embeds
@@ -246,3 +246,18 @@ are removed; regression coverage lives in `backend/src/test/kotlin`. The Node co
 above record historical verification, not the current suite. Use JDK 21 for Ktor;
 OTP retains its own Java runtime. Configure `PUBLIC_API=true` and Supabase credentials
 when publishing a loopback backend through a tunnel.
+
+## Consolidated server layout
+
+All server sources, OTP/feed tools and launch scripts now live under the root
+`backend/` folder. See [backend/README.md](../backend/README.md). The standalone
+`gradlew -p backend` build does not configure Android or require its SDK. Existing
+ignored runtime data in another checkout can still be used with `-StackDirectory`;
+no credentials, running graph or downloaded runtime files were moved from that checkout.
+
+After the migration, 15 Kotlin backend regression tests and 176 shared JVM tests
+passed; Android debug assembly and lint passed. The standalone backend test-class
+compilation and installable distribution build passed without configuring Android.
+Relocated STM/exo Java bridge regression fixtures and PowerShell syntax checks
+also passed. The removed tests exercised the retired
+fixed STM/exo demos. Previous Node test results above are historical.

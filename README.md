@@ -56,11 +56,11 @@ Start the configured combined OTP/realtime stack, then the Ktor generation backe
 in another PowerShell window. Install the app into your running emulator:
 
 ```powershell
-.\tool\otp\stm-scheduled\Start-StmRealtimeStack.ps1
+.\backend\otp\stm-scheduled\Start-StmRealtimeStack.ps1
 # In another window:
-.\tool\otp\Start-TripBackend.ps1
+.\backend\scripts\Start-TripBackend.ps1
 # In a third window:
-.\tool\otp\Install-GeneratedTripAndroid.ps1 -Emulator
+.\backend\scripts\Install-GeneratedTripAndroid.ps1 -Emulator
 ```
 
 In the app confirm an origin, choose time, transport and walking pace, and press

@@ -2,7 +2,7 @@
 param(
     [string]$OtpEndpoint,
     [string]$CatalogueEndpoint,
-    [string]$StackDirectory = (Join-Path $PSScriptRoot 'stm-scheduled'),
+    [string]$StackDirectory = (Join-Path $PSScriptRoot '..\otp\stm-scheduled'),
     [ValidateRange(1024,65535)][int]$Port = 18088
 )
 $ErrorActionPreference = 'Stop'
@@ -26,7 +26,7 @@ try {
     $env:PORT = "$Port"
     Write-Host "Planning via $OtpEndpoint; catalogue via $CatalogueEndpoint"
     Push-Location -LiteralPath $repo
-    try { & .\gradlew.bat :backend:run --console=plain } finally { Pop-Location }
+    try { & .\gradlew.bat -p backend run --console=plain } finally { Pop-Location }
     if ($LASTEXITCODE -ne 0) { throw 'Trip backend stopped. Read the startup error above.' }
 } finally {
     $env:OTP_URL = $previousOtp
