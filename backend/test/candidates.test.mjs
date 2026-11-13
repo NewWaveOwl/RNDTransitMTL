@@ -1,36 +1,39 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { RandomPointGenerator } from '../candidates.mjs';
-import { center, distance, inPolygon } from '../geo.mjs';
-
+import { center, distance, inServiceArea, inPolygon } from '../geo.mjs';
 function seeded(seed) { return () => ((seed = (1664525 * seed + 1013904223) >>> 0) / 2 ** 32); }
-const pool = Array.from({ length: 30 }, (_, i) => ({ id: String(i), label: `Stop ${i}`, point: {
-  latitude: center.latitude + (i + 1) * .002, longitude: center.longitude,
-} }));
 
-test('seeded randomness creates reproducible bounded and separated candidates', () => {
-  const generate = () => new RandomPointGenerator([...pool, pool[3], { point: { latitude: 0, longitude: 0 } }], { random: seeded(7) })
-    .generate(center, { limit: 8, maxDistanceMeters: 3000 });
+test('seeded geographic samples need no stop or POI catalogue and remain bounded and distinct', () => {
+  const generate = () => new RandomPointGenerator({ random: seeded(7) }).generate(center, { limit: 16, maxDistanceMeters: 3000 });
   assert.deepEqual(generate(), generate());
   const points = generate().map(it => it.point);
-  assert.equal(points.length, 8);
-  assert.ok(points.every(point => distance(center, point) >= 250 && distance(center, point) <= 3000));
+  assert.equal(points.length, 16);
+  assert.ok(points.every(point => distance(center, point) >= 250 && distance(center, point) <= 3000 && inServiceArea(point)));
   assert.ok(points.every((point, i) => points.slice(i + 1).every(other => distance(point, other) >= 100)));
 });
-
-test('same origin can produce distinct candidates and exclude previous proposals', () => {
-  const generator = new RandomPointGenerator(pool, { random: seeded(11) });
+test('samples a park interior without requiring a nearby transit stop', () => {
+  const origin = { latitude: 45.56, longitude: -73.57 };
+  const polygon = { type: 'Polygon', coordinates: [[[-73.58,45.55],[-73.56,45.55],[-73.56,45.57],[-73.58,45.57],[-73.58,45.55]]] };
+  const points = new RandomPointGenerator({ random: seeded(12), polygon }).generate(origin, { limit: 8, maxDistanceMeters: 500 });
+  assert.equal(points.length, 8);
+  assert.ok(points.every(candidate => inPolygon(candidate.point, polygon)));
+});
+test('same origin can produce different destinations and exclude previous proposals', () => {
+  const generator = new RandomPointGenerator({ random: seeded(11) });
   const first = generator.generate(center, { limit: 1 })[0];
   const next = generator.generate(center, { limit: 1, excluded: [first.point] })[0];
   assert.ok(distance(first.point, next.point) >= 100);
 });
-
-test('polygon holes, unusable pools, and invalid coordinates do not produce candidates', () => {
+test('polygon holes and impossible radii terminate within a fixed sampling limit', () => {
+  let draws = 0;
   const polygon = { type: 'Polygon', coordinates: [
     [[-74,45],[-73,45],[-73,46],[-74,46],[-74,45]],
     [[-73.7,45.4],[-73.5,45.4],[-73.5,45.6],[-73.7,45.6],[-73.7,45.4]],
   ] };
-  assert.equal(inPolygon(center, polygon), false);
-  assert.deepEqual(new RandomPointGenerator(pool, { polygon }).generate(center), []);
-  assert.throws(() => new RandomPointGenerator(pool).generate({ latitude: NaN, longitude: 0 }));
+  const generator = new RandomPointGenerator({ random: () => { draws++; return .5; }, polygon });
+  assert.deepEqual(generator.generate(center, { limit: 2, maxDistanceMeters: 1000 }), []);
+  assert.equal(draws, 2 * 64 * 2);
+  assert.deepEqual(generator.generate(center, { maxDistanceMeters: 10 }), []);
+  assert.throws(() => generator.generate({ latitude: NaN, longitude: 0 }));
 });

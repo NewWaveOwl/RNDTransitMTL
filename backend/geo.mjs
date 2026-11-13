@@ -14,6 +14,15 @@ export function distance(a, b) {
   return 2 * earthRadius * Math.asin(Math.sqrt(Math.min(1, h)));
 }
 export const center = { latitude: 45.5019, longitude: -73.5673 };
+/** Great-circle destination; bearing is radians clockwise from north. */
+export function destinationPoint(origin, meters, bearing) {
+  const angular = meters / earthRadius;
+  const lat = rad(origin.latitude), lon = rad(origin.longitude);
+  const latitude = Math.asin(Math.sin(lat) * Math.cos(angular) + Math.cos(lat) * Math.sin(angular) * Math.cos(bearing));
+  const longitude = lon + Math.atan2(Math.sin(bearing) * Math.sin(angular) * Math.cos(lat),
+    Math.cos(angular) - Math.sin(lat) * Math.sin(latitude));
+  return geoPoint({ latitude: latitude * 180 / Math.PI, longitude: ((longitude * 180 / Math.PI + 540) % 360) - 180 });
+}
 export const radiusMeters = distance(center, { latitude: 45.98474970, longitude: -73.18629259 }) + 5_000;
 export const inServiceArea = point => distance(center, point) <= radiusMeters;
 

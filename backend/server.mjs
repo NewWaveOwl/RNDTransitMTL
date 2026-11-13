@@ -1,6 +1,6 @@
 import http from 'node:http';
 import { pathToFileURL, fileURLToPath } from 'node:url';
-import { RandomPointGenerator, loadDestinations } from './candidates.mjs';
+import { RandomPointGenerator } from './candidates.mjs';
 import { createOtpClient, ProviderError } from './otp.mjs';
 import { TripGenerationService, InputError } from './generation.mjs';
 import { loadFareZones, loadRouteCatalogue, lineResolver, itineraryPolicy, validateRestrictions } from './restrictions.mjs';
@@ -66,14 +66,13 @@ async function main() {
   if (!['127.0.0.1', '::1', 'localhost'].includes(host) && !authenticated) {
     throw new Error('Public binding requires SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY.');
   }
-  const [pool, fareZones, routes] = await Promise.all([
-    loadDestinations(catalogueEndpoint, { signal: AbortSignal.timeout(30_000) }),
+  const [fareZones, routes] = await Promise.all([
     loadFareZones(process.env.FARE_ZONES_FILE ?? fileURLToPath(new URL('./data/fare-zones-2026.geojson', import.meta.url))),
     loadRouteCatalogue(catalogueEndpoint),
   ]);
   const resolveLines = lineResolver(routes);
   const generation = new TripGenerationService({
-    candidates: new RandomPointGenerator(pool), route: createOtpClient(endpoint),
+    candidates: new RandomPointGenerator(), route: createOtpClient(endpoint),
     prepare: input => { validateRestrictions(input); return resolveLines(input); },
     accept: itineraryPolicy(fareZones, resolveLines),
   });
@@ -81,7 +80,7 @@ async function main() {
     supabaseAuthorizer(process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY) : undefined });
   server.requestTimeout = 20_000;
   server.headersTimeout = 10_000;
-  server.listen(port, host, () => console.log(`Trip generation ready at http://${host}:${port} (${pool.length} destination stops).`));
+  server.listen(port, host, () => console.log(`Trip generation ready at http://${host}:${port} (random geographic destinations).`));
   for (const name of ['SIGTERM', 'SIGINT']) process.on(name, () => server.close());
 }
 
