@@ -46,7 +46,8 @@ data class TripGenerationInput(
     val selectedZonesByTransport: Map<TransportId, List<ZoneId>> = emptyMap(),
     val origin: TripPoint? = null,
     val ownerId: UserId? = null,
-    val originPlace: Place? = null
+    val originPlace: Place? = null,
+    val walkingPreference: String = "Amble"
 )
 
 /**

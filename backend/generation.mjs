@@ -1,5 +1,6 @@
 import { geoPoint, inServiceArea } from './geo.mjs';
 import { modeNames, ProviderError } from './otp.mjs';
+import { walkingSpeedsKmh, walkingSpeedMps, orientationBufferSeconds } from './walking.mjs';
 
 const noRouteCodes = new Set(['LOCATION_NOT_FOUND', 'NO_DIRECT_MODE_CONNECTION', 'NO_STOPS_IN_RANGE',
   'NO_TRANSIT_CONNECTION', 'NO_TRANSIT_CONNECTION_IN_SEARCH_WINDOW', 'OUTSIDE_SERVICE_PERIOD',
@@ -25,13 +26,17 @@ export function validateRequest(input) {
   }
   try { (input.excludedDestinations ?? []).forEach(geoPoint); } catch { throw new InputError('Invalid previous destination.'); }
   const reference = input.origin.osmReference;
+  const walkingPreference = input.walkingPreference ?? 'Amble';
+  if (typeof walkingPreference !== 'string' || !Object.hasOwn(walkingSpeedsKmh, walkingPreference)) {
+    throw new InputError('Choose Amble, Walk or Dash.');
+  }
   if (reference != null && (!['Node', 'Way', 'Relation'].includes(reference.type) ||
       !Number.isSafeInteger(reference.id) || reference.id <= 0)) throw new InputError('Invalid origin reference.');
   // Discard client-supplied filters, endpoints, attempt limits and derived policy fields.
   return {
     origin: { label: input.origin.label, point: geoPoint(input.origin.point),
       ...(reference == null ? {} : { osmReference: { type: reference.type, id: reference.id } }) },
-    plannedMinutes: input.plannedMinutes, modes: [...input.modes],
+    plannedMinutes: input.plannedMinutes, modes: [...input.modes], walkingPreference,
     zonesByTransport: input.zonesByTransport, selectedRouteIds: input.selectedRouteIds,
     excludedDestinations: input.excludedDestinations ?? [],
   };
@@ -87,9 +92,11 @@ export class TripGenerationService {
     const signal = AbortSignal.any([clientSignal, deadline]);
     const prepared = this.prepare(input);
     const speed = input.modes.includes('train') || input.modes.includes('metro') ? 30 :
-      input.modes.includes('bus') ? 15 : input.modes.includes('bike') ? 8 : 2;
+      input.modes.includes('bus') ? 15 : input.modes.includes('bike') ? 8 : walkingSpeedMps(input.walkingPreference);
+    // An optimistic straight-line bound, reduced by the same orientation reserve used on real routes.
+    const radius = Math.min(100_000, input.plannedMinutes * 60 / (1 / speed + 60 / 1000));
     const candidates = this.candidates.generate(input.origin.point, {
-      limit: this.maxAttempts, maxDistanceMeters: Math.min(100_000, speed * input.plannedMinutes * 60),
+      limit: this.maxAttempts, maxDistanceMeters: radius, minSeparationMeters: Math.min(250, radius / 4),
       excluded: input.excludedDestinations ?? [],
     });
     let attempts = 0, providerFailures = 0;
@@ -111,12 +118,19 @@ export class TripGenerationService {
         if (errors.some(error => !noRouteCodes.has(error.code))) throw new ProviderError('OTP could not process the route.');
         for (const edge of plan?.edges ?? []) {
           const itinerary = edge.node;
-          const elapsedSeconds = itineraryElapsed(itinerary, startedAt);
-          if (elapsedSeconds === null || elapsedSeconds > input.plannedMinutes * 60) continue;
+          const travelTimeSeconds = itineraryElapsed(itinerary, startedAt);
+          if (travelTimeSeconds === null) continue;
+          const meters = itinerary.legs.reduce((total, leg) =>
+            Number.isFinite(leg.distance) && leg.distance >= 0 ? total + leg.distance : NaN, 0);
+          if (!Number.isFinite(meters) || meters <= 0) continue;
+          const buffer = orientationBufferSeconds(meters);
+          const elapsedSeconds = travelTimeSeconds + buffer;
+          if (elapsedSeconds > input.plannedMinutes * 60) continue;
           if (!this.accept(itinerary, input, candidate)) continue;
           return {
             status: 'success', origin: input.origin, destination: { label: candidate.label, point: candidate.point },
-            elapsedSeconds, departure, attempts,
+            elapsedSeconds, travelTimeSeconds, orientationBufferSeconds: buffer,
+            walkingPreference: input.walkingPreference, walkingSpeedKmh: walkingSpeedsKmh[input.walkingPreference], departure, attempts,
             otp: { ...body, data: { planConnection: { ...plan, routingErrors: [], edges: [edge] } } },
           };
         }

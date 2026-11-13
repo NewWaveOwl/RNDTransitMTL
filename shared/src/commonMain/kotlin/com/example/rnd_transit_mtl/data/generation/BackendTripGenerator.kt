@@ -23,7 +23,8 @@ internal data class BackendGenerationRequest(
     val modes: List<String>,
     val zonesByTransport: Map<String, List<String>>,
     val selectedRouteIds: List<String>,
-    val excludedDestinations: List<GeoPoint>
+    val excludedDestinations: List<GeoPoint>,
+    val walkingPreference: String = "Amble"
 )
 
 @Serializable
@@ -34,7 +35,9 @@ internal data class BackendGenerationResponse(
     val destination: Place? = null,
     val elapsedSeconds: Long? = null,
     val departure: String? = null,
-    val otp: JsonObject? = null
+    val otp: JsonObject? = null,
+    val travelTimeSeconds: Long? = null,
+    val orientationBufferSeconds: Long = 0
 )
 
 /** One GO request. Destination search and OTP calls execute exclusively on the backend.
@@ -69,6 +72,7 @@ internal class BackendTripGenerator(
                 input.plannedMinutes, input.attractionIntensity)
             require(input.selectedTransportIds.isNotEmpty()) { "Choose at least one transport type." }
             require(input.selectedTransportIds.distinct().size == input.selectedTransportIds.size)
+            require(input.walkingPreference in listOf("Amble", "Walk", "Dash")) { "Choose Amble, Walk or Dash." }
             require(input.selectedTransportIds.all { id -> OtpMode.entries.any { it.id == id } }) {
                 "Choose walking, cycling, STM bus/métro or exo train. REM routing is not available yet."
             }
@@ -84,7 +88,7 @@ internal class BackendTripGenerator(
             val request = BackendGenerationRequest(
                 origin, input.plannedMinutes, input.selectedTransportIds.map { it.value },
                 input.selectedZonesByTransport.entries.associate { (mode, zones) -> mode.value to zones.map { it.value } },
-                input.selectedRouteIds.map { it.value }, excludedDestinations.takeLast(10)
+                input.selectedRouteIds.map { it.value }, excludedDestinations.takeLast(10), input.walkingPreference
             )
             val response = json.decodeFromString<BackendGenerationResponse>(post(json.encodeToString(request)))
             when (response.status) {
@@ -109,6 +113,8 @@ internal class BackendTripGenerator(
         val destination = requireNotNull(response.destination)
         val elapsed = requireNotNull(response.elapsedSeconds)
         require(elapsed in 1..input.plannedMinutes * 60L)
+        require(response.orientationBufferSeconds in 0..elapsed)
+        response.travelTimeSeconds?.let { require(it > 0 && it + response.orientationBufferSeconds == elapsed) }
         val request = TripRequest(input.ownerId, origin, destination, input.plannedMinutes, input.selectedTransportIds,
             input.selectedZonesByTransport)
         val decoder = OtpRoutingService(post = { error("An accepted trip must never be routed again.") },
@@ -127,7 +133,8 @@ internal class BackendTripGenerator(
             selectedRoutes = route.routes, attractionIntensity = input.attractionIntensity, createdAt = now(),
             selectedZoneIds = input.selectedZoneIds.toList(),
             selectedZonesByTransport = input.selectedZonesByTransport.mapValues { it.value.toList() },
-            routedDurationSeconds = elapsed, waitingTimeSeconds = route.waitingTimeSeconds
+            routedDurationSeconds = elapsed, waitingTimeSeconds = route.waitingTimeSeconds,
+            orientationBufferSeconds = response.orientationBufferSeconds, walkingPreference = input.walkingPreference
         )
         return TripGenerationResult.Success(trip)
     }

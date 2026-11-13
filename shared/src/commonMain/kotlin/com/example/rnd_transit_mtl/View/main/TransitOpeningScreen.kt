@@ -425,7 +425,8 @@ internal fun TransitOpeningScreen(
                     selectedZoneIds = zones.values.flatten().distinct().sortedBy { it.value },
                     selectedZonesByTransport = zones,
                     origin = origin?.copy(),
-                    originPlace = planner.originPlace
+                    originPlace = planner.originPlace,
+                    walkingPreference = planner.walkingPreference
                 )
 
                 // Explicit samples are distinct from validation failures.

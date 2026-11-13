@@ -168,3 +168,18 @@ See the [decision log](ML3-AI-Decision-Log.md) for full prompts and source cover
 **Use of output:** Implementation accepted for validation under the user's selected architecture. The final test results and remaining live-device checks are recorded in `docs/BackendTripGeneration.md`.
 
 **Actual interaction time / AI percentage:** Not measured; no estimate claimed. Conversation reference: this issue #67 integration conversation.
+
+### M3-A8 follow-up - User correction of the generation algorithm
+
+**Iteration:** The user rejected stop-only candidates and specified arbitrary points,
+fixed walking paces and a distance-based orientation reserve. Updated coordinate
+sampling first, then backend timing/OTP preferences and shared trip persistence.
+Updated the design and integration guide to describe the changed behavior and the
+remaining scoring features honestly.
+
+**Verification:** Seeded geographic/park fixtures, controlled OTP responses at the
+time-budget boundary, mixed walking/transit distances, pace conversion checks and
+shared DTO restoration. Official OTP docs confirm walking speed is in metres/second
+and describes flat-ground maximum speed. Reused the existing in-process compilation
+and direct JUnit workflow; no subagents or live deployment. Final results are in
+`docs/BackendTripGeneration.md`; time and AI percentage were not measured.

@@ -1,17 +1,18 @@
 /** Coordinate-based OTP 2.10 client. Agency credentials belong to OTP/its feed bridge. */
+import { walkingSpeedMps } from './walking.mjs';
 export const modeNames = Object.freeze({ walk: 'WALK', bike: 'BICYCLE', bus: 'BUS', metro: 'SUBWAY', train: 'RAIL' });
 
 export const query = `query GenerateTrip(
   $originLat: CoordinateValue!, $originLon: CoordinateValue!,
   $destinationLat: CoordinateValue!, $destinationLon: CoordinateValue!,
-  $departure: OffsetDateTime!, $modes: PlanModesInput!, $filters: [TransitFilterInput!], $excludeRealtime: Boolean!
+  $departure: OffsetDateTime!, $modes: PlanModesInput!, $filters: [TransitFilterInput!], $excludeRealtime: Boolean!, $walkSpeed: Speed!
 ) {
   planConnection(
     origin: {location: {coordinate: {latitude: $originLat, longitude: $originLon}}}
     destination: {location: {coordinate: {latitude: $destinationLat, longitude: $destinationLon}}}
     dateTime: {earliestDeparture: $departure}
     modes: $modes
-    preferences: {transit: {filters: $filters, timetable: {excludeRealTimeUpdates: $excludeRealtime}}}
+    preferences: {street: {walk: {speed: $walkSpeed}}, transit: {filters: $filters, timetable: {excludeRealTimeUpdates: $excludeRealtime}}}
     first: 4
   ) {
     routingErrors { code inputField }
@@ -31,7 +32,7 @@ export const query = `query GenerateTrip(
 }`;
 
 /** Selections are allowed modes. Walking access/egress remains necessary for transit. */
-export function otpRequest({ origin, destination, modes, departure, filters }) {
+export function otpRequest({ origin, destination, modes, departure, filters, walkingPreference = 'Amble' }) {
   const transit = modes.filter(mode => !['walk', 'bike'].includes(mode));
   const direct = modes.filter(mode => ['walk', 'bike'].includes(mode)).map(mode => modeNames[mode]);
   return {
@@ -39,7 +40,7 @@ export function otpRequest({ origin, destination, modes, departure, filters }) {
     variables: {
       originLat: origin.latitude, originLon: origin.longitude,
       destinationLat: destination.latitude, destinationLon: destination.longitude,
-      departure,
+      departure, walkSpeed: walkingSpeedMps(walkingPreference),
       modes: {
         direct, directOnly: transit.length === 0, transitOnly: direct.length === 0,
         ...(transit.length ? { transit: {

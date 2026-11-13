@@ -21,11 +21,12 @@ class BackendTripGeneratorTest {
     private val input = TripGenerationInput("Trip", "Real route", "", 30, listOf(TransportId("walk")),
         emptyList(), 50f, originPlace = origin)
 
-    private fun response(start: Place = origin, elapsed: Long = 600): String = buildJsonObject {
+    private fun response(start: Place = origin, elapsed: Long = 600, buffer: Long = 0): String = buildJsonObject {
         put("status", "success")
         put("origin", Json.encodeToJsonElement(start))
         put("destination", Json.encodeToJsonElement(destination))
         put("elapsedSeconds", elapsed)
+        put("orientationBufferSeconds", buffer)
         put("otp", Json.parseToJsonElement("""
             {"data":{"planConnection":{"routingErrors":[],"edges":[{"node":{
               "duration":600,"waitingTime":0,"legs":[{
@@ -65,6 +66,19 @@ class BackendTripGeneratorTest {
             val generator = BackendTripGenerator(post = { body })
             assertIs<TripGenerationResult.RoutingUnavailable>(generator.generate(input, modes, emptySet()))
         }
+    }
+
+    @Test
+    fun sendsTheChosenPaceAndPreservesTheOrientationReserve() = runTest {
+        val generator = BackendTripGenerator(post = { body ->
+            assertEquals("Dash", Json.decodeFromString<BackendGenerationRequest>(body).walkingPreference)
+            response(elapsed = 634, buffer = 34)
+        })
+        val trip = assertIs<TripGenerationResult.Success>(generator.generate(input.copy(walkingPreference = "Dash"), modes, emptySet())).trip
+        assertEquals("Dash", trip.walkingPreference)
+        assertEquals(34L, trip.orientationBufferSeconds)
+        assertEquals(634L, trip.routedDurationSeconds)
+        assertEquals(trip, trip.toDto().toDomainOrNull())
     }
 
     @Test

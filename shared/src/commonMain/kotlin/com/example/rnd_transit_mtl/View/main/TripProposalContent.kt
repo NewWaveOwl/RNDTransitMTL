@@ -370,8 +370,9 @@ internal fun TripProposalContent(
                     trip.legs.any { it.isRouted } -> " · includes short map connections"
                     else -> " straight line"
                 }
+                val orientationNote = if (trip.orientationBufferSeconds > 0) " incl. orientation" else ""
                 Text(
-                    text = "$duration · $distance km$geometryNote · One way",
+                    text = "$duration$orientationNote · $distance km$geometryNote · One way",
                     color = TransitWhite,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold

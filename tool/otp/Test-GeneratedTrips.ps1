@@ -2,12 +2,13 @@
 param(
     [string]$Endpoint = 'http://127.0.0.1:18088/v1/trips/generate',
     [ValidateSet('walk','bike','bus','metro','train')][string]$Mode = 'walk',
-    [ValidateRange(5,360)][int]$Minutes = 30
+    [ValidateRange(5,360)][int]$Minutes = 30,
+    [ValidateSet('Amble','Walk','Dash')][string]$WalkingPreference = 'Amble'
 )
 $ErrorActionPreference = 'Stop'
 $origin = @{ label='Confirmed test origin'; point=@{latitude=45.50455; longitude=-73.55610} }
 $request = @{ origin=$origin; plannedMinutes=$Minutes; modes=@($Mode); selectedRouteIds=@();
-    zonesByTransport=@{}; excludedDestinations=@() }
+    zonesByTransport=@{}; excludedDestinations=@(); walkingPreference=$WalkingPreference }
 if ($Mode -in @('bus','metro','train')) { $request.zonesByTransport[$Mode] = @('A','B','C','D') }
 $destinations = @()
 foreach ($number in 1..2) {
@@ -18,6 +19,9 @@ foreach ($number in 1..2) {
         throw 'The confirmed origin changed.'
     }
     if ($trip.elapsedSeconds -gt $Minutes*60) { throw 'Trip exceeds the time budget.' }
+    if ($trip.travelTimeSeconds + $trip.orientationBufferSeconds -ne $trip.elapsedSeconds) {
+        throw 'Trip timing does not include its orientation reserve.'
+    }
     if (!@($trip.otp.data.planConnection.edges[0].node.legs).Count) { throw 'Trip has no route legs.' }
     $point = $trip.destination.point
     if ($destinations | Where-Object { $_.latitude -eq $point.latitude -and $_.longitude -eq $point.longitude }) {

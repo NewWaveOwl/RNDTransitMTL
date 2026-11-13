@@ -26,6 +26,12 @@ test('street-only search does not force transit', () => {
   assert.deepEqual(variables.modes.direct, ['BICYCLE']);
 });
 
+test('each named walking pace reaches OTP in metres per second, including transit access', () => {
+  for (const [walkingPreference, kmh] of [['Amble',3],['Walk',4.8],['Dash',6.8]]) {
+    assert.equal(otpRequest({ ...request, walkingPreference }).variables.walkSpeed, kmh / 3.6);
+  }
+});
+
 test('provider failure is distinct from an empty valid itinerary result', async () => {
   await assert.rejects(createOtpClient('http://localhost/otp', async () => ({ ok: false, status: 503 }))(request), ProviderError);
   const body = { data: { planConnection: { edges: [], routingErrors: [] } } };

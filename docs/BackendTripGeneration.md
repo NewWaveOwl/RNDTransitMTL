@@ -1,8 +1,8 @@
 # Backend trip generation (#67)
 
 Android **GO** sends the confirmed WGS84 origin, time budget, allowed modes and
-per-mode transit zones to a Node.js service. The backend chooses destinations from
-the public stops in the serving OTP graph, validates routes through OTP, and returns
+per-mode transit zones and walking pace to a Node.js service. The backend samples
+arbitrary geographic destinations, including park interiors, validates routes through OTP, and returns
 one accepted itinerary. The app decodes that itinerary once and reuses its geometry
 in Preview, Active Trip and saved state. Android does not fall back to invented routes
 when the backend is unavailable. Desktop/Web previews retain their existing sample
@@ -19,14 +19,17 @@ flow unless supplied a generation endpoint.
 | Android | Exact pin/device origin, loading/cancel/retry, preview, Start Trip, stored trip geometry |
 
 Search uses at most 16 candidates and a 15-second deadline. Candidate destinations are
-at least 250 metres from the origin and 100 metres apart; the app excludes its last ten
+normally at least 250 metres from the origin (less for short budgets) and 100 metres apart; the app excludes its last ten
 accepted destinations. The service area matches the Android picker: Montréal centre
 45.5019, -73.5673 to the recorded farthest CMM point, plus 5 km. Transit shapes are
 checked against ARTM A/B/C/D polygons, including intermediate samples at most 100 m
 apart. Missing zone data prevents startup; legacy numeric exo zones are not guessed.
 
-The budget is final arrival minus the backend's requested departure time, including
-the wait before the first leg. `searchWindow` is not a trip-duration limit. The saved
+The budget includes final arrival minus the backend's requested departure time,
+including the wait before the first leg, **plus one minute per routed kilometre**
+for orientation and slowing down. Distance sums every leg, including transit and
+cycling. The reserve is rounded up to whole seconds; 25 minutes of travel/waiting
+over 5 km consumes a 30-minute budget. `searchWindow` is not a trip-duration limit. The saved
 trip records the accepted elapsed time separately from the planner budget and from
 the existing 10-second **simulated** playback clock. Live GPS navigation is not added
 by this issue. Schedules and estimates describe a proposal and can change afterwards.
@@ -37,7 +40,22 @@ Supported feeds currently cover walking, cycling, STM bus/métro and exo trains.
 REM and additional agencies/exo bus feeds require their own graph integration; they
 are not silently mapped to another mode. STM métro times are scheduled, not live
 arrival predictions. Attraction intensity remains stored but does not rank destinations.
-Destinations are public stop locations, not an attraction/POI recommendation catalogue.
+Destinations are random coordinates, not an attraction/POI recommendation catalogue.
+Sampling does not depend on stops or POIs. OTP must find a connected route to each
+candidate; unreachable points are skipped without inventing a connecting path.
+
+The backend binds `walkingPreference` to these speeds; client-supplied numeric speeds
+cannot override them. This pace applies to walking access and transfers as well.
+
+| Walking preference | km/h | OTP metres/second |
+| --- | --- | --- |
+| Amble | 3 | 0.833333... |
+| Walk | 4.8 | 1.333333... |
+| Dash | 6.8 | 1.888888... |
+
+OTP defines walking speed as the maximum on flat ground; crossings and terrain may
+reduce actual average speed. The candidate radius accounts for both the selected
+pace and orientation reserve, and the routed itinerary receives the final budget check.
 
 ## Start locally on Windows
 
@@ -85,7 +103,8 @@ Use `-Phone` for an authorized USB phone. Installation uses `adb reverse` and em
 reconnection. Android Studio's ordinary debug build defaults to the emulator host
 `http://10.0.2.2:18088/v1/trips/generate`.
 
-The smoke test accepts `-Mode bus`, `-Mode metro`, `-Mode train` or `-Mode bike`.
+The smoke test accepts `-Mode bus`, `-Mode metro`, `-Mode train` or `-Mode bike`, and
+`-WalkingPreference Amble`, `Walk` or `Dash` (default `Amble`).
 Transit results depend on the current timetable and service hours; increasing
 `-Minutes` can help for sparse train service. The scripts report failure when no
 itinerary fits rather than claiming a passing live test.
@@ -110,6 +129,7 @@ itinerary fits rather than claiming a passing live test.
 {
   "origin": {"label": "Confirmed pin", "point": {"latitude": 45.50455, "longitude": -73.55610}},
   "plannedMinutes": 30,
+  "walkingPreference": "Walk",
   "modes": ["bus", "metro"],
   "zonesByTransport": {"bus": ["A"], "metro": ["A"]},
   "selectedRouteIds": [],
@@ -119,7 +139,9 @@ itinerary fits rather than claiming a passing live test.
 
 Responses distinguish `success`, `no_trip`, `invalid_input`, `unauthorized` and
 `unavailable`. Success contains the unchanged origin, accepted destination,
-`elapsedSeconds`, departure timestamp and the OTP response restricted to the accepted
+`elapsedSeconds` (travel/waiting plus reserve), `travelTimeSeconds`,
+`orientationBufferSeconds`, the named `walkingPreference` and derived `walkingSpeedKmh`,
+departure timestamp and the OTP response restricted to the accepted
 itinerary. The Kotlin decoder validates geometry and trip invariants before accepting
 it. Client disconnection aborts the search and the in-flight fetch. `GET /health`
 indicates the server loaded its catalogues; it is not a live upstream-health guarantee.
@@ -135,7 +157,7 @@ search load before choosing production machine capacity.
 | Environment variable | Meaning |
 | --- | --- |
 | `OTP_URL` | Planning endpoint, normally the realtime bridge |
-| `OTP_CATALOGUE_URL` | Optional direct OTP endpoint for stop/route catalogues |
+| `OTP_CATALOGUE_URL` | Optional direct OTP endpoint for the route catalogue |
 | `PORT` | Generation API port; default 18088 |
 | `HOST` | Bind address; default 127.0.0.1 |
 | `FARE_ZONES_FILE` | Cached official ARTM GeoJSON path |
@@ -165,6 +187,8 @@ origin preservation, accepted geometry and timing/DTO restoration.
 
 - [OTP 2.10 GTFS GraphQL endpoint](https://docs.opentripplanner.org/en/v2.10.0/apis/GTFS-GraphQL-API/)
 - [OTP planning arguments](https://docs.opentripplanner.org/api/dev-2.x/graphql-gtfs/queries/planConnection)
+- [OTP walking speed preference](https://docs.opentripplanner.org/api/dev-2.x/graphql-gtfs/types/WalkPreferencesInput)
+- [OTP Speed scalar (metres/second)](https://docs.opentripplanner.org/api/dev-2.x/graphql-gtfs/types/Speed)
 - [OTP 2.10 realtime configuration](https://docs.opentripplanner.org/en/v2.10.0/GTFS-RT-Config/)
 - [STM open data](https://www.stm.info/a-propos/documents-donnees/donnees-ouvertes)
 - [exo open data](https://exo.quebec/fr/a-propos/donnees-ouvertes)
@@ -191,3 +215,12 @@ sources and a writable dependency cache.
 Live agency requests, the initial ARTM polygon download, physical-device generation,
 and hosted deployment were not verified in this restricted session. Run the smoke
 script and Android review above against the active combined stack before closing #67.
+
+### Follow-up: arbitrary coordinates, walking pace and orientation allowance
+
+After the user's algorithm correction, 25 backend tests and 181 shared JVM tests
+passed. Android debug assembly and lint passed. The updated smoke script parsed,
+and `git diff --check` passed. Coverage includes park-interior sampling without a
+stop catalogue, named pace conversion, short-budget search bounds, the exact budget
+boundary, mixed-leg distance reserves and pace/reserve DTO restoration. Live-provider,
+physical-device and deployment checks remain pending as described above.

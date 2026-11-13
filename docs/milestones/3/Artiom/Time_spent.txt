@@ -33,3 +33,6 @@ Issue #67 | branch: feature/67-otp-stm-exo-integration
 
 2026-11-12 19:25 -05:00 (America/Toronto)
 Checkpoint -> OTP/STM/EXO backend integration: six implementation stages; 20 backend tests, 180 shared JVM tests, Android build/lint and bridge fixtures passed. Live device/provider checks pending.
+
+2026-11-12 19:45 -05:00 (America/Toronto)
+Checkpoint -> work on the OTP/STM/EXO full integration: arbitrary geographic destinations, backend walking paces and one-minute-per-kilometre orientation reserve. 25 backend tests, 181 shared JVM tests and Android build/lint passed; live checks pending.

@@ -618,3 +618,25 @@ as a lats feature lets make the trip card in the history only show 1 or 2 lines 
 **Consequences:** OTP remains a long-running service. Generation runs only on demand. Public-stop candidates are a practical first destination pool, not a POI-ranking system. Guest access works locally; hosted mode requires an existing Supabase session. REM, exo bus feeds, live GPS trip tracking and permanent trip storage remain outside this implementation.
 
 **Related files:** `backend/`, `docs/BackendTripGeneration.md`, `BackendTripGenerator.kt`, `TransitOpeningScreen.kt`, `tool/otp/*Trip*.ps1`. Conversation reference: this issue #67 integration conversation.
+
+### M3-A8 follow-up - Geographic destinations and pace-aware time budget
+
+**User correction:** Destinations must be arbitrary geographic points, including park
+interiors, rather than random public stops. Bind backend walking speeds to Amble
+3 km/h, Walk 4.8 km/h and Dash 6.8 km/h. Reserve one minute per kilometre travelled
+because orientation slows the user down. The message ended with an unfinished `3)`.
+
+**Implemented decision:** Sample coordinates uniformly by area in the bounded search
+region; OTP must still find a connected route. Send the selected named pace to the
+backend, map it to OTP metres/second there, and include the orientation reserve in
+both candidate radius estimation and final itinerary acceptance. Interpret distance
+as the sum of every routed leg, including transit/cycling; round the reserve up to
+seconds. Store pace and reserve with the accepted trip and restore them through DTOs.
+
+**Limits:** This correction does not implement attraction scoring, reviews, visit
+durations or weighted choice among high-scoring candidates from the full design.
+
+**Verification:** 25 Node tests and 181 shared JVM tests passed; Android debug build
+and lint passed; smoke script parsed and whitespace checks passed. Checked OTP's
+official walking preference and Speed scalar documentation. Live stack/device checks
+remain pending. Arbitrary-point sampling was committed separately as `3dda5ea`.

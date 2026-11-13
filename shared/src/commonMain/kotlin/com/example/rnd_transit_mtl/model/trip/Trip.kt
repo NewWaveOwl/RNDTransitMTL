@@ -94,14 +94,20 @@ data class Trip(
     val selectedZoneIds: List<ZoneId> = emptyList(),
     /** Independent zone constraints recorded for each selected transit mode; empty on older trips. */
     val selectedZonesByTransport: Map<TransportId, List<ZoneId>> = emptyMap(),
-    /** Time from requested departure through arrival, including initial waiting. */
+    /** Budgeted time from requested departure, including waiting and the orientation reserve. */
     val routedDurationSeconds: Long? = null,
     /** Provider transfer waiting time, separate from the fixed playback clock. */
-    val waitingTimeSeconds: Long? = null
+    val waitingTimeSeconds: Long? = null,
+    /** User's named pace, retained so repeating a trip keeps its generation settings. */
+    val walkingPreference: String? = null,
+    /** Orientation reserve already included in routedDurationSeconds. */
+    val orientationBufferSeconds: Long = 0
 ) {
     init {
         require(routedDurationSeconds == null || routedDurationSeconds > 0)
         require(waitingTimeSeconds == null || waitingTimeSeconds >= 0)
+        require(walkingPreference == null || walkingPreference in listOf("Amble", "Walk", "Dash"))
+        require(orientationBufferSeconds >= 0 && (routedDurationSeconds == null || orientationBufferSeconds <= routedDurationSeconds))
         require(routedDurationSeconds == null || waitingTimeSeconds == null || waitingTimeSeconds <= routedDurationSeconds)
         validatePlannerValues(
             title = title,

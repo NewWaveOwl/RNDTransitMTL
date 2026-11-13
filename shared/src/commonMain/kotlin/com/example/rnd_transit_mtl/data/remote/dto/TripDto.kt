@@ -72,7 +72,9 @@ data class TripDto(
     @SerialName("zone_ids") val zoneIds: List<String> = emptyList(),
     @SerialName("zones_by_transport") val zonesByTransport: Map<String, List<String>> = emptyMap(),
     @SerialName("routed_duration_seconds") val routedDurationSeconds: Long? = null,
-    @SerialName("waiting_time_seconds") val waitingTimeSeconds: Long? = null
+    @SerialName("waiting_time_seconds") val waitingTimeSeconds: Long? = null,
+    @SerialName("walking_preference") val walkingPreference: String? = null,
+    @SerialName("orientation_buffer_seconds") val orientationBufferSeconds: Long = 0
 )
 
 /** Converts a trip into its backend form. */
@@ -99,6 +101,8 @@ fun Trip.toDto(): TripDto = TripDto(
     zoneIds = selectedZoneIds.map { it.value },
     routedDurationSeconds = routedDurationSeconds,
     waitingTimeSeconds = waitingTimeSeconds,
+    walkingPreference = walkingPreference,
+    orientationBufferSeconds = orientationBufferSeconds,
     zonesByTransport = selectedZonesByTransport.entries.associate { (mode, zones) ->
         mode.value to zones.map { it.value }
     }
@@ -134,6 +138,8 @@ fun TripDto.toDomainOrNull(): Trip? = runCatchingInvalid {
         selectedZoneIds = zoneIds.map(::ZoneId),
         routedDurationSeconds = routedDurationSeconds,
         waitingTimeSeconds = waitingTimeSeconds,
+        walkingPreference = walkingPreference,
+        orientationBufferSeconds = orientationBufferSeconds,
         selectedZonesByTransport = zonesByTransport.entries.associate { (mode, zones) ->
             TransportId(mode) to zones.map(::ZoneId)
         }
