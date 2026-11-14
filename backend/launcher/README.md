@@ -52,10 +52,16 @@ production resolves its bundle relative to the jpackage executable.
   run in this sandbox (Windows socket connect permission denied). Unit readiness
   checks use an injected transport; `LauncherHttpIntegrationTest` remains enabled
   for normal Gradle execution/CI on an unrestricted host.
-- Live OTP route generation, agency feeds, public tunnel connectivity, tray
-  interaction and Windows 10 on the second PC: **not verified here**. The EXE GUI
-  check ran on the development host, Windows build 26300. No cloudflared binary,
-  feed credentials or graph was included in the distributable.
+- Target-PC follow-up: the user confirmed startup; the launcher screenshot shows
+  Bridge, OTP and Ktor Ready. Uploaded logs show the combined graph loading and
+  STM/exo realtime updates being applied, with some individual updates rejected.
+  The public tunnel's `/health` response was independently checked and returned
+  `{"status":"ready"}`. An Android APK was built with that endpoint and its
+  manifest setting and signature were checked.
+- End-to-end Android trip generation over the tunnel and tray interaction still
+  need device testing. The initial EXE GUI check ran on development Windows build
+  26300; the target PC's exact OS build was not independently inspected. No
+  cloudflared binary, feed credentials or graph was included in the distributable.
 
 Portable outputs and QA renders live under ignored `launcher/build/`. The source,
 package script, guides and tests are committed; generated runtimes/ZIPs are not.

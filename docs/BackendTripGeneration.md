@@ -57,7 +57,21 @@ OTP defines walking speed as the maximum on flat ground; crossings and terrain m
 reduce actual average speed. The candidate radius accounts for both the selected
 pace and orientation reserve, and the routed itinerary receives the final budget check.
 
-## Start locally on Windows
+## Run with the Windows launcher
+
+The current setup runs the routing stack on a separate Windows PC using
+**RNDTransitServer.exe**. Import the prepared combined STM/exo graph and feed
+configuration once, press **Start server**, then wait for Bridge, OTP and Ktor to
+show Ready. For remote clients, enable Cloudflare Tunnel and use the launcher's
+Public HTTPS address as Android's `generationEndpoint`. The launcher starts and
+supervises all services; Android Studio only builds/runs the phone app.
+
+See the [root quick-start](../README.md#quick-start) for Android Studio configuration
+and the [Windows server guide](../backend/launcher/SERVER_GUIDE.md) for imports,
+data paths, authentication and tunnel settings. The following manual workflow is
+an alternative for developing services directly on the same PC.
+
+## Manual startup on Windows
 
 Use the combined STM/exo graph and local credentials prepared for #21. See
 [RunTripSimulation.md](RunTripSimulation.md) for the existing realtime stack.
@@ -108,8 +122,10 @@ In a third window, test two generated walking trips, then install Android:
 
 Use `-Phone` for an authorized USB phone. Installation uses `adb reverse` and embeds
 `http://127.0.0.1:18088/v1/trips/generate` in the debug manifest. Re-run it after an ADB
-reconnection. Android Studio's ordinary debug build defaults to the emulator host
-`http://10.0.2.2:18088/v1/trips/generate`.
+reconnection. Without a configured `generationEndpoint`, Android Studio's ordinary
+debug build defaults to `http://10.0.2.2:18088/v1/trips/generate` on the emulator's
+host PC. A server on another PC requires its public HTTPS endpoint instead; the
+local installer is not the remote-server workflow.
 
 The installer uses `ANDROID_HOME`, or the default Windows SDK at
 `%LOCALAPPDATA%\Android\Sdk`, and passes that location to Gradle for the build.
@@ -172,21 +188,24 @@ search load before choosing production machine capacity.
 | `OTP_CATALOGUE_URL` | Optional direct OTP endpoint for the route catalogue |
 | `PORT` | Generation API port; default 18088 |
 | `HOST` | Bind address; default 127.0.0.1 |
+| `PUBLIC_API` | Set to `true` for a loopback service published through a tunnel; requires Supabase authentication |
 | `FARE_ZONES_FILE` | Cached official ARTM GeoJSON path |
 | `SUPABASE_URL` | Existing project's HTTPS URL for token verification |
 | `SUPABASE_PUBLISHABLE_KEY` | Public Supabase API key; never a service-role key |
 
-Non-loopback binding requires Supabase configuration. In that mode every generation
-request needs a valid Supabase bearer token; Android reads the current session token
-at request time. Local loopback development permits the app's Guest flow. Hosted
-guest access is not implemented. Configure release builds with
-`-PgenerationEndpoint=https://YOUR-HOST/v1/trips/generate`; no deployment or public
-hostname is created by this change.
+Non-loopback binding or `PUBLIC_API=true` requires Supabase configuration. Every
+generation request then needs a valid Supabase bearer token; Android reads its
+current session token at request time. Loopback development without authentication
+permits the app's Guest flow. Hosted guest access is not implemented. Configure
+remote debug/release builds with
+`-PgenerationEndpoint=https://YOUR-HOST/v1/trips/generate`. The launcher sets
+`PUBLIC_API=true` when either tunnel mode is enabled, even though Ktor stays bound
+to loopback.
 
 ## Automated checks
 
 ```powershell
-.\gradlew.bat :backend:test
+.\gradlew.bat :backend:test :backend:launcher:test
 .\gradlew.bat :shared:jvmTest :androidApp:assembleDebug :androidApp:lintDebug
 ```
 

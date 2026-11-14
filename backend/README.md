@@ -1,7 +1,7 @@
 # Trip generation backend
 
 Kotlin/JVM 21 + Ktor 3.4.3. The Android app calls this service; OTP and the
-STM/exo bridge stay private. Node.js is no longer needed for trip generation.
+STM/exo bridge stay private.
 
 ## Layout
 
@@ -15,11 +15,31 @@ STM/exo bridge stay private. Node.js is no longer needed for trip generation.
   [the server guide](launcher/SERVER_GUIDE.md).
 - `data/`: ARTM polygon cache and attribution. Downloaded data is ignored by Git.
 
-## Run on Windows
+## Run the packaged Windows server
 
-Run commands from the repository root. Install JDK 21 and the Android SDK only if
-building the phone app. OTP uses its separate Java 25 runtime and requires a graph,
-OSM/GTFS inputs and configured realtime credentials as before.
+For the current second-PC setup, use **RNDTransitServer.exe** from the portable
+package. The launcher bundles Java 21, the separate OTP Java 25 runtime, Ktor, OTP
+and the production bridge. No Android Studio, Node.js or system Java is required
+on that PC. Import the prepared combined STM/exo data into an empty directory once,
+then press **Start server** and wait for Bridge, OTP and Ktor to show Ready.
+
+For remote phones/emulators, enable the launcher's Cloudflare Tunnel and configure
+the Android app with its Public HTTPS address. Public mode requires the app's
+Supabase project and a signed-in user. A Quick Tunnel URL is temporary; changing it
+requires rebuilding/reinstalling the phone app. Keep OTP and the bridge private.
+
+See the [Windows server guide](launcher/SERVER_GUIDE.md) for imports, data/config
+locations, tunnel settings and package builds, and the
+[root README](../README.md#build-and-launch-android-in-android-studio) for Android
+Studio's `generationEndpoint` setting. Generated packages and private routing data
+are not included when cloning the repository.
+
+## Manual development startup
+
+Use the following alternative when working on the services directly. JDK 21 is
+required for the Gradle/Ktor process; the Android SDK is needed only when building
+the phone app. OTP requires its separate Java 25 runtime, prepared graph and local
+feed configuration. Run commands from the repository root:
 
 ```powershell
 .\backend\otp\stm-scheduled\Start-StmRealtimeStack.ps1
@@ -30,8 +50,8 @@ OSM/GTFS inputs and configured realtime credentials as before.
 ```
 
 The stack writes its current ports into `stm-stack-processes.json`. After rebooting,
-start the stack again before starting Ktor. Stop any old Node backend on port 18088
-with Ctrl+C before starting the replacement.
+start the stack again before Ktor. Do not run this workflow alongside the launcher
+on the same ports.
 
 If the existing graph/credentials are in another checkout, keep using them:
 
@@ -39,8 +59,7 @@ If the existing graph/credentials are in another checkout, keep using them:
 .\backend\scripts\Start-TripBackend.ps1 -StackDirectory 'K:\CLASSES 26 FALL\APP_DEV\PRJ\RNDTransitMTL\tool\otp\stm-scheduled'
 ```
 
-Downloaded runtime files in that original checkout were not moved or deleted. For
-an independent second-PC installation, prepare the OTP runtime under `backend/otp`:
+For manual development in this checkout, prepare the runtime under `backend/otp`:
 `otp.jar`, `java25/`, and the `stm-scheduled/` graph, GTFS archives, adapter index,
 router configuration and local feed credentials. Do not commit these runtime files.
 `Start-StmOtp.ps1 -Rebuild` refreshes the graph with the prepared input feeds;
