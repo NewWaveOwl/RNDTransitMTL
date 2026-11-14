@@ -208,8 +208,8 @@ indicates the server loaded its catalogues; it is not a live upstream-health gua
 
 ## Hosting
 
-One VM can initially run OTP, the bridge and the backend as separate processes or
-containers. Build the backend container with `docker build -f backend/Dockerfile -t rnd-generation .`.
+Use the [Windows server launcher](launcher/README.md) to run OTP, the bridge and
+the backend as separate processes.
 Keep OTP and the credential-bearing bridge private. Terminate HTTPS at a reverse
 proxy in front of the generation API. Measure the graph's memory and concurrent
 search load before choosing production machine capacity.

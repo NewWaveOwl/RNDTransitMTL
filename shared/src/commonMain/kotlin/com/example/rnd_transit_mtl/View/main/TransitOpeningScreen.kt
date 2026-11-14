@@ -227,10 +227,10 @@ internal fun TransitOpeningScreen(
     val activeSummary = activeState?.let {
         val percentage = (it.elapsedMillis.toFloat() / TRIP_SIMULATION_DURATION_MILLIS * 100f)
             .toInt().coerceIn(0, 99)
-        "Unfinished: ${it.trip.title} В· $percentage%"
+        "Unfinished: ${it.trip.title} · $percentage%"
     }
     val completedSummary = pendingReviewTrip?.let {
-        "Completed: ${it.title} В· tap 100% to open your trip"
+        "Completed: ${it.title} · tap 100% to open your trip"
     }
 
     // Choosing another section cancels the opening intent, keeping the trip.
@@ -349,7 +349,7 @@ internal fun TransitOpeningScreen(
             .joinToString(" + ") { it.label }
 
         requestSummary =
-            "$boundedMinutes minutes В· $modes В· " +
+            "$boundedMinutes minutes · $modes · " +
                 (planner.originPlace?.label ?: planner.origin?.label ?: "Choose starting point")
 
         generationJob = generationScope.launch {
@@ -611,7 +611,7 @@ internal fun TransitOpeningScreen(
                 pickingOrigin = false
             },
             sampleLabel = if (sampleOutcome != Trip33Sample.Normal) {
-                "Sample В· ${sampleOutcome.name}"
+                "Sample · ${sampleOutcome.name}"
             } else {
                 null
             },

@@ -381,7 +381,7 @@ internal fun MainPlannerContent(
                     color = TransitWhite,
                     shape = RoundedCornerShape(4.dp)
                 ) {
-                    Text(if (liveMap) "OpenFreeMap" else "В© OpenStreetMap contributors В· Sample map",
+                    Text(if (liveMap) "OpenFreeMap" else "© OpenStreetMap contributors · Sample map",
                         color = TransitComplementary,
                         style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 4.dp))
                 }

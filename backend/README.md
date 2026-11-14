@@ -208,18 +208,12 @@ feed access and remote phone connectivity require the configured server and grap
 
 ## Hosting
 
-```powershell
-docker build -f backend/Dockerfile -t rnd-generation .
-```
-
-The image contains Ktor only. Run OTP and the STM/exo bridge alongside it on a private
-network; configure endpoint URLs rather than using container localhost. Mount durable
-storage at `/var/lib/rnd` for the polygon cache. Supply `SUPABASE_URL` and
-`SUPABASE_PUBLISHABLE_KEY` for public binding. Set `PUBLIC_API=true` when exposing a
-loopback service through Cloudflare Tunnel so it also requires authentication.
-Hosted guest access is not implemented. The phone uses a configured HTTPS
-`generationEndpoint`; OTP and feed keys are never exposed in the app.
+Use the [Windows server launcher](launcher/README.md) to run and supervise Ktor,
+OTP and the STM/exo bridge as separate processes. Keep OTP and feed credentials
+private. Configure public HTTPS access through the launcher's tunnel settings;
+public access requires Supabase authentication. Hosted guest access is not implemented.
+The phone uses a configured HTTPS `generationEndpoint`.
 
 See [the integration guide](TripGeneration.md) for Android checks,
-protocol details and official API/data references. Live device, cloud and Docker
-runtime checks must be performed on the target host.
+protocol details and official API/data references. Live device, feed and tunnel
+checks must be performed against the configured server.

@@ -201,7 +201,7 @@ and corrected during compilation/lint. No subagents were used.
 The independent server build also passed. Its offline Gradle plugin classpath used
 a validation-only annotation dependency substitution (cached 2.28.0 instead of
 2.27.0); this was confined to the temporary init script, not committed application
-dependencies. Docker execution and live device/tunnel checks remain unverified.
+dependencies. Live device/tunnel checks remain unverified.
 
 ## M3-A9 - Portable Windows server and public access
 

@@ -664,12 +664,12 @@ search limits, provider failures and Supabase checks. Removed Node sources/tests
 fixed journey controls/intents/loaders and preset-query scripts. Kept the production
 STM/exo bridge and its failure/freshness regression fixtures. Android only decodes
 accepted itineraries. All server code and tools live under `backend`; standalone
-Gradle builds and the container build avoid configuring Android.
+Gradle builds avoid configuring Android.
 
 **Verification:** 15 backend Kotlin and 176 shared JVM tests passed using direct
 JUnit in this restricted session; Android APK assembly and lint passed. PowerShell
 scripts parsed; relocated Java feed fixtures compiled and were checked. Live device,
-agency polling, Docker runtime and public tunnel deployment are not claimed. See
+agency polling and public tunnel deployment are not claimed. See
 `backend/README.md` for setup and retained external runtime data.
 
 ## M3-A9 - Portable Windows server and public access
