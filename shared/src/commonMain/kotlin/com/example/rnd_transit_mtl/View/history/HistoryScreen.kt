@@ -2,7 +2,11 @@ package com.example.rnd_transit_mtl.View.history
 
 import com.example.rnd_transit_mtl.state.NullableTripIdSaver
 import com.example.rnd_transit_mtl.model.ids.TripId
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.AlertDialog
+import com.example.rnd_transit_mtl.layout.PageTitle
+import com.example.rnd_transit_mtl.navigation.HistoryScreenKey
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -196,10 +200,8 @@ fun HistoryScreen(
             { tripId -> openExistingTrip(tripId, callback) }
         }
 
-    Column(modifier) {
-        if (loadFailed) {
-            TextButton(onClick = { retry++ }) { Text("Could not load History. Retry") }
-        }
+    Column(modifier.fillMaxSize()) {
+        PageTitle(title = HistoryScreenKey.screenTitle, layoutScale = 1f, highlighted = false)
         HistoryContent(
             trips = historyTrips(historyRecords, filter),
             filter = filter,
@@ -214,8 +216,7 @@ fun HistoryScreen(
             onReview = reviewCallback,
             onRemove = { requestRemoval(it) },
             actionsEnabled = isDestinationActive,
-            errorMessage = errorMessage,
-            modifier = Modifier
+            errorMessage = errorMessage
         )
     }
     if (isDestinationActive && pendingRemovalTrip != null) {

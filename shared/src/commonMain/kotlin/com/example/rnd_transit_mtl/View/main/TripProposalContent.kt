@@ -145,7 +145,8 @@ internal fun TripLoadingContent(
             0.5f,
             0.35f
         ),
-    liveOrigin: Place? = null
+    liveOrigin: Place? = null,
+    originIsManual: Boolean = true
 ) {
     val liveMap = LocalTransitMap.current != null
     Box(modifier.fillMaxSize()) {
@@ -154,7 +155,8 @@ internal fun TripLoadingContent(
                 interactive = false,
                 sharedTripFlow = true,
                 browsing = true,
-                pin = liveOrigin?.point
+                pin = liveOrigin?.point,
+                centerOnPin = originIsManual
             ),
             modifier = Modifier.fillMaxSize()
         ) {

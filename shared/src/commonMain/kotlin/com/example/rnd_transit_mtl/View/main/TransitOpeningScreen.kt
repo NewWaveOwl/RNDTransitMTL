@@ -29,6 +29,7 @@ import com.example.rnd_transit_mtl.ViewModels.main.MainPlannerState
 import com.example.rnd_transit_mtl.ViewModels.main.MainPlannerViewModel
 import com.example.rnd_transit_mtl.data.generation.MockTripGenerator
 import com.example.rnd_transit_mtl.data.location.LocalPlannerLocation
+import com.example.rnd_transit_mtl.data.location.LocationUpdate
 import com.example.rnd_transit_mtl.data.fake.FakeRoutingService
 import com.example.rnd_transit_mtl.model.geo.GeoPoint
 import com.example.rnd_transit_mtl.model.trip.Place
@@ -51,6 +52,8 @@ import com.example.rnd_transit_mtl.state.trip.TripActionResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
@@ -278,6 +281,37 @@ internal fun TransitOpeningScreen(
 
     fun canChangeInputs(): Boolean =
         latestDestinationActive && !processingAction && pendingOpenTripId == null
+
+    var defaultOriginStatus by remember { mutableStateOf<String?>(null) }
+    val needsDefaultOrigin = isDestinationActive && canChangeInputs() &&
+        originMode == "planner" && planner.originPlace == null && !planner.originIsManual
+    LaunchedEffect(location, needsDefaultOrigin) {
+        defaultOriginStatus = null
+        if (!needsDefaultOrigin || location == null) return@LaunchedEffect
+        val updates = location.automaticOriginUpdates ?: return@LaunchedEffect
+        val timeout = launch {
+            delay(15_000)
+            if (defaultOriginStatus == null) {
+                defaultOriginStatus = "Location unavailable. Choose a starting point."
+            }
+        }
+        try {
+            val fix = updates.first { update ->
+                val usable = update is LocationUpdate.Fix && location.containsPoint(update.point)
+                defaultOriginStatus = when (update) {
+                    LocationUpdate.PermissionDenied -> "Location permission is off. Choose a starting point."
+                    LocationUpdate.Unavailable -> "Location unavailable. Choose a starting point."
+                    is LocationUpdate.Fix -> if (usable) null else "Outside the supported area. Choose a starting point."
+                }
+                usable
+            } as LocationUpdate.Fix
+            if (canChangeInputs() && originMode == "planner") {
+                plannerViewModel.setDefaultOrigin(Place("Current location", fix.point))
+            }
+        } finally {
+            timeout.cancel()
+        }
+    }
 
     fun clearValidation() {
         validationMessage = ""
@@ -646,6 +680,7 @@ internal fun TransitOpeningScreen(
         TripLoadingContent(
             origin = planner.origin,
             liveOrigin = planner.originPlace,
+            originIsManual = planner.originIsManual,
             minutes = boundedMinutes,
             transportSummary = transportTypes
                 .filter { it.id in selectedTransportIds }
@@ -909,6 +944,8 @@ internal fun TransitOpeningScreen(
             onMapViewportReady = { generationBounds = it },
             origin = planner.origin,
             liveOrigin = planner.originPlace,
+            originIsManual = planner.originIsManual,
+            originStatus = defaultOriginStatus,
             onEditOrigin = {
                 if (canChangeInputs()) {
                     originMessage = null
