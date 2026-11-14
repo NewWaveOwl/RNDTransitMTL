@@ -320,6 +320,24 @@ private fun AndroidTransitMap(
                     if (!map.isCameraMoving) map.cameraPosition else null
                 }.collect { position -> if (position != null) session.saveCamera(position) }
             }
+            LaunchedEffect(map, cameraReady, offline, data.pickerOpen) {
+                if (!cameraReady || !offline || !data.pickerOpen) return@LaunchedEffect
+
+                snapshotFlow { latestData.cameraInsetsReady }.first { it }
+                val viewport = map.awaitViewport()
+                val visible = viewport.visibleBounds
+                // Preserve a usable saved view, but bring the bundled image back when it is off screen.
+                val overlapsOfflineMap = visible.west < OfflineBounds.east &&
+                    visible.east > OfflineBounds.west &&
+                    visible.south < OfflineBounds.north &&
+                    visible.north > OfflineBounds.south
+                if (!overlapsOfflineMap) {
+                    map.fitCameraToBounds(
+                        OfflineBounds,
+                        CameraFit(cameraPadding = latestData.visibleMapPadding(viewport.size.height))
+                    )
+                }
+            }
             LaunchedEffect(map) {
                 snapshotFlow { map.cameraMoveReason }.collect { reason ->
                     if (reason == CameraMoveReason.Gesture) session.autoCenterPending = false
