@@ -182,6 +182,28 @@ class LauncherTest {
     @Test fun `data must be a launcher import before router can be managed`() {
         assertThrows(IllegalArgumentException::class.java) { DataSetup().validateData(preparedSource()) }
     }
+
+    @Test fun `backend command uses concrete jars and preserves paths with spaces`() {
+        val bundle = directory("server package with spaces")
+        val libs = Files.createDirectories(bundle.resolve("services/backend/lib"))
+        val backend = Files.writeString(libs.resolve("backend.jar"), "fixture")
+        val dependency = Files.writeString(libs.resolve("ktor library.jar"), "fixture")
+        Files.writeString(libs.resolve("not-a-library.txt"), "ignored")
+        Files.createDirectory(libs.resolve("not-a-file.jar"))
+        val command = backendCommand(bundle)
+        assertEquals(bundle.resolve("runtime/bin/java.exe").toString(), command[0])
+        assertEquals("-cp", command[1])
+        assertEquals(setOf(backend.toAbsolutePath().toString(), dependency.toAbsolutePath().toString()), command[2].split(java.io.File.pathSeparator).toSet())
+        assertFalse(command[2].contains('*'))
+        assertEquals("transit.ServerKt", command[3])
+    }
+
+    @Test fun `backend command rejects missing or empty libraries before starting services`() {
+        val bundle = directory()
+        assertThrows(IllegalArgumentException::class.java) { backendCommand(bundle) }
+        Files.createDirectories(bundle.resolve("services/backend/lib"))
+        assertThrows(IllegalArgumentException::class.java) { backendCommand(bundle) }
+    }
 }
 
 /** A child fixture with no networking, secret data or dependency on a Java compiler at runtime. */

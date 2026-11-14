@@ -11,6 +11,22 @@ import java.util.concurrent.atomic.AtomicBoolean
 data class ServerState(val services: Map<String, String> = listOf("Ktor", "OTP", "Bridge", "Tunnel").associateWith { "Stopped" },
     val message: String = "Import a prepared OTP stack, then press Start.", val localAddress: String = "", val publicAddress: String = "")
 
+/**
+ * Builds Java's argument vector from concrete JAR paths; Windows Path rejects wildcard characters.
+ * @param bundle Portable application root, including paths containing spaces.
+ * @return Java executable, classpath and backend entry point without shell quoting.
+ */
+internal fun backendCommand(bundle: Path): List<String> {
+    val libraryDirectory = bundle.resolve("services/backend/lib")
+    require(Files.isDirectory(libraryDirectory)) { "Missing packaged Ktor libraries." }
+    val jars = Files.list(libraryDirectory).use { files ->
+        files.filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".jar", ignoreCase = true) }
+            .sorted().map { it.toAbsolutePath().toString() }.toList()
+    }
+    require(jars.isNotEmpty()) { "Packaged Ktor library directory has no JAR files. Copy the entire server package." }
+    return listOf(bundle.resolve("runtime/bin/java.exe").toString(), "-cp", jars.joinToString(java.io.File.pathSeparator), "transit.ServerKt")
+}
+
 /** Supervises the packaged services without Gradle, Python, PowerShell, or a system Java installation. */
 class ServerController(
     private val store: ConfigStore,
@@ -108,7 +124,7 @@ class ServerController(
             for (file in listOf(java21, java25, otpJar, bundle.resolve("services/bridge/StmRealtimeAdapter.class"))) {
                 require(Files.isRegularFile(file)) { "Package is incomplete: ${file.fileName}. Rebuild with Package-Server.ps1 and copy the entire package." }
             }
-            require(Files.isDirectory(bundle.resolve("services/backend/lib"))) { "Missing packaged Ktor libraries." }
+            val ktorCommand = backendCommand(bundle)
             for (port in listOf(settings.apiPort, settings.otpPort, settings.bridgePort) + if (settings.tunnelMode == "off") emptyList() else listOf(settings.metricsPort())) readiness.requireAvailable(port)
             DataSetup().prepareRouter(settings)
             // The bridge starts first because OTP's configured updaters poll its private endpoints.
@@ -129,7 +145,7 @@ class ServerController(
                 "FARE_ZONES_FILE" to store.home.resolve("cache/fare-zones-2026.geojson").toString(),
                 "SUPABASE_URL" to settings.supabaseUrl, "SUPABASE_PUBLISHABLE_KEY" to settings.supabaseKey,
                 "PUBLIC_API" to "${settings.tunnelMode != "off"}")
-            processes.start("Ktor", listOf(java21.toString(), "-cp", bundle.resolve("services/backend/lib/*").toString(), "transit.ServerKt"), store.home, environment)
+            processes.start("Ktor", ktorCommand, store.home, environment)
             await("Ktor", 90) { readiness.check("http://127.0.0.1:${settings.apiPort}/health", valid = { Json.parseToJsonElement(it).jsonObject["status"]?.jsonPrimitive?.content == "ready" }) }
             service("Ktor", "Ready")
             if (settings.tunnelMode != "off") startTunnel(settings) else service("Tunnel", "Off — local access only")

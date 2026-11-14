@@ -30,11 +30,17 @@ production resolves its bundle relative to the jpackage executable.
 ## Verification performed (2026-11-13)
 
 - Standalone backend + launcher compilation and installDist: passed.
-- 21 launcher unit tests and 15 existing backend tests: **36 passed** via direct
+- 23 launcher unit tests and 15 existing backend tests: **38 passed** via direct
   JUnit invocation of Gradle-compiled classes. These include actual child Java
   process ownership, duplicate launch locks, shutdown, verified crash recovery,
   PID mismatch rejection, occupied port detection, import/config validation,
   readiness result/cancellation/deadline handling, secret redaction and log rotation.
+- Windows startup follow-up: fixed `InvalidPathException` from resolving
+  `services/backend/lib/*` as a Windows filesystem path. The launcher now builds
+  the backend classpath from concrete JAR filenames, before starting any service.
+  Regression checks cover spaces, ignored non-JAR files and missing/empty library
+  directories. Actual packaged backend JVM/main-class validation with `--dry-run`
+  passed; this check loads the entry point without starting networking.
 - Windows x64 jpackage app-image, bundled Java 21 and separate Java 25 runtime,
   production bridge compilation: passed using the existing OTP 2.10.0 JAR.
 - Packaged EXE `--self-check <absolute-PNG-path>`: exit 0, GUI rendered and all
