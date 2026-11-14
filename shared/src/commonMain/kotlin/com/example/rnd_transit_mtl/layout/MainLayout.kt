@@ -33,7 +33,10 @@ fun MainLayout(
     val tripsState by tripsStore.state
     val currentKey = navigator.current
 
+    val openCompass = onOpenCompass ?: { navigator.open(CompassScreenKey) }
+
     val displayedTab = selectedTab ?: when (currentKey) {
+        CompassScreenKey -> MainViewTab.Compass
         MainScreenKey -> MainViewTab.Map
         is CurrentTripScreenKey -> MainViewTab.Map
         else -> null
@@ -41,7 +44,7 @@ fun MainLayout(
 
     val enabledTabs = buildSet {
         add(MainViewTab.Map)
-        if (onOpenCompass != null) add(MainViewTab.Compass)
+        add(MainViewTab.Compass)
         if (onOpenTogether != null) add(MainViewTab.Together)
     }
 
@@ -84,7 +87,7 @@ fun MainLayout(
                             }
 
                             MainViewTab.Compass ->
-                                onOpenCompass?.invoke()
+                                openCompass()
 
                             MainViewTab.Together ->
                                 onOpenTogether?.invoke()
