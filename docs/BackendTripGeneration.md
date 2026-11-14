@@ -1,9 +1,8 @@
 # Backend trip generation (#67)
 
 Android **GO** sends the confirmed WGS84 origin, time budget, allowed modes and
-per-mode transit zones and walking pace to a Kotlin/Ktor service. The backend samples
-arbitrary geographic destinations, including park interiors, validates routes through OTP, and returns
-one accepted itinerary. The app decodes that itinerary once and reuses its geometry
+per-mode transit zones and walking pace to a Kotlin/Ktor service. The backend evaluates network-linked stops and geographic destinations, validates routes
+through OTP, and returns the valid itinerary closest to the selected duration. The app decodes that itinerary once and reuses its geometry
 in Preview, Active Trip and saved state. Android does not fall back to invented routes
 when the backend is unavailable. Desktop/Web previews retain their existing sample
 flow unless supplied a generation endpoint.
@@ -18,9 +17,23 @@ flow unless supplied a generation endpoint.
 | Supabase | Account authentication; local prototype trips continue using the existing saved-state store |
 | Android | Exact pin/device origin, loading/cancel/retry, preview, Start Trip, stored trip geometry |
 
-Search uses at most 16 candidates and a 15-second deadline. Candidate destinations are
-normally at least 250 metres from the origin (less for short budgets) and 100 metres apart; the app excludes its last ten
-accepted destinations. The service area matches the Android picker: Montréal centre
+Search uses a deadline of `20 + floor(selectedMinutes / 60)` seconds: 30 minutes
+gets 20 seconds, 60 gets 21, 120 gets 22, and 360 gets 26. This search deadline is
+separate from the hard maximum trip duration. The search retains its best valid
+result and returns it at the deadline or exhaustion; reaching 95% of the selected
+duration permits an early exit. Equal-duration ties retain the first accepted option.
+A maximum of 128 routing attempts bounds work even if OTP responds immediately.
+
+For transit, candidates favour stops served by allowed routes in selected zones.
+The startup catalogue requests stop coordinates; older schemas can fall back to the
+route-only catalogue and geographic sampling. Walk/bike alternatives also retain
+geographic candidates, including park interiors. With no transit selected, stop
+anchors provide known street-access locations without enabling transit legs. An over-budget itinerary can supply
+a linked intermediate geometry point for a shorter retry. Previously attempted
+points within 50 metres are skipped; previous destinations within 100 metres remain
+excluded. Geographic candidates are normally at least 250 metres from the origin
+(less for short trips) and 100 metres apart; stop anchors are over 100 metres away.
+The app excludes its last ten accepted destinations. The service area matches the Android picker: Montréal centre
 45.5019, -73.5673 to the recorded farthest CMM point, plus 5 km. Transit shapes are
 checked against ARTM A/B/C/D polygons, including intermediate samples at most 100 m
 apart. Missing zone data prevents startup; legacy numeric exo zones are not guessed.
@@ -34,14 +47,15 @@ trip records the accepted elapsed time separately from the planner budget and fr
 the existing 10-second **simulated** playback clock. Live GPS navigation is not added
 by this issue. Schedules and estimates describe a proposal and can change afterwards.
 
-Enabled modes are alternatives, not a required leg sequence. Walking access, egress
+Enabled modes are alternatives, not a required leg sequence. Walking-only results
+require Walk to be selected: Bus alone must include a bus leg; Walk + Bus may use either. Walking access, egress
 and transfers are permitted for transit even if walking-only trips are disabled.
 Supported feeds currently cover walking, cycling, STM bus/métro and exo trains.
 REM and additional agencies/exo bus feeds require their own graph integration; they
 are not silently mapped to another mode. STM métro times are scheduled, not live
 arrival predictions. Attraction intensity remains stored but does not rank destinations.
 Destinations are random coordinates, not an attraction/POI recommendation catalogue.
-Sampling does not depend on stops or POIs. OTP must find a connected route to each
+Geographic fallback does not require a stop or POI catalogue. OTP must find a connected route to each
 candidate; unreachable points are skipped without inventing a connecting path.
 
 The backend binds `walkingPreference` to these speeds; client-supplied numeric speeds
@@ -136,6 +150,24 @@ The smoke test accepts `-Mode bus`, `-Mode metro`, `-Mode train` or `-Mode bike`
 Transit results depend on the current timetable and service hours; increasing
 `-Minutes` can help for sparse train service. The scripts report failure when no
 itinerary fits rather than claiming a passing live test.
+
+## Loading and timeout behavior
+
+Generation shows a non-interactive 64 dp rounded progress bar using the Bike Speed
+selector palette and gradient. Its sweep remains indeterminate throughout the
+synchronous backend search. Crossfading messages say "Looking around...", "Trying a
+few routes...", and "Finding a good fit..."; these are ongoing-search messages,
+not completed stages or percentages. Leaving loading disposes its animation/message
+state; retries start fresh. Cancel and navigation invalidate the proposal token and
+cancel the client request, preventing stale responses from replacing a newer proposal.
+
+The API allows 40 seconds overall (including authentication/body reading); Android
+allows 45 seconds. Backend-to-bridge HTTP requests remain bounded at 30 seconds,
+and the bridge keeps 15 seconds per OTP call (including a possible scheduled retry).
+The generation deadline cancels any outstanding backend HTTP call at 20-26 seconds.
+Only the internal deadline may return the saved best result. Parent cancellation
+propagates and must not publish that result. Geometry, navigation, timestamps and
+realtime extensions are copied from the winning itinerary without reconstruction.
 
 ## Android review
 
@@ -280,3 +312,33 @@ compilation and installable distribution build passed without configuring Androi
 Relocated STM/exo Java bridge regression fixtures and PowerShell syntax checks
 also passed. The removed tests exercised the retired
 fixed STM/exo demos. Previous Node test results above are historical.
+
+## Duration-matching verification (2026-11-14)
+
+- 22 backend regression tests passed via cached Kotlin compilation and direct JUnit.
+  Coverage includes alternatives, explicit Walk requirements, walking connections,
+  later/closer candidates, deterministic ties, exact maximum elapsed time, retained
+  best at deadline, parent cancellation after finding a valid route, whole-hour
+  budget boundaries, stop filtering and geometry-guided retry.
+- Changed shared UI/client sources and the loading UI test compiled against the
+  cached JVM build. 182 cached shared JVM tests passed with those fresh classes first on the classpath, including existing proposal
+  cancellation/supersession, generator/DTO/timing/navigation tests, and a rendered
+  loading test verifying indeterminate semantics, moving frames and Cancel actions.
+- Fresh Java bridge compilation passed; STM/exo train fallback/recovery fixtures
+  and all 25 exo bus fixtures passed without live API requests.
+- Loading frames at 412 x 720 were rendered and visually inspected.
+- Full Gradle tests/Android assembly could not run: the default wrapper cache is
+  protected, distribution downloads cannot resolve DNS, and the installed Gradle
+  with a writable cache cannot connect to its daemon in this environment. No new
+  APK is claimed. Direct compilation checks do not replace Android assembly/lint.
+- A cumulative server update ZIP is generated under ignored
+  `backend/launcher/build/release-duration-matching/`. It preserves the prior
+  launcher/bridge update and replaces the generation backend; no graph or keys.
+
+On the server PC, apply the update with the launcher closed, restart, confirm the
+OTP stop catalogue and current realtime fallback, and run the generated-trip smoke
+checks during service hours. On Android, build `:androidApp:assembleDebug` and
+`:androidApp:lintDebug`, install using the existing endpoint, inspect loading at
+small/large sizes, cancel/back/retry repeatedly, and verify Walk + Bus versus Bus
+alone and short/long duration matching. Live routing quality and device behavior
+remain target-environment checks.

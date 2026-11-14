@@ -92,12 +92,21 @@ excludedDestinations. Responses retain `success`, `no_trip`, `invalid_input`,
 `unauthorized` and `unavailable`, plus the accepted OTP itinerary on success.
 `GET /health` means the initial catalogues loaded; it does not continuously test OTP.
 
-Candidates are arbitrary coordinates, including parks. OTP must find a connected
-route; the backend never invents an off-network path. Search is capped at 16
-candidates and 15 seconds, with four concurrent API requests. The walking speeds
-are Amble 3, Walk 4.8 and Dash 6.8 km/h. Travel and waiting plus one minute per routed
-kilometre must fit the selected budget. Transit modes, selected lines and intermediate
-ARTM zones are checked. Attraction scoring remains future work.
+Candidates favour selected-line transit stops in allowed fare zones, with geographic
+sampling for direct modes and older catalogue schemas. OTP must find a connected
+route; the backend never invents an off-network path. Up to 128 attempts fit within
+`20 + floor(selectedMinutes / 60)` seconds (20-26 seconds for supported durations),
+with four concurrent API requests. The closest valid duration wins; equal durations
+keep the first result, and a 95% match allows early exit. The best valid result
+survives an internal deadline; caller cancellation still propagates.
+
+The walking speeds are Amble 3, Walk 4.8 and Dash 6.8 km/h. Total elapsed time includes
+initial waiting, transfers, walking and one minute per routed kilometre, and cannot
+exceed the selected trip duration. Selected modes are alternatives. Walking-only
+requires Walk; transit-only selections may use walking connections. Line, intermediate
+ARTM zone and prior-destination exclusions remain enforced. API and Android timeouts
+are 40/45 seconds; see [generation details](../docs/BackendTripGeneration.md) for
+loading behavior, regression coverage and remaining device/server checks.
 
 ## Hosting
 

@@ -53,7 +53,7 @@ internal class Api(private val generator: Generator, private val authorize: susp
     suspend fun handle(contentType: String?, authorization: String?, read: suspend ()->String): Pair<Int,JsonObject> {
         if(!capacity.tryAcquire()) return 429 to obj("status" to "unavailable","message" to "Trip planner is busy. Try again.")
         try {
-            return withTimeout(25_000) {
+            return withTimeout(40_000) {
                 if(!authorize(authorization)) return@withTimeout 401 to obj("status" to "unauthorized")
                 checkInput(contentType?.substringBefore(';')?.trim()=="application/json","Send application/json.")
                 val text=read(); checkInput(text.toByteArray().size<=16_384,"Request is too large.")
@@ -100,7 +100,11 @@ fun main() {
         val (zones,routes)=runBlocking {
             val zones=try { loadZones(Path.of(env("FARE_ZONES_FILE","data/fare-zones-2026.geojson")),upstream) }
                 catch(e: Exception) { throw IllegalStateException("Could not load ARTM fare zones: ${e.message}",e) }
-            val response=try { upstream.json(catalogue,obj("query" to "query RoutingLines { routes { gtfsId mode shortName longName } }")) }
+            val response=try {
+                val enriched=upstream.json(catalogue,obj("query" to "query RoutingLines { routes { gtfsId mode shortName longName stops { lat lon } } }"))
+                if(enriched["errors"].items().isEmpty()) enriched else
+                    upstream.json(catalogue,obj("query" to "query RoutingLines { routes { gtfsId mode shortName longName } }"))
+            }
                 catch(e: Exception) { throw IllegalStateException("OTP catalogue unavailable at $catalogue. Start Start-StmRealtimeStack.ps1, then restart the backend.",e) }
             require(response["errors"].items().isEmpty() && response.field("data").field("routes") is JsonArray) { "Invalid OTP route catalogue." }
             zones to response.field("data").field("routes").items()

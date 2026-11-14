@@ -13,6 +13,9 @@ import com.example.rnd_transit_mtl.View.main.TripProposalContent
 import com.example.rnd_transit_mtl.ui.theme.RNDTransitTheme
 import java.io.File
 import kotlin.test.Test
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import kotlin.test.assertEquals
 
 /** Verifies the supplied loading/preview controls render and dispatch their separate actions. */
@@ -49,6 +52,14 @@ class TripProposalContentTest {
         }
         try {
             render("Trip-loading.png")
+            val progress = scene.semanticsOwners.flatMap { all(it.rootSemanticsNode) }.firstOrNull {
+                it.config.getOrNull(SemanticsProperties.ProgressBarRangeInfo) == ProgressBarRangeInfo.Indeterminate
+            }
+            assertNotNull(progress)
+            val firstFrame = File("build/planner-previews/Trip-loading.png").readBytes()
+            time += 600_000_000
+            render("Trip-loading-moving.png")
+            assertFalse(firstFrame.contentEquals(File("build/planner-previews/Trip-loading-moving.png").readBytes()))
             click("Cancel search")
             loading = false
             render("Trip-proposal.png")

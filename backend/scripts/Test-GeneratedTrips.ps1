@@ -13,7 +13,7 @@ if ($Mode -in @('bus','metro','train')) { $request.zonesByTransport[$Mode] = @('
 $destinations = @()
 foreach ($number in 1..2) {
     $body = $request | ConvertTo-Json -Depth 15 -Compress
-    $trip = Invoke-RestMethod -Method Post -Uri $Endpoint -ContentType 'application/json' -Body $body -TimeoutSec 30
+    $trip = Invoke-RestMethod -Method Post -Uri $Endpoint -ContentType 'application/json' -Body $body -TimeoutSec 45
     if ($trip.status -ne 'success') { throw "Trip $number failed: $($trip.message)" }
     if ($trip.origin.point.latitude -ne $origin.point.latitude -or $trip.origin.point.longitude -ne $origin.point.longitude) {
         throw 'The confirmed origin changed.'

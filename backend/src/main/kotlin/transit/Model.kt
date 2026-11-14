@@ -104,8 +104,8 @@ internal fun candidates(input: Request, random: Random=Random.Default): List<Poi
     val speed=when { input.modes.any { it in listOf("train","metro") } -> 30.0; "bus" in input.modes -> 15.0; "bike" in input.modes -> 8.0; else -> input.speed }
     val radius=min(100_000.0,input.minutes*60/(1/speed+0.06)); val inner=cos(min(250.0,radius/4)/earthRadius); val outer=cos(radius/earthRadius)
     val result=mutableListOf<Point>()
-    repeat(16*64) {
-        if(result.size==16) return result
+    repeat(128*64) {
+        if(result.size==128) return result
         val meters=earthRadius*acos((inner-random.nextDouble()*(inner-outer)).coerceIn(-1.0,1.0))
         val p=destination(input.start,meters,random.nextDouble()*2*PI)
         if(inServiceArea(p) && input.excluded.none { distance(p,it)<100 } && result.none { distance(p,it)<100 }) result+=p

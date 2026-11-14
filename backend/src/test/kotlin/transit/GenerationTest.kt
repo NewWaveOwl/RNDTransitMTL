@@ -130,4 +130,73 @@ class GenerationTest {
         assertEquals("no_trip",generator.generate(parseRequest(input(modes=listOf("bus"))))["status"].text())
     }
 
+    @Test fun selectedModesAreAlternativesAndWalkMustBeExplicit()=runBlocking {
+        assertEquals("success",generator { response() }.generate(parseRequest(input(modes=listOf("walk","bus"))))["status"].text())
+        assertEquals("success",generator { response(mode="BUS") }.generate(parseRequest(input(modes=listOf("walk","bus"))))["status"].text())
+        assertEquals("no_trip",generator { response() }.generate(parseRequest(input(modes=listOf("bus"))))["status"].text())
+        val multipleTransit=parseRequest(input(modes=listOf("bus"))).copy(modes=listOf("bus","metro"),zones=mapOf("bus" to listOf("A"),"metro" to listOf("A")))
+        assertEquals("success",generator { response(mode="BUS") }.generate(multipleTransit)["status"].text())
+        val middle=Point(45.505,-73.6)
+        val walk=response(points=listOf(start,middle)).field("data").field("planConnection").field("edges").items().single().field("node").field("legs").items().single()
+        val bus=response(mode="BUS",points=listOf(middle,end)).field("data").field("planConnection").field("edges").items().single().field("node").field("legs").items().single()
+        val itinerary=obj("legs" to listOf(walk,bus))
+        assertTrue(accepts(itinerary,parseRequest(input(modes=listOf("bus"))),end,zones(),null))
+    }
+    @Test fun laterCloserCandidateWinsAndEqualDurationKeepsFirst()=runBlocking {
+        val other=Point(45.52,-73.6); var calls=0
+        val g=Generator(emptyList(),zones(),{ query ->
+            calls++
+            val target=Point(query.field("variables").field("destinationLat").number()!!,query.field("variables").field("destinationLon").number()!!)
+            response(if(calls==1) 10.0 else 25.0,points=listOf(start,target))
+        },{now},{listOf(end,other)})
+        val result=g.generate(parseRequest(input()))
+        assertEquals(1560.0,result["elapsedSeconds"].number()!!,0.0)
+        assertEquals(other.toJson(),result.field("destination").field("point"))
+        val tie=Generator(emptyList(),zones(),{ query ->
+            response(points=listOf(start,Point(query.field("variables").field("destinationLat").number()!!,query.field("variables").field("destinationLon").number()!!)))
+        },{now},{listOf(end,other)}).generate(parseRequest(input()))
+        assertEquals(end.toJson(),tie.field("destination").field("point"))
+    }
+    @Test fun deadlineReturnsBestButParentCancellationStillWins()=runBlocking {
+        var calls=0
+        val g=Generator(emptyList(),zones(),{
+            if(++calls==1) response() else { delay(10_000); response() }
+        },{now},{listOf(end,Point(45.52,-73.6))},100)
+        assertEquals("success",g.generate(parseRequest(input()))["status"].text())
+        calls=0
+        val entered=CompletableDeferred<Unit>()
+        val cancellable=Generator(emptyList(),zones(),{
+            if(++calls==1) response() else { entered.complete(Unit); delay(10_000); response() }
+        },{now},{listOf(end,Point(45.52,-73.6))},5000)
+        val job=async { cancellable.generate(parseRequest(input())) }
+        entered.await(); job.cancel()
+        try { job.await(); fail("Cancelled generation returned a result") } catch(_: CancellationException) { }
+    }
+    @Test fun searchBudgetUsesWholeHours() {
+        mapOf(5 to 20L,30 to 20L,59 to 20L,60 to 21L,61 to 21L,119 to 21L,120 to 22L,360 to 26L).forEach { (minutes,seconds) ->
+            assertEquals(seconds,searchBudgetSeconds(minutes))
+        }
+    }
+
+    @Test fun networkCandidatesRespectLinesZonesAndExclusions() {
+        val route=obj("gtfsId" to "STM:55","mode" to "BUS","stops" to listOf(obj("lat" to end.latitude,"lon" to end.longitude)))
+        val r=parseRequest(input(modes=listOf("bus")))
+        assertEquals(listOf(end),destinationCandidates(r,listOf(route),zones(),setOf("STM:55")))
+        assertTrue(end in destinationCandidates(parseRequest(input()),listOf(route),zones(),null))
+        assertFalse(end in destinationCandidates(r.copy(excluded=listOf(end)),listOf(route),zones(),setOf("STM:55")))
+        assertFalse(end in destinationCandidates(r,listOf(route),zones(),setOf("STM:99")))
+    }
+    @Test fun overBudgetRouteFeedsLinkedGeometryBackIntoSearch()=runBlocking {
+        val middle=Point(45.505,-73.6); var calls=0
+        val g=Generator(emptyList(),zones(),{ query ->
+            if(++calls==1) response(40.0,points=listOf(start,middle,end)) else {
+                assertEquals(middle.latitude,query.field("variables").field("destinationLat").number()!!,0.0)
+                response(25.0,points=listOf(start,middle))
+            }
+        },{now},{listOf(end)})
+        val result=g.generate(parseRequest(input()))
+        assertEquals(middle.toJson(),result.field("destination").field("point"))
+        assertEquals(2,calls)
+    }
+
 }

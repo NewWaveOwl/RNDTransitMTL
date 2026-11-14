@@ -3,6 +3,7 @@ package com.example.rnd_transit_mtl.View.main
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMap
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMapData
 import com.example.rnd_transit_mtl.data.assets.toSampleMapPoint
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -24,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.LocalTransitMap
+import com.example.rnd_transit_mtl.View.main.components.TripSearchBar
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -185,11 +187,16 @@ internal fun TripLoadingContent(
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            CircularProgressIndicator(
-                color = TransitSelected,
-                strokeWidth = 3.dp,
-                modifier = Modifier.size(26.dp)
-            )
+            // Indeterminate: the synchronous search cannot report a truthful percentage.
+            TripSearchBar()
+            val searchMessage by produceState(0) {
+                while (true) { delay(4000); value = (value + 1) % 3 }
+            }
+            Crossfade(searchMessage, label = "Search status") { message ->
+                Text(listOf("Looking around...", "Trying a few routes...", "Finding a good fit...")[message],
+                    color = TransitWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+            }
 
             Text(
                 text = "Finding your adventure…",
