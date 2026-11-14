@@ -41,7 +41,46 @@ The per-user launcher lock prevents duplicates. On recovery, a saved PID is only
 stopped if its creation time AND executable match; unverified processes require
 manual attention. Port conflicts are reported without killing their owners.
 
-## Settings
+## Realtime feeds and credentials
+
+The main window's **Realtime feeds** panel reports STM and exo trains separately.
+Predictions and alerts have independent status and last-success times; one may
+work while the other is unavailable. **Bridge: Ready** only means the local
+bridge responds. It does not confirm upstream API access or freshness.
+
+- **Live**: the bridge has fresh, accepted data for that feed.
+- **Stale** / **Unavailable** / **Auth failed**: predictions fall back to scheduled
+  routing. A failed alerts feed does not by itself disable fresh predictions.
+- **Waiting**: no first successful download yet. **Not configured**: optional exo
+  realtime has no saved configuration. **Stopped**: the launcher is not running
+  the bridge. **Bridge unavailable**: its status could not be read.
+- **Last predictions** / **Last alerts** show the bridge's last successful
+  download in the server PC's local time, never the current status-check time.
+  Failure retains the previous successful time; **Never** means none is known in
+  this run. Restarting the bridge resets its in-memory download history.
+- **Credentials: Saved** means a key is stored, not that it is valid. Watch the
+  actual prediction/alert statuses after starting.
+
+The launcher checks the private bridge status periodically (about every five
+seconds), including while OTP loads. **Refresh** rechecks that status; it does not
+make additional STM/exo requests. No private bridge/status endpoint is published.
+
+To replace credentials, **Stop server**, click **Feed credentials...**, enter a
+replacement STM API key and/or exo train token, and **Save**. Blank fields keep
+existing keys. You may also change exo's polling interval (30-3600 seconds).
+Then press **Start server** to load and verify the new values through normal feed
+polling. Key fields are masked and existing secrets are never prefilled.
+
+Settings update only `stm-upstream.json` and `exo-realtime.local.json` inside the
+imported data copy. They do not modify the original stack, server.properties or
+the generated private router endpoints. Import the matching exo train GTFS before
+adding its token. Keys stay local and are excluded from packages/Git.
+
+The Chrono portal's `agency` parameter supports selecting API feeds, but this
+build still connects only STM and exo trains. exo bus sectors require their own
+schedule/graph integration; entering a token here does not enable them.
+
+## General settings
 
 Configuration opens `server.properties` in Notepad. Save, then Restart. Java
 properties paths use escaped backslashes (the generated file already does this);
@@ -54,8 +93,10 @@ forward slashes such as `C:/RND/data` are also supported. Defaults:
 | otpPort | 18085; private OTP |
 | bridgePort | 18086; private STM/exo bridge |
 | otpMemoryMb | 4096; increase if the graph exceeds available heap |
-| tunnelMode | off, quick or named |
+| tunnelMode | off, quick, named or microsoft |
 | cloudflared | Absolute path to separately installed cloudflared.exe |
+| devtunnel | Absolute path to separately installed devtunnel.exe; blank searches PATH and winget links |
+| devTunnelId | Persistent Microsoft tunnel ID; defaults to rndtransit; regional IDs such as rndtransit.use work |
 | tunnelTokenFile | Path to a private named-tunnel token file, never the token itself |
 | publicAddress | Named tunnel's HTTPS URL |
 | supabaseUrl | Your project's HTTPS URL |
@@ -66,6 +107,58 @@ There are no automatic large downloads or graph rebuilds in the launcher. Prepar
 and refresh schedules/graph/index using the existing backend/otp tools in the
 development checkout, then import a new copy. An expired schedule needs a refreshed
 graph. Missing credentials, runtimes, data and occupied ports produce setup errors.
+
+## Microsoft Dev Tunnels (Azure)
+
+This shares the server running on your PC; it does not deploy OTP/Ktor to an Azure
+VM or consume an Azure VM allocation. Install Microsoft's CLI once from
+https://learn.microsoft.com/en-us/azure/developer/dev-tunnels/get-started
+(`winget install Microsoft.devtunnel`). The CLI is not bundled with this EXE.
+
+1. Stop the server and close any manually running `devtunnel host` (Ctrl+C in its
+   PowerShell window). The launcher must be the only host for this tunnel.
+2. Open **Tunnel settings**, select **Microsoft Dev Tunnels (Azure)** and keep
+   the same Supabase project URL and publishable key used by Android. Leave
+   **Microsoft CLI** blank for automatic detection, or Browse to devtunnel.exe.
+3. Already created your tunnel in PowerShell? Enter its ID, such as
+   `rndtransit.use`, and **Save**. Existing CLI sign-in is reused for the same
+   Windows user. Do not click Create for an existing tunnel.
+4. For a new account/tunnel, click **Microsoft sign-in**, complete the browser
+   sign-in, reopen Tunnel settings, then click **Create new Microsoft tunnel**.
+   This creates a persistent tunnel with public relay access and adds only the
+   configured API port. The backend still requires a valid app session token.
+   Setup status and CLI output appear in the main launcher. Stop server cancels
+   setup. If creation succeeds but port setup fails, add the port once with
+   `devtunnel port create YOUR-ID -p 18088 --protocol http` rather than repeating
+   Create. Replace 18088 if you changed apiPort.
+5. Press **Start server**. After Ktor is ready, the launcher hosts the saved
+   tunnel, extracts its HTTPS API address and checks public `/health`. It shows
+   **Tunnel: Connected - Microsoft Dev Tunnels** only when that check returns
+   the backend's ready response. Copy **Public HTTPS** for the Android endpoint.
+   Sign-in redirects, inspection URLs and HTML warning pages are not readiness.
+
+Stop, Restart and Exit manage the launcher-owned tunnel with the other services;
+no separate PowerShell window is needed. A lost public connection is shown as
+Reconnecting while the CLI attempts to restore it. If the CLI exits, the normal
+managed-service failure handling stops the stack; check logs and sign in again
+through Tunnel settings if the account session expired.
+
+The equivalent saved settings are:
+
+```properties
+tunnelMode=microsoft
+devtunnel=
+devTunnelId=rndtransit.use
+```
+
+The launcher discovers the public address automatically; leave publicAddress
+blank (it is only used by Cloudflare named mode). Old off/quick/named configs
+continue to work. A reused Microsoft tunnel normally keeps its URL; unused
+tunnels expire after 30 days without activity by default. Dev Tunnels is a
+development/testing preview, without a production SLA. For a reused tunnel,
+review its configured ports and allow only the API port, never OTP or the bridge.
+Changing apiPort also requires updating the persistent tunnel's port configuration.
+Account tokens remain in the CLI's OS credential store, outside server.properties.
 
 ## Optional Cloudflare Tunnel
 
@@ -143,6 +236,8 @@ Official references:
 - https://docs.oracle.com/en/java/javase/21/docs/specs/man/jpackage.html
 - https://developers.cloudflare.com/tunnel/reference/run-parameters/
 - https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/
+- https://learn.microsoft.com/en-us/azure/developer/dev-tunnels/cli-commands
+- https://learn.microsoft.com/en-us/azure/developer/dev-tunnels/faq
 - https://docs.opentripplanner.org/en/latest/Configuration/
 
 ## Verification limits

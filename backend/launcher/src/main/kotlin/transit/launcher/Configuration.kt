@@ -19,20 +19,26 @@ data class ServerConfig(
     val publicAddress: String = "",
     val supabaseUrl: String = "",
     val supabaseKey: String = "",
+    val devtunnel: String = "",
+    val devTunnelId: String = "rndtransit",
 ) {
     /** Validates before any service is launched, including loopback tunnel authentication. */
     fun validate() {
-        val ports = listOf(apiPort, otpPort, bridgePort, metricsPort())
+        val ports = listOf(apiPort, otpPort, bridgePort) + if (tunnelMode in listOf("quick", "named")) listOf(metricsPort()) else emptyList()
         require(ports.all { it in 1024..65535 } && ports.distinct().size == ports.size) {
             "API, OTP, bridge and tunnel metrics ports must be different, between 1024 and 65535."
         }
         require(otpMemoryMb in 512..65536) { "OTP memory must be 512–65536 MB." }
-        require(tunnelMode in listOf("off", "quick", "named")) { "Tunnel mode must be off, quick or named." }
+        require(tunnelMode in listOf("off", "quick", "named", "microsoft")) { "Tunnel mode must be off, quick, named or microsoft." }
         if (supabaseUrl.isNotBlank() || supabaseKey.isNotBlank() || tunnelMode != "off") {
             require(runCatching { URI(supabaseUrl).let { it.scheme == "https" && !it.host.isNullOrBlank() && it.userInfo == null } }.getOrDefault(false)
                 && supabaseKey.isNotBlank()) { "Configure Supabase HTTPS URL and publishable key before using a public tunnel." }
         }
-        if (tunnelMode != "off") require(Files.isRegularFile(Path.of(cloudflared))) { "Choose an existing cloudflared.exe." }
+        if (tunnelMode in listOf("quick", "named")) require(Files.isRegularFile(Path.of(cloudflared))) { "Choose an existing cloudflared.exe." }
+        if (tunnelMode == "microsoft") {
+            devTunnelExecutable(devtunnel)
+            requireDevTunnelId(devTunnelId)
+        }
         if (tunnelMode == "named") {
             require(tunnelTokenFile.isNotBlank() && Files.isRegularFile(Path.of(tunnelTokenFile)) && Files.size(Path.of(tunnelTokenFile)) > 0) {
                 "Named tunnel requires a nonempty token file. Store the token there, never in server.properties."
@@ -62,7 +68,7 @@ class ConfigStore(val home: Path) {
         return ServerConfig(Path.of(value("dataDirectory", home.resolve("data").toString())).toAbsolutePath(),
             number("apiPort", 18088), number("otpPort", 18085), number("bridgePort", 18086), number("otpMemoryMb", 4096),
             value("tunnelMode", "off"), value("cloudflared"), value("tunnelTokenFile"), value("publicAddress"),
-            value("supabaseUrl"), value("supabaseKey"))
+            value("supabaseUrl"), value("supabaseKey"), value("devtunnel"), value("devTunnelId", "rndtransit"))
     }
 
     /** @param config Settings to replace atomically on the next Start/Restart. */
@@ -75,6 +81,7 @@ class ConfigStore(val home: Path) {
             setProperty("tunnelMode", config.tunnelMode); setProperty("cloudflared", config.cloudflared)
             setProperty("tunnelTokenFile", config.tunnelTokenFile); setProperty("publicAddress", config.publicAddress)
             setProperty("supabaseUrl", config.supabaseUrl); setProperty("supabaseKey", config.supabaseKey)
+            setProperty("devtunnel", config.devtunnel); setProperty("devTunnelId", config.devTunnelId)
         }
         val temporary = file.resolveSibling("server.properties.tmp")
         Files.newBufferedWriter(temporary).use { values.store(it, "RNDTransit Server. Restart after edits. See SERVER_GUIDE.md for tunnel setup.") }

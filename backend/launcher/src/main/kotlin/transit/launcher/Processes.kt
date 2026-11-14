@@ -102,7 +102,7 @@ class OwnedProcesses(private val home: Path, private val log: ServiceLog) {
      * @param environment Explicit environment, including public API authentication settings.
      * @param observe Optional raw line observer for the non-secret temporary tunnel hostname.
      */
-    @Synchronized fun start(name: String, command: List<String>, directory: Path, environment: Map<String, String> = emptyMap(), observe: (String) -> Unit = {}) {
+    @Synchronized fun start(name: String, command: List<String>, directory: Path, environment: Map<String, String> = emptyMap(), observe: (String) -> Unit = {}): Process {
         check(children[name]?.isAlive != true) { "$name is already running." }
         val process = ProcessBuilder(command).directory(directory.toFile()).redirectErrorStream(true).apply {
             // Do not accidentally inherit a developer's tunnel token or an unsafe API bind address.
@@ -116,6 +116,19 @@ class OwnedProcesses(private val home: Path, private val log: ServiceLog) {
                 .onFailure { log.write("launcher", "$name log stream closed: ${it.javaClass.simpleName}") }
         }
         log.write("launcher", "Started $name (PID ${process.pid()}).")
+        return process
+    }
+
+    /** Runs a finite setup command with the same ownership, cancellation and log handling as services. */
+    fun run(name: String, command: List<String>, directory: Path, seconds: Long, cancelled: () -> Boolean) {
+        val process = start(name, command, directory)
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(seconds)
+        while (!process.waitFor(250, TimeUnit.MILLISECONDS)) {
+            check(!cancelled()) { "Microsoft tunnel setup cancelled." }
+            check(System.nanoTime() < deadline) { "Microsoft tunnel setup timed out. Check the sign-in browser and logs, then retry." }
+        }
+        check(!cancelled()) { "Microsoft tunnel setup cancelled." }
+        check(process.exitValue() == 0) { "Microsoft tunnel setup failed (exit ${process.exitValue()}). Check logs; sign in again if needed. For an existing tunnel, use Save instead of Create." }
     }
 
     /** @param name A directly owned service label. */
@@ -153,6 +166,14 @@ class OwnedProcesses(private val home: Path, private val log: ServiceLog) {
 /** Readiness uses bounded loopback HTTP requests rather than saved PID files or console messages. */
 class Readiness(private val request: (String, String?) -> Pair<Int, String> = ::readHealth) {
 
+    /** Reads a bounded JSON status response; errors never include potentially private response content. */
+    fun jsonObject(url: String): kotlinx.serialization.json.JsonObject {
+        val (status, text) = request(url, null)
+        check(status == 200) { "Bridge status is unavailable." }
+        return kotlinx.serialization.json.Json.parseToJsonElement(text) as? kotlinx.serialization.json.JsonObject
+            ?: error("Bridge status is not a JSON object.")
+    }
+
     /** @param port Preferred loopback port. A conflict is reported without terminating its owner. */
     fun requireAvailable(port: Int) {
         try { ServerSocket().use { socket -> socket.reuseAddress = false; socket.bind(InetSocketAddress(InetAddress.getByName("127.0.0.1"), port)) } }
@@ -182,10 +203,13 @@ class Readiness(private val request: (String, String?) -> Pair<Int, String> = ::
     }
 }
 
-/** Blocking loopback probe with bounded time and response size; no client threads are created at GUI startup. */
+/** Bounded health probe for loopback services and the Microsoft public HTTPS endpoint. */
 private fun readHealth(url: String, body: String?): Pair<Int, String> {
     val connection = URI(url).toURL().openConnection(java.net.Proxy.NO_PROXY) as HttpURLConnection
     connection.connectTimeout = 2000; connection.readTimeout = 3000
+    connection.instanceFollowRedirects = false
+    connection.setRequestProperty("Accept", "application/json")
+    connection.setRequestProperty("X-Tunnel-Skip-AntiPhishing-Page", "true")
     try {
         if (body != null) {
             connection.requestMethod = "POST"; connection.doOutput = true

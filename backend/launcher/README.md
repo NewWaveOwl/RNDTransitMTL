@@ -2,7 +2,18 @@
 
 Independent Kotlin/JVM + Swing application under `backend/launcher`. It manages
 the packaged Ktor API, OTP and production STM/exo bridge, with optional
-Cloudflare Tunnel. It does not depend on the Android app or share its UI state.
+Cloudflare Tunnel or Microsoft Dev Tunnels (Azure). Tunnel settings provides
+provider selection, Microsoft browser sign-in and persistent tunnel creation.
+Start/Stop/Restart own the tunnel process and show its public HTTPS URL alongside
+service status. Microsoft connection status requires a successful public health
+probe, not just a printed CLI address. It does not depend on the Android app or
+share its UI state.
+
+The main window also polls the bridge's private `/status` for separate STM/exo
+prediction and alert freshness, last successful downloads, and stored-credential
+presence. A masked credential editor updates only the imported private feed
+settings while stopped; blank fields preserve secrets. This does not add exo bus
+feeds. Bridge/process readiness remains separate from realtime freshness.
 
 Start with [SERVER_GUIDE.md](SERVER_GUIDE.md) for second-PC setup, imports, ports,
 authentication, tunnel settings, Android endpoint configuration and packaging.
@@ -65,3 +76,37 @@ production resolves its bundle relative to the jpackage executable.
 
 Portable outputs and QA renders live under ignored `launcher/build/`. The source,
 package script, guides and tests are committed; generated runtimes/ZIPs are not.
+
+## Microsoft tunnel follow-up verification (2026-11-13)
+
+- Compiled launcher and test sources with the cached Kotlin 2.4.20 compiler and
+  Java 21; all 28 launcher unit tests passed via JUnit. New checks cover Microsoft
+  config round trips, migration from old properties, auth requirements, CLI lookup
+  after a winget PATH change, regional IDs, safe forwarding URL extraction, and
+  setup command exit/cancellation with owned child processes.
+- Normal Gradle execution is blocked in this environment by daemon socket access;
+  in-process offline Gradle also reports an unavailable cached
+  error_prone_annotations 2.27.0 dependency. The existing HTTP integration test was
+  extended to check API Accept headers and reject redirects. It compiles but its
+  execution is blocked by the sandbox's loopback connect restriction.
+- Microsoft sign-in, creation and public relay probing still require a check on
+  the target PC with its installed CLI/account. No tunnel was created, account
+  signed in or server published from the development machine during this change.
+- Rebuilt the Windows x64 portable package with the verified launcher JAR.
+  Packaged EXE self-check exited 0 with no missing service/runtime files. Both
+  the main window (including Tunnel settings) and Microsoft settings dialog were
+  rendered and visually inspected without starting services.
+
+## Realtime feeds follow-up verification (2026-11-13)
+
+- All 37 launcher unit tests passed with the cached Kotlin compiler/direct JUnit
+  workflow above. The nine new feed tests cover independent predictions/alerts,
+  stale/unconfigured/auth failures, last-success retention, JSON status failures,
+  credential replacement/preservation, validation before writes, optional exo,
+  imported-data restrictions, and secret-free malformed-JSON diagnostics.
+- The main window was rendered with mixed feed fixture states (not live API
+  observations); the feed credential dialog was also rendered. Both were visually
+  inspected. Existing secrets are never supplied to the dialog's password fields.
+- No upstream API request was made during these checks. Live bridge status and
+  replacement credentials need target-PC verification. Gradle and actual HTTP
+  integration execution retain the environment limitations described above.

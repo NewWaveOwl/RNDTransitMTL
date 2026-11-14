@@ -18,7 +18,7 @@ PC builds and runs the app on an emulator or phone.
 | Kotlin/Ktor backend | Generates destinations, asks OTP for routes, checks settings and time, and returns the accepted route as JSON | `http://127.0.0.1:18088` |
 | OTP | Calculates street/path routes and STM/exo train journeys from the prepared graph | `http://127.0.0.1:18085` |
 | STM/exo bridge | Handles realtime feeds, freshness and scheduled fallback | `http://127.0.0.1:18086` |
-| Cloudflare Tunnel (optional) | Makes Ktor reachable through public HTTPS | Shown under **Public HTTPS** in the launcher |
+| Cloudflare / Microsoft Dev Tunnels (optional) | Makes Ktor reachable through public HTTPS | Shown under **Public HTTPS** in the launcher |
 
 The phone sends its origin, time, modes, zones and walking pace to Ktor. Ktor chooses
 candidate destinations, OTP calculates routes, and Ktor returns one valid itinerary.
@@ -79,7 +79,10 @@ Open this repository folder in Android Studio, let Gradle sync, and install any 
    The launcher copies these inputs and preserves the source folder.
 3. Click **Start server** and wait for **Bridge**, **OTP** and **Ktor** to show
    **Ready**. The imported location is saved as `dataDirectory` in Configuration.
-4. For a phone/emulator on another PC, configure Cloudflare through the launcher
+   Check **Realtime feeds** for each agency's prediction/alert freshness and last
+   successful update. **Bridge: Ready** alone does not confirm live API access.
+   To replace keys, stop the server and use **Feed credentials...**, then Start.
+4. For a phone/emulator on another PC, choose Cloudflare or **Microsoft Dev Tunnels (Azure)** in **Tunnel settings**
    and wait for **Tunnel: Connected**. Use its **Public HTTPS** address in the app.
    Public mode requires the same Supabase project URL and publishable key as
    Android, plus a signed-in user. Do not use a service-role key.
@@ -89,6 +92,14 @@ for a stable hostname. Quick Tunnel addresses change when the tunnel restarts:
 update the app endpoint and rebuild/reinstall. See the
 [Windows server guide](backend/launcher/SERVER_GUIDE.md) for configuration, imports,
 tunnel setup and packaging.
+
+For Microsoft, install the official `devtunnel` CLI once on the server PC. In
+**Tunnel settings**, reuse an existing persistent ID (for example `rndtransit.use`)
+or use the sign-in and creation buttons for a new tunnel. Select
+`tunnelMode=microsoft`; Start server then hosts it and shows the checked public
+HTTPS address. Close any manual `devtunnel host` first. No separate PowerShell
+window is needed afterward. Microsoft tunnel URLs are reusable, subject to the
+service's inactivity expiration; the server PC still needs to stay on.
 
 The portable package is generated under `backend/launcher/build/`; obtain it from
 the developer or build it using the guide. Cloning Git does not download it.

@@ -16,12 +16,25 @@ class LauncherHttpIntegrationTest {
             exchange.sendResponseHeaders(if (accepted) 200 else 503, body.size.toLong())
             exchange.responseBody.use { it.write(body) }
         }
+        server.createContext("/health") { exchange ->
+            val accepted = exchange.requestHeaders.getFirst("Accept") == "application/json" &&
+                exchange.requestHeaders.getFirst("X-Tunnel-Skip-AntiPhishing-Page") == "true"
+            val body = "ready".toByteArray()
+            exchange.sendResponseHeaders(if (accepted) 200 else 400, body.size.toLong())
+            exchange.responseBody.use { it.write(body) }
+        }
+        server.createContext("/redirect") { exchange ->
+            exchange.responseHeaders.add("Location", "/health")
+            exchange.sendResponseHeaders(302, -1); exchange.close()
+        }
         server.start()
         try {
             val url = "http://127.0.0.1:${server.address.port}"
             assertTrue(Readiness().check("$url/ready", "{ query }", valid = { it == "ready" }))
             assertFalse(Readiness().check("$url/ready"))
             assertFalse(Readiness().check("$url/missing"))
+            assertTrue(Readiness().check("$url/health", valid = { it == "ready" }))
+            assertFalse(Readiness().check("$url/redirect"))
         } finally { server.stop(0) }
     }
 }

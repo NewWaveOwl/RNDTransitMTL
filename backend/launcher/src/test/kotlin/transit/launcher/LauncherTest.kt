@@ -60,6 +60,58 @@ class LauncherTest {
         assertThrows(IllegalArgumentException::class.java) { config.copy(tunnelTokenFile = token.toString(), publicAddress = "http://trips.example").validate() }
     }
 
+    @Test fun `Microsoft settings preserve paths and existing regional tunnel without Cloudflare`() {
+        val home = directory(); val executable = Files.writeString(home.resolve("devtunnel.exe"), "fixture")
+        val config = ServerConfig(home, tunnelMode = "microsoft", devtunnel = executable.toString(), devTunnelId = "rndtransit.use",
+            supabaseUrl = "https://project.example", supabaseKey = "publishable", apiPort = 18089)
+        config.validate() // Microsoft does not use the Cloudflare metrics port or executable.
+        val store = ConfigStore(home); store.save(config)
+        assertEquals(config, store.load())
+        assertThrows(IllegalArgumentException::class.java) { config.copy(supabaseKey = "").validate() }
+        assertThrows(IllegalArgumentException::class.java) { config.copy(devtunnel = home.resolve("missing.exe").toString()).validate() }
+        assertThrows(IllegalArgumentException::class.java) { config.copy(devTunnelId = "--access-token").validate() }
+    }
+
+    @Test fun `old config defaults Microsoft settings without changing its existing mode`() {
+        val home = directory(); val store = ConfigStore(home)
+        Files.writeString(store.file, "tunnelMode=off\n")
+        assertEquals("off", store.load().tunnelMode)
+        assertEquals("", store.load().devtunnel)
+        assertEquals("rndtransit", store.load().devTunnelId)
+    }
+
+    @Test fun `Microsoft executable lookup handles winget links and spaces without a refreshed PATH`() {
+        val home = directory(); val links = Files.createDirectories(home.resolve("Microsoft/WinGet/Links"))
+        val executable = Files.writeString(links.resolve("devtunnel.exe"), "fixture")
+        assertEquals(executable.toString(), devTunnelExecutable("", "", home.toString()))
+        assertEquals(executable.toString(), devTunnelExecutable("", "\"$links\"", null))
+        assertThrows(IllegalStateException::class.java) { devTunnelExecutable("", "", null) }
+    }
+
+    @Test fun `Microsoft forwarding parser excludes inspection unrelated ports and lookalike hosts`() {
+        val address = "https://3lpq3blc-18088.use.devtunnels.ms"
+        assertEquals(address, devTunnelAddress("Connect via browser: $address", 18088))
+        assertEquals(address, devTunnelAddress("Hosting port 18088 at $address/ and inspect...", 18088))
+        assertEquals("https://abc-18088.devtunnels.ms", devTunnelAddress("https://abc-18088.devtunnels.ms/", 18088))
+        assertNull(devTunnelAddress("https://3lpq3blc-18088-inspect.use.devtunnels.ms", 18088))
+        assertNull(devTunnelAddress("https://3lpq3blc-18085.use.devtunnels.ms", 18088))
+        assertNull(devTunnelAddress("$address.evil.example", 18088))
+        assertNull(devTunnelAddress("http://3lpq3blc-18088.use.devtunnels.ms", 18088))
+    }
+
+    @Test fun `finite setup commands report exit failures and cancellation while retaining ownership`() {
+        val home = directory(); val owned = OwnedProcesses(home, logger(home))
+        try {
+            owned.run("setup", fixtureCommand() + "success", home, 10) { false }
+            assertFalse(owned.alive("setup"))
+            assertThrows(IllegalStateException::class.java) { owned.run("setup", fixtureCommand() + "failure", home, 10) { false } }
+            assertThrows(IllegalStateException::class.java) { owned.run("setup", fixtureCommand(), home, 10) { true } }
+            assertTrue(owned.alive("setup"))
+            owned.stop()
+            assertFalse(owned.alive("setup"))
+        } finally { owned.stop() }
+    }
+
     @Test fun `one launcher owns a user directory at a time and releases its lock`() {
         val home = directory()
         InstanceLock.acquire(home)!!.use { assertNull(InstanceLock.acquire(home)) }
@@ -208,5 +260,12 @@ class LauncherTest {
 
 /** A child fixture with no networking, secret data or dependency on a Java compiler at runtime. */
 object ProcessFixture {
-    @JvmStatic fun main(args: Array<String>) { println("Fixture ready"); Thread.sleep(120_000) }
+    @JvmStatic fun main(args: Array<String>) {
+        println("Fixture ready")
+        when (args.firstOrNull()) {
+            "success" -> return
+            "failure" -> kotlin.system.exitProcess(2)
+            else -> Thread.sleep(120_000)
+        }
+    }
 }

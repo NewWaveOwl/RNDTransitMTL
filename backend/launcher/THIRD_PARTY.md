@@ -18,6 +18,10 @@ Cloudflared is optional, separately installed from
 https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/.
 It is not included in the portable ZIP.
 
+Microsoft Dev Tunnels is optional and separately installed under Microsoft's
+terms: https://learn.microsoft.com/en-us/azure/developer/dev-tunnels/get-started.
+The CLI and account credentials are not included in the portable ZIP.
+
 Graphs, STM/exo feeds, private credentials and account configuration are not
 distributed in the executable package. Their data licenses and provider terms
 continue to apply to separately imported data. ARTM zone source attribution:

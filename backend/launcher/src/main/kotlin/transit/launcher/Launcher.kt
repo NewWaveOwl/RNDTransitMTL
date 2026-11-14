@@ -62,13 +62,15 @@ class ServerWindow(private val store: ConfigStore, bundle: Path) : JFrame("RNDTr
     private val public = JTextField("Public access is off")
     private val logs = JTextArea()
     private val controller: ServerController
+    private val realtimePanel: RealtimeFeedsPanel
     private var tray: TrayIcon? = null
 
     init {
         defaultCloseOperation = DO_NOTHING_ON_CLOSE
-        minimumSize = Dimension(820, 650)
-        size = Dimension(980, 760)
-        setLocationRelativeTo(null)
+        val workArea = GraphicsEnvironment.getLocalGraphicsEnvironment().maximumWindowBounds
+        minimumSize = Dimension(minOf(920, workArea.width), minOf(720, workArea.height))
+        size = Dimension(minOf(1040, workArea.width), minOf(880, workArea.height))
+        setLocation(workArea.x + (workArea.width - width) / 2, workArea.y + (workArea.height - height) / 2)
         val outer = JPanel(BorderLayout(0, 16)).apply { border = EmptyBorder(22, 24, 20, 24) }
         contentPane = outer
         val header = JPanel(BorderLayout()).apply {
@@ -100,6 +102,8 @@ class ServerWindow(private val store: ConfigStore, bundle: Path) : JFrame("RNDTr
             logs.caretPosition = logs.document.length
         } }
         controller = ServerController(store, bundle, logger) { state -> SwingUtilities.invokeLater { render(state) } }
+        realtimePanel = RealtimeFeedsPanel(controller::refreshFeeds, ::editFeedCredentials)
+        information.add(Box.createVerticalStrut(10)); information.add(realtimePanel)
         val actions = JPanel(GridLayout(2, 1, 0, 8))
         actions.add(JPanel(FlowLayout(FlowLayout.LEFT, 8, 0)).apply {
             add(button("Start server") { controller.start() })
@@ -109,6 +113,10 @@ class ServerWindow(private val store: ConfigStore, bundle: Path) : JFrame("RNDTr
         })
         actions.add(JPanel(FlowLayout(FlowLayout.LEFT, 8, 0)).apply {
             add(button("Configuration") { openFile(store.file) })
+            add(button("Tunnel settings") {
+                if (controller.active()) JOptionPane.showMessageDialog(this@ServerWindow, "Stop the server before changing tunnel settings.")
+                else TunnelSettings(this@ServerWindow, store, controller::setupMicrosoft).isVisible = true
+            })
             add(button("Data folder") { openFile(store.load().dataDirectory, true) })
             add(button("Full logs") { openFile(store.home.resolve("logs"), true) })
             add(button("Guide") { openFile(bundle.resolve("SERVER_GUIDE.md")) })
@@ -128,6 +136,15 @@ class ServerWindow(private val store: ConfigStore, bundle: Path) : JFrame("RNDTr
         message.text = state.message
         if (state.localAddress.isNotBlank()) local.text = state.localAddress
         public.text = state.publicAddress.ifBlank { "Public access is off / not connected" }
+        realtimePanel.render(state.realtimeFeeds)
+    }
+
+    private fun editFeedCredentials() {
+        if (controller.active()) { JOptionPane.showMessageDialog(this, "Stop the server before changing feed credentials."); return }
+        runCatching {
+            val summary = FeedCredentials(store.load().dataDirectory).summary()
+            FeedCredentialsDialog(this, summary, controller::saveFeedCredentials).isVisible = true
+        }.onFailure { JOptionPane.showMessageDialog(this, it.message ?: "Cannot read feed credential settings.") }
     }
 
     private fun importData() {

@@ -6,10 +6,12 @@ import java.nio.file.Path
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 /** Immutable display state, published by the service owner and rendered only on Swing's UI thread. */
 data class ServerState(val services: Map<String, String> = listOf("Ktor", "OTP", "Bridge", "Tunnel").associateWith { "Stopped" },
-    val message: String = "Import a prepared OTP stack, then press Start.", val localAddress: String = "", val publicAddress: String = "")
+    val message: String = "Import a prepared OTP stack, then press Start.", val localAddress: String = "", val publicAddress: String = "",
+    val realtimeFeeds: List<RealtimeFeedState> = initialRealtimeFeeds())
 
 /**
  * Builds Java's argument vector from concrete JAR paths; Windows Path rejects wildcard characters.
@@ -47,6 +49,8 @@ class ServerController(
     init {
         worker.execute {
             runCatching { processes.recover() }.onFailure { update(message = "Recovery needs attention: ${it.message}") }
+            runCatching { update(realtimeFeeds = credentialFeeds(store.load())) }
+                .onFailure { update(message = "Realtime credential settings need attention. Open Feed credentials or Data folder.") }
         }
         monitor.scheduleWithFixedDelay({ monitorServices() }, 5, 5, TimeUnit.SECONDS)
     }
@@ -94,9 +98,73 @@ class ServerController(
             try {
                 DataSetup().importData(source, destination) { update(message = it) }
                 store.save(store.load().copy(dataDirectory = destination.toAbsolutePath()))
-                update(message = "Import complete. Original stack unchanged. Press Start.")
+                update(message = "Import complete. Original stack unchanged. Press Start.", realtimeFeeds = credentialFeeds(store.load()))
             } catch (error: Exception) { fail(error) }
             finally { busy.set(false) }
+        }
+    }
+
+    /** Saves private feed credentials on the service worker, only while no managed service/setup is active. */
+    fun saveFeedCredentials(edit: FeedCredentialEdit) {
+        if (running || !busy.compareAndSet(false, true)) { update(message = "Stop the server before changing feed credentials."); return }
+        worker.execute {
+            try {
+                val settings = store.load()
+                log.secrets = log.secrets + listOf(edit.stmKey, edit.exoToken).filter(String::isNotBlank)
+                FeedCredentials(settings.dataDirectory).save(edit)
+                update(message = "Feed credentials saved locally. Press Start server to connect and verify them.", realtimeFeeds = credentialFeeds(settings))
+            } catch (error: Exception) { fail(error) }
+            finally { busy.set(false) }
+        }
+    }
+
+    /** Rechecks bridge status without making upstream API calls or blocking Swing. */
+    fun refreshFeeds() { monitor.execute { refreshRealtimeFeeds() } }
+
+    private fun credentialFeeds(settings: ServerConfig): List<RealtimeFeedState> {
+        val summary = FeedCredentials(settings.dataDirectory).summary()
+        return initialRealtimeFeeds().map { it.copy(credentials = if (if (it.id == "STM") summary.stm else summary.exo) "Saved" else "Missing") }
+    }
+
+    private fun refreshRealtimeFeeds() {
+        val settings = config ?: return
+        if (cancelled.get() || !processes.alive("Bridge")) return
+        val feeds = runCatching {
+            parseRealtimeFeeds(readiness.jsonObject("http://127.0.0.1:${settings.bridgePort}/status"), state.realtimeFeeds)
+        }.getOrElse {
+            state.realtimeFeeds.map { row -> row.copy(predictions = row.predictions.copy(connection = FeedConnection.BRIDGE_UNAVAILABLE),
+                alerts = row.alerts.copy(connection = FeedConnection.BRIDGE_UNAVAILABLE)) }
+        }
+        // A late HTTP response from an old run must not overwrite Stopped or a new import/start.
+        publishRealtimeFeeds(settings, feeds)
+    }
+
+    @Synchronized private fun publishRealtimeFeeds(settings: ServerConfig, feeds: List<RealtimeFeedState>) {
+        if (!cancelled.get() && config === settings && processes.alive("Bridge")) update(realtimeFeeds = feeds)
+    }
+
+    /** One-time Microsoft setup is explicit; regular starts only host the saved persistent tunnel. */
+    fun setupMicrosoft(settings: ServerConfig, signIn: Boolean) {
+        if (running || !busy.compareAndSet(false, true)) { update(message = "Stop the server before Microsoft tunnel setup."); return }
+        cancelled.set(false)
+        worker.execute {
+            try {
+                processes.recover()
+                val executable = devTunnelExecutable(settings.devtunnel)
+                if (signIn) {
+                    update(message = "Complete Microsoft sign-in in your browser. Stop server cancels setup.")
+                    processes.run("Microsoft-setup", listOf(executable, "user", "login"), store.home, 180, cancelled::get)
+                    update(message = "Microsoft sign-in complete. Save your existing tunnel ID, or Create a new tunnel in Tunnel settings.")
+                } else {
+                    requireDevTunnelId(settings.devTunnelId)
+                    require(settings.apiPort in 1024..65535) { "API port must be between 1024 and 65535." }
+                    update(message = "Creating Microsoft tunnel for the API port only...")
+                    processes.run("Microsoft-setup", listOf(executable, "create", settings.devTunnelId, "-a"), store.home, 60, cancelled::get)
+                    processes.run("Microsoft-setup", listOf(executable, "port", "create", settings.devTunnelId, "-p", "${settings.apiPort}", "--protocol", "http"), store.home, 60, cancelled::get)
+                    update(message = "Microsoft tunnel created. Press Start server. If setup was partial, see the Guide before retrying Create.")
+                }
+            } catch (error: Exception) { fail(error) }
+            finally { runCatching { processes.stop() }.onFailure { log.write("launcher", "Setup shutdown needs attention: ${it.message}") }; busy.set(false) }
         }
     }
 
@@ -116,7 +184,8 @@ class ServerController(
             val settings = store.load().also { it.validate() }
             config = settings
             configureRedaction(settings)
-            update(message = "Checking runtimes, graph, feed credentials and ports…", localAddress = "http://127.0.0.1:${settings.apiPort}", publicAddress = "")
+            update(message = "Checking runtimes, graph, feed credentials and ports…", localAddress = "http://127.0.0.1:${settings.apiPort}", publicAddress = "",
+                realtimeFeeds = credentialFeeds(settings).map { it.copy(predictions = FeedReading(FeedConnection.WAITING), alerts = FeedReading(FeedConnection.WAITING)) })
             DataSetup().validateData(settings.dataDirectory)
             val java21 = bundle.resolve("runtime/bin/java.exe")
             val java25 = bundle.resolve("services/otp-runtime/bin/java.exe")
@@ -125,14 +194,15 @@ class ServerController(
                 require(Files.isRegularFile(file)) { "Package is incomplete: ${file.fileName}. Rebuild with Package-Server.ps1 and copy the entire package." }
             }
             val ktorCommand = backendCommand(bundle)
-            for (port in listOf(settings.apiPort, settings.otpPort, settings.bridgePort) + if (settings.tunnelMode == "off") emptyList() else listOf(settings.metricsPort())) readiness.requireAvailable(port)
+            for (port in listOf(settings.apiPort, settings.otpPort, settings.bridgePort) + if (settings.tunnelMode in listOf("quick", "named")) listOf(settings.metricsPort()) else emptyList()) readiness.requireAvailable(port)
             DataSetup().prepareRouter(settings)
             // The bridge starts first because OTP's configured updaters poll its private endpoints.
             service("Bridge", "Starting — live feeds may fall back to schedules")
             processes.start("Bridge", listOf(java25.toString(), "-cp", "$otpJar;${bundle.resolve("services/bridge")}", "StmRealtimeAdapter",
                 settings.dataDirectory.toString(), "${settings.bridgePort}", "${settings.otpPort}"), settings.dataDirectory)
             await("Bridge", 90) { readiness.check("http://127.0.0.1:${settings.bridgePort}/status", valid = { Json.parseToJsonElement(it).jsonObject.containsKey("realtimeByFeed") }) }
-            service("Bridge", "Ready — scheduled fallback if feeds unavailable")
+            service("Bridge", "Ready - see Realtime feeds")
+            refreshRealtimeFeeds()
             service("OTP", "Loading graph…")
             processes.start("OTP", listOf(java25.toString(), "-Xmx${settings.otpMemoryMb}M", "-jar", otpJar.toString(),
                 "--load", "--serve", "--bindAddress", "127.0.0.1", "--port", "${settings.otpPort}", settings.dataDirectory.toString()), settings.dataDirectory)
@@ -159,6 +229,7 @@ class ServerController(
     }
 
     private fun startTunnel(settings: ServerConfig) {
+        if (settings.tunnelMode == "microsoft") { startMicrosoftTunnel(settings); return }
         service("Tunnel", "Connecting…")
         val args = mutableListOf(settings.cloudflared, "tunnel", "--no-autoupdate", "--metrics", "127.0.0.1:${settings.metricsPort()}")
         val environment = if (settings.tunnelMode == "quick") {
@@ -174,6 +245,22 @@ class ServerController(
         if (settings.tunnelMode == "named") update(publicAddress = settings.publicAddress.trimEnd('/'))
         service("Tunnel", if (settings.tunnelMode == "quick") "Connected — temporary URL" else "Connected — verify hostname ingress in Cloudflare")
     }
+
+    private fun startMicrosoftTunnel(settings: ServerConfig) {
+        service("Tunnel", "Connecting - Microsoft Dev Tunnels")
+        val address = AtomicReference<String?>(null)
+        processes.start("Tunnel", listOf(devTunnelExecutable(settings.devtunnel), "host", settings.devTunnelId), store.home) { line ->
+            devTunnelAddress(line, settings.apiPort)?.let { address.set(it) }
+        }
+        // A printed URL is not enough: check HTTPS reaches the backend after its local readiness.
+        await("Tunnel", 90) { address.get()?.let { publicTunnelReady(it) } == true }
+        update(publicAddress = address.get()!!)
+        service("Tunnel", "Connected - Microsoft Dev Tunnels")
+    }
+
+    private fun publicTunnelReady(address: String) = readiness.check("$address/health", valid = {
+        Json.parseToJsonElement(it).jsonObject["status"]?.jsonPrimitive?.content == "ready"
+    })
 
     private fun configureRedaction(settings: ServerConfig) {
         val secrets = mutableListOf(settings.supabaseKey)
@@ -202,9 +289,12 @@ class ServerController(
         running = false
         processes.stop()
         update(services = state.services.mapValues { "Stopped" }, publicAddress = "")
+        update(realtimeFeeds = state.realtimeFeeds.map { it.copy(predictions = it.predictions.copy(connection = FeedConnection.STOPPED),
+            alerts = it.alerts.copy(connection = FeedConnection.STOPPED)) })
     }
 
     private fun monitorServices() {
+        refreshRealtimeFeeds()
         if (!running || busy.get()) return
         val settings = config ?: return
         val expected = listOf("Bridge", "OTP", "Ktor") + if (settings.tunnelMode == "off") emptyList() else listOf("Tunnel")
@@ -217,8 +307,11 @@ class ServerController(
             }
         } else {
             val healthy = otpReady(settings) && readiness.check("http://127.0.0.1:${settings.apiPort}/health")
+            val tunnelHealthy = settings.tunnelMode != "microsoft" || publicTunnelReady(state.publicAddress)
             if (!running) return
-            update(message = if (healthy) "Server ready. Agency outages use scheduled fallback."
+            if (settings.tunnelMode == "microsoft") service("Tunnel", if (tunnelHealthy) "Connected - Microsoft Dev Tunnels" else "Reconnecting - Microsoft public endpoint unavailable")
+            update(message = if (!tunnelHealthy) "Local server is running; Microsoft tunnel is not responding. Check internet, sign-in and Tunnel logs."
+                else if (healthy) "Server ready. Agency outages use scheduled fallback."
                 else "A service is running but not responding. Inspect logs or press Restart.")
         }
     }
@@ -234,11 +327,16 @@ class ServerController(
         update(message = log.redact("$summary. Open logs, correct setup and retry."))
     }
 
-    private fun service(name: String, status: String) { update(services = state.services + (name to status)); log.write("launcher", "$name: $status") }
+    private fun service(name: String, status: String) {
+        if (state.services[name] == status) return
+        update(services = state.services + (name to status)); log.write("launcher", "$name: $status")
+    }
 
-    @Synchronized private fun update(services: Map<String, String> = state.services, message: String = state.message,
-        localAddress: String = state.localAddress, publicAddress: String = state.publicAddress) {
-        state = ServerState(services, message, localAddress, publicAddress)
+    @Synchronized private fun update(services: Map<String, String>? = null, message: String? = null,
+        localAddress: String? = null, publicAddress: String? = null,
+        realtimeFeeds: List<RealtimeFeedState>? = null) {
+        state = ServerState(services ?: state.services, message ?: state.message, localAddress ?: state.localAddress,
+            publicAddress ?: state.publicAddress, realtimeFeeds ?: state.realtimeFeeds)
         publish(state)
     }
 }
