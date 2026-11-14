@@ -3,6 +3,32 @@
 Kotlin/JVM 21 + Ktor 3.4.3. The Android app calls this service; OTP and the
 STM/exo bridge stay private.
 
+All commands below run from the repository root unless stated otherwise.
+
+## How the server works
+
+The Android app and routing server run separately. In the current setup, a second
+Windows PC runs **RNDTransitServer.exe**, while Android Studio on the development
+PC builds and runs the app on an emulator or phone.
+
+| Component | Role | Default address on the server PC |
+| --- | --- | --- |
+| Windows launcher | Starts/stops services and displays status and logs | Desktop application |
+| Kotlin/Ktor backend | Generates destinations, asks OTP for routes, checks settings and time, and returns the accepted route as JSON | `http://127.0.0.1:18088` |
+| OTP | Calculates street/path routes and STM/exo journeys from the prepared graph | `http://127.0.0.1:18085` |
+| STM/exo bridge | Handles realtime feeds, freshness and scheduled fallback | `http://127.0.0.1:18086` |
+| Cloudflare / Microsoft Dev Tunnels (optional) | Makes Ktor reachable through public HTTPS | Shown under **Public HTTPS** in the launcher |
+
+The phone sends its origin, time, modes, zones and walking pace to Ktor. Ktor chooses
+candidate destinations, OTP calculates routes, and Ktor returns one valid itinerary.
+The app draws its geometry and displays legs, distance and duration. Supabase
+provides account authentication; the public generation API requires the signed-in
+user's session token. OTP and the bridge stay private to the server PC.
+
+The server PC, services, tunnel and internet connection must stay running for remote
+trip generation. Android Studio does not start the server. `127.0.0.1` refers to
+the device making the request; it is not the second PC's address from a phone.
+
 ## Layout
 
 - `src/main/kotlin/transit/`: request validation, arbitrary-point sampling, route
@@ -17,22 +43,67 @@ STM/exo bridge stay private.
 
 ## Run the packaged Windows server
 
-For the current second-PC setup, use **RNDTransitServer.exe** from the portable
-package. The launcher bundles Java 21, the separate OTP Java 25 runtime, Ktor, OTP
-and the production bridge. No Android Studio, Node.js or system Java is required
-on that PC. Import the prepared combined STM/exo data into an empty directory once,
-then press **Start server** and wait for Bridge, OTP and Ktor to show Ready.
+1. Extract the complete portable package and run **RNDTransitServer.exe**. Keep its
+   `app`, `runtime` and `services` folders beside the EXE. Java, Ktor, OTP and the
+   bridge are bundled; Android Studio and Node.js are not required on this PC.
+2. On first run, click **Setup / import**, select the prepared `stm-scheduled`
+   folder, and choose a separate empty destination. Inputs include the combined
+   `graph.obj`, STM/exo schedules, adapter index and local feed configuration.
+   The launcher copies these inputs and preserves the source folder.
+3. Click **Start server** and wait for **Bridge**, **OTP** and **Ktor** to show
+   **Ready**. The imported location is saved as `dataDirectory` in Configuration.
+   Check **Realtime feeds** for each agency's prediction/alert freshness and last
+   successful update. **Bridge: Ready** alone does not confirm live API access.
+   To replace keys, stop the server and use **Feed credentials...**, then Start.
+   For exo buses, build/import a combined bus graph using the packaged
+   `Prepare-ExoBusGraph.ps1`, then enable the imported sectors in **exo bus
+   settings...**. See the Windows server guide for the complete setup. Bus
+   predictions/alerts are separate per sector; the Android **Bus** choice uses
+   the routes available in that graph.
+4. For a phone/emulator on another PC, choose Cloudflare or **Microsoft Dev Tunnels (Azure)** in **Tunnel settings**
+   and wait for **Tunnel: Connected**. Use its **Public HTTPS** address in the app.
+   Public mode requires the same Supabase project URL and publishable key as
+   Android, plus a signed-in user. Do not use a service-role key.
 
-For remote phones/emulators, enable the launcher's Cloudflare Tunnel and configure
-the Android app with its Public HTTPS address. Public mode requires the app's
-Supabase project and a signed-in user. A Quick Tunnel URL is temporary; changing it
-requires rebuilding/reinstalling the phone app. Keep OTP and the bridge private.
+Use `tunnelMode=quick` for a temporary testing address, or a configured named tunnel
+for a stable hostname. Quick Tunnel addresses change when the tunnel restarts:
+update the app endpoint and rebuild/reinstall. See the
+[Windows server guide](launcher/SERVER_GUIDE.md) for configuration, imports,
+tunnel setup and packaging.
 
-See the [Windows server guide](launcher/SERVER_GUIDE.md) for imports, data/config
-locations, tunnel settings and package builds, and the
-[root README](../README.md#build-and-launch-android-in-android-studio) for Android
-Studio's `generationEndpoint` setting. Generated packages and private routing data
-are not included when cloning the repository.
+For Microsoft, install the official `devtunnel` CLI once on the server PC. In
+**Tunnel settings**, reuse an existing persistent ID (for example `rndtransit.use`)
+or use the sign-in and creation buttons for a new tunnel. Select
+`tunnelMode=microsoft`; Start server then hosts it and shows the checked public
+HTTPS address. Close any manual `devtunnel host` first. No separate PowerShell
+window is needed afterward. Microsoft tunnel URLs are reusable, subject to the
+service's inactivity expiration; the server PC still needs to stay on.
+
+The portable package is generated under `backend/launcher/build/`; obtain it from
+the developer or build it using the guide. Cloning Git does not download it.
+Generated EXEs, APKs, ZIPs, runtimes and build folders are not committed. Graphs
+and local feed credentials must be prepared/transferred separately and kept out of Git.
+
+## Update an existing server installation
+
+Stop services and exit the launcher before applying an update ZIP. Extract its
+contents beside the existing `RNDTransitServer.exe`, preserving subfolders and
+replacing the included files, then reopen the launcher and start the server.
+An update ZIP requires the complete portable installation and its existing runtime
+and dependency folders; it is not a standalone installation.
+
+Keep the existing graph, schedules and credentials. Duration-matching updates do
+not require rebuilding the graph. Adding routes from new exo bus sectors does
+require a combined graph containing those schedules. Follow the instructions shipped
+with each update and the [server guide](launcher/SERVER_GUIDE.md).
+
+## Connect Android to the server
+
+Use the launcher's **Public HTTPS** address as the app's `generationEndpoint`.
+The endpoint is embedded when the APK is built. A changing tunnel URL requires
+rebuilding/reinstalling the app; an installed APK does not read repository settings.
+See [Android development and APK builds](../docs/AndroidDevelopment.md) for endpoint
+configuration, debug installation, release signing and client checks.
 
 ## Manual development startup
 
@@ -67,6 +138,13 @@ router configuration and local feed credentials. Do not commit these runtime fil
 The bridge needs the combined STM + exo train graph to provide both agencies.
 
 ## Independent server build
+
+To obtain the source:
+
+```powershell
+git clone https://github.com/NewWaveOwl/RNDTransitMTL.git
+cd RNDTransitMTL
+```
 
 No Android SDK is required for these commands:
 
@@ -105,8 +183,19 @@ initial waiting, transfers, walking and one minute per routed kilometre, and can
 exceed the selected trip duration. Selected modes are alternatives. Walking-only
 requires Walk; transit-only selections may use walking connections. Line, intermediate
 ARTM zone and prior-destination exclusions remain enforced. API and Android timeouts
-are 40/45 seconds; see [generation details](../docs/BackendTripGeneration.md) for
+are 40/45 seconds; see [generation details](TripGeneration.md) for
 loading behavior, regression coverage and remaining device/server checks.
+
+## Regression tests
+
+```powershell
+.\gradlew.bat -p backend test :launcher:test
+```
+
+Backend and launcher tests run independently of Android. Use the
+[generation guide](TripGeneration.md#automated-checks) for integration checks,
+realtime fallback fixtures and recorded environment limitations. Live routing,
+feed access and remote phone connectivity require the configured server and graph.
 
 ## Hosting
 
@@ -122,6 +211,6 @@ loopback service through Cloudflare Tunnel so it also requires authentication.
 Hosted guest access is not implemented. The phone uses a configured HTTPS
 `generationEndpoint`; OTP and feed keys are never exposed in the app.
 
-See [the integration guide](../docs/BackendTripGeneration.md) for Android checks,
+See [the integration guide](TripGeneration.md) for Android checks,
 protocol details and official API/data references. Live device, cloud and Docker
 runtime checks must be performed on the target host.

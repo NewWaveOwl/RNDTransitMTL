@@ -1,6 +1,6 @@
 # Run routed trips with simulated progress
 
-Use the [backend generation guide](BackendTripGeneration.md) to start OTP, the STM/exo
+Use the [backend generation guide](../backend/TripGeneration.md) to start OTP, the STM/exo
 realtime bridge and Ktor, then install Android. The app now generates routes only
 through the actual backend when running with the live Android map. The old fixed
 STM/exo endpoints, test buttons, launch intents and direct phone-to-OTP client have

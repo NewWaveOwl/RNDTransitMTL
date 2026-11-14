@@ -80,15 +80,15 @@ show Ready. For remote clients, enable Cloudflare Tunnel and use the launcher's
 Public HTTPS address as Android's `generationEndpoint`. The launcher starts and
 supervises all services; Android Studio only builds/runs the phone app.
 
-See the [root quick-start](../README.md#quick-start) for Android Studio configuration
-and the [Windows server guide](../backend/launcher/SERVER_GUIDE.md) for imports,
+See the [Android development guide](../docs/AndroidDevelopment.md) for Android Studio configuration
+and the [Windows server guide](launcher/SERVER_GUIDE.md) for imports,
 data paths, authentication and tunnel settings. The following manual workflow is
 an alternative for developing services directly on the same PC.
 
 ## Manual startup on Windows
 
 Use the combined STM/exo graph and local credentials prepared for #21. See
-[RunTripSimulation.md](RunTripSimulation.md) for the existing realtime stack.
+[RunTripSimulation.md](../docs/RunTripSimulation.md) for the existing realtime stack.
 From the repository root, start it in one PowerShell window:
 
 ```powershell
@@ -255,7 +255,7 @@ origin preservation, accepted geometry and timing/DTO restoration.
 - [OTP 2.10 realtime configuration](https://docs.opentripplanner.org/en/v2.10.0/GTFS-RT-Config/)
 - [STM open data](https://www.stm.info/a-propos/documents-donnees/donnees-ouvertes)
 - [exo open data](https://exo.quebec/fr/a-propos/donnees-ouvertes)
-- [Official ARTM 2026 zone polygons and attribution](../backend/data/README.md)
+- [Official ARTM 2026 zone polygons and attribution](data/README.md)
 
 The linked generated GraphQL reference follows OTP development. Keep the application
 on the tested OTP 2.10 graph/runtime and verify schema compatibility when upgrading.
@@ -301,7 +301,7 @@ when publishing a loopback backend through a tunnel.
 ## Consolidated server layout
 
 All server sources, OTP/feed tools and launch scripts now live under the root
-`backend/` folder. See [backend/README.md](../backend/README.md). The standalone
+`backend/` folder. See [backend/README.md](README.md). The standalone
 `gradlew -p backend` build does not configure Android or require its SDK. Existing
 ignored runtime data in another checkout can still be used with `-StackDirectory`;
 no credentials, running graph or downloaded runtime files were moved from that checkout.
