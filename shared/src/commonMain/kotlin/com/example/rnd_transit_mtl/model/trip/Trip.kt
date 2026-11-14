@@ -101,7 +101,9 @@ data class Trip(
     /** User's named pace, retained so repeating a trip keeps its generation settings. */
     val walkingPreference: String? = null,
     /** Orientation reserve already included in routedDurationSeconds. */
-    val orientationBufferSeconds: Long = 0
+    val orientationBufferSeconds: Long = 0,
+    /** Allowed planner alternatives, separate from walking access and other used leg modes. Null on legacy trips. */
+    val requestedTransportIds: List<TransportId>? = null
 ) {
     init {
         require(routedDurationSeconds == null || routedDurationSeconds > 0)
@@ -154,6 +156,12 @@ data class Trip(
 
         require(selectedTransports.isNotEmpty()) {
             "Choose at least one transport type."
+        }
+        requestedTransportIds?.let { requested ->
+            require(requested.isNotEmpty() && requested.distinct() == requested &&
+                requested.all { id -> selectedTransports.any { it.id == id } }) {
+                "Requested transport IDs must be unique selected transports."
+            }
         }
         require(
             selectedTransports.map { it.id }.distinct().size ==

@@ -365,6 +365,7 @@ public class StmRealtimeAdapter {
         // Planning queries declare this variable so a stale feed can force scheduled routing.
         boolean fromItinerary = body.path("extensions").path("realtimeFeedsFromItinerary").asBoolean(false);
         Set<String> feeds = initialFeeds(body);
+        Set<String> requestedFeeds = requestedFeeds(body);
         body.remove("extensions");
         routingRequest(body, feeds);
         ObjectNode variables = body.with("variables");
@@ -374,7 +375,7 @@ public class StmRealtimeAdapter {
         ObjectNode result = otpResponse(response.statusCode(), response.body());
         // If a source became stale during routing, retry once with scheduled times.
         feeds.addAll(itineraryFeeds(result));
-        boolean needsFallback = fromItinerary ? needsScheduledFallback(result) : !predictionsUsable(feeds);
+        boolean needsFallback = fromItinerary ? needsScheduledFallback(result, requestedFeeds) : !predictionsUsable(feeds);
         if (!exclude && needsFallback) {
             ObjectNode original = result;
             variables.put("excludeRealtime", true);
@@ -399,6 +400,20 @@ public class StmRealtimeAdapter {
         return feeds;
     }
 
+    /** Used only when OTP returns no journeys from which to identify the affected feed. */
+    Set<String> requestedFeeds(ObjectNode body) {
+        Set<String> feeds = new HashSet<>();
+        for (JsonNode feed : body.path("extensions").path("realtimeFeeds")) feeds.add(feed.asText());
+        for (JsonNode transit : body.path("variables").path("modes").path("transit").path("transit")) {
+            switch (transit.path("mode").asText()) {
+                case "BUS" -> { feeds.add("STM"); feeds.addAll(exoBuses.keySet()); }
+                case "SUBWAY" -> feeds.add("STM");
+                case "RAIL" -> feeds.add(ExoRealtimeFeed.ID);
+            }
+        }
+        return feeds;
+    }
+
     static Set<String> itineraryFeeds(JsonNode result) {
         Set<String> feeds = new HashSet<>();
         for (JsonNode edge : result.path("data").path("planConnection").path("edges"))
@@ -413,7 +428,14 @@ public class StmRealtimeAdapter {
     }
 
     boolean needsScheduledFallback(JsonNode result) {
-        for (JsonNode edge : result.path("data").path("planConnection").path("edges"))
+        return needsScheduledFallback(result, Set.of());
+    }
+
+    boolean needsScheduledFallback(JsonNode result, Set<String> requestedFeeds) {
+        JsonNode edges = result.path("data").path("planConnection").path("edges");
+        if (result.path("errors").size() > 0) return false;
+        if (edges.isArray() && edges.isEmpty()) return !predictionsUsable(requestedFeeds);
+        for (JsonNode edge : edges)
             if (!predictionsUsable(legFeeds(edge.path("node")))) return true;
         return false;
     }
@@ -425,7 +447,8 @@ public class StmRealtimeAdapter {
         var edges = JSON.createArrayNode();
         for (JsonNode edge : original.path("data").path("planConnection").path("edges"))
             if (predictionsUsable(legFeeds(edge.path("node")))) edges.add(edge);
-        for (JsonNode edge : plan.path("edges")) edges.add(edge);
+        for (JsonNode edge : plan.path("edges"))
+            if (!predictionsUsable(legFeeds(edge.path("node")))) edges.add(edge);
         ((ObjectNode) plan).set("edges", edges);
         return scheduled;
     }

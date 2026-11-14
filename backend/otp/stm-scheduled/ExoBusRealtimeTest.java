@@ -67,6 +67,9 @@ public class ExoBusRealtimeTest {
         check(adapter.needsScheduledFallback(original), "One affected alternative triggers a scheduled retry");
         check(!adapter.needsScheduledFallback(journeys("STM:55")), "STM-only alternatives need no bus fallback");
         var scheduled = journeys("EXO_BUS_CITSO:10");
+        // A whole-graph scheduled replan can also return healthy-feed journeys. They must not hide known delays.
+        ((com.fasterxml.jackson.databind.node.ArrayNode) scheduled.path("data").path("planConnection").path("edges"))
+            .add(journeys("STM:55").path("data").path("planConnection").path("edges").get(0));
         ((ObjectNode)scheduled.path("data").path("planConnection").path("edges").get(0).path("node").path("legs").get(0)).put("realTime",false);
         var merged = adapter.mergeScheduledFallback(original,scheduled);
         check(merged.path("data").path("planConnection").path("edges").size()==3, "Healthy alternatives retained and affected one replaced");
@@ -74,6 +77,14 @@ public class ExoBusRealtimeTest {
             var leg = edge.path("node").path("legs").get(0);
             check(leg.path("realTime").asBoolean() != leg.path("route").path("gtfsId").asText().startsWith("EXO_BUS_CITSO:"), "Only the affected bus journey is scheduled");
         }
+        var noJourneys = journeys();
+        check(adapter.needsScheduledFallback(noJourneys,Set.of("EXO_BUS_CITSO")), "Missing journeys still retry unavailable feeds");
+        check(!adapter.needsScheduledFallback(noJourneys,Set.of("STM")), "No scheduled retry for healthy cancellation results");
+        var busRequest = StmRealtimeAdapter.JSON.createObjectNode();
+        busRequest.putObject("variables").putObject("modes").putObject("transit").putArray("transit")
+            .addObject().put("mode","BUS");
+        check(adapter.requestedFeeds(busRequest).equals(Set.of("STM","EXO_BUS_CITSO","EXO_BUS_CITLA")), "Empty bus results include configured bus sectors");
+        routingFallbackOverHttp();
         so.mode = "live"; so.refresh(); check(adapter.predictionsUsable(Set.of("EXO_BUS_CITSO")), "Bus recovery restores predictions");
         var request = ExoRealtimeFeed.request("CITSO","fixture & key",false);
         check(request.uri().getPath().equals("/api/opendata/v1/CITSO/tripupdate"), "API request uses selected sector");
@@ -97,5 +108,38 @@ public class ExoBusRealtimeTest {
         Files.writeString(root.resolve("graph.obj"), "another graph");
         rejects(() -> ExoRealtimeFeed.loadBuses(root,clock,null), "Changed graphs cannot accept bus realtime");
         System.out.println("PASS: " + checks + " exo bus fixture checks; no API calls made.");
+    }
+
+    /** Actual bridge requests against a local OTP fixture, with no agency requests or real graph. */
+    static void routingFallbackOverHttp() throws Exception {
+        var requests = new ArrayList<Boolean>();
+        var otp = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1",0),0);
+        otp.createContext("/", exchange -> {
+            boolean scheduled = StmRealtimeAdapter.JSON.readTree(exchange.getRequestBody()).path("variables").path("excludeRealtime").asBoolean();
+            requests.add(scheduled);
+            var response = scheduled ? journeys("STM:55") : journeys();
+            StmRealtimeAdapter.send(exchange,200,"application/json",StmRealtimeAdapter.JSON.writeValueAsBytes(response));
+        });
+        otp.start();
+        var adapter = new StmRealtimeAdapter(Path.of("."),Clock.systemUTC(),(url,key)->new byte[0],
+            StmRealtimeAdapter.JSON.createObjectNode(),"fixture",java.net.URI.create("http://127.0.0.1:"+otp.getAddress().getPort()),false);
+        adapter.http = java.net.http.HttpClient.newHttpClient();
+        var bridge = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1",0),0);
+        bridge.createContext("/",adapter::handle);
+        bridge.start();
+        try {
+            var body = StmRealtimeAdapter.JSON.createObjectNode();
+            body.put("query","query { planConnection(preferences:{transit:{timetable:{excludeRealTimeUpdates:$excludeRealtime}}}) { edges { node { duration } } } }");
+            body.putObject("variables").put("excludeRealtime",false);
+            body.putObject("extensions").put("realtimeFeedsFromItinerary",true).putArray("realtimeFeeds").add("STM");
+            var request = java.net.http.HttpRequest.newBuilder(java.net.URI.create("http://127.0.0.1:"+bridge.getAddress().getPort()+"/otp/gtfs/v1"))
+                .timeout(Duration.ofSeconds(5)).header("Content-Type","application/json")
+                .POST(java.net.http.HttpRequest.BodyPublishers.ofString(body.toString())).build();
+            var response = adapter.http.send(request,java.net.http.HttpResponse.BodyHandlers.ofString());
+            check(response.statusCode()==200,"Empty-result fallback succeeds over HTTP");
+            check(requests.equals(List.of(false,true)),"Unavailable feeds get exactly one scheduled retry");
+            check(StmRealtimeAdapter.JSON.readTree(response.body()).path("data").path("planConnection").path("edges").size()==1,
+                "The scheduled journey survives the production bridge response");
+        } finally { bridge.stop(0); otp.stop(0); }
     }
 }

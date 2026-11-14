@@ -9,6 +9,7 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
 import io.ktor.server.engine.*
+import io.ktor.server.http.HttpRequestLifecycle
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -69,6 +70,7 @@ internal class Api(private val generator: Generator, private val authorize: susp
 }
 internal fun Application.generationRoutes(api: Api) {
     routing {
+        install(HttpRequestLifecycle) { cancelCallOnClose = true }
         get("/health") { call.respondText(obj("status" to "ready").toString(),ContentType.Application.Json) }
         post("/v1/trips/generate") {
             val (status,result)=api.handle(call.request.headers[HttpHeaders.ContentType],call.request.headers[HttpHeaders.Authorization]) {

@@ -5,6 +5,8 @@ import com.example.rnd_transit_mtl.data.remote.dto.toDto
 import com.example.rnd_transit_mtl.data.remote.dto.toDomainOrNull
 import com.example.rnd_transit_mtl.model.geo.GeoPoint
 import com.example.rnd_transit_mtl.model.ids.TransportId
+import com.example.rnd_transit_mtl.model.ids.ZoneId
+import com.example.rnd_transit_mtl.ViewModels.main.MainPlannerViewModel
 import com.example.rnd_transit_mtl.model.transport.TransportType
 import com.example.rnd_transit_mtl.model.trip.Place
 import com.example.rnd_transit_mtl.model.trip.Trip
@@ -39,6 +41,70 @@ class BackendTripGeneratorTest {
             }}]}}}
         """.trimIndent()))
     }.toString()
+
+    @Test
+    fun repeatingRestoredBusOnlyTripsKeepsWalkingAsAccessRatherThanAnAlternative() = runTest {
+        val bus = TransportId("bus")
+        val walk = TransportId("walk")
+        val zone = ZoneId("A")
+        fun geometry(from: GeoPoint, to: GeoPoint): JsonObject {
+            var lat = 0; var lon = 0
+            fun delta(number: Int): String {
+                var value = if (number < 0) (number shl 1).inv() else number shl 1
+                return buildString {
+                    while (value >= 32) { append(((32 or (value and 31)) + 63).toChar()); value = value ushr 5 }
+                    append((value + 63).toChar())
+                }
+            }
+            val encoded = listOf(from, to).joinToString("") { point ->
+                val a = kotlin.math.round(point.latitude * 1e5).toInt()
+                val b = kotlin.math.round(point.longitude * 1e5).toInt()
+                val text = delta(a - lat) + delta(b - lon)
+                lat = a; lon = b; text
+            }
+            return buildJsonObject { put("length", 2); put("points", encoded) }
+        }
+        val middle = GeoPoint(45.502, -73.6)
+        val original = Json.parseToJsonElement(response()).jsonObject
+        val node = original.getValue("otp").jsonObject.getValue("data").jsonObject
+            .getValue("planConnection").jsonObject.getValue("edges").jsonArray.single().jsonObject.getValue("node").jsonObject
+        val walking = node.getValue("legs").jsonArray.single().jsonObject
+        val access = JsonObject(walking + mapOf("duration" to JsonPrimitive(300), "legGeometry" to geometry(origin.point, middle)))
+        val transit = JsonObject(walking + mapOf(
+            "mode" to JsonPrimitive("BUS"), "duration" to JsonPrimitive(300), "steps" to JsonArray(emptyList()),
+            "legGeometry" to geometry(middle, destination.point),
+            "route" to buildJsonObject { put("gtfsId", "STM:24"); put("shortName", "24") },
+            "start" to buildJsonObject { put("scheduledTime", "2026-11-13T10:00:00-05:00") },
+            "end" to buildJsonObject { put("scheduledTime", "2026-11-13T10:05:00-05:00") }
+        ))
+        val updated = JsonObject(node + ("legs" to JsonArray(listOf(access, transit))))
+        val body = JsonObject(original + ("otp" to buildJsonObject { put("data", buildJsonObject {
+            put("planConnection", buildJsonObject {
+                put("routingErrors", JsonArray(emptyList()))
+                put("edges", buildJsonArray { add(buildJsonObject { put("node", updated) }) })
+            })
+        }) }))
+        val busInput = input.copy(selectedTransportIds = listOf(bus), selectedZoneIds = listOf(zone),
+            selectedZonesByTransport = mapOf(bus to listOf(zone)))
+        val catalogue = listOf(TransportType(bus, "Bus", true), TransportType(walk, "Walk", false))
+        val trip = assertIs<TripGenerationResult.Success>(BackendTripGenerator(post = { body.toString() })
+            .generate(busInput, catalogue, emptySet())).trip
+        assertEquals(setOf(bus, walk), trip.selectedTransports.map { it.id }.toSet())
+        for (restored in listOf(Json.decodeFromString<Trip>(Json.encodeToString(trip)), assertNotNull(trip.toDto().toDomainOrNull()))) {
+            val planner = MainPlannerViewModel()
+            planner.copyTripPreferences(restored, liveMap = true)
+            assertEquals(listOf(bus), planner.uiState.value.selectedTransportIds)
+            BackendTripGenerator(post = { request ->
+                assertEquals(listOf("bus"), Json.decodeFromString<BackendGenerationRequest>(request).modes)
+                """{"status":"no_trip"}"""
+            }).generate(busInput.copy(selectedTransportIds = planner.uiState.value.selectedTransportIds), catalogue, emptySet())
+        }
+        val legacy = Json.decodeFromString<Trip>(JsonObject(Json.encodeToJsonElement(trip).jsonObject - "requestedTransportIds").toString())
+        assertNull(legacy.requestedTransportIds)
+        val legacyPlanner = MainPlannerViewModel()
+        legacyPlanner.copyTripPreferences(legacy)
+        assertEquals(legacy.selectedTransports.map { it.id }, legacyPlanner.uiState.value.selectedTransportIds)
+    }
 
     @Test
     fun oneBackendCallPreservesExactPinGeometryBudgetAndSavedTiming() = runTest {

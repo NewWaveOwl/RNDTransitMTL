@@ -133,7 +133,8 @@ internal class BackendTripGenerator(
             selectedZoneIds = input.selectedZoneIds.toList(),
             selectedZonesByTransport = input.selectedZonesByTransport.mapValues { it.value.toList() },
             routedDurationSeconds = elapsed, waitingTimeSeconds = route.waitingTimeSeconds,
-            orientationBufferSeconds = response.orientationBufferSeconds, walkingPreference = input.walkingPreference
+            orientationBufferSeconds = response.orientationBufferSeconds, walkingPreference = input.walkingPreference,
+            requestedTransportIds = input.selectedTransportIds.toList()
         )
         return TripGenerationResult.Success(trip)
     }

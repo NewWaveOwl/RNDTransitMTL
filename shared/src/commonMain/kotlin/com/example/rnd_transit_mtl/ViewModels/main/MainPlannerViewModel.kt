@@ -91,9 +91,7 @@ class MainPlannerViewModel(
         mutableUiState.update {
             it.copy(
                 minutes = Trip.coercePlannedMinutes(trip.plannedMinutes),
-                selectedTransportIds = trip.selectedTransports.map { mode ->
-                    mode.id
-                },
+                selectedTransportIds = trip.requestedTransportIds ?: trip.selectedTransports.map { it.id },
                 selectedZoneIds = trip.selectedZoneIds.toList(),
                 selectedZonesByTransport =
                     trip.selectedZonesByTransport.mapValues { entry ->

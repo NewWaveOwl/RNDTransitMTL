@@ -528,7 +528,7 @@ internal fun TransitOpeningScreen(
         val saved = copiedTripToGenerate
         if (saved != null && isDestinationActive &&
             planner.minutes == saved.plannedMinutes &&
-            planner.selectedTransportIds == saved.selectedTransports.map { it.id } &&
+            planner.selectedTransportIds == (saved.requestedTransportIds ?: saved.selectedTransports.map { it.id }) &&
             planner.selectedZoneIds == saved.selectedZoneIds &&
             planner.selectedZonesByTransport == saved.selectedZonesByTransport &&
             (if (liveMap) planner.originPlace == saved.origin else planner.origin == saved.origin.toSampleMapPoint()) &&
