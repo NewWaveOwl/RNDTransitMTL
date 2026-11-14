@@ -137,6 +137,15 @@ router configuration and local feed credentials. Do not commit these runtime fil
 `Set-ExoRealtimeToken.ps1` and `Connect-StmRealtime.ps1` configure live credentials.
 The bridge needs the combined STM + exo train graph to provide both agencies.
 
+Keep `backend/otp/stm-scheduled/prepare-stm-index.py`: the stack startup script
+runs it when the STM feed or helper changes, or when the adapter index is missing.
+It produces `stm-adapter-index.json` from the same `stm-gtfs.zip` used by OTP,
+mapping route names, stop codes and verified directions for realtime alerts.
+The bridge reads that index and the launcher requires it during data import.
+The old `tool/otp/stm-scheduled/` source path was relocated to `backend/otp/`;
+existing runtime data in another checkout can still be reused as described above.
+
+
 ## Independent server build
 
 To obtain the source:
