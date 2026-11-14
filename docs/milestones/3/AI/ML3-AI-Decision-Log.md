@@ -29,6 +29,10 @@ The web reader returned cache misses for all six URLs; the browser successfully 
 | M3-A13 | Codex - current PR 75 review conversation; [Conversation link needed]; [P01](ML3-PR75-Review-Fixes-Chat-Prompts.md#p01---independent-pr-review) | Independent exact-head review, bounded observations and failure reproduction |
 | M3-A14 | Same current Codex conversation; [Conversation link needed]; [P02-P03](ML3-PR75-Review-Fixes-Chat-Prompts.md#p02---remediation-and-git-authorization) | Authorized fixes, regression tests, merge resolution, commits and logging/push handoff |
 
+| M3-A15 | [ChatGPT - PR 75 review follow-up](https://chatgpt.com/share/6af88f56-58f0-83ea-aa4b-739d9e77f32f); [prompts](ML3-PR75-Followup-Chat-Prompts.md) | CLI review handoff, issue acceptance, Git ownership/time log and branch guidance |
+| M3-A16 | [Same chat](https://chatgpt.com/share/6af88f56-58f0-83ea-aa4b-739d9e77f32f); [P07-P10](ML3-PR75-Followup-Chat-Prompts.md#p07---existing-geohash-use) | Spatial sampling and concurrent discovery investigation, issue #78 |
+| M3-A17 | [Same chat](https://chatgpt.com/share/6af88f56-58f0-83ea-aa4b-739d9e77f32f); [P15 onward](ML3-PR75-Followup-Chat-Prompts.md#p15---peer-review-findings) | Peer findings, Docker removal, UTF-8 fixes, App.kt conflict guidance and logging |
+
 ## M3-A1 - PR 53 review and Android saved-state explanations
 
 **Source:** [Shared conversation](https://chatgpt.com/s/cx_6ae7b432fc4081919e59a08ce2eaf35d)
@@ -785,3 +789,52 @@ The AI proposed a 20-second base search deadline plus `floor(selectedMinutes / 6
 **Logging follow-up:** P03 is documented by these two new decision/technique entries and the three-prompt archive. Existing contributors' entries and earlier shared URLs are preserved. No current conversation URL was invented or published. This documentation turn does not rerun historical commands, change application code, retry the blocked push or deploy the server; it prepares a separate log commit and a push-command handoff. Student reflection and a verified conversation link remain needed.
 
 **Reflection:** Whether AI saved time, what the student learned, deliberate technique choices, active interaction time and estimated code percentage: [Student reflection needed] / [Not documented]. **Technique record:** [M3-A14](ML3-AI-Technique-Log.md#m3-a14---pr-75-fixes-merge-resolution-and-commit-handoff).
+
+## M3-A15 - PR 75 follow-up review and verification handoff
+
+**Contributor:** Requester; Artiom / NewWaveOwl supported by repository context. **Logged:** 2026-11-14 (America/Toronto). **AI:** ChatGPT/Codex; exact model [Not documented].
+**Source:** [Current chat](https://chatgpt.com/share/6af88f56-58f0-83ea-aa4b-739d9e77f32f). **Prompts:** [Follow-up archive](ML3-PR75-Followup-Chat-Prompts.md), P01-P06 and P11-P14/P27. This is a separate conversation from the CLI execution recorded in M3-A13/A14.
+
+**Task/context:** Review PR #75, move review execution to PowerShell when this session's access failed, preserve the already running second-PC server, assess issue completion and maintain the time log.
+
+**AI output summary:** Inspected local e650332 and browser-confirmed the PR branch/head; review was interrupted by PC disconnection and did not produce confirmed findings or approval. Supplied Codex CLI installation/run commands and a risk-based review prompt. Explained that approval=never retains the sandbox and blocked commands fail instead of prompting. Revised the prompt to use bounded checks against the running server and fixtures for disruptive scenarios. Explained a path-specific safe.directory exception after the user's ownership error. Compared supplied #64/#66 criteria, then gave closure advice after the student's Android confirmation. Advised retaining the old branch until checking unique changes.
+
+**Student decision / how output was used:** User chose a PowerShell review with no approval prompts, stated the second-PC server was running, and reported that #64 worked on Android with a proposal screenshot. User requested the time-log commit/push. Successful CLI installation/review launch, issue closure, PR merge and branch deletion are not established here.
+
+**Implemented result / evidence:** Local commit 63a63ce records the student's Time_spent.txt edits on top of the newer fixes checkout. Original checkout modifications, including gradle.properties, were preserved. CLI review findings/tests in M3-A13/A14 came from the other conversation and are not new results for this chat.
+
+**Verification / limitations:** Repository search and source inspection performed. Gradle wrapper access failed on the user-cache lock; later PC disconnection interrupted review. GitHub CLI/fetch/push attempts failed due to connectivity/name resolution. User-provided gh output established the then-open #64/#66 bodies; Android confirmation is student-reported acceptance, while the screenshot independently shows only a generated proposal/geometry/duration state. It does not prove every cancellation/outage criterion. Current remote completion is unknown. Time, code percentage and personal reflection: [Student reflection needed]. **Technique record:** [M3-A15](ML3-AI-Technique-Log.md#m3-a15---pr-75-follow-up-review-and-verification-handoff).
+
+## M3-A16 - Spatial sampling and concurrent candidate discovery investigation
+
+**Contributor:** Requester; Artiom / NewWaveOwl supported by assignment UI. **Logged:** 2026-11-14. **AI:** ChatGPT/Codex; exact model [Not documented].
+**Source:** [Current chat](https://chatgpt.com/share/6af88f56-58f0-83ea-aa4b-739d9e77f32f). **Full available prompts:** [P07-P10](ML3-PR75-Followup-Chat-Prompts.md#p07---existing-geohash-use).
+
+**Task/context:** Assess whether geohash/grid sampling can improve random destinations and serve overlapping requests without giving everyone similar trips.
+
+**AI suggestion:** Repository search found no geohash use. Suggested measuring additional benefit beyond existing proximity checks, investigating reusable candidate discovery and bounded caching/coalescing, and treating variety across corridors as an experiment. Geohash letters do not replace distance calculations or OTP travel-time validation. Cells should remain sampling areas, with varied routable park/path destinations rather than compulsory centres, entrances or stops.
+
+**Student decision:** User prioritized reducing near-duplicate attempts and reusing recent useful areas for simultaneous users; challenged the benefit of corridor diversity and explicitly required varied park destinations. Authorized creation and assignment to Artiom.
+
+**Implemented result / evidence:** Created [issue #78](https://github.com/NewWaveOwl/RNDTransitMTL/issues/78), assigned to NewWaveOwl after the picker displayed Artiom Sova. Browser readback confirmed title, body, open state and assignment. Scope includes profiling, candidate constraints, cache expiry/invalidation, concurrent cancellation, cell boundaries, park reachability, latency/OTP-call/success/memory/diversity measurements and a measured recommendation. It is an investigation; no geohash algorithm or caching implementation was added.
+
+**Verification / limitations:** No performance benefit, throughput gain or destination-quality gain was measured. Exact model, personal time and learning reflection [Not documented] / [Student reflection needed]. **Technique record:** [M3-A16](ML3-AI-Technique-Log.md#m3-a16---spatial-sampling-and-concurrent-candidate-discovery-investigation).
+
+## M3-A17 - Peer findings, deployment simplification and App.kt merge guidance
+
+**Contributor:** Requester; Artiom / NewWaveOwl supported by project context. **Logged:** 2026-11-14. **AI:** ChatGPT/Codex; exact model [Not documented].
+**Source:** [Current chat](https://chatgpt.com/share/6af88f56-58f0-83ea-aa4b-739d9e77f32f). **Prompts/attachments:** [P15-P29](ML3-PR75-Followup-Chat-Prompts.md#p15---peer-review-findings); peer's findings, conflict-editor screenshots and Pasted text(3).txt (read in full, 240 lines).
+
+**Task/context:** Act on a peer's Docker configuration and corrupted-text findings, decide which deployment method to maintain, and resolve App.kt conflicts between backend generation and cloud trip persistence.
+
+**AI output summary:** Confirmed Dockerfile omitted backend/launcher even though standalone settings included :launcher, and found literal corrupted characters in attribution/summaries. Initially added the launcher COPY and repaired UTF-8 strings. Explained Docker was optional for the running Windows launcher; after the user's removal decision, removed Docker setup and instructions. Conflict guidance combined generationEndpoint with tripRepository/outbox/cloud persistence and omitted removed debug-trip parameters/effects. Early screenshots/excerpts were incomplete; the assistant later searched for and read Pasted text(3).txt and returned the full resolved App.kt in chat.
+
+**Student decision:** User authorized fixes, questioned Docker's purpose, explicitly chose removal including docs, and requested commit/push. Student edited App.kt in the conflict editor and supplied more evidence; AI corrected missing tripRepository arguments. Later requested this conversation be logged, committed and pushed, and supplied its share URL.
+
+**Implemented result / evidence:** Commit f0d2f9d removes .dockerignore and backend/Dockerfile, replaces Docker hosting instructions with Windows launcher guidance, adjusts log references and fixes five string locations across MainPlannerContent.kt/TransitOpeningScreen.kt. The initial Docker COPY repair was superseded by deletion, not retained. App.kt resolution was supplied in chat only; this session did not apply or compile it. It must not be described as a verified merged file.
+
+**Verification:** Strict UTF-8 decoding/corruption checks and launcher-input existence checks passed before removal; git diff --check passed after fixes/removal. Documentation search left only the transitive is-docker dependency in yarn.lock, which was intentionally retained. Launcher documentation link target exists. Docker executable was unavailable, so no container build was performed. No Android assembly/UI rerun was performed for the punctuation-only fix. Original worktree/time-log/settings changes were preserved. All push attempts from this session failed due to network/name-resolution errors; manual push commands were supplied. No successful remote push is claimed.
+
+**Logging follow-up:** Read docs/HowToLog_AI.md and both existing logs; added M3-A15 through M3-A17 and the source archive, preserving existing IDs and distinguishing this chat from the independent CLI review. Supplied share URL identifies the source; the visible conversation is used as evidence without claiming a freshly exported complete transcript. Documentation-only checks are recorded with the logging commit; commit/push outcomes must be taken from actual Git output.
+
+**Reflection / limits:** Student-estimated active time, assignment-code percentage, deliberate technique selection and productivity/learning judgment: [Student reflection needed]. No subagents were used in this chat. **Technique record:** [M3-A17](ML3-AI-Technique-Log.md#m3-a17---peer-findings-deployment-simplification-and-appkt-merge-guidance).

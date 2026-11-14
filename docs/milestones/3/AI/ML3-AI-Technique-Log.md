@@ -332,3 +332,66 @@ dependencies. Live device/tunnel checks remain unverified.
 | Time | Student-estimated active interaction time [Not documented]; build duration is not used as an estimate of student AI time. |
 | Outcome | Four fixes and the resolved main merge exist as local commits. The existing gradle.properties modification and running server were preserved. A remote push or GitHub PR merge is not established. The current request adds linked log records and a prompt archive for a separate commit. |
 | Productivity / learning reflection | [Student reflection needed]. |
+
+## M3-A15 - PR 75 follow-up review and verification handoff
+
+**Contributor:** Requester; Artiom / NewWaveOwl supported by repository context. **Logged:** 2026-11-14. **Conversation:** [Current chat](https://chatgpt.com/share/6af88f56-58f0-83ea-aa4b-739d9e77f32f).
+**Decision/full prompts:** [M3-A15](ML3-AI-Decision-Log.md#m3-a15---pr-75-follow-up-review-and-verification-handoff), [archive](ML3-PR75-Followup-Chat-Prompts.md).
+
+| Field | Student record |
+| --- | --- |
+| Challenge/context | Review PR #75 despite connectivity/cache restrictions; hand off to local CLI while preserving the running server. |
+| AI(s) used | ChatGPT/Codex; exact model [Not documented]. Separate CLI execution is documented in M3-A13/A14. No subagents used here. |
+| Observable pattern | Supplied repo/PR context, actual shell failures, server constraints, issue criteria and a device screenshot; requested progressively refined review prompts. |
+| Techniques deliberately used | [Student reflection needed]. |
+| Iterations | Multiple follow-ups preserved in order; exact engineering iteration count [Not documented]. |
+| Debugging/refinement | GitHub CLI failed; browser verified PR scope; cache-lock error and PC disconnect interrupted review. CLI handoff avoided pretending blocked checks passed. |
+| Failed/rejected approaches | Initial local review could not complete. codex command was not installed/on PATH; npx and installation guidance were supplied. Successful launch is not established. |
+| Strategy changes | Shifted execution to PowerShell; retained sandbox with never approvals; prioritized bounded live checks and isolated outage fixtures. |
+| Verification | Local source reads/search; user-reported #64 Android success plus visible proposal screenshot. Full acceptance and remote closure not independently established. |
+| Code impact | Time-log-only commit 63a63ce; no source implementation from review handoff. Percentage [Not documented]. |
+| Time | [Not documented]; student reflection/estimate needed. |
+| Outcome | Review prompt and safe Git handoffs supplied; branch deletion deferred pending uniqueness checks. Push failed in this session. |
+| Productivity/learning reflection | [Student reflection needed]. |
+
+## M3-A16 - Spatial sampling and concurrent candidate discovery investigation
+
+**Contributor:** Requester. **Logged:** 2026-11-14. **Conversation:** [Current chat](https://chatgpt.com/share/6af88f56-58f0-83ea-aa4b-739d9e77f32f).
+**Decision/full prompts:** [M3-A16](ML3-AI-Decision-Log.md#m3-a16---spatial-sampling-and-concurrent-candidate-discovery-investigation), [P07-P10](ML3-PR75-Followup-Chat-Prompts.md#p07---existing-geohash-use).
+
+| Field | Student record |
+| --- | --- |
+| Challenge/context | Explore reduced redundant OTP work for overlapping requests while preserving random, varied, reachable destinations. |
+| AI(s) used | ChatGPT/Codex; exact model [Not documented]. No subagents used. |
+| Observable pattern | Proposed geohash; asked whether it helps; selected benefits and challenged corridor diversity/fixed park endpoints before authorizing an issue. |
+| Techniques deliberately used | [Student reflection needed]. |
+| Iterations | Four visible relevant requests; not a measured implementation-iteration count. |
+| Debugging/refinement | Distinguished spatial identifiers from distance and routing; compared proposed grids to existing proximity filtering. |
+| Failed/rejected approaches | Fixed per-cell endpoints and assumed geohash performance benefits were not adopted. No algorithm was implemented or benchmarked. |
+| Strategy changes | Reframed implementation idea as measured investigation; added per-request constraints, cache expiry, concurrency and diversity criteria. |
+| Verification | Repository search for geohash; browser confirmed issue #78 and Artiom/NewWaveOwl assignment. |
+| Code impact | Issue only; no application source changes. Percentage not applicable. |
+| Time | [Not documented]. |
+| Outcome | Investigation issue created; implementation choice deferred to evidence. |
+| Productivity/learning reflection | [Student reflection needed]. |
+
+## M3-A17 - Peer findings deployment simplification and App.kt merge guidance
+
+**Contributor:** Requester. **Logged:** 2026-11-14. **Conversation:** [Current chat](https://chatgpt.com/share/6af88f56-58f0-83ea-aa4b-739d9e77f32f).
+**Decision/full prompts:** [M3-A17](ML3-AI-Decision-Log.md#m3-a17---peer-findings-deployment-simplification-and-appkt-merge-guidance), [P15-P29](ML3-PR75-Followup-Chat-Prompts.md#p15---peer-review-findings).
+
+| Field | Student record |
+| --- | --- |
+| Challenge/context | Validate peer findings; simplify deployment and repair text; reconcile generation and cloud-trip persistence conflicts. |
+| AI(s) used | ChatGPT/Codex; peer review findings supplied by user, peer's AI use [Not documented]. No subagents used here. |
+| Observable pattern | Supplied concrete findings, questioned unused technology, selected removal, requested commits, then iterated through code excerpts/screenshots and a full text attachment. |
+| Techniques deliberately used | [Student reflection needed]. |
+| Iterations | Related fixes and merge-guidance follow-ups grouped as one challenge; exact engineering iteration count [Not documented]. |
+| Debugging/refinement | Confirmed missing launcher COPY and corrupted characters. Initial documentation replacement failed on line endings; adjusted matching and checked final diff. Initial conflict excerpt lacked full context; complete attachment was subsequently read. |
+| Failed/rejected approaches | Docker repair was implemented temporarily then superseded by user-requested removal. Accepting only the feature side would discard tripRepository support; guidance preserved both current features. |
+| Strategy changes | Supported Windows launcher instead of maintaining an unused Docker path; provided full merged code only after reading the attachment. |
+| Verification | UTF-8/corruption checks, launcher-input/link existence, reference search and git diff --check. Docker absent; no container build or App.kt compilation/device verification claimed. |
+| Code impact | f0d2f9d changes eight files: Docker setup removed, docs adjusted, text repaired. App.kt code supplied in chat, not applied locally. Percentage [Not documented]. |
+| Time | Student-estimated active interaction time [Not documented]. |
+| Outcome | Local commit created; pushes failed and manual command provided. Current follow-up adds linked logs/archive, with Git outcome reported separately. |
+| Productivity/learning reflection | [Student reflection needed]. |
