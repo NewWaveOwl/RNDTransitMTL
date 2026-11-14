@@ -76,9 +76,74 @@ imported data copy. They do not modify the original stack, server.properties or
 the generated private router endpoints. Import the matching exo train GTFS before
 adding its token. Keys stay local and are excluded from packages/Git.
 
-The Chrono portal's `agency` parameter supports selecting API feeds, but this
-build still connects only STM and exo trains. exo bus sectors require their own
-schedule/graph integration; entering a token here does not enable them.
+exo bus sectors appear as additional rows after importing a bus-enabled graph.
+Use **exo bus settings...** for their separate tokens, refresh intervals and
+enable/disable switches. See the one-time graph preparation below.
+
+## exo bus setup
+
+The bridge supports Chrono bus **TripUpdate** and **Alert** feeds per agency.
+It does not add moving vehicle markers or TripModification/Stop/Shape processing.
+The ordinary **Bus** choice in Android includes exo bus routes available in the
+loaded graph; no new transport mode or Android endpoint is needed.
+The app's existing permitted service area and the user's selected fare zones
+still apply to generated trips.
+
+1. Download the current GTFS ZIP for each desired bus sector from
+   https://exo.quebec/fr/a-propos/donnees-ouvertes. Confirm that sector's exact
+   uppercase `agency` code and API subscription access in your Chrono developer
+   account. Train access alone does not prove bus access. `CITSO` below is an
+   example; use the code matching your chosen sector's feed.
+2. Transfer the OSM `.pbf` used for the original graph to the server PC if needed.
+   It must cover the bus sectors you want to route through. Imported runtime
+   folders do not include OSM by default. In the development setup it is typically
+   `tools/otp-montreal/stm-scheduled/Montreal.osm.pbf`.
+3. In the folder containing `RNDTransitServer.exe`, run the included helper:
+
+   ```powershell
+   .\Prepare-ExoBusGraph.ps1 `
+     -SourceDirectory 'D:/SERVER 2026/rnd_tranzit/newfldr' `
+     -Destination 'D:/SERVER 2026/rnd_tranzit/data-with-buses' `
+     -BusFeeds @{ CITSO = 'D:/SERVER 2026/rnd_tranzit/CITSO.zip' } `
+     -OsmFile 'D:/SERVER 2026/rnd_tranzit/Montreal.osm.pbf'
+   ```
+
+   Add other agency/ZIP pairs to BusFeeds to include more sectors. The helper uses
+   the packaged Java 25 runtime and OTP JAR; no Java installation is needed. From
+   a source checkout, also supply `-Java` and `-OtpJar` pointing at your prepared
+   Java 25 executable and OTP JAR. Building can take several minutes. `-MemoryMb`
+   defaults to 4096; leave enough RAM for Windows and other running services.
+
+   The destination must be new. The helper copies the existing STM/train inputs,
+   private feed settings and selected bus schedules, then builds a separate graph.
+   It does not replace the original graph or change server.properties. Build
+   output/cache/report paths are confined to the new directory. On failure, keep
+   using the original and inspect the new directory's graph-build.log. A failed
+   build is never marked as an importable bus graph.
+4. Stop the launcher. In **Configuration**, set dataDirectory to the completed
+   new folder (forward-slash paths work). Alternatively use Setup / import to
+   copy that completed folder to another empty destination.
+5. Open **exo bus settings...**, select an imported sector, enter its Chrono bus
+   token, check **Enable realtime**, Save, then Start server. Repeat for other
+   sectors. Blank token fields keep saved values. Disable a sector to use its
+   schedules without polling its API.
+6. Check each bus row's predictions and alerts. **Auth failed** indicates a
+   rejected subscription; **Unavailable** can also mean an incorrect agency code,
+   upstream outage, malformed data or identifiers that do not match the schedules.
+   A saved token is not a successful connection. Use private Bridge logs/status
+   for details. No account key belongs in Android or Git.
+
+Each sector has a distinct OTP feed ID (`EXO_BUS_<agency>`) and archive
+(`exo-bus-<agency>-gtfs.zip`). The generated public `exo-buses.json` records the
+graph and schedule SHA-256 values. Changing either requires rebuilding; the
+launcher and bridge reject mismatched files. Private tokens live separately in
+`exo-bus-realtime.local.json`, excluded from packages. PrepareOnly is available
+for development input checks; it does not create a graph or a ready marker.
+
+Freshness is evaluated for actual returned itineraries. A stale/unavailable sector
+uses a scheduled retry for affected journeys; healthy STM/train/other-bus realtime
+alternatives are retained. Alerts have an independent freshness check. Existing
+legacy debug requests keep their explicit feed-scope behavior.
 
 ## General settings
 
@@ -107,6 +172,9 @@ There are no automatic large downloads or graph rebuilds in the launcher. Prepar
 and refresh schedules/graph/index using the existing backend/otp tools in the
 development checkout, then import a new copy. An expired schedule needs a refreshed
 graph. Missing credentials, runtimes, data and occupied ports produce setup errors.
+
+For exo bus graphs, the included Prepare-ExoBusGraph.ps1 is the supported rebuild
+helper; it can also run on the server PC using the packaged runtime.
 
 ## Microsoft Dev Tunnels (Azure)
 

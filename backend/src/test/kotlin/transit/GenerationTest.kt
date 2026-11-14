@@ -50,8 +50,23 @@ class GenerationTest {
     @Test fun transitRetainsWalkingAccessAndRealtimeScope() {
         val r=otpRequest(parseRequest(input(modes=listOf("bus"))),end,now,null)
         assertEquals(listOf("STM"),r.field("extensions").field("realtimeFeeds").strings())
+        assertEquals(JsonPrimitive(true),r.field("extensions").field("realtimeFeedsFromItinerary"))
         assertEquals(listOf("WALK"),r.field("variables").field("modes").field("transit").field("access").strings())
         assertEquals(JsonPrimitive(false),r.field("variables").field("excludeRealtime"))
+    }
+    @Test fun busGenerationPreservesExoSectorNamespaceAndFeedHealth()=runBlocking {
+        val original=response(mode="BUS")
+        val text=original.toString().replace("STM:55","EXO_BUS_CITSO:10")
+        val health=obj("realtimeByFeed" to obj("EXO_BUS_CITSO" to obj("tripUpdates" to obj("state" to "fresh"))))
+        val body=JsonObject(json.parseToJsonElement(text).jsonObject + ("extensions" to health))
+        val result=generator { query ->
+            assertEquals(JsonPrimitive(true),query.field("extensions").field("realtimeFeedsFromItinerary"))
+            body
+        }.generate(parseRequest(input(modes=listOf("bus"))))
+        assertEquals("success",result["status"].text())
+        assertEquals("EXO_BUS_CITSO:10",result.field("otp").field("data").field("planConnection").field("edges").items().single()
+            .field("node").field("legs").items().single().field("route").field("gtfsId").text())
+        assertEquals(health,result.field("otp").field("extensions"))
     }
     @Test fun randomCoordinatesNeedNoStopCatalogueAndExcludePrevious() {
         val r=parseRequest(input()); val a=candidates(r,Random(123)); assertEquals(a,candidates(r,Random(123)))

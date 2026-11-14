@@ -92,7 +92,7 @@ class ConfigStore(val home: Path) {
 /** Imports an existing prepared graph without changing the source checkout or copying unrelated files. */
 class DataSetup {
     private val files = listOf("graph.obj", "stm-adapter-index.json", "stm-upstream.json", "exo-realtime.local.json",
-        "stm-gtfs.zip", "exo-trains-gtfs.zip", "build-config.json")
+        "stm-gtfs.zip", "exo-trains-gtfs.zip", "build-config.json", busCatalogName, busCredentialsName)
 
     /**
      * Copies prepared data into a new dedicated directory; existing imports are never overwritten.
@@ -105,7 +105,7 @@ class DataSetup {
         require(!Files.exists(target) || Files.list(target).use { it.findAny().isEmpty }) { "Import destination must be empty. Choose a new folder." }
         validateData(source, requireMarker = false)
         Files.createDirectories(target)
-        for (name in files) {
+        for (name in files + busSectors(source).map { it.archive }) {
             val input = source.resolve(name)
             if (Files.isRegularFile(input)) {
                 progress("Importing $name")
@@ -125,6 +125,7 @@ class DataSetup {
      * @param requireMarker Whether this must be an imported launcher-owned copy.
      */
     fun validateData(data: Path, requireMarker: Boolean = true) {
+        BusCredentials(data).validate()
         if (requireMarker) require(Files.exists(data.resolve(".rndtransit-data"))) { "Import your prepared OTP stack first (Setup / import)." }
         for (name in listOf("graph.obj", "stm-adapter-index.json", "stm-gtfs.zip")) {
             require(Files.isRegularFile(data.resolve(name)) && Files.size(data.resolve(name)) > 0) { "Missing $name. Prepare the graph/index in the development checkout, then import it." }
@@ -153,7 +154,8 @@ class DataSetup {
     fun prepareRouter(config: ServerConfig) {
         val root = Json.parseToJsonElement(Files.readString(config.dataDirectory.resolve("stm-upstream.json"))).jsonObject
         val others = root["updaters"]?.jsonArray.orEmpty().filterNot {
-            it.jsonObject["feedId"]?.jsonPrimitive?.content in listOf("STM", "EXO_TRAINS") &&
+            (it.jsonObject["feedId"]?.jsonPrimitive?.content in listOf("STM", "EXO_TRAINS") ||
+                it.jsonObject["feedId"]?.jsonPrimitive?.content?.startsWith("EXO_BUS_") == true) &&
                 it.jsonObject["type"]?.jsonPrimitive?.content in listOf("stop-time-updater", "real-time-alerts")
         }
         // Unknown credential-bearing updaters could echo their keys in OTP logs; require explicit development setup instead.
@@ -170,6 +172,8 @@ class DataSetup {
         updater("STM", "", 60)
         val exo = config.dataDirectory.resolve("exo-realtime.local.json")
         if (Files.exists(exo)) updater("EXO_TRAINS", "exo/", Json.parseToJsonElement(Files.readString(exo)).jsonObject.getValue("pollSeconds").jsonPrimitive.int)
+        for (bus in BusCredentials(config.dataDirectory).summaries().filter { it.enabled })
+            updater(bus.sector.feedId, "exo/bus/${bus.sector.agency}/", bus.pollSeconds)
         val router = JsonObject(root + ("updaters" to JsonArray(others + updates)))
         Files.writeString(config.dataDirectory.resolve("router-config.json"), Json { prettyPrint = true }.encodeToString(JsonObject.serializer(), router))
     }

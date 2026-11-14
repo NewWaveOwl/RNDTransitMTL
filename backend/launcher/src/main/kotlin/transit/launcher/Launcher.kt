@@ -102,7 +102,7 @@ class ServerWindow(private val store: ConfigStore, bundle: Path) : JFrame("RNDTr
             logs.caretPosition = logs.document.length
         } }
         controller = ServerController(store, bundle, logger) { state -> SwingUtilities.invokeLater { render(state) } }
-        realtimePanel = RealtimeFeedsPanel(controller::refreshFeeds, ::editFeedCredentials)
+        realtimePanel = RealtimeFeedsPanel(controller::refreshFeeds, ::editFeedCredentials, ::editBusCredentials)
         information.add(Box.createVerticalStrut(10)); information.add(realtimePanel)
         val actions = JPanel(GridLayout(2, 1, 0, 8))
         actions.add(JPanel(FlowLayout(FlowLayout.LEFT, 8, 0)).apply {
@@ -145,6 +145,16 @@ class ServerWindow(private val store: ConfigStore, bundle: Path) : JFrame("RNDTr
             val summary = FeedCredentials(store.load().dataDirectory).summary()
             FeedCredentialsDialog(this, summary, controller::saveFeedCredentials).isVisible = true
         }.onFailure { JOptionPane.showMessageDialog(this, it.message ?: "Cannot read feed credential settings.") }
+    }
+
+    private fun editBusCredentials() {
+        if (controller.active()) { JOptionPane.showMessageDialog(this, "Stop the server before changing bus credentials."); return }
+        runCatching {
+            val summaries = BusCredentials(store.load().dataDirectory).summaries()
+            if (summaries.isEmpty()) JOptionPane.showMessageDialog(this,
+                "Import a combined graph containing exo bus sectors first. See Guide: exo bus setup and Prepare-ExoBusGraph.ps1.")
+            else BusCredentialsDialog(this, summaries, controller::saveBusCredentials).isVisible = true
+        }.onFailure { JOptionPane.showMessageDialog(this, it.message ?: "Cannot read bus settings.") }
     }
 
     private fun importData() {

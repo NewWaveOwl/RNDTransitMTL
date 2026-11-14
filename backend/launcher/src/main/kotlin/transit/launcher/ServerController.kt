@@ -121,9 +121,26 @@ class ServerController(
     /** Rechecks bridge status without making upstream API calls or blocking Swing. */
     fun refreshFeeds() { monitor.execute { refreshRealtimeFeeds() } }
 
+    /** Edits one bus sector without replacing another sector's token or publishing credentials. */
+    fun saveBusCredentials(edit: BusCredentialEdit) {
+        if (running || !busy.compareAndSet(false, true)) { update(message = "Stop the server before changing bus credentials."); return }
+        worker.execute {
+            try {
+                val settings = store.load()
+                if (edit.token.isNotBlank()) log.secrets = log.secrets + edit.token
+                BusCredentials(settings.dataDirectory).save(edit)
+                update(message = "exo bus settings saved. Press Start server to connect.", realtimeFeeds = credentialFeeds(settings))
+            } catch (error: Exception) { fail(error) }
+            finally { busy.set(false) }
+        }
+    }
+
     private fun credentialFeeds(settings: ServerConfig): List<RealtimeFeedState> {
         val summary = FeedCredentials(settings.dataDirectory).summary()
-        return initialRealtimeFeeds().map { it.copy(credentials = if (if (it.id == "STM") summary.stm else summary.exo) "Saved" else "Missing") }
+        return initialRealtimeFeeds().map { it.copy(credentials = if (if (it.id == "STM") summary.stm else summary.exo) "Saved" else "Missing") } +
+            BusCredentials(settings.dataDirectory).summaries().map {
+                RealtimeFeedState(it.sector.feedId, "exo ${it.sector.agency}", credentials = if (it.saved) (if (it.enabled) "Saved" else "Saved (off)") else "Missing")
+            }
     }
 
     private fun refreshRealtimeFeeds() {
@@ -264,7 +281,7 @@ class ServerController(
 
     private fun configureRedaction(settings: ServerConfig) {
         val secrets = mutableListOf(settings.supabaseKey)
-        for (name in listOf("stm-upstream.json", "exo-realtime.local.json")) {
+        for (name in listOf("stm-upstream.json", "exo-realtime.local.json", busCredentialsName)) {
             val file = settings.dataDirectory.resolve(name)
             if (Files.isRegularFile(file)) {
                 // Extract before JSON validation so parse diagnostics cannot disclose a partly configured key.

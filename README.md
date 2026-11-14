@@ -82,6 +82,11 @@ Open this repository folder in Android Studio, let Gradle sync, and install any 
    Check **Realtime feeds** for each agency's prediction/alert freshness and last
    successful update. **Bridge: Ready** alone does not confirm live API access.
    To replace keys, stop the server and use **Feed credentials...**, then Start.
+   For exo buses, build/import a combined bus graph using the packaged
+   `Prepare-ExoBusGraph.ps1`, then enable the imported sectors in **exo bus
+   settings...**. See the Windows server guide for the complete setup. Bus
+   predictions/alerts are separate per sector; the Android **Bus** choice uses
+   the routes available in that graph.
 4. For a phone/emulator on another PC, choose Cloudflare or **Microsoft Dev Tunnels (Azure)** in **Tunnel settings**
    and wait for **Tunnel: Connected**. Use its **Public HTTPS** address in the app.
    Public mode requires the same Supabase project URL and publishable key as

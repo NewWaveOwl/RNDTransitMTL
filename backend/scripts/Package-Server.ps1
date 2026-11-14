@@ -65,6 +65,7 @@ Write-Host 'Creating separate OTP Java 25 runtime...'
 & (Join-Path $OtpJdk 'bin\jlink.exe') --module-path (Join-Path $OtpJdk 'jmods') --add-modules ALL-MODULE-PATH --strip-debug --no-header-files --no-man-pages --output (Join-Path $services 'otp-runtime')
 if ($LASTEXITCODE -ne 0) { throw 'OTP Java 25 runtime packaging failed.' }
 Copy-Item -LiteralPath (Join-Path $backend 'launcher\SERVER_GUIDE.md') -Destination (Join-Path $app 'SERVER_GUIDE.md')
+Copy-Item -LiteralPath (Join-Path $backend 'scripts\Prepare-ExoBusGraph.ps1') -Destination (Join-Path $app 'Prepare-ExoBusGraph.ps1')
 Copy-Item -LiteralPath (Join-Path $backend 'launcher\README.md') -Destination (Join-Path $app 'VERIFICATION.md')
 Copy-Item -LiteralPath (Join-Path $backend 'launcher\THIRD_PARTY.md') -Destination (Join-Path $app 'THIRD_PARTY.md')
 Copy-Item -LiteralPath (Join-Path $repo 'gradle\libs.versions.toml') -Destination (Join-Path $app 'build-versions.toml')

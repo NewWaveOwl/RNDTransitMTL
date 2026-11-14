@@ -45,7 +45,8 @@ internal fun otpRequest(input: Request, end: Point, departure: Instant, allowed:
     return obj("query" to planQuery,"variables" to obj("originLat" to input.start.latitude,"originLon" to input.start.longitude,
         "destinationLat" to end.latitude,"destinationLon" to end.longitude,"departure" to departure.toString(),"walkSpeed" to input.speed,
         "modes" to modes,"filters" to allowed?.let { listOf(mapOf("include" to listOf(mapOf("routes" to it.toList())))) },"excludeRealtime" to transit.isEmpty()),
-        "extensions" to obj("realtimeFeeds" to buildList { if(transit.any { it in listOf("bus","metro") }) add("STM"); if("train" in transit) add("EXO_TRAINS") }))
+        "extensions" to obj("realtimeFeedsFromItinerary" to true,
+            "realtimeFeeds" to buildList { if(transit.any { it in listOf("bus","metro") }) add("STM"); if("train" in transit) add("EXO_TRAINS") }))
 }
 internal fun accepts(itinerary: JsonElement,input: Request,end: Point,zones: FareZones,allowed: Set<String>?): Boolean = try {
     var previous=input.start; var meters=0.0

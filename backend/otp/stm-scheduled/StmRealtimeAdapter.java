@@ -41,6 +41,7 @@ public class StmRealtimeAdapter {
     final String key;
     final URI otp;
     ExoRealtimeFeed exo;
+    java.util.Map<String, ExoRealtimeFeed> exoBuses = java.util.Map.of();
     HttpClient http; // Supplied by main; pure conversion tests open no sockets.
     volatile Snapshot snapshot = new Snapshot(FeedState.empty(), FeedState.empty());
     volatile String mode = "live";
@@ -226,6 +227,7 @@ public class StmRealtimeAdapter {
         ObjectNode result = JSON.createObjectNode();
         result.set("STM", health(snapshot));
         result.set(ExoRealtimeFeed.ID, health(exo.snapshot, exo.mode));
+        exoBuses.forEach((id, feed) -> result.set(id, health(feed.snapshot, feed.mode)));
         return result;
     }
 
@@ -233,7 +235,7 @@ public class StmRealtimeAdapter {
         return feeds.stream().allMatch(feed -> switch (feed) {
             case "STM" -> mode.equals("live") && fresh(snapshot.trips);
             case ExoRealtimeFeed.ID -> exo.mode.equals("live") && fresh(exo.snapshot.trips);
-            default -> false;
+            default -> exoBuses.containsKey(feed) && exoBuses.get(feed).mode.equals("live") && fresh(exoBuses.get(feed).snapshot.trips());
         });
     }
 
@@ -305,10 +307,14 @@ public class StmRealtimeAdapter {
                 send(exchange, 200, "application/json", JSON.writeValueAsBytes(health(exo.snapshot, exo.mode)));
                 return;
             }
-            if (List.of("/trip-updates", "/alerts", "/exo/trip-updates", "/exo/alerts").contains(path)) {
+            var bus = exoBuses.entrySet().stream().filter(entry ->
+                path.equals("/exo/bus/" + entry.getKey().substring(ExoRealtimeFeed.BUS_PREFIX.length()) + "/trip-updates") ||
+                path.equals("/exo/bus/" + entry.getKey().substring(ExoRealtimeFeed.BUS_PREFIX.length()) + "/alerts"))
+                .map(java.util.Map.Entry::getValue).findFirst().orElse(null);
+            if (bus != null || List.of("/trip-updates", "/alerts", "/exo/trip-updates", "/exo/alerts").contains(path)) {
                 boolean exoFeed = path.startsWith("/exo/");
-                Snapshot current = exoFeed ? exo.snapshot : snapshot;
-                String currentMode = exoFeed ? exo.mode : mode;
+                Snapshot current = bus != null ? bus.snapshot : exoFeed ? exo.snapshot : snapshot;
+                String currentMode = bus != null ? bus.mode : exoFeed ? exo.mode : mode;
                 FeedState feed = path.endsWith("/alerts") ? current.alerts : current.trips;
                 if (currentMode.equals("stale") && feed.bytes != null) {
                     // Test-only replay: old feed header, never falsely restamped as fresh.
@@ -357,9 +363,8 @@ public class StmRealtimeAdapter {
             return;
         }
         // Planning queries declare this variable so a stale feed can force scheduled routing.
-        Set<String> feeds = new HashSet<>();
-        for (JsonNode feed : body.path("extensions").path("realtimeFeeds")) feeds.add(feed.asText());
-        if (feeds.isEmpty()) feeds.add("STM"); // Legacy STM debug requests.
+        boolean fromItinerary = body.path("extensions").path("realtimeFeedsFromItinerary").asBoolean(false);
+        Set<String> feeds = initialFeeds(body);
         body.remove("extensions");
         routingRequest(body, feeds);
         ObjectNode variables = body.with("variables");
@@ -368,16 +373,15 @@ public class StmRealtimeAdapter {
         var response = http.send(request, HttpResponse.BodyHandlers.ofByteArray());
         ObjectNode result = otpResponse(response.statusCode(), response.body());
         // If a source became stale during routing, retry once with scheduled times.
-        for (JsonNode edge : result.path("data").path("planConnection").path("edges")) {
-            for (JsonNode leg : edge.path("node").path("legs")) {
-                if (leg.path("route").isObject()) feeds.add(legFeed(leg));
-            }
-        }
-        if (!exclude && !predictionsUsable(feeds)) {
+        feeds.addAll(itineraryFeeds(result));
+        boolean needsFallback = fromItinerary ? needsScheduledFallback(result) : !predictionsUsable(feeds);
+        if (!exclude && needsFallback) {
+            ObjectNode original = result;
             variables.put("excludeRealtime", true);
             var retry = otpRequest(body);
             response = http.send(retry, HttpResponse.BodyHandlers.ofByteArray());
             result = otpResponse(response.statusCode(), response.body());
+            if (fromItinerary) result = mergeScheduledFallback(original, result);
         }
         ObjectNode health = healthByFeed();
         mapJourneyAlerts(result, leg -> health.path(legFeed(leg)).path("alerts").path("state").asText().equals("fresh"));
@@ -385,6 +389,45 @@ public class StmRealtimeAdapter {
         extensions.set("stmRealtime", health.path("STM"));
         extensions.set("realtimeByFeed", health);
         send(exchange, response.statusCode(), "application/json", JSON.writeValueAsBytes(result));
+    }
+
+    static Set<String> initialFeeds(ObjectNode body) {
+        Set<String> feeds = new HashSet<>();
+        if (body.path("extensions").path("realtimeFeedsFromItinerary").asBoolean(false)) return feeds;
+        for (JsonNode feed : body.path("extensions").path("realtimeFeeds")) feeds.add(feed.asText());
+        if (feeds.isEmpty()) feeds.add("STM");
+        return feeds;
+    }
+
+    static Set<String> itineraryFeeds(JsonNode result) {
+        Set<String> feeds = new HashSet<>();
+        for (JsonNode edge : result.path("data").path("planConnection").path("edges"))
+            feeds.addAll(legFeeds(edge.path("node")));
+        return feeds;
+    }
+
+    static Set<String> legFeeds(JsonNode itinerary) {
+        Set<String> feeds = new HashSet<>();
+        for (JsonNode leg : itinerary.path("legs")) if (leg.path("route").isObject()) feeds.add(legFeed(leg));
+        return feeds;
+    }
+
+    boolean needsScheduledFallback(JsonNode result) {
+        for (JsonNode edge : result.path("data").path("planConnection").path("edges"))
+            if (!predictionsUsable(legFeeds(edge.path("node")))) return true;
+        return false;
+    }
+
+    /** Retain healthy realtime alternatives; replace affected journeys with an all-scheduled response. */
+    ObjectNode mergeScheduledFallback(ObjectNode original, ObjectNode scheduled) {
+        JsonNode plan = scheduled.path("data").path("planConnection");
+        if (!plan.isObject() || !plan.path("edges").isArray() || scheduled.path("errors").size() > 0) return scheduled;
+        var edges = JSON.createArrayNode();
+        for (JsonNode edge : original.path("data").path("planConnection").path("edges"))
+            if (predictionsUsable(legFeeds(edge.path("node")))) edges.add(edge);
+        for (JsonNode edge : plan.path("edges")) edges.add(edge);
+        ((ObjectNode) plan).set("edges", edges);
+        return scheduled;
     }
 
     static String legFeed(JsonNode leg) {
@@ -443,6 +486,15 @@ public class StmRealtimeAdapter {
     }
 
     public static void main(String[] args) throws Exception {
+        if (args.length == 2 && args[0].equals("--bus-updaters")) {
+            var root = Path.of(args[1]);
+            var updates = JSON.createArrayNode();
+            ExoRealtimeFeed.loadBuses(root, Clock.systemUTC(), null).forEach((id, feed) -> {
+                if (feed.download != null) updates.addObject().put("feedId", id)
+                    .put("agency", id.substring(ExoRealtimeFeed.BUS_PREFIX.length())).put("pollSeconds", feed.pollSeconds);
+            });
+            System.out.println(JSON.writeValueAsString(updates)); return;
+        }
         Path root = Path.of(args.length > 0 ? args[0] : ".").toAbsolutePath();
         int port = args.length > 1 ? Integer.parseInt(args[1]) : 18086;
         int otpPort = args.length > 2 ? Integer.parseInt(args[2]) : 18085;
@@ -466,16 +518,19 @@ public class StmRealtimeAdapter {
             JSON.readTree(root.resolve("stm-adapter-index.json").toFile()), key,
             URI.create("http://127.0.0.1:" + otpPort + "/otp/gtfs/v1"), testing);
         adapter.exo = ExoRealtimeFeed.load(root, adapter.clock, client);
+        adapter.exoBuses = ExoRealtimeFeed.loadBuses(root, adapter.clock, client);
         adapter.http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5))
             .version(HttpClient.Version.HTTP_1_1).proxy(HttpClient.Builder.NO_PROXY).build();
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 0);
         server.createContext("/", adapter::handle);
         server.setExecutor(Executors.newFixedThreadPool(6));
-        var polling = Executors.newScheduledThreadPool(adapter.exo.download == null ? 1 : 2);
+        var polling = Executors.newScheduledThreadPool(2 + adapter.exoBuses.size());
         polling.scheduleWithFixedDelay(adapter::refresh, 0, 60, TimeUnit.SECONDS);
         if (adapter.exo.download != null) {
             polling.scheduleWithFixedDelay(adapter.exo::refresh, 0, adapter.exo.pollSeconds, TimeUnit.SECONDS);
         }
+        adapter.exoBuses.values().stream().filter(feed -> feed.download != null).forEach(feed ->
+            polling.scheduleWithFixedDelay(feed::refresh, 0, feed.pollSeconds, TimeUnit.SECONDS));
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             server.stop(0); polling.shutdownNow();
         }));

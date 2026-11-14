@@ -12,8 +12,10 @@ share its UI state.
 The main window also polls the bridge's private `/status` for separate STM/exo
 prediction and alert freshness, last successful downloads, and stored-credential
 presence. A masked credential editor updates only the imported private feed
-settings while stopped; blank fields preserve secrets. This does not add exo bus
-feeds. Bridge/process readiness remains separate from realtime freshness.
+settings while stopped; blank fields preserve secrets. Imported exo bus sectors
+have separate settings and status, with graph/schedule hash verification and a
+packaged one-time graph preparation helper. Bridge/process readiness remains
+separate from realtime freshness.
 
 Start with [SERVER_GUIDE.md](SERVER_GUIDE.md) for second-PC setup, imports, ports,
 authentication, tunnel settings, Android endpoint configuration and packaging.
@@ -110,3 +112,28 @@ package script, guides and tests are committed; generated runtimes/ZIPs are not.
 - No upstream API request was made during these checks. Live bridge status and
   replacement credentials need target-PC verification. Gradle and actual HTTP
   integration execution retain the environment limitations described above.
+
+## exo bus implementation and verification
+
+- Each configured Chrono agency gets its own `EXO_BUS_<agency>` namespace,
+  schedule identifier index, API requests, polling interval, retry state and feed
+  health. Only explicitly enabled sectors poll upstream. Credentials stay in
+  `exo-bus-realtime.local.json`; generated OTP updaters contain only loopback URLs.
+- Prepare-ExoBusGraph.ps1 builds a separate combined graph using selected bus GTFS
+  archives and OSM, preserving the old source. Its public manifest binds the graph
+  and each bus archive by SHA-256. The launcher/bridge reject changed inputs.
+- Production generation requests evaluate freshness against actual itineraries.
+  Affected journeys get a scheduled retry; healthy realtime alternatives remain.
+  Older explicit-scope debug requests retain their previous behavior.
+- Compiled launcher and backend with cached Kotlin 2.4.20/Java 21. **44 launcher
+  tests and 16 backend tests passed** via direct JUnit. Compiled bridge with Java
+  25 against OTP 2.10.0; existing STM/train fixtures and **25 new bus fixture
+  checks passed**. No upstream requests are made by these fixtures.
+- The Windows PowerShell 5 graph-helper preparation test passed: paths with spaces,
+  exact namespaces, safe output paths, original-graph preservation, refusal to
+  overwrite a destination, and no import-ready marker for unbuilt inputs.
+- Main/feed-sector dialogs were rendered with fixture states and inspected at
+  960x720. Live API connectivity, full OTP graph building with real bus archives,
+  and real HTTP integration execution still need target-PC verification. This
+  environment could not resolve exo.quebec for a live GTFS download; the earlier
+  Gradle/loopback restrictions also remain.

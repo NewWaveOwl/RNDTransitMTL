@@ -10,7 +10,7 @@ import javax.swing.table.DefaultTableCellRenderer
 import javax.swing.table.DefaultTableModel
 
 /** Displays bridge freshness independently of service/process readiness. */
-internal class RealtimeFeedsPanel(refresh: () -> Unit, credentials: () -> Unit) : JPanel(BorderLayout(0, 6)) {
+internal class RealtimeFeedsPanel(refresh: () -> Unit, credentials: () -> Unit, buses: () -> Unit = {}) : JPanel(BorderLayout(0, 6)) {
     private var feeds = initialRealtimeFeeds()
     private val model = object : DefaultTableModel(arrayOf("Agency", "Predictions", "Alerts", "Last predictions", "Last alerts", "Credentials"), 0) {
         override fun isCellEditable(row: Int, column: Int) = false
@@ -43,13 +43,14 @@ internal class RealtimeFeedsPanel(refresh: () -> Unit, credentials: () -> Unit) 
 
     init {
         border = BorderFactory.createTitledBorder("Realtime feeds")
-        maximumSize = Dimension(Int.MAX_VALUE, 160)
+        maximumSize = Dimension(Int.MAX_VALUE, 200)
         add(JPanel(FlowLayout(FlowLayout.LEFT, 6, 0)).apply {
             add(JButton("Refresh").apply { addActionListener { refresh() } })
             add(JButton("Feed credentials...").apply { addActionListener { credentials() } })
+            add(JButton("exo bus settings...").apply { addActionListener { buses() } })
             add(JLabel("Refreshes automatically while the server runs"))
         }, BorderLayout.NORTH)
-        add(JScrollPane(table).apply { preferredSize = Dimension(800, 77) }, BorderLayout.CENTER)
+        add(JScrollPane(table).apply { preferredSize = Dimension(800, 130) }, BorderLayout.CENTER)
         add(JLabel("Times show the last successful downloads in local time. Stale/unavailable predictions use scheduled routing."), BorderLayout.SOUTH)
         render(feeds)
     }
@@ -78,7 +79,7 @@ internal class FeedCredentialsDialog(owner: JFrame, summary: FeedCredentialSumma
         body.add(row("exo refresh interval (seconds)", interval))
         body.add(JTextArea("Leave a key field blank to keep its saved value. Credentials stay in your imported data folder.\n\n" +
             "Press Start server after saving to connect. A saved key does not confirm API access; the feeds panel shows the result.\n\n" +
-            "exo bus feeds are not connected in this build.").apply {
+            "Use exo bus settings for bus-sector tokens and refresh intervals.").apply {
             font = UIManager.getFont("Label.font"); isEditable = false; isOpaque = false; lineWrap = true; wrapStyleWord = true
             border = EmptyBorder(12, 0, 12, 0)
         })

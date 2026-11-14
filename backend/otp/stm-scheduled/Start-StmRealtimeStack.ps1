@@ -38,11 +38,19 @@ if (Test-Path -LiteralPath $exoConfigPath) {
         throw 'Build the combined graph with exo-trains-gtfs.zip before enabling exo realtime.'
     }
 }
-& "$bin\javac.exe" -cp $jar ExoRealtimeFeed.java StmRealtimeAdapter.java StmRealtimeAdapterTest.java
+& "$bin\javac.exe" -cp $jar ExoRealtimeFeed.java StmRealtimeAdapter.java StmRealtimeAdapterTest.java ExoBusRealtimeTest.java
 if ($LASTEXITCODE -ne 0) { throw 'Adapter compilation failed.' }
+$busUpdaterLines = @(& "$bin\java.exe" -cp "$jar;." StmRealtimeAdapter --bus-updaters $PSScriptRoot)
+if ($LASTEXITCODE -ne 0) { throw 'Bus graph/config validation failed. Rebuild and import matching bus schedules first.' }
+$busUpdaterJson = $busUpdaterLines | Where-Object { $_.TrimStart().StartsWith('[') } | Select-Object -Last 1
+$busUpdaters = @($busUpdaterJson | ConvertFrom-Json)
 Write-Host 'Running offline fixture tests with simulated data...'
 & "$bin\java.exe" -cp "$jar;." StmRealtimeAdapterTest
 if ($LASTEXITCODE -ne 0) { throw 'Adapter regression checks failed.' }
+$busFixtures = Join-Path ([IO.Path]::GetTempPath()) ('exo-bus-fixtures-' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $busFixtures | Out-Null
+& "$bin\java.exe" -cp "$jar;." ExoBusRealtimeTest $busFixtures
+if ($LASTEXITCODE -ne 0) { throw 'exo bus fixture checks failed.' }
 Write-Host 'Offline tests passed. Restarting the live servers...'
 
 # Clean up servers whose full command lines identify this adapter / OTP instance.
@@ -92,7 +100,7 @@ if ($OtpPort -eq $AdapterPort) {
     $OtpPort = Select-AvailablePort -PreferredPort 0 -AvoidPort $AdapterPort
 }
 $others = @($config.updaters | Where-Object {
-    !($_.feedId -in @('STM','EXO_TRAINS') -and $_.type -in @('stop-time-updater','real-time-alerts'))
+    !(($_.feedId -in @('STM','EXO_TRAINS') -or $_.feedId -like 'EXO_BUS_*') -and $_.type -in @('stop-time-updater','real-time-alerts'))
 })
 $updates = @(
     @{type='stop-time-updater'; feedId='STM'; url="http://127.0.0.1:$AdapterPort/trip-updates"; frequency='PT60S'},
@@ -102,6 +110,13 @@ if ($exoPollingSeconds) {
     $updates += @(
         @{type='stop-time-updater'; feedId='EXO_TRAINS'; url="http://127.0.0.1:$AdapterPort/exo/trip-updates"; frequency="PT${exoPollingSeconds}S"},
         @{type='real-time-alerts'; feedId='EXO_TRAINS'; url="http://127.0.0.1:$AdapterPort/exo/alerts"; frequency="PT${exoPollingSeconds}S"}
+    )
+}
+foreach ($bus in $busUpdaters) {
+    if (!$bus.feedId) { continue }
+    $updates += @(
+        @{type='stop-time-updater'; feedId=$bus.feedId; url="http://127.0.0.1:$AdapterPort/exo/bus/$($bus.agency)/trip-updates"; frequency="PT$($bus.pollSeconds)S"},
+        @{type='real-time-alerts'; feedId=$bus.feedId; url="http://127.0.0.1:$AdapterPort/exo/bus/$($bus.agency)/alerts"; frequency="PT$($bus.pollSeconds)S"}
     )
 }
 $config | Add-Member -Force -NotePropertyName updaters -NotePropertyValue ($others + $updates)
