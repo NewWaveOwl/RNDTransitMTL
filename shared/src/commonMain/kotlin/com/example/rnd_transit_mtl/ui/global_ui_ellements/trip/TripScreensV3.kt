@@ -638,7 +638,7 @@ fun TripDetailsV3(
             V3Button("Repeat as a new trip", onRepeat, enabled)
             V3Button("Edit a copy of these settings", onEditCopy, enabled, true)
             Text(
-                "This saved record is never overwritten.",
+                "Repeat and edit a copy create new trips.",
                 color = TransitWhite,
                 fontSize = 12.sp
             )

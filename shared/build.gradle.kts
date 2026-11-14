@@ -84,6 +84,7 @@ kotlin {
 
             implementation("io.github.jan-tennert.supabase:auth-kt:$supabaseVersion")
             implementation("io.github.jan-tennert.supabase:postgrest-kt:$supabaseVersion")
+            implementation("com.russhwolf:multiplatform-settings-no-arg:1.3.0")
         }
 
         androidMain.dependencies {
@@ -108,7 +109,7 @@ kotlin {
         }
 
         wasmJsMain.dependencies {
-            implementation("io.ktor:ktor-client-cio:$ktorVersion")
+            implementation("io.ktor:ktor-client-js:$ktorVersion")
         }
 
         commonTest.dependencies {

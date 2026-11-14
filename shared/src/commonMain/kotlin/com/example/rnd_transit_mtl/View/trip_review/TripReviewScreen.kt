@@ -20,6 +20,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.rememberCoroutineScope
+import com.example.rnd_transit_mtl.data.trips.LocalCloudTrips
+import com.example.rnd_transit_mtl.data.trips.tryCloudAction
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -59,6 +63,9 @@ fun TripReviewScreen(
     feedbackAvailable: Boolean = false
 ) {
     val tripsStore = LocalTripsStore.current
+    val cloud = LocalCloudTrips.current
+    val scope = rememberCoroutineScope()
+    var saving by remember { mutableStateOf(false) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val focusManager = LocalFocusManager.current
 
@@ -106,7 +113,7 @@ fun TripReviewScreen(
                 lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
 
     fun canEdit(): Boolean =
-        isInteractive() && exitMessage == null
+        isInteractive() && exitMessage == null && !saving
 
     fun finish(message: String) {
         focusManager.clearFocus()
@@ -133,6 +140,7 @@ fun TripReviewScreen(
     }
 
     fun discardAndExit() {
+        if (saving) return
         if (!isInteractive()) return
 
         if (exitMessage != null) {
@@ -183,6 +191,35 @@ fun TripReviewScreen(
 
     fun saveAndExit() {
         if (!canEdit()) return
+
+        if (cloud != null) {
+            val result = tripsStore.prepareReview(tripId) { review ->
+                saving = true
+                scope.launch {
+                    try {
+                        if (tryCloudAction {
+                            cloud.mutate {
+                                val stored = saveReview(tripId, review)
+                                tripsStore.saveReview(tripId, stored)
+                            }
+                        }) {
+                            finish("Review saved.")
+                        } else {
+                            errorMessage = "Could not save your review. Please retry."
+                        }
+                    } finally {
+                        saving = false
+                    }
+                }
+                TripActionResult.Applied
+            }
+            when (result) {
+                is TripActionResult.InvalidInput -> errorMessage = result.message
+                is TripActionResult.MissingTrip -> errorMessage = "This trip is no longer available."
+                else -> Unit
+            }
+            return
+        }
 
         when (val result = tripsStore.saveReview(tripId)) {
             TripActionResult.Applied -> finish("Review saved.")

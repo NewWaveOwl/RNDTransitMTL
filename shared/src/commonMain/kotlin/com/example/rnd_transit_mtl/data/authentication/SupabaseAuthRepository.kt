@@ -53,11 +53,12 @@ internal class SupabaseAuthRepository(
     }
 
     override suspend fun signUp(email: String, password: String): Boolean {
-        val user = auth.signUpWith(Email) {
+        auth.signUpWith(Email) {
             this.email = email.trim()
             this.password = password
         }
-        return user != null
+        // The SDK can return a user with or without an authenticated session.
+        return auth.currentSessionOrNull() == null
     }
 
     override suspend fun signOut() {

@@ -283,7 +283,7 @@ fun CurrentTripScreen(
     if (completedTrip != null) {
         CompleteV3(completedTrip, onReview = { requestReview() },
             onSkipToHistory = { skipCompletion(true) }, onPlanAnother = { skipCompletion(false) },
-            onGo = { skipCompletion(false) }, enabled = isDestinationActive && isAppResumed,
+            onGo = { skipCompletion(false) }, enabled = isDestinationActive && isAppResumed && trip.id !in currentState.pendingFinalTripIds,
             errorMessage = operationMessage, modifier = modifier)
     } else if (storedTrip == null) {
         Column(
@@ -314,7 +314,7 @@ fun CurrentTripScreen(
                         latestReturnToPlanner()
                     }
                 },
-                enabled = isDestinationActive && isAppResumed,
+                enabled = isDestinationActive && isAppResumed && trip.id !in currentState.pendingFinalTripIds,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Return to planner")
@@ -349,7 +349,7 @@ fun CurrentTripScreen(
                      */
                     simulation.pause()
 
-                    when (tripsStore.cancel(trip.id, keepInHistory)) {
+                    when (tripsStore.cancel(trip.id, keepInHistory || tripsStore.queueFinalTrips)) {
                         TripActionResult.Applied -> {
                             operationMessage = null
                             latestReturnToPlanner()
