@@ -16,6 +16,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.layout.Column
+import com.example.rnd_transit_mtl.data.trips.LocalCloudTrips
+import com.example.rnd_transit_mtl.data.trips.tryCloudAction
+import com.example.rnd_transit_mtl.model.trip.Trip
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -26,7 +32,7 @@ import com.example.rnd_transit_mtl.ui.theme.TransitMain
 import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 
 /**
- * Displays completed trips from the shared store.
+ * Displays owner-scoped History for signed-in users and local History for guests.
  *
  * Remove requests confirmation. Only the dialog's explicit confirmation
  * calls removeCompleted. Cancel, Back and outside dismissal keep the trip.
@@ -39,6 +45,18 @@ fun HistoryScreen(
     modifier: Modifier = Modifier
 ) {
     val tripsStore = LocalTripsStore.current
+    val cloud = LocalCloudTrips.current
+    val scope = rememberCoroutineScope()
+    var cloudRecords by remember(cloud) { mutableStateOf(emptyList<Trip>()) }
+    var loadFailed by remember { mutableStateOf(false) }
+    var retry by remember { mutableStateOf(0) }
+    var removing by remember { mutableStateOf(false) }
+
+    LaunchedEffect(cloud, cloud?.revision, isDestinationActive, retry) {
+        if (cloud != null && isDestinationActive) {
+            loadFailed = !tryCloudAction { cloudRecords = cloud.history() }
+        }
+    }
 
     val latestDestinationActive by rememberUpdatedState(
         isDestinationActive
@@ -57,7 +75,11 @@ fun HistoryScreen(
     val filter = TripHistoryFilter.entries.firstOrNull { it.name == filterName } ?: TripHistoryFilter.ALL
 
     // History lists completed trips and cancelled trips the user chose to keep.
-    val historyRecords = tripsStore.completedTrips + tripsStore.cancelledTrips
+    val historyRecords = if (cloud != null) {
+        cloudRecords.filterNot { it.id in tripsStore.state.value.pendingFinalTripIds }
+    } else {
+        tripsStore.completedTrips + tripsStore.cancelledTrips
+    }
     val pendingRemovalTrip = historyRecords.firstOrNull {
         it.id == pendingRemovalId
     }
@@ -86,10 +108,12 @@ fun HistoryScreen(
     ) {
         if (!latestDestinationActive) return
 
-        if (tripsStore.findInHistory(tripId) == null) {
+        val trip = historyRecords.firstOrNull { it.id == tripId }
+        if (trip == null) {
             errorMessage = "This trip is no longer available."
         } else {
             errorMessage = null
+            if (cloud != null) tripsStore.acceptStoredTrip(trip)
             callback(tripId)
         }
     }
@@ -97,7 +121,8 @@ fun HistoryScreen(
     fun requestRemoval(tripId: TripId) {
         if (!latestDestinationActive) return
 
-        if (tripsStore.findInHistory(tripId) == null) {
+        val trip = historyRecords.firstOrNull { it.id == tripId }
+        if (trip == null) {
             errorMessage = "This trip is no longer available."
             return
         }
@@ -111,9 +136,34 @@ fun HistoryScreen(
         val tripId = pendingRemovalId ?: return
 
         // Check again at confirmation time, rather than using an old record.
-        if (tripsStore.findInHistory(tripId) == null) {
+        val trip = historyRecords.firstOrNull { it.id == tripId }
+        if (trip == null) {
             pendingRemovalId = null
             errorMessage = "This trip has already been removed."
+            return
+        }
+
+        if (cloud != null) {
+            if (removing) return
+            removing = true
+            scope.launch {
+                try {
+                    if (tryCloudAction {
+                        cloud.mutate {
+                            deleteTrip(tripId)
+                            tripsStore.removeFromHistory(tripId)
+                            cloudRecords = cloudRecords.filterNot { it.id == tripId }
+                        }
+                    }) {
+                        pendingRemovalId = null
+                        errorMessage = null
+                    } else {
+                        errorMessage = "Could not remove this trip. Please retry."
+                    }
+                } finally {
+                    removing = false
+                }
+            }
             return
         }
 
@@ -184,11 +234,12 @@ fun HistoryScreen(
                 Text(
                     "Remove “${pendingRemovalTrip.title}” from History? " +
                         "Its saved review will also be removed. " +
-                        "This cannot be undone."
+                        "This cannot be undone." + if (errorMessage != null) "\n${errorMessage.orEmpty()}" else ""
                 )
             },
             confirmButton = {
                 TextButton(
+                    enabled = !removing,
                     onClick = { confirmRemoval() }
                 ) {
                     Text(
