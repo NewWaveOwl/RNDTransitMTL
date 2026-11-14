@@ -1,7 +1,11 @@
 package com.example.rnd_transit_mtl
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
+import androidx.compose.ui.Modifier
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.LocalSharedTransitMapHost
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.example.rnd_transit_mtl.data.routing.DebugTripLoader
 import androidx.compose.runtime.CompositionLocalProvider
@@ -154,19 +158,26 @@ internal fun App(
             LocalAuthRepository provides authRepository,
             LocalAccountSession provides accountSession.value
         ) {
-            when {
-                accountSession.value == AccountSession.Restoring -> androidx.compose.material3.CircularProgressIndicator()
-                accountSession.value !is AccountSession.SignedIn && !continueAsGuest -> {
-                    val authViewModel = viewModel { AuthViewModel(authRepository) }
-                    MainLayout {
-                        AuthScreen(authViewModel, onContinueAsGuest = {
-                            continueAsGuest = true
-                            appNicknameSession.signIn("Guest")
-                        })
+            val showAccountScreen = accountSession.value !is AccountSession.SignedIn && !continueAsGuest
+            if (accountSession.value == AccountSession.Restoring || showAccountScreen || navigationOwner != identity) {
+                val mapHost = LocalSharedTransitMapHost.current
+                Box(Modifier.fillMaxSize()) {
+                    mapHost?.invoke(Modifier.matchParentSize(), false)
+                    when {
+                        accountSession.value == AccountSession.Restoring -> androidx.compose.material3.CircularProgressIndicator()
+                        showAccountScreen -> {
+                            val authViewModel = viewModel { AuthViewModel(authRepository) }
+                            MainLayout {
+                                AuthScreen(authViewModel, onContinueAsGuest = {
+                                    continueAsGuest = true
+                                    appNicknameSession.signIn("Guest")
+                                })
+                            }
+                        }
+                        else -> Unit
                     }
                 }
-                navigationOwner != identity -> Unit
-                else -> {
+            } else {
                 MainLayout {
                     Router(
                         backStack = backStack,
@@ -179,7 +190,6 @@ internal fun App(
         }
       }
     }
-}
 }
 
 internal val LocalDebugStmTripLoader = staticCompositionLocalOf<DebugTripLoader?> { null }

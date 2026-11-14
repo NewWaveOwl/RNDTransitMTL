@@ -12,6 +12,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -33,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import com.example.rnd_transit_mtl.ui.theme.TransitComplementary
 import com.example.rnd_transit_mtl.ui.theme.TransitMain
 import com.example.rnd_transit_mtl.ui.theme.TransitSelected
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.acos
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -56,13 +60,16 @@ private val compassEasing = CubicBezierEasing(0.35f, 0.15f, 0.5f, 1f)
 private val spreadColor = lerp(TransitComplementary, TransitMain, 0.40f)
 
 @Composable
-fun AnimatedStartupOverlay() {
+fun AnimatedStartupOverlay(readyToReveal: () -> Boolean = { true }) {
     val progress = remember { Animatable(0f) }
     var finished by remember { mutableStateOf(false) }
+    val latestReadyToReveal by rememberUpdatedState(readyToReveal)
 
     LaunchedEffect(Unit) {
         // Compose applies the device's animator duration scale to this timeline.
-        progress.animateTo(1f, tween(durationMillis = 1100, easing = LinearEasing))
+        progress.animateTo(RevealStart, tween(durationMillis = 869, easing = LinearEasing))
+        withTimeoutOrNull(3_000) { snapshotFlow { latestReadyToReveal() }.first { it } }
+        progress.animateTo(1f, tween(durationMillis = 231, easing = LinearEasing))
         finished = true
     }
 

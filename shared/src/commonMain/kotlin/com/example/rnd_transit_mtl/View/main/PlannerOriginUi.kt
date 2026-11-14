@@ -22,7 +22,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.translate
@@ -39,7 +38,6 @@ import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
 import com.example.rnd_transit_mtl.model.trip.TripPoint
-import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.drawDirectedTripPointer
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.mapImageRect
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.validMapSourceSize
 import com.example.rnd_transit_mtl.ui.theme.*
@@ -47,7 +45,7 @@ import org.jetbrains.compose.resources.painterResource
 import rnd_transit_mtl.shared.generated.resources.Res
 import rnd_transit_mtl.shared.generated.resources.map_sample
 import rnd_transit_mtl.shared.generated.resources.rnd_origin_marker
-import rnd_transit_mtl.shared.generated.resources.map_user_pointer_marker
+import rnd_transit_mtl.shared.generated.resources.ellipse_starting
 import rnd_transit_mtl.shared.generated.resources.rnd_recenter
 import rnd_transit_mtl.shared.generated.resources.rnd_warning
 
@@ -81,7 +79,7 @@ internal fun FigmaOriginMap(
     val map = painterResource(Res.drawable.map_sample)
     val picking = onPick != null
     val marker = painterResource(
-        if (picking) Res.drawable.map_user_pointer_marker else Res.drawable.rnd_origin_marker
+        if (picking) Res.drawable.ellipse_starting else Res.drawable.rnd_origin_marker
     )
     val source = validMapSourceSize(map.intrinsicSize)
 
@@ -234,16 +232,12 @@ internal fun FigmaOriginMap(
         }
 
         origin?.let { point ->
-            val markerSize = OriginMarkerSize.toPx()
+            val markerSize = (if (picking) 16.dp else OriginMarkerSize).toPx()
             val x = rect.left + point.x * rect.width
             val y = rect.top + point.y * rect.height
 
-            if (picking) {
-                drawDirectedTripPointer(marker, Offset(x, y), markerSize, rotationDegrees = 0f)
-            } else {
-                translate(x - markerSize / 2f, y - markerSize / 2f) {
-                    with(marker) { draw(size = Size(markerSize, markerSize)) }
-                }
+            translate(x - markerSize / 2f, y - markerSize / 2f) {
+                with(marker) { draw(size = Size(markerSize, markerSize)) }
             }
         }
     }

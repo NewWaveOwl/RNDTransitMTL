@@ -21,6 +21,8 @@ import com.example.rnd_transit_mtl.ui.theme.TransitMain
 import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 import com.example.rnd_transit_mtl.navigation.LocalNavigator
 import com.example.rnd_transit_mtl.navigation.MainScreenKey
+import com.example.rnd_transit_mtl.navigation.SettingsScreenKey
+import com.example.rnd_transit_mtl.layout.PageTitle
 
 /**
  * Displays settings placeholders and a shortcut back to the trip planner.
@@ -38,6 +40,7 @@ fun SettingsScreen() {
         val layoutScale = (maxWidth.value / 402f).coerceIn(0.7f, 1.4f)
 
         Column(Modifier.fillMaxSize().background(TransitMain)) {
+            PageTitle(title = SettingsScreenKey.screenTitle, layoutScale = 1f, highlighted = false)
             Column(
                 modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(20.dp * layoutScale)

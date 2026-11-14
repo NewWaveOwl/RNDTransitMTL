@@ -14,7 +14,7 @@ The current prototype includes a nickname introduction, a map-based trip planner
 4. At completion, tap the 100% progress bar to open the review. Give an overall rating, optionally answer the other questions, add a comment or an HTTPS image link, then save or skip.
 5. Open History to filter completed trips, expand saved feedback, view details, edit a review, or remove a trip. Review photos load when saved feedback is displayed, with retry and browser fallback controls.
 
-The map and route are a simulation; this prototype does not use GPS or live street routing. Trips and review drafts support saved-state restoration, but there is no permanent database. A fresh session without restored state starts with empty History. The nickname stays only in process memory.
+The regular GO flow simulates trips using built-in sample routes and runs without a routing backend. Trips and review drafts support saved-state restoration, but there is no permanent database. A fresh session without restored state starts with empty History. The nickname stays only in process memory.
 
 This flow is imported from [Artiom's Assignment 3 repository](https://github.com/NewWaveOwl/As3_APPDEV2_RND_Tranzit_Sova/tree/8b1b538), including its shared state, navigation, resources, previews, and regression tests. The destination's design documents and earlier screenshots remain historical planning material.
 
@@ -49,6 +49,20 @@ adb shell am start -n com.example.rnd_transit_mtl/.MainActivity
 ```
 
 For a physical device, enable USB debugging. If `adb` is not on your PATH, run it from your Android SDK's `platform-tools` folder.
+
+### Run the STM test trip on Windows
+
+Start an Android emulator, then run this from the repository root in PowerShell:
+
+```powershell
+.\tool\otp\stm-scheduled\Run-StmTestTrip.ps1 -Emulator
+```
+
+The first run downloads any missing routing dependencies and builds a Montréal graph. The script starts OpenTripPlanner, checks that the scheduled STM sample returns a bus route with geometry, and installs and opens the debug app. It requires no STM API key.
+
+In the app, open **Map**, expand the planner, and tap **Load STM test trip**. Tap **Start Trip** in the preview to run the simulation.
+
+Use `-Phone` for an authorized USB device, or omit the device flag to run just the backend check. See the [routing simulation guide](docs/RunTripSimulation.md) for timetable refresh, troubleshooting, and the STM realtime and exo setup.
 
 ### Build and launch a release
 
