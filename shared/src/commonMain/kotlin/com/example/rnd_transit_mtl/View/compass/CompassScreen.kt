@@ -25,13 +25,14 @@ import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.ui.theme.*
 
 /**
- * Presentation only: displays the compass and active/idle trip layouts.
+ * Presentation only: supply directionDegrees clockwise from north (0=N, 90=E).
  * No sensor or routing assumptions are made here. Destination names stay private.
  * Action callbacks are optional so trip completion/presets can be connected later.
  */
 @Composable
 fun CompassScreen(
     activeTrip: Trip? = null,
+    directionDegrees: Float = 45f,
     controlsVisible: Boolean = true,
     onOpenMap: () -> Unit = {},
     onFinishTrip: (() -> Unit)? = null,
@@ -52,7 +53,7 @@ fun CompassScreen(
                     color = TransitWhite, fontSize = 14.sp)
             }
             Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 24.dp), contentAlignment = Alignment.Center) {
-                CompassDial(Modifier.widthIn(max = 420.dp).aspectRatio(1f)
+                CompassDial(directionDegrees, Modifier.widthIn(max = 420.dp).aspectRatio(1f)
                     .alpha(if (activeTrip == null && controlsVisible) 0.6f else 1f))
             }
             Text("Hold the screen to reveal controls", color = TransitWhite.copy(alpha = 0.65f), fontSize = 12.sp)
@@ -90,10 +91,10 @@ private fun CompassAction(label: String, action: (() -> Unit)?, modifier: Modifi
     }
 }
 
-/** Compass artwork with stationary cardinal labels. */
+/** Vector needle rotates independently of the stationary cardinal labels. */
 @Composable
-fun CompassDial(modifier: Modifier = Modifier) {
-    val angle = 45f
+fun CompassDial(directionDegrees: Float, modifier: Modifier = Modifier) {
+    val angle = if (directionDegrees.isFinite()) ((directionDegrees % 360f) + 360f) % 360f else 0f
     Box(modifier.semantics { contentDescription = "Compass direction ${angle.toInt()} degrees clockwise from north" }) {
         Canvas(Modifier.fillMaxSize()) {
             val radius = size.minDimension / 2f - 4.dp.toPx()
