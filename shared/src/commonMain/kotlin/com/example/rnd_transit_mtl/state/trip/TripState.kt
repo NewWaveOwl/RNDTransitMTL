@@ -41,8 +41,7 @@ data class ActiveTripState(
 /**
  * The single serializable snapshot owned by TripsStore.
  *
- * completedTrips is the only completed collection. History, details,
- * and review screens must read these records through LocalTripsStore.
+ * completedTrips holds local working records for simulation, navigation and drafts.
  *
  * pendingReviewTripId identifies one automatic review request that
  * navigation has not yet acknowledged. A new trip cannot start until
@@ -60,7 +59,9 @@ data class TripsState(
     val completedTrips: List<Trip> = emptyList(),
     val cancelledTrips: List<Trip> = emptyList(),
     val pendingReviewTripId: TripId? = null,
-    val reviewDrafts: Map<TripId, ReviewDraft> = emptyMap()
+    val reviewDrafts: Map<TripId, ReviewDraft> = emptyMap(),
+    @kotlinx.serialization.Transient
+    val pendingFinalTripIds: Set<TripId> = emptySet()
 ) {
     init {
         require(schemaVersion == CURRENT_SCHEMA_VERSION) {

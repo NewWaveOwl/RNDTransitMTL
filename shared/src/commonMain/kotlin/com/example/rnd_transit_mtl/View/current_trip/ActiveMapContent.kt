@@ -1,5 +1,7 @@
 package com.example.rnd_transit_mtl.View.current_trip
 
+import com.example.rnd_transit_mtl.data.trips.LocalCloudTrips
+
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMap
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMapData
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.LocalTransitMap
@@ -424,6 +426,7 @@ fun ActiveMapContent(
         }
     }
 
+    val alwaysSaveCancellation = LocalCloudTrips.current != null
     if (confirmingCancel && !completed) {
         Dialog(
             onDismissRequest = { confirmingCancel = false },
@@ -448,7 +451,8 @@ fun ActiveMapContent(
                 )
 
                 Text(
-                    "This ends trip #$reference. Do you want to save it " +
+                    if (alwaysSaveCancellation) "This ends trip #$reference and saves it to your History."
+                    else "This ends trip #$reference. Do you want to save it " +
                         "to your History? Your planner choices stay saved either way.",
                     color = TransitComplementary,
                     fontSize = 16.sp
@@ -463,7 +467,7 @@ fun ActiveMapContent(
                     }
                 )
 
-                TripActionButton(
+                if (!alwaysSaveCancellation) TripActionButton(
                     label = "Cancel without saving",
                     enabled = actionsEnabled,
                     secondary = true,

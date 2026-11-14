@@ -16,7 +16,7 @@ import kotlin.time.Clock
 import com.example.rnd_transit_mtl.state.review.ReviewDraft
 
 /**
- * Owns active and completed trip state, pending review handling,
+ * Owns active trip state, local working records, pending review handling,
  * and unsaved review drafts.
  *
  * All operations are synchronous and must be called from the UI
@@ -54,6 +54,42 @@ class TripsStore private constructor(
      */
     val state: State<TripsState>
         get() = mutableState
+
+    internal var onPendingFinalTripsChanged: ((List<Trip>) -> Unit)? = null
+    internal val queueFinalTrips: Boolean get() = onPendingFinalTripsChanged != null
+
+    internal fun restorePendingFinalTrips(trips: List<Trip>) {
+        for (trip in trips) {
+            val current = mutableState.value
+            if (trip.id in current.pendingFinalTripIds) continue
+            if (current.activeTrip?.trip?.id == trip.id) {
+                mutableState.value = current.copy(activeTrip = null)
+            }
+            acceptStoredTrip(trip)
+            mutableState.value = mutableState.value.copy(
+                pendingFinalTripIds = mutableState.value.pendingFinalTripIds + trip.id
+            )
+        }
+    }
+
+    internal fun acceptStoredTrip(trip: Trip, acknowledgeWrite: Boolean = false) {
+        val current = mutableState.value
+        val id = trip.id
+        if (current.activeTrip?.trip?.id == id) return
+        if (!acknowledgeWrite && id in current.pendingFinalTripIds) return
+
+        mutableState.value = current.copy(
+            completedTrips = current.completedTrips.filterNot { it.id == id } +
+                listOf(trip).filter { it.status == TripStatus.Completed },
+            cancelledTrips = current.cancelledTrips.filterNot { it.id == id } +
+                listOf(trip).filter { it.status == TripStatus.Cancelled },
+            pendingFinalTripIds = current.pendingFinalTripIds - id
+        )
+        if (acknowledgeWrite) onPendingFinalTripsChanged?.invoke(pendingFinalTrips())
+    }
+
+    internal fun pendingFinalTrips(): List<Trip> =
+        state.value.pendingFinalTripIds.mapNotNull(::findInHistory)
 
     val activeTrip: Trip?
         get() = mutableState.value.activeTrip?.trip
@@ -284,10 +320,16 @@ class TripsStore private constructor(
                 // Wall-clock adjustments must not place cancellation before creation.
                 cancelledAt = nowEpochMillis().coerceAtLeast(active.trip.createdAt)
             )
-            current.copy(activeTrip = null, cancelledTrips = current.cancelledTrips + cancelledTrip)
+            current.copy(
+                activeTrip = null,
+                cancelledTrips = current.cancelledTrips + cancelledTrip,
+                pendingFinalTripIds = if (queueFinalTrips) current.pendingFinalTripIds + tripId
+                    else current.pendingFinalTripIds
+            )
         } else {
             current.copy(activeTrip = null)
         }
+        if (keepInHistory) onPendingFinalTripsChanged?.invoke(pendingFinalTrips())
         return TripActionResult.Applied
     }
 
@@ -348,7 +390,13 @@ class TripsStore private constructor(
      *
      * Missing overall feedback leaves the draft and saved review intact.
      */
-    fun saveReview(tripId: TripId): TripActionResult {
+    fun saveReview(tripId: TripId): TripActionResult =
+        prepareReview(tripId) { saveReview(tripId, it) }
+
+    internal fun prepareReview(
+        tripId: TripId,
+        onValid: (TripReview) -> TripActionResult
+    ): TripActionResult {
         val current = mutableState.value
 
         if (current.completedTrips.none { it.id == tripId }) {
@@ -381,7 +429,7 @@ class TripsStore private constructor(
             imageUrl = imageUrl
         )
 
-        return saveReview(tripId, review)
+        return onValid(review)
     }
 
     /**
@@ -557,9 +605,12 @@ class TripsStore private constructor(
         mutableState.value = current.copy(
             activeTrip = null,
             completedTrips = current.completedTrips + completedTrip,
-            pendingReviewTripId = completedTrip.id
+            pendingReviewTripId = completedTrip.id,
+            pendingFinalTripIds = if (queueFinalTrips) current.pendingFinalTripIds + completedTrip.id
+                else current.pendingFinalTripIds
         )
 
+        onPendingFinalTripsChanged?.invoke(pendingFinalTrips())
         return TripActionResult.Applied
     }
 

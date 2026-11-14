@@ -11,6 +11,10 @@ class SessionTripsStores private constructor(
     fun forIdentity(identity: String): TripsStore =
         stores.getOrPut(identity) { TripsStore() }
 
+    fun clearAccountStores(except: String? = null) {
+        stores.keys.removeAll { it.startsWith("account:") && it != except }
+    }
+
     companion object {
         val Saver: Saver<SessionTripsStores, Map<String, String>> = Saver(
             save = { holder -> holder.stores.mapValues { it.value.toSavedStateJson() } },

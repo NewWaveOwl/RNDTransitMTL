@@ -1,6 +1,12 @@
 package com.example.rnd_transit_mtl
 
+import com.example.rnd_transit_mtl.data.trips.CloudTrips
+import com.example.rnd_transit_mtl.data.trips.TripRepository
+import com.example.rnd_transit_mtl.data.trips.tryCloudAction
+import com.example.rnd_transit_mtl.model.review.TripReview
 import com.example.rnd_transit_mtl.model.ids.TripId
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import com.example.rnd_transit_mtl.model.ids.ZoneId
 import com.example.rnd_transit_mtl.model.ids.RouteId
 import com.example.rnd_transit_mtl.model.ids.TransportId
@@ -46,6 +52,58 @@ class TripFlowIntegrationTest {
         serializersModule = backStackConfig.serializersModule
     }
     private val stackSerializer = ListSerializer(PolymorphicSerializer(NavKey::class))
+
+    @Test
+    fun finalTripRetryAfterLostResponseReusesTheRecordAcrossStoreReset() = runTest {
+        val trip = generatedTrip()
+        var queued = emptyList<Trip>()
+        val store = TripsStore(nowEpochMillis = { 12_000L }).apply {
+            onPendingFinalTripsChanged = { queued = it }
+        }
+        assertEquals(TripActionResult.Applied, store.start(trip))
+        assertEquals(TripActionResult.Applied, store.updateElapsed(trip.id, TRIP_SIMULATION_DURATION_MILLIS))
+        val finalTrip = queued.single()
+        assertEquals(TripStatus.Completed, finalTrip.status)
+
+        val rows = mutableMapOf<TripId, Trip>()
+        val attempts = mutableListOf<TripId>()
+        val repository = object : TripRepository {
+            override suspend fun saveFinalTrip(trip: Trip): Trip {
+                attempts += trip.id
+                val stored = rows.getOrPut(trip.id) { trip }
+                if (attempts.size == 1) error("Response lost after insert")
+                return stored
+            }
+
+            override suspend fun listHistory() = rows.values.toList()
+            override suspend fun getTrip(id: TripId) = rows[id]
+            override suspend fun updateTrip(id: TripId, title: String, description: String) = error("Unexpected update")
+            override suspend fun deleteTrip(id: TripId) = error("Unexpected delete")
+            override suspend fun saveReview(tripId: TripId, review: TripReview) = error("Unexpected review")
+            override suspend fun deleteReview(tripId: TripId) = error("Unexpected delete")
+        }
+
+        assertFalse(tryCloudAction { CloudTrips(repository, store).flushFinalTrips() })
+        assertEquals(listOf(finalTrip), queued)
+
+        val restored = TripsStore().apply {
+            restorePendingFinalTrips(queued)
+            onPendingFinalTripsChanged = { queued = it }
+        }
+        val cloud = CloudTrips(repository, restored)
+        assertTrue(tryCloudAction { cloud.flushFinalTrips() })
+        assertEquals(listOf(trip.id, trip.id), attempts)
+        assertEquals(listOf(finalTrip), cloud.history())
+        assertEquals(finalTrip, cloud.details(trip.id))
+        assertTrue(queued.isEmpty())
+
+        val anotherTrip = trip.copy(id = TripId("cancelled-test-trip"))
+        assertEquals(TripActionResult.Applied, restored.start(anotherTrip))
+        assertEquals(TripActionResult.Applied, restored.cancel(anotherTrip.id, keepInHistory = true))
+        cloud.flushFinalTrips()
+        assertEquals(TripStatus.Cancelled, cloud.details(anotherTrip.id)?.status)
+        assertTrue(queued.isEmpty())
+    }
 
     @Test
     fun registeredDestinationsRestoreTripParametersAndBothReviewModes() = runTest {
