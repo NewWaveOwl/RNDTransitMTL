@@ -2,6 +2,8 @@
 
 See the [decision log](ML3-AI-Decision-Log.md) for full prompts and source coverage. Shared-session dates and exact models are [Not documented]; 2026-11-01 is the retrieval date. Related UI iterations are grouped into one challenge.
 
+M3-A13 and M3-A14 cover a separate current Codex conversation logged on 2026-11-14. Its three available human prompts are in the [PR 75 archive](ML3-PR75-Review-Fixes-Chat-Prompts.md); its verified conversation URL remains [Conversation link needed].
+
 ## M3-A1 - PR 53 review and Android saved-state explanations
 
 **Conversations:** [Shared chat](https://chatgpt.com/s/cx_6ae7b432fc4081919e59a08ce2eaf35d)
@@ -287,4 +289,46 @@ dependencies. Docker execution and live device/tunnel checks remain unverified.
 | Code impact | Documentation only; application code percentage not applicable. |
 | Time | [Not documented]. |
 | Outcome | Four linked challenge records, session-index rows and an archive of 49 available human messages plus one labeled earlier excerpt; logging changes remain uncommitted and unpushed. |
+| Productivity / learning reflection | [Student reflection needed]. |
+
+## M3-A13 - Independent PR 75 review and reproduction
+
+**Contributor:** Requester; individual attribution [Not documented]. **Date:** 2026-11-14. **Conversation:** Current Codex chat; [Conversation link needed].
+**Decision record / full prompts:** [M3-A13](ML3-AI-Decision-Log.md#m3-a13---independent-pr-75-review-and-reproduction); [P01](ML3-PR75-Review-Fixes-Chat-Prompts.md#p01---independent-pr-review).
+
+| Field | Student record |
+| --- | --- |
+| Challenge addressed / context | Independently assess PR #75's generation, cancellation, OTP fallback, client restoration and server packaging without disturbing the running second-PC backend or local changes. |
+| AI(s) used | Codex coding agent. Exact model version and use of another AI in this session [Not documented]. No subagents were used. |
+| Observable prompting pattern | Detailed repository/revision context; explicit safety and scope constraints; risk-based verification instructions; requirement to reproduce actionable regressions and separate CI, local and live evidence. |
+| Techniques deliberately used | [Student reflection needed]. Observable prompting does not prove a deliberate technique choice. |
+| Iterations | One initial human review prompt in this challenge; many inspection/reproduction steps were agent-driven. Exact engineering-iteration count [Not documented]. |
+| Debugging / refinement | Compared the PR with its merge base, traced backend-to-client behavior, and used isolated HTTP and saved-state fixtures to reproduce bugs not detected by the pre-existing passing tests. |
+| Failed / rejected approaches | GitHub GraphQL authentication failed, so the agent used CLI REST reads. Original-worktree fetches hit metadata write restrictions; isolated Git storage was used. Missing SDK and external-cache permissions blocked Android/Web coverage. |
+| Strategy changes | Continued independent local checks despite blocked build paths. Replaced unsafe live outage/cancellation experiments with fixtures. Skipped authenticated trip sampling because no valid existing account token was available. |
+| Verification | Agent-run: 22 backend, 45 launcher and 182 shared JVM tests, Desktop compilation, STM/exo fixtures, 25 bus checks and graph-preparation/script checks passed. Separate live observations were one health 200 and two anonymous generation 401 responses; live build identity remained unknown. Student-run evaluation [Not documented]. |
+| Code impact | Review phase changed no tracked application source. Four reproduced findings were supplied for a later decision; no implementation percentage is attributed to the review. |
+| Time | Student-estimated active interaction/debugging time [Not documented]. |
+| Outcome | Four actionable findings and a request-changes recommendation. No exact-head CI runs/checks/statuses were available, and current-main merge conflicts were confirmed. |
+| Productivity / learning reflection | [Student reflection needed]. |
+
+## M3-A14 - PR 75 fixes, merge resolution and commit handoff
+
+**Contributor:** Requester; individual attribution [Not documented]. **Date:** 2026-11-14. **Conversation:** Same current Codex chat; [Conversation link needed].
+**Decision record / full prompts:** [M3-A14](ML3-AI-Decision-Log.md#m3-a14---pr-75-fixes-merge-resolution-and-commit-handoff); [P02-P03](ML3-PR75-Review-Fixes-Chat-Prompts.md#p02---remediation-and-git-authorization).
+
+| Field | Student record |
+| --- | --- |
+| Challenge addressed / context | Fix the four verified regressions, add production-path regression coverage, commit the fixes, resolve current-main conflicts in another commit, and hand off the blocked push. The final follow-up requests AI logging and a log commit. |
+| AI(s) used | Codex coding agent. Exact model version and additional AI use [Not documented]. No subagents were used. |
+| Observable prompting pattern | Explicit follow-up changed the authorized scope from review-only to fixes/commits/push, then requested this chat be documented and a push command supplied. |
+| Techniques deliberately used | [Student reflection needed]. |
+| Iterations | Two available human follow-ups are recorded here; this prompt count is not an exact implementation/debugging-iteration count. |
+| Debugging / refinement | Added real CIO disconnect coverage, empty-result bridge HTTP coverage, healthy-feed fallback filtering and Bus-only restoration through Trip/DTO serialization. Thread-dump evidence identified test waits in JVM entropy seeding; a test-process-only entropy source allowed a valid rerun. |
+| Failed / rejected approaches | Initial shared test runs had two waiting-for-proposal failures before the entropy issue was identified. Original worktree Git metadata remained unwritable. Push/authentication attempts failed: credential-store persistence was unavailable, the CLI token was invalid and the helper supplied no credential. |
+| Strategy changes | Used a clean isolated clone in build/pr75-fixes. Kept source fixes and current-main conflict resolution in separate commits. Retained the offline map-picker fix and database setup while keeping the new generation workflow. Supplied a manual push command after authentication blocked publication. |
+| Verification | Agent-run merged Gradle build: 23 backend + 45 launcher + 183 shared JVM tests = 251 passing tests; Desktop compilation passed. Fresh bridge fixtures included 31 bus checks. Conflict-marker, whitespace and documentation-link checks passed. Student-run/manual device verification [Not documented]. |
+| Code impact | Fix commit 03e640d changes 10 files, including regression tests. Merge commit dc80fe4 integrates main at 29af854. Student-estimated assignment-code percentage [Not documented]. This logging follow-up changes documentation only. |
+| Time | Student-estimated active interaction time [Not documented]; build duration is not used as an estimate of student AI time. |
+| Outcome | Four fixes and the resolved main merge exist as local commits. The existing gradle.properties modification and running server were preserved. A remote push or GitHub PR merge is not established. The current request adds linked log records and a prompt archive for a separate commit. |
 | Productivity / learning reflection | [Student reflection needed]. |
