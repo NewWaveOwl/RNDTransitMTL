@@ -1,8 +1,4 @@
 package com.example.rnd_transit_mtl.View.main
-import com.example.rnd_transit_mtl.LocalDebugStmTripLoader
-import com.example.rnd_transit_mtl.LocalDebugExoTripLoader
-import com.example.rnd_transit_mtl.LocalDebugTripLaunch
-import com.example.rnd_transit_mtl.DebugTripSource
 import com.example.rnd_transit_mtl.data.assets.toSampleMapPoint
 import com.example.rnd_transit_mtl.state.NullableTripIdSaver
 import com.example.rnd_transit_mtl.model.ids.TripId
@@ -28,6 +24,7 @@ import com.example.rnd_transit_mtl.View.current_trip.ActiveMapContent
 import com.example.rnd_transit_mtl.ViewModels.main.MainPlannerState
 import com.example.rnd_transit_mtl.ViewModels.main.MainPlannerViewModel
 import com.example.rnd_transit_mtl.data.generation.MockTripGenerator
+import com.example.rnd_transit_mtl.data.generation.LocalBackendTripGenerator
 import com.example.rnd_transit_mtl.data.location.LocalPlannerLocation
 import com.example.rnd_transit_mtl.data.location.LocationUpdate
 import com.example.rnd_transit_mtl.data.fake.FakeRoutingService
@@ -78,12 +75,11 @@ internal fun TransitOpeningScreen(
     modifier: Modifier = Modifier,
     sampleOutcome: Trip33Sample = Trip33Sample.Normal
 ) {
-    val loadDebugStmTrip = LocalDebugStmTripLoader.current
-    val loadDebugExoTrip = LocalDebugExoTripLoader.current
-    var debugProposalSource by rememberSaveable { mutableStateOf<String?>(null) }
     val tripsStore = LocalTripsStore.current
     val liveMap = LocalTransitMap.current != null
     val location = LocalPlannerLocation.current
+    val backendGenerator = LocalBackendTripGenerator.current
+    var previousDestinations by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     val generator = remember(location?.containsPoint) {
         MockTripGenerator(routingService = FakeRoutingService(containsPoint = location?.containsPoint))
     }
@@ -189,7 +185,6 @@ internal fun TransitOpeningScreen(
     }
 
     fun closeProposalFlow() {
-        debugProposalSource = null
         proposalGuard.cancel()
         generationJob?.cancel()
         generationJob = null
@@ -318,7 +313,6 @@ internal fun TransitOpeningScreen(
     }
 
     fun performPrimaryAction() {
-        debugProposalSource = null
         if (!latestDestinationActive ||
             processingAction ||
             pendingOpenTripId != null
@@ -390,6 +384,11 @@ internal fun TransitOpeningScreen(
                     it.usesRoutes && it.id in planner.selectedTransportIds
                 }
 
+                if (planner.selectedTransportIds.isEmpty()) {
+                    fail(Trip33Failure.InvalidInput, "Choose at least one transport type.")
+                    return@launch
+                }
+
                 val zones = transitModes.associate {
                     it.id to planner.zonesForTransport(it.id).toList()
                 }
@@ -408,7 +407,7 @@ internal fun TransitOpeningScreen(
 
                 val input = TripGenerationInput(
                     title = "Trip ${tripsStore.completedTrips.size + 1}",
-                    description = "Random mock route with $boundedMinutes planned minutes.",
+                    description = "Random route with $boundedMinutes planned minutes.",
                     imageUrl = "",
                     plannedMinutes = boundedMinutes,
                     selectedTransportIds = planner.selectedTransportIds.toList(),
@@ -417,7 +416,8 @@ internal fun TransitOpeningScreen(
                     selectedZoneIds = zones.values.flatten().distinct().sortedBy { it.value },
                     selectedZonesByTransport = zones,
                     origin = origin?.copy(),
-                    originPlace = planner.originPlace
+                    originPlace = planner.originPlace,
+                    walkingPreference = planner.walkingPreference
                 )
 
                 // Explicit samples are distinct from validation failures.
@@ -440,7 +440,12 @@ internal fun TransitOpeningScreen(
                 }
 
                 val generated = withContext(Dispatchers.Default) {
-                    generator.generate(
+                    if (liveMap || backendGenerator != null) {
+                        backendGenerator?.generate(
+                            input = input, transportTypes = transportTypes, existingTripIds = existingIds,
+                            excludedDestinations = previousDestinations.map { Json.decodeFromString<GeoPoint>(it) }
+                        ) ?: TripGenerationResult.RoutingUnavailable("The trip planner is not configured. Please try again later.")
+                    } else generator.generate(
                         input = input,
                         transportTypes = transportTypes,
                         transportRoutes = transportRoutes,
@@ -456,6 +461,7 @@ internal fun TransitOpeningScreen(
                         if (latestDestinationActive &&
                             proposalGuard.complete(token, generated.trip.id)
                         ) {
+                            previousDestinations = (previousDestinations + Json.encodeToString(generated.trip.destination.point)).takeLast(10)
                             proposalJson = encoded
                         }
                     }
@@ -485,11 +491,9 @@ internal fun TransitOpeningScreen(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                // An unexpected mock-generation exception is not evidence
-                // that a real routing provider is unavailable.
                 fail(
-                    Trip33Failure.InvalidInput,
-                    "The sample request could not finish. Please try again."
+                    Trip33Failure.ProviderUnavailable,
+                    "The trip request could not finish. Please try again."
                 )
             } finally {
                 if (proposalGuard.isCurrent(token)) {
@@ -524,67 +528,13 @@ internal fun TransitOpeningScreen(
         val saved = copiedTripToGenerate
         if (saved != null && isDestinationActive &&
             planner.minutes == saved.plannedMinutes &&
-            planner.selectedTransportIds == saved.selectedTransports.map { it.id } &&
+            planner.selectedTransportIds == (saved.requestedTransportIds ?: saved.selectedTransports.map { it.id }) &&
             planner.selectedZoneIds == saved.selectedZoneIds &&
             planner.selectedZonesByTransport == saved.selectedZonesByTransport &&
             (if (liveMap) planner.originPlace == saved.origin else planner.origin == saved.origin.toSampleMapPoint()) &&
             planner.intensity == saved.attractionIntensity) {
             copiedTripToGenerate = null
             performPrimaryAction()
-        }
-    }
-
-    fun requestDebugTrip(source: DebugTripSource) {
-        val load = (when (source) {
-            DebugTripSource.Stm -> loadDebugStmTrip
-            DebugTripSource.Exo -> loadDebugExoTrip
-        }) ?: return
-        if (!latestDestinationActive || processingAction || pendingOpenTripId != null ||
-            tripsStore.activeTrip != null || pendingReviewId != null
-        ) return
-
-        closeProposalFlow()
-        debugProposalSource = source.name
-        val enabledModes = planner.selectedTransportIds.toList()
-        val labels = transportTypes.filter { it.id in enabledModes }.joinToString(" + ") { it.label }
-        requestSummary = "$boundedMinutes minutes · $labels"
-        val token = proposalGuard.begin()
-        processingAction = true
-        generationJob = generationScope.launch {
-            fun fail(kind: Trip33Failure, detail: String = "") {
-                if (proposalGuard.complete(token, null)) {
-                    failureName = kind.name
-                    failureMessage = detail
-                }
-            }
-            try {
-                when (val result = load(enabledModes)) {
-                    is TripGenerationResult.Success -> {
-                        val encoded = Json.encodeToString(result.trip)
-                        if (latestDestinationActive && proposalGuard.complete(token, result.trip.id)) {
-                            proposalJson = encoded
-                        }
-                    }
-                    is TripGenerationResult.InvalidInput -> fail(Trip33Failure.InvalidInput, result.message)
-                    TripGenerationResult.NoRoute -> fail(Trip33Failure.NoRoute)
-                    is TripGenerationResult.RoutingUnavailable -> fail(Trip33Failure.ProviderUnavailable, result.message)
-                    TripGenerationResult.IdUnavailable -> fail(Trip33Failure.InvalidInput, "Try again to create a trip ID.")
-                }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                fail(Trip33Failure.ProviderUnavailable, "Could not load the test trip. Try again when OTP is available.")
-            } finally {
-                if (proposalGuard.isCurrent(token)) processingAction = false
-            }
-        }
-    }
-
-    val debugLaunch = LocalDebugTripLaunch.current
-    LaunchedEffect(debugLaunch?.source, isDestinationActive) {
-        if (debugLaunch != null && isDestinationActive) {
-            debugLaunch.consume()
-            requestDebugTrip(debugLaunch.source)
         }
     }
 
@@ -646,11 +596,8 @@ internal fun TransitOpeningScreen(
                 closeProposalFlow()
             },
             onRetry = {
-                val source = debugProposalSource?.let(DebugTripSource::valueOf)
-                if (source != null) requestDebugTrip(source) else {
-                    closeProposalFlow()
-                    performPrimaryAction()
-                }
+                closeProposalFlow()
+                performPrimaryAction()
             },
             onEditSettings = {
                 closeProposalFlow()
@@ -694,7 +641,7 @@ internal fun TransitOpeningScreen(
     if (proposal != null) {
         TripProposalContent(
             trip = proposal,
-            scheduled = debugProposalSource != null,
+            scheduled = proposal.routedDurationSeconds != null,
             onStart = {
                 if (latestDestinationActive &&
                     !processingAction &&
@@ -729,11 +676,8 @@ internal fun TransitOpeningScreen(
                 }
             },
             onGenerateAnother = {
-                val source = debugProposalSource?.let(DebugTripSource::valueOf)
-                if (source != null) requestDebugTrip(source) else {
-                    closeProposalFlow()
-                    performPrimaryAction()
-                }
+                closeProposalFlow()
+                performPrimaryAction()
             },
             onEditSettings = { closeProposalFlow() },
             modifier = proposalModifier
@@ -928,12 +872,7 @@ internal fun TransitOpeningScreen(
                 completedSummary
             },
             onPrimaryAction = { performPrimaryAction() },
-            onLoadStmTrip = if (loadDebugStmTrip != null && activeState == null &&
-                pendingReviewId == null && pendingOpenTripId == null && isDestinationActive
-            ) ({ requestDebugTrip(DebugTripSource.Stm) }) else null,
-            onLoadExoTrip = if (loadDebugExoTrip != null && activeState == null &&
-                pendingReviewId == null && pendingOpenTripId == null && isDestinationActive
-            ) ({ requestDebugTrip(DebugTripSource.Exo) }) else null,
+
             onOpenDetailedSettings = {
                 if (canChangeInputs() && navigator.current == MainScreenKey) {
                     navigation.openSection(SettingsScreenKey)

@@ -19,7 +19,7 @@ import kotlinx.serialization.Serializable
  * @property selectedTransportIds Enabled transport-mode IDs.
  * @property selectedZoneIds Legacy shared zones used to restore older drafts.
  * @property intensity Attraction intensity from 0 to 100.
- * @property walkingPreference Walking pace (Amble, Walk, or Dash), retained for future routing.
+ * @property walkingPreference Backend pace: Amble 3, Walk 4.8, or Dash 6.8 km/h.
  * @property bikeSpeedKmh Preferred cycling speed in km/h, retained for future routing.
  * @property selectedAttractionIds Attraction preferences retained for future routing.
  * @property selectedZonesByTransport Independent zones for each transit mode, including disabled modes.
@@ -91,15 +91,14 @@ class MainPlannerViewModel(
         mutableUiState.update {
             it.copy(
                 minutes = Trip.coercePlannedMinutes(trip.plannedMinutes),
-                selectedTransportIds = trip.selectedTransports.map { mode ->
-                    mode.id
-                },
+                selectedTransportIds = trip.requestedTransportIds ?: trip.selectedTransports.map { it.id },
                 selectedZoneIds = trip.selectedZoneIds.toList(),
                 selectedZonesByTransport =
                     trip.selectedZonesByTransport.mapValues { entry ->
                         entry.value.toList()
                     },
                 intensity = trip.attractionIntensity,
+                walkingPreference = trip.walkingPreference ?: it.walkingPreference,
                 origin = if (liveMap) null else trip.origin.toSampleMapPoint(),
                 originPlace = trip.origin.takeIf { liveMap },
                 originIsManual = true

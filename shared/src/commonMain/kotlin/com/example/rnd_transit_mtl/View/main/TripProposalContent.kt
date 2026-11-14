@@ -3,6 +3,7 @@ package com.example.rnd_transit_mtl.View.main
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMap
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMapData
 import com.example.rnd_transit_mtl.data.assets.toSampleMapPoint
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -24,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.LocalTransitMap
+import com.example.rnd_transit_mtl.View.main.components.TripSearchBar
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -185,11 +187,16 @@ internal fun TripLoadingContent(
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            CircularProgressIndicator(
-                color = TransitSelected,
-                strokeWidth = 3.dp,
-                modifier = Modifier.size(26.dp)
-            )
+            // Indeterminate: the synchronous search cannot report a truthful percentage.
+            TripSearchBar()
+            val searchMessage by produceState(0) {
+                while (true) { delay(4000); value = (value + 1) % 3 }
+            }
+            Crossfade(searchMessage, label = "Search status") { message ->
+                Text(listOf("Looking around...", "Trying a few routes...", "Finding a good fit...")[message],
+                    color = TransitWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+            }
 
             Text(
                 text = "Finding your adventure…",
@@ -287,14 +294,14 @@ internal fun TripProposalContent(
         ) {
             TripLabelValueField(
                 label = "Trip destination",
-                value = trip.title
+                value = if (trip.routedDurationSeconds != null) trip.destination.label else trip.title
             )
             Surface(
                 shape = RoundedCornerShape(16.dp),
                 color = TransitWhite
             ) {
                 Text(
-                    text = "Sample trip · #${trip.id.value.takeLast(3)}",
+                    text = "${if (trip.routedDurationSeconds != null) "Generated trip" else "Sample trip"} · #${trip.id.value.takeLast(3)}",
                     color = TransitMain,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
@@ -348,7 +355,7 @@ internal fun TripProposalContent(
                 }
                 val timedLegs = trip.legs.filter { it.transitTiming != null }
                 val estimates = timedLegs.mapNotNull { it.transitTiming }.filter { it.realtimeApplied }
-                val elapsedSeconds = if (timedLegs.size > 1) {
+                val elapsedSeconds = trip.routedDurationSeconds ?: if (timedLegs.size > 1) {
                     val first = requireNotNull(timedLegs.first().transitTiming)
                     val last = requireNotNull(timedLegs.last().transitTiming)
                     val departure = first.estimatedDeparture.takeIf { first.realtimeApplied } ?: first.scheduledDeparture
@@ -370,8 +377,9 @@ internal fun TripProposalContent(
                     trip.legs.any { it.isRouted } -> " · includes short map connections"
                     else -> " straight line"
                 }
+                val orientationNote = if (trip.orientationBufferSeconds > 0) " incl. orientation" else ""
                 Text(
-                    text = "$duration · $distance km$geometryNote · One way",
+                    text = "$duration$orientationNote · $distance km$geometryNote · One way",
                     color = TransitWhite,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold

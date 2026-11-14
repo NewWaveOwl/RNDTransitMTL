@@ -6,6 +6,10 @@ ML3 scope is supplied by the requester. This log records six shared URLs coverin
 
 The web reader returned cache misses for all six URLs; the browser successfully displayed their contents. Full visible human prompt text is retained below, with rendered links on separate lines. Attachment images in the brainstorming session were visible as attachment controls; original filenames and image contents were not extracted. Collapsed work traces are not included. Historical code/test reports are attributed to AI and have not been rerun in this documentation session.
 
+**2026-11-14 coverage update:** M3-A9 through M3-A12 add the supplied current chat, "Propose Integration Solutions," covering Windows server setup, tunnel integration, realtime feeds, generation planning and this logging request. The web reader failed; the browser verified the share and exposed only part of its history. Available human requests from the current conversation are retained in a [separate prompt archive](ML3-Server-Realtime-Chat-Prompts.md), with explicit privacy omissions and attachment/source limits. These entries extend the backend work in M3-A8. Contributor: requester; individual attribution and exact model version [Not documented]. Earlier verification reports are historical evidence, not checks rerun for this documentation update.
+
+**2026-11-14 PR 75 review/fix coverage:** M3-A13 and M3-A14 document the current Codex conversation, separate from the shared chat in M3-A9 through M3-A12. The requester first limited the agent to an independent review, then explicitly authorized fixes, two commits, conflict resolution and a push, followed by this logging/commit/push-command request. All three available human prompts are preserved in the [PR 75 prompt archive](ML3-PR75-Review-Fixes-Chat-Prompts.md). Current conversation URL: [Conversation link needed]. Student reflections, active time, code-percentage estimates and exact model version remain [Not documented] or [Student reflection needed].
+
 ## Linked AI sessions
 
 | Entry | Conversation | Scope |
@@ -17,6 +21,17 @@ The web reader returned cache misses for all six URLs; the browser successfully 
 | M3-A5 | [ChatGPT — ML3 Figma alignment, trip screens and issue 30 planning](https://chatgpt.com/s/cx_6ae7b476302081919f02267cac33adfb) | ML3 — ML3 Figma alignment, trip screens and issue 30 planning |
 | M3-A6 | Codex desktop; [Conversation link needed] | ML3 log organization and repository preparation |
 | M3-A7 | Claude Code (Opus 5.5); [Conversation link needed] | Issue #29 (T05.3) gap analysis after syncing feat/typed-ids with main |
+| M3-A8 | [Existing backend integration record](#m3-a8--backend-destination-generation-and-otp-integration-67); original conversation link [Not documented] | Backend generation, geographic destinations and Ktor migration |
+| M3-A9 | [ChatGPT - Windows server and public access](https://chatgpt.com/share/6af7f15e-aa4c-83ea-b62e-5c7ed9db2532) | Portable launcher, second-PC setup and Microsoft Dev Tunnels |
+| M3-A10 | [ChatGPT - Realtime feeds and exo buses](https://chatgpt.com/share/6af7f15e-aa4c-83ea-b62e-5c7ed9db2532) | Agency health panel, credentials and exo bus integration |
+| M3-A11 | [ChatGPT - Duration matching and loading proposal](https://chatgpt.com/share/6af7f15e-aa4c-83ea-b62e-5c7ed9db2532) | Failed generation feedback and a future implementation handoff |
+| M3-A12 | [ChatGPT - Current chat logging](https://chatgpt.com/share/6af7f15e-aa4c-83ea-b62e-5c7ed9db2532) | Decision/technique records and available prompt preservation |
+| M3-A13 | Codex - current PR 75 review conversation; [Conversation link needed]; [P01](ML3-PR75-Review-Fixes-Chat-Prompts.md#p01---independent-pr-review) | Independent exact-head review, bounded observations and failure reproduction |
+| M3-A14 | Same current Codex conversation; [Conversation link needed]; [P02-P03](ML3-PR75-Review-Fixes-Chat-Prompts.md#p02---remediation-and-git-authorization) | Authorized fixes, regression tests, merge resolution, commits and logging/push handoff |
+
+| M3-A15 | [ChatGPT - PR 75 review follow-up](https://chatgpt.com/share/6af88f56-58f0-83ea-aa4b-739d9e77f32f); [prompts](ML3-PR75-Followup-Chat-Prompts.md) | CLI review handoff, issue acceptance, Git ownership/time log and branch guidance |
+| M3-A16 | [Same chat](https://chatgpt.com/share/6af88f56-58f0-83ea-aa4b-739d9e77f32f); [P07-P10](ML3-PR75-Followup-Chat-Prompts.md#p07---existing-geohash-use) | Spatial sampling and concurrent discovery investigation, issue #78 |
+| M3-A17 | [Same chat](https://chatgpt.com/share/6af88f56-58f0-83ea-aa4b-739d9e77f32f); [P15 onward](ML3-PR75-Followup-Chat-Prompts.md#p15---peer-review-findings) | Peer findings, Docker removal, UTF-8 fixes, App.kt conflict guidance and logging |
 
 ## M3-A1 - PR 53 review and Android saved-state explanations
 
@@ -602,3 +617,224 @@ as a lats feature lets make the trip card in the history only show 1 or 2 lines 
 **Implemented result:** `TripHistoryCard` now shows, collapsed, the title and status badge plus two lines: "<origin> to <destination>" and a summary ("30 min · 0.77 km · 2026-11-02", with " · ★ 4/5" when reviewed), and a small "More ▾ / Less ▴" button using the existing `ic_arrow_drop_down` / `ic_arrow_drop_up` icons. Expanded (animated) it shows coordinates, transport, routes, the completion or cancellation time, and the full review (or the not-reviewed / cancelled message). The existing per-trip `expanded` state was reused, so the separate "Read full review" toggle was removed; the Details/Actions row is unchanged. A duplicated "planned minutes · demo distance" line was dropped from the expanded part. Card sizes moved into a `// Layout settings` block as the coding guide requires. `firstReviewSentence` is no longer used by the app (still covered by its existing test). New helper `historyCardSummaryLine` with a unit test; `CancelAndSaveFlowTest` now checks the collapsed card and expands it with "More".
 **Debugging:** A bash heredoc failed on quote characters in the inline script; the script was written to a scratchpad file instead. First headless screenshots were taken mid-animation; the test now renders extra frames before the expanded screenshot.
 **Verification:** `:shared:jvmTest` 156 tests, 0 failures; `:shared:compileAndroidMain` succeeded; headless screenshots `shared/build/planner-previews/Cancel-flow-history.png` and `Cancel-flow-history-expanded.png`. Not checked on a real window. Changes uncommitted.
+
+### M3-A8 — Backend destination generation and OTP integration (#67)
+
+**Decision:** Run random destination selection and bounded itinerary search in a small backend; use OTP for street/transit routing, the existing bridge for realtime freshness, and shared Kotlin decoding for accepted trip geometry.
+
+**Context:** The regular Android GO flow still used sample routing. The STM/exo demonstrations used fixed stops and an exact sequence of transport legs.
+
+**Options considered:** Generate on the phone and call hosted OTP; generate in a backend beside OTP; keep the existing PC-only demonstration stack.
+
+**User decision:** The user selected option 2, “Generate in a backend; backend calls OTP,” and requested a commit after each of the six proposed steps.
+
+**AI contribution:** Implemented coordinate-based queries and variable legs, backend candidate selection/search, line and ARTM zone checks, Android GO wiring, timing persistence, tests, scripts and documentation.
+
+**Consequences:** OTP remains a long-running service. Generation runs only on demand. Public-stop candidates are a practical first destination pool, not a POI-ranking system. Guest access works locally; hosted mode requires an existing Supabase session. REM, exo bus feeds, live GPS trip tracking and permanent trip storage remain outside this implementation.
+
+**Related files:** `backend/`, `docs/BackendTripGeneration.md`, `BackendTripGenerator.kt`, `TransitOpeningScreen.kt`, `tool/otp/*Trip*.ps1`. Conversation reference: this issue #67 integration conversation.
+
+### M3-A8 follow-up - Geographic destinations and pace-aware time budget
+
+**User correction:** Destinations must be arbitrary geographic points, including park
+interiors, rather than random public stops. Bind backend walking speeds to Amble
+3 km/h, Walk 4.8 km/h and Dash 6.8 km/h. Reserve one minute per kilometre travelled
+because orientation slows the user down. The message ended with an unfinished `3)`.
+
+**Implemented decision:** Sample coordinates uniformly by area in the bounded search
+region; OTP must still find a connected route. Send the selected named pace to the
+backend, map it to OTP metres/second there, and include the orientation reserve in
+both candidate radius estimation and final itinerary acceptance. Interpret distance
+as the sum of every routed leg, including transit/cycling; round the reserve up to
+seconds. Store pace and reserve with the accepted trip and restore them through DTOs.
+
+**Limits:** This correction does not implement attraction scoring, reviews, visit
+durations or weighted choice among high-scoring candidates from the full design.
+
+**Verification:** 25 Node tests and 181 shared JVM tests passed; Android debug build
+and lint passed; smoke script parsed and whitespace checks passed. Checked OTP's
+official walking preference and Speed scalar documentation. Live stack/device checks
+remain pending. Arbitrary-point sampling was committed separately as `3dda5ea`.
+
+### M3-A8 follow-up - Ktor migration and server consolidation
+
+**User decision:** Replace Node.js with Kotlin/Ktor, remove the obsolete backend,
+commit; remove fixed STM/exo map test trips and their tests, commit; consolidate
+backend code at the repository top level.
+
+**Implemented:** Ktor CIO service on JVM 21 retains the Android JSON contract,
+arbitrary destinations, pace bindings, distance allowance, mode/line/zone validation,
+search limits, provider failures and Supabase checks. Removed Node sources/tests,
+fixed journey controls/intents/loaders and preset-query scripts. Kept the production
+STM/exo bridge and its failure/freshness regression fixtures. Android only decodes
+accepted itineraries. All server code and tools live under `backend`; standalone
+Gradle builds avoid configuring Android.
+
+**Verification:** 15 backend Kotlin and 176 shared JVM tests passed using direct
+JUnit in this restricted session; Android APK assembly and lint passed. PowerShell
+scripts parsed; relocated Java feed fixtures compiled and were checked. Live device,
+agency polling and public tunnel deployment are not claimed. See
+`backend/README.md` for setup and retained external runtime data.
+
+## M3-A9 - Portable Windows server and public access
+
+**Contributor:** Requester; individual attribution [Not documented]. **Milestone:** ML3 backend deployment. **Logged:** 2026-11-14; individual prompt dates [Not documented]. **AI:** ChatGPT/Codex; exact model [Not documented].
+
+**Source:** [Current shared chat](https://chatgpt.com/share/6af7f15e-aa4c-83ea-b62e-5c7ed9db2532). **Available human prompts:** [P01-P24](ML3-Server-Realtime-Chat-Prompts.md#p01) and [P27-P39](ML3-Server-Realtime-Chat-Prompts.md#p27), in order. These include the configuration snippets, installation output and follow-ups. Screenshots show launcher status and Microsoft tunnel output; uploaded log contents are not reconstructed.
+
+**Task/context:** Make the backend usable on a second Windows PC without Android Studio, explain the launcher/data folder, document how Android reaches the server, and bring public access settings into the launcher.
+
+**AI output summary:** Explained the launcher versus the backend, portable distribution and private runtime data. Compared Cloudflare, ngrok, Tailscale Funnel, self-hosting and Azure-related options, then guided Microsoft Dev Tunnels installation, login, tunnel creation and port forwarding. The same PowerShell session did not recognize the newly installed CLI; reopening the shell was the proposed PATH refresh. Tunnel/domain comparisons were advice at the time of the chat, not a guarantee of current service plans or permanent addresses.
+
+**Student decision / how output was used:** The requester chose a local data directory, confirmed the server worked, manually hosted a Microsoft tunnel for API port 18088, later said "works," and requested integration into the server app. They requested README cleanup and commits. The screenshot with localhost connection refusals preceded that confirmation; its exact failure cause is not independently established.
+
+**Implemented result / evidence:** Git history confirms `c8ecf8f` (service-supervising launcher), `7dd5706` (portable package/runtimes), `2c66fb3` (Windows classpath/startup validation), `43bbe64` (run instructions), and `1461fd4` (Microsoft Dev Tunnels and feed controls). The Swing launcher owns start/stop/retry, imports prepared data and reports service readiness. Packaging includes separate Java runtimes for the API/launcher and OTP. Configuration/logs and prepared GTFS/graph data remain local; build outputs and credentials are excluded from Git/public packages. Cloudflare and Microsoft tunnel settings are in one launcher; only API port 18088 is forwarded. OTP/bridge ports remain private. See [server guide](../../../../backend/launcher/SERVER_GUIDE.md).
+
+**Verification:** The user's screenshots and explicit confirmations support successful server startup and the manual tunnel setup. The assistant reported launcher tests, rendered GUI and portable EXE/package checks during implementation; those are historical reports. Repository source and commit subjects were checked for this log. Target-PC use of the subsequently integrated Microsoft settings is [Not documented]. Successful tunnel access does not establish successful trip generation: the requester separately reported failed 30/60-minute bus requests (M3-A11).
+
+**Limits / reflection:** The local Android endpoint in `gradle.properties` remains outside this documentation change. Private endpoint/key/account values are omitted from the archived prompts. Actual AI interaction time, code percentage and personal learning assessment: [Student reflection needed]. **Technique record:** [M3-A9](ML3-AI-Technique-Log.md#m3-a9---portable-windows-server-and-public-access).
+
+## M3-A10 - Realtime feed visibility and exo bus integration
+
+**Contributor:** Requester; individual attribution [Not documented]. **Milestone:** ML3 transit integration. **Logged:** 2026-11-14; individual prompt dates [Not documented]. **AI:** ChatGPT/Codex; exact model [Not documented].
+
+**Source:** [Current shared chat](https://chatgpt.com/share/6af7f15e-aa4c-83ea-b62e-5c7ed9db2532). **Available human prompts:** [P40-P45](ML3-Server-Realtime-Chat-Prompts.md#p40). **Attachment:** Chrono developer portal screenshot showing GTFS-realtime operations, an agency path parameter and token query parameter; original filename [Not documented].
+
+**Task/context:** Determine what STM/exo realtime support already exists, expose actual feed health rather than only bridge process readiness, and add exo bus support.
+
+**AI output summary:** Distinguished existing STM/exo train updates and alerts from exo bus support. Proposed per-agency connection/freshness rows, last successful updates and credential controls. The Chrono screenshot helped identify the API shape; it did not prove successful bus authorization or supply all bus agency codes. AI reported consulting agency/feed documentation while designing separate bus-sector scopes.
+
+**Student decision / how output was used:** The requester explicitly asked for the "Realtime feeds" panel, requested a commit, then requested exo bus implementation and another commit. Deployment and live acceptance of the resulting bus integration are [Not documented].
+
+**Implemented result / evidence:** `1461fd4` adds the feed status/credential panel alongside Microsoft tunnel integration. `92b9efe` adds bus-sector credentials, bridge feed handling, graph preparation and associated checks. The launcher displays feed-specific status and successful-download times; blank credential fields preserve existing secrets. Exo buses use separate `EXO_BUS_<agency>` namespaces and matching scheduled GTFS archives. Updates/alerts are checked against their schedule scope, including trip/route pairing. The graph-preparation helper builds into a separate data location and records input checksums so the graph and feed archives match. Generation uses feed health for affected itinerary scopes with scheduled fallback. Existing selectable Bus routing can use routes present in the prepared graph. Vehicle-position markers and TripModification handling are not claimed. See [bus setup instructions](../../../../backend/launcher/SERVER_GUIDE.md) and [preparation script](../../../../backend/scripts/Prepare-ExoBusGraph.ps1).
+
+**Verification:** Historical assistant reports cover launcher/backend unit checks, bus feed fixtures, STM/train regression fixtures, Windows preparation checks, GUI/EXE checks and package inspection. Normal Gradle verification encountered cache/socket restrictions; direct compilation/JUnit and fixture runners were reported as the fallback. These checks are not fresh results from this logging task. Live feed downloads encountered network/DNS limits; an authenticated live exo bus feed, a complete real bus graph build and an Android trip through that graph were not demonstrated. The source commit and its changed files were checked while logging.
+
+**Limits / reflection:** Prepared graph data, sector access credentials and an actual successful feed update remain necessary for live bus predictions. A green bridge process alone proves none of those. Time, code percentage and learning/productivity assessment: [Student reflection needed]. **Technique record:** [M3-A10](ML3-AI-Technique-Log.md#m3-a10---realtime-feed-visibility-and-exo-bus-integration).
+
+## M3-A11 - Duration matching and generation loading proposal
+
+**Contributor:** Requester; individual attribution [Not documented]. **Milestone:** ML3 generation design. **Logged:** 2026-11-14; individual prompt dates [Not documented]. **AI:** ChatGPT/Codex; exact model [Not documented].
+
+**Source:** [Current shared chat](https://chatgpt.com/share/6af7f15e-aa4c-83ea-b62e-5c7ed9db2532). **Available human prompts:** [P25-P26](ML3-Server-Realtime-Chat-Prompts.md#p25), [P46-P47](ML3-Server-Realtime-Chat-Prompts.md#p46) and the explicitly partial earlier [S01 excerpt](ML3-Server-Realtime-Chat-Prompts.md#s01---additional-earlier-prompt-excerpt-visible-only-in-the-shared-rendering).
+
+**Task/context:** The requester reported that 30/60-minute requests including Bus in zone A returned "no trip fits these choices." They clarified that selected transport modes are allowed alternatives, not a requirement to use every mode. They then asked for better duration matching, a slightly larger search deadline scaling by one second per additional hour, and a more interesting loading bar styled like the bike-speed selector with casual status text.
+
+**AI output summary / suggestions:** The discussion identified the first-valid-route policy, bounded candidate search and disconnected random coordinates as possible contributors; it did not isolate a proven cause of the failed requests. Proposed evaluating multiple valid routes and preferring effective durations closer to, but within, the selected maximum. Preserve arbitrary geographic destinations from M3-A8, mode/line/zone constraints and walking connections for transit. Walking-only results remain allowed when Walk is selected. Include waits, transfers, walking and orientation allowance when comparing duration.
+
+The AI proposed a 20-second base search deadline plus `floor(selectedMinutes / 60)` seconds (30 minutes: 20 seconds; 60: 21; 120: 22; 360: 26), aligning outer timeouts. The base of 20 seconds and possible early exit near 95% of the duration were AI suggestions, not separately confirmed student choices. The proposed search keeps the best valid route when its own deadline ends, while respecting parent cancellation. The loading design was a noninteractive animated bar with changing casual messages and no fabricated completion percentage; reset it after success, failure or cancellation.
+
+**Student decision / how output was used:** The requester asked for a chat reply before implementation, then specifically requested a full prompt for another chat. The assistant supplied that implementation handoff. This records the intended next task; the supplied conversation does not establish implementation or acceptance of every proposed detail.
+
+**Implemented result / verification:** No new duration-matching, scaled-deadline or loading-bar implementation is attributed to this chat. Existing server/realtime commits belong to M3-A9/M3-A10. Suggested future checks include later/better candidate selection, hard duration limits, selected modes, deadline/cancellation behavior and loading-state reset; these are a test plan, not completed verification. This logging request does not execute the handoff.
+
+**Subsequent repository evidence:** At final documentation review, the branch also contains `1aef8de` ("Improve trip duration matching and generation loading"). This confirms a later implementation commit exists; it does not make the shared chat's proposal a verified implementation report. Its separate implementation conversation and verification evidence are not supplied here. The planning status above describes the handoff stage of this chat, not the latest capability of the branch.
+
+**Limits / reflection:** Opening a new chat may simplify context, but no performance gain was measured. Diagnosis of the particular failed trips and personal learning/time estimates remain [Not documented] / [Student reflection needed]. **Technique record:** [M3-A11](ML3-AI-Technique-Log.md#m3-a11---duration-matching-and-generation-loading-proposal).
+
+## M3-A12 - Current conversation logging
+
+**Contributor:** Requester; individual attribution [Not documented]. **Milestone:** ML3 documentation. **Date:** 2026-11-14 logging update. **AI:** ChatGPT/Codex; exact model [Not documented].
+
+**Source:** [Current shared chat](https://chatgpt.com/share/6af7f15e-aa4c-83ea-b62e-5c7ed9db2532). **Available human prompts:** [P48-P49](ML3-Server-Realtime-Chat-Prompts.md#p48).
+
+**Task / student decision:** Add this chat to the existing AI log using the supplied current-chat link. The request authorizes documentation, not implementation of historical prompts.
+
+**AI output summary / implemented result:** Read the repository's logging guide and existing milestone logs; extended their session index and stable IDs with four challenge records and matching technique entries. Preserved 49 available human messages in order plus one explicitly labeled earlier excerpt in the prompt archive. Sensitive configuration/account/tunnel values have named omissions. Original attachment contents and inaccessible earlier work traces are not reconstructed. Personal learning, deliberate technique choice, time and code-percentage estimates remain for the student.
+
+**Verification / source limits:** The web reader failed; the browser verified the exact shared URL and title and exposed nine human-message blocks plus the final proposal/handoff. Current conversation context supplies the broader prompt archive. Documentation checks cover record IDs, prompt ranges, relative links, fences and whitespace. No application tests were rerun for this documentation-only update. Existing `gradle.properties` edits were left untouched; no logging changes were committed or pushed.
+
+**Reflection:** Student assessment of usefulness and learning: [Student reflection needed]. **Technique record:** [M3-A12](ML3-AI-Technique-Log.md#m3-a12---current-conversation-logging).
+
+## M3-A13 - Independent PR 75 review and reproduction
+
+**Contributor:** Requester; individual attribution [Not documented]. **Milestone (inferred):** ML3 / issue #67 backend integration, based on the existing backend records in `docs/milestones/3/AI/`. **Date:** 2026-11-14. **AI tool:** Codex coding agent; exact model version [Not documented].
+
+**Source:** Current conversation; [Conversation link needed]. **Full available prompt:** [P01](ML3-PR75-Review-Fixes-Chat-Prompts.md#p01---independent-pr-review). No attachments were supplied for this review request. The prior interrupted review was explicitly excluded as correctness evidence.
+
+**Task/context and purpose of AI use:** Independently review [PR #75](https://github.com/NewWaveOwl/RNDTransitMTL/pull/75), tracing backend planning, OTP decoding, client state, presentation and Windows packaging. Preserve the already-running second-PC server and all uncommitted work; use fixtures for outage/cancellation cases and distinguish live observations from exact-head verification.
+
+**Student decision / scope:** P01 authorized autonomous inspection and bounded tests but prohibited source edits, commits, merges, deployment and GitHub review publication. The agent stayed within that review phase until P02 separately authorized remediation. No student-run reproduction or independent manual evaluation of the findings is documented.
+
+**AI output summary / findings and suggested corrections:** The agent reported four reproduced bugs: (1) a scheduled replan also returned healthy-feed journeys, allowing a known realtime over-budget trip to be accepted under its shorter scheduled duration; (2) empty OTP itinerary lists skipped unavailable-feed scheduled fallback; (3) a closed HTTP connection did not cancel generation; and (4) restoring a saved Bus-only trip promoted walking access into an allowed walking-only alternative. Suggested filtering fallback journeys, handling empty results, wiring HTTP disconnect cancellation and preserving the original requested modes separately from used leg modes. These were recommendations at the end of the review, not fixes already applied in this phase.
+
+**Exact scope evidence:** GitHub CLI REST calls succeeded after the GraphQL request failed. Reviewed head `e650332fae057e3568ff593997d70c64f10fd193` on `feature/67-otp-stm-exo-integration`, current base `29af85494558ba44d3d2d0ca29d58ae8e7aaf6cb` on `main`, and merge base `d784ea1f940ba49d734e24f5ab2dff48c5e35373`. Local HEAD matched the reviewed head; the merge-base diff contained 124 changed files. No applicable `AGENTS.md` was found. GitHub showed no existing reviews/comments and no check runs, workflow runs or commit statuses for that head. An isolated merge-tree check confirmed conflicts with the current base.
+
+**Agent-run local verification:** Fresh compilation and 22 backend, 45 launcher and 182 shared JVM tests passed. Initial launcher temp-directory permission failures passed with a workspace-local test temp directory. Desktop compilation, fresh STM/exo bridge fixtures, 25 bus fixture checks, one graph-preparation fixture, seven PowerShell parsing checks and `git diff --check` passed. Additional isolated reproductions exercised actual CIO disconnection, the bridge's HTTP fallback path, bridge/backend duration selection, and saved-trip mode restoration. Passing pre-existing tests did not cover away the reproduced bugs.
+
+**Live-server observations, kept separate:** Sequential requests to the configured endpoint returned health HTTP 200 in 0.63 seconds and unauthenticated generation HTTP 401 in 0.27 seconds; a POST without the tunnel-bypass header returned 401 in 0.35 seconds. The observed health response/headers exposed no build identity, so these checks do not identify the running server as this PR's revision. No valid existing account token was available: authenticated Walk, Bus, combined-mode, short/long-duration and realtime-metadata samples were skipped. No credential values or active hostnames are retained here. The running server was not restarted, rebuilt, reconfigured or redeployed.
+
+**Limits and outcome:** Android assembly, host tests and lint were blocked by the missing configured SDK. JS/Wasm compilation encountered permission errors on dependency `.klib` files outside the writable workspace. Device behavior, a fresh EXE installation, real recovery/tunnel lifecycle and iOS compilation remained unverified. The recommendation was to request changes. The original checkout retained only its pre-existing `gradle.properties` modification. No code was changed or review published during this review phase.
+
+**Reflection:** Personal learning, deliberate technique selection, active time and code-percentage estimates: [Student reflection needed] / [Not documented]. **Technique record:** [M3-A13](ML3-AI-Technique-Log.md#m3-a13---independent-pr-75-review-and-reproduction).
+
+## M3-A14 - PR 75 fixes, merge resolution and commit handoff
+
+**Contributor:** Requester; individual attribution [Not documented]. **Milestone (inferred):** ML3 / issue #67 remediation and documentation, following the same existing backend log placement as M3-A13. **Date:** 2026-11-14. **AI tool:** Codex coding agent; exact model version [Not documented].
+
+**Source:** Current conversation; [Conversation link needed]. **Full available prompts:** [P02 - implementation/Git authorization](ML3-PR75-Review-Fixes-Chat-Prompts.md#p02---remediation-and-git-authorization) and [P03 - log, commit and push command](ML3-PR75-Review-Fixes-Chat-Prompts.md#p03---ai-log-and-push-command-handoff).
+
+**Student decision / how output was used:** After receiving the four findings, the requester directed the agent to fix the errors, commit, resolve merge conflicts, commit again and push to the PR. The follow-up requested this chat be logged using the AI log skill, committed, and accompanied by a push command. These explicit follow-ups authorize the subsequent implementation and Git work; they do not establish student-authored code changes or manual device verification.
+
+**AI implementation choices and result:** The agent filtered scheduled fallback results to affected feeds, added a bounded scheduled retry for empty results using requested feed/mode scope, installed Ktor's `HttpRequestLifecycle` with `cancelCallOnClose`, and saved `requestedTransportIds` separately from itinerary modes. The optional field is retained through Trip serialization and DTO conversion, used by planner restoration/repeat handling, and defaults to legacy behavior when absent. Added an actual CIO disconnect regression, bridge HTTP/fixture checks, and a saved-trip Bus-only regression covering serialization and DTO restoration.
+
+**Version-control result:** Git metadata for the original worktree was outside writable permissions, so the agent used a clean isolated clone at `build/pr75-fixes` under the supplied workspace. Commit `03e640d1d001548435ea6af144392f6f2592156d` contains the fixes and regression tests. Merge commit `dc80fe4634a4452e7a8af872f4a0bff221c113b4` includes main at `29af85494558ba44d3d2d0ca29d58ae8e7aaf6cb`. Conflict resolution preserved main's offline map-picker recovery, planner UI tests and Supabase setup alongside the PR's backend generation/leg colours. Obsolete fixed-trip debug installers were removed in favor of the generation workflow. These are local commits; their existence does not establish a remote push or PR merge.
+
+**Agent-run verification and debugging:** Direct tests first passed 23 backend tests and 31 bus fixture checks, including HTTP fallback, while the shared run exposed two existing cancellation/history tests waiting for proposal creation. A thread dump located the wait in Windows JVM entropy seeding for generated IDs. A temporary OS-generated entropy file was scoped to the test JVMs; no machine-level settings or production randomness implementation were changed. All 183 shared tests then passed. After merge resolution, a fresh Gradle run of `:backend:test :backend:launcher:test :shared:jvmTest :desktopApp:classes` succeeded: 23 backend, 45 launcher and 183 shared tests, with zero failures/errors/skips, plus Desktop compilation. Local generated Gradle XML reports under each module's ignored `build/test-results/` and the observed `BUILD SUCCESSFUL` output support these counts. Whitespace, conflict markers and documentation links were checked. Android/Web/device limitations from M3-A13 remain; no deployment or successful live authenticated generation is claimed.
+
+**Failed push and handoff:** The push failed because Git Credential Manager could not persist credentials in Windows Credential Manager. `gh auth status` reported an invalid existing token; a bounded noninteractive credential-helper check returned no usable credentials. No tokens were printed. At the last remote verification in the implementation turn, PR #75 still pointed to `e650332fae057e3568ff593997d70c64f10fd193` and still reported conflicts because the local merge had not been pushed. The assistant supplied a regular-PowerShell push command using `git -C` and the isolated checkout. A suggested command is not recorded as executed by the student; a successful remote push is [Not documented].
+
+**Autonomy disclosure:** The agent performed the review, source edits, fixtures/tests, commits and conflict resolution autonomously after the corresponding scope authorization. No subagents were used. Student-run tests, manual source review and device acceptance: [Not documented].
+
+**Logging follow-up:** P03 is documented by these two new decision/technique entries and the three-prompt archive. Existing contributors' entries and earlier shared URLs are preserved. No current conversation URL was invented or published. This documentation turn does not rerun historical commands, change application code, retry the blocked push or deploy the server; it prepares a separate log commit and a push-command handoff. Student reflection and a verified conversation link remain needed.
+
+**Reflection:** Whether AI saved time, what the student learned, deliberate technique choices, active interaction time and estimated code percentage: [Student reflection needed] / [Not documented]. **Technique record:** [M3-A14](ML3-AI-Technique-Log.md#m3-a14---pr-75-fixes-merge-resolution-and-commit-handoff).
+
+## M3-A15 - PR 75 follow-up review and verification handoff
+
+**Contributor:** Requester; Artiom / NewWaveOwl supported by repository context. **Logged:** 2026-11-14 (America/Toronto). **AI:** ChatGPT/Codex; exact model [Not documented].
+**Source:** [Current chat](https://chatgpt.com/share/6af88f56-58f0-83ea-aa4b-739d9e77f32f). **Prompts:** [Follow-up archive](ML3-PR75-Followup-Chat-Prompts.md), P01-P06 and P11-P14/P27. This is a separate conversation from the CLI execution recorded in M3-A13/A14.
+
+**Task/context:** Review PR #75, move review execution to PowerShell when this session's access failed, preserve the already running second-PC server, assess issue completion and maintain the time log.
+
+**AI output summary:** Inspected local e650332 and browser-confirmed the PR branch/head; review was interrupted by PC disconnection and did not produce confirmed findings or approval. Supplied Codex CLI installation/run commands and a risk-based review prompt. Explained that approval=never retains the sandbox and blocked commands fail instead of prompting. Revised the prompt to use bounded checks against the running server and fixtures for disruptive scenarios. Explained a path-specific safe.directory exception after the user's ownership error. Compared supplied #64/#66 criteria, then gave closure advice after the student's Android confirmation. Advised retaining the old branch until checking unique changes.
+
+**Student decision / how output was used:** User chose a PowerShell review with no approval prompts, stated the second-PC server was running, and reported that #64 worked on Android with a proposal screenshot. User requested the time-log commit/push. Successful CLI installation/review launch, issue closure, PR merge and branch deletion are not established here.
+
+**Implemented result / evidence:** Local commit 63a63ce records the student's Time_spent.txt edits on top of the newer fixes checkout. Original checkout modifications, including gradle.properties, were preserved. CLI review findings/tests in M3-A13/A14 came from the other conversation and are not new results for this chat.
+
+**Verification / limitations:** Repository search and source inspection performed. Gradle wrapper access failed on the user-cache lock; later PC disconnection interrupted review. GitHub CLI/fetch/push attempts failed due to connectivity/name resolution. User-provided gh output established the then-open #64/#66 bodies; Android confirmation is student-reported acceptance, while the screenshot independently shows only a generated proposal/geometry/duration state. It does not prove every cancellation/outage criterion. Current remote completion is unknown. Time, code percentage and personal reflection: [Student reflection needed]. **Technique record:** [M3-A15](ML3-AI-Technique-Log.md#m3-a15---pr-75-follow-up-review-and-verification-handoff).
+
+## M3-A16 - Spatial sampling and concurrent candidate discovery investigation
+
+**Contributor:** Requester; Artiom / NewWaveOwl supported by assignment UI. **Logged:** 2026-11-14. **AI:** ChatGPT/Codex; exact model [Not documented].
+**Source:** [Current chat](https://chatgpt.com/share/6af88f56-58f0-83ea-aa4b-739d9e77f32f). **Full available prompts:** [P07-P10](ML3-PR75-Followup-Chat-Prompts.md#p07---existing-geohash-use).
+
+**Task/context:** Assess whether geohash/grid sampling can improve random destinations and serve overlapping requests without giving everyone similar trips.
+
+**AI suggestion:** Repository search found no geohash use. Suggested measuring additional benefit beyond existing proximity checks, investigating reusable candidate discovery and bounded caching/coalescing, and treating variety across corridors as an experiment. Geohash letters do not replace distance calculations or OTP travel-time validation. Cells should remain sampling areas, with varied routable park/path destinations rather than compulsory centres, entrances or stops.
+
+**Student decision:** User prioritized reducing near-duplicate attempts and reusing recent useful areas for simultaneous users; challenged the benefit of corridor diversity and explicitly required varied park destinations. Authorized creation and assignment to Artiom.
+
+**Implemented result / evidence:** Created [issue #78](https://github.com/NewWaveOwl/RNDTransitMTL/issues/78), assigned to NewWaveOwl after the picker displayed Artiom Sova. Browser readback confirmed title, body, open state and assignment. Scope includes profiling, candidate constraints, cache expiry/invalidation, concurrent cancellation, cell boundaries, park reachability, latency/OTP-call/success/memory/diversity measurements and a measured recommendation. It is an investigation; no geohash algorithm or caching implementation was added.
+
+**Verification / limitations:** No performance benefit, throughput gain or destination-quality gain was measured. Exact model, personal time and learning reflection [Not documented] / [Student reflection needed]. **Technique record:** [M3-A16](ML3-AI-Technique-Log.md#m3-a16---spatial-sampling-and-concurrent-candidate-discovery-investigation).
+
+## M3-A17 - Peer findings, deployment simplification and App.kt merge guidance
+
+**Contributor:** Requester; Artiom / NewWaveOwl supported by project context. **Logged:** 2026-11-14. **AI:** ChatGPT/Codex; exact model [Not documented].
+**Source:** [Current chat](https://chatgpt.com/share/6af88f56-58f0-83ea-aa4b-739d9e77f32f). **Prompts/attachments:** [P15-P29](ML3-PR75-Followup-Chat-Prompts.md#p15---peer-review-findings); peer's findings, conflict-editor screenshots and Pasted text(3).txt (read in full, 240 lines).
+
+**Task/context:** Act on a peer's Docker configuration and corrupted-text findings, decide which deployment method to maintain, and resolve App.kt conflicts between backend generation and cloud trip persistence.
+
+**AI output summary:** Confirmed Dockerfile omitted backend/launcher even though standalone settings included :launcher, and found literal corrupted characters in attribution/summaries. Initially added the launcher COPY and repaired UTF-8 strings. Explained Docker was optional for the running Windows launcher; after the user's removal decision, removed Docker setup and instructions. Conflict guidance combined generationEndpoint with tripRepository/outbox/cloud persistence and omitted removed debug-trip parameters/effects. Early screenshots/excerpts were incomplete; the assistant later searched for and read Pasted text(3).txt and returned the full resolved App.kt in chat.
+
+**Student decision:** User authorized fixes, questioned Docker's purpose, explicitly chose removal including docs, and requested commit/push. Student edited App.kt in the conflict editor and supplied more evidence; AI corrected missing tripRepository arguments. Later requested this conversation be logged, committed and pushed, and supplied its share URL.
+
+**Implemented result / evidence:** Commit f0d2f9d removes .dockerignore and backend/Dockerfile, replaces Docker hosting instructions with Windows launcher guidance, adjusts log references and fixes five string locations across MainPlannerContent.kt/TransitOpeningScreen.kt. The initial Docker COPY repair was superseded by deletion, not retained. App.kt resolution was supplied in chat only; this session did not apply or compile it. It must not be described as a verified merged file.
+
+**Verification:** Strict UTF-8 decoding/corruption checks and launcher-input existence checks passed before removal; git diff --check passed after fixes/removal. Documentation search left only the transitive is-docker dependency in yarn.lock, which was intentionally retained. Launcher documentation link target exists. Docker executable was unavailable, so no container build was performed. No Android assembly/UI rerun was performed for the punctuation-only fix. Original worktree/time-log/settings changes were preserved. All push attempts from this session failed due to network/name-resolution errors; manual push commands were supplied. No successful remote push is claimed.
+
+**Logging follow-up:** Read docs/HowToLog_AI.md and both existing logs; added M3-A15 through M3-A17 and the source archive, preserving existing IDs and distinguishing this chat from the independent CLI review. Supplied share URL identifies the source; the visible conversation is used as evidence without claiming a freshly exported complete transcript. Documentation-only checks are recorded with the logging commit; commit/push outcomes must be taken from actual Git output.
+
+**Reflection / limits:** Student-estimated active time, assignment-code percentage, deliberate technique selection and productivity/learning judgment: [Student reflection needed]. No subagents were used in this chat. **Technique record:** [M3-A17](ML3-AI-Technique-Log.md#m3-a17---peer-findings-deployment-simplification-and-appkt-merge-guidance).

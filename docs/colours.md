@@ -20,4 +20,11 @@ The foundations palette supersedes the older cream #F7F0E5, lime #9ACA45, and ac
 
 Semantic error colours remain defined by the Material theme; yellow and orange are not substitutes for error feedback.
 
+Trip legs use `tripLegColor(index)` from `ui/theme/TripLegColors.kt`, keyed by travel
+order rather than transport mode. The first eight colours are #0072B2, #D55E00,
+#009E73, #AA4499, #827000, #5648CF, #B83C55 and #007F86; longer trips use distinct
+generated hues. These route colours are shared by both map renderers, the current
+section indicator and the information key. Numbered sections and mode/line labels
+also distinguish legs without relying on colour alone.
+
 The attraction-intensity band uses teal with white text. Its slider reverses the earlier blue-track/lime-fill pairing: lime track, blue filled amount, and a white value on blue (teal on the unfilled lime area).

@@ -1,0 +1,11 @@
+# Keep downloaded data, credentials, generated files, and logs local.
+/*
+!/.gitignore
+!/*.ps1
+!/build-config.json
+!/stm-scheduled/
+/stm-scheduled/*
+!/stm-scheduled/*.ps1
+!/stm-scheduled/*.java
+!/stm-scheduled/*.py
+!/stm-scheduled/build-config.json

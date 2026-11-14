@@ -18,6 +18,7 @@ import kotlinx.serialization.Serializable
  * @property distanceMeters Travelled distance; never negative.
  * @property durationSeconds Expected travel time; never negative.
  * @property isRouted True only when geometry came from a real routing service.
+ * @property navigation Saved provider manoeuvres and transit signage; absent on legacy trips.
  */
 @Serializable
 data class RouteLeg(
@@ -27,7 +28,8 @@ data class RouteLeg(
     val distanceMeters: Double,
     val durationSeconds: Long,
     val isRouted: Boolean,
-    val transitTiming: TransitTiming? = null
+    val transitTiming: TransitTiming? = null,
+    val navigation: LegNavigation? = null
 ) {
     init {
         require(geometry.size >= 2) { "A route leg needs at least a start and an end point." }
@@ -70,6 +72,30 @@ data class RouteLeg(
 
     /** Where this leg ends. */
     val end: GeoPoint get() = geometry.last()
+}
+
+/** Provider instructions retained with the leg, including after saving and restoring a trip. */
+@Serializable
+data class LegNavigation(
+    val routeShortName: String? = null,
+    val headsign: String? = null,
+    val fromName: String? = null,
+    val toName: String? = null,
+    val steps: List<NavigationStep> = emptyList()
+)
+
+/** A provider manoeuvre at the beginning of a street segment; distance is in metres. */
+@Serializable
+data class NavigationStep(
+    val relativeDirection: String,
+    val streetName: String? = null,
+    val distanceMeters: Double,
+    val bogusName: Boolean = false,
+    val exit: String? = null
+) {
+    init {
+        require(distanceMeters.isFinite() && distanceMeters >= 0.0)
+    }
 }
 
 /** Provider timing accepted together with this leg's geometry. Older trips have no timing. */

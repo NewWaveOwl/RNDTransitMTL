@@ -218,6 +218,17 @@ Supporting inputs include transit schedules and service conditions, place openin
 
 The team's starting idea is to randomly select points near the user within a distance roughly walkable during the available minutes. The generator then compares those points with attraction preferences, time, and transportation choices to produce a final destination and path.
 
+Candidate destinations may be any geographic point, including a random point inside
+a park; they are not restricted to transit stops or a POI catalogue. Each accepted
+candidate must still have a connected route from the confirmed origin.
+
+Walking pace is bound in the backend: **Amble = 3 km/h**, **Walk = 4.8 km/h**, and
+**Dash = 6.8 km/h**. This applies to walking-only routes and walking connections in
+transit trips. Reserve **one minute per kilometre travelled** for orientation and
+slowing down, using the sum of all routed leg distances. Travel, initial waiting,
+transfers and this reserve must fit the user's available one-way time. Round the
+reserve up to whole seconds and include it once in the displayed trip estimate.
+
 Use that walking-distance estimate as an initial candidate-search area, not as proof that a route fits. Roads, paths, barriers, visits, waiting, transfers, and an explicit timing allowance affect actual one-way travel time. When transit or cycling is enabled, reachable-area calculations can extend candidate search beyond the initial walking radius.
 
 The proposed generation process is:
