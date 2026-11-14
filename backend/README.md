@@ -11,6 +11,8 @@ STM/exo bridge stay private. Node.js is no longer needed for trip generation.
 - `src/test/kotlin/`: generation and API regression tests.
 - `otp/`: OTP build configuration and the production STM/exo feed bridge.
 - `scripts/`: service startup, Android installation and generated-trip smoke check.
+- `launcher/`: independent Windows server GUI and portable EXE packaging; see
+  [the server guide](launcher/SERVER_GUIDE.md).
 - `data/`: ARTM polygon cache and attribution. Downloaded data is ignored by Git.
 
 ## Run on Windows
