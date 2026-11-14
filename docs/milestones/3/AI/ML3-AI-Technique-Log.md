@@ -200,3 +200,91 @@ The independent server build also passed. Its offline Gradle plugin classpath us
 a validation-only annotation dependency substitution (cached 2.28.0 instead of
 2.27.0); this was confined to the temporary init script, not committed application
 dependencies. Docker execution and live device/tunnel checks remain unverified.
+
+## M3-A9 - Portable Windows server and public access
+
+**Contributor:** Requester; individual attribution [Not documented]. **Logged:** 2026-11-14; individual session dates [Not documented].
+**Conversation:** [Current shared chat](https://chatgpt.com/share/6af7f15e-aa4c-83ea-b62e-5c7ed9db2532).
+**Decision record:** [M3-A9](ML3-AI-Decision-Log.md#m3-a9---portable-windows-server-and-public-access). **Available prompts:** [P01-P24](ML3-Server-Realtime-Chat-Prompts.md#p01), [P27-P39](ML3-Server-Realtime-Chat-Prompts.md#p27); source/privacy limits are in the archive.
+
+| Field | Student record |
+| --- | --- |
+| Challenge addressed / context | Run the complete backend on a second Windows PC and expose the API to Android through launcher-managed public access. |
+| AI(s) used | ChatGPT/Codex; exact model and use of additional AIs [Not documented]. |
+| Observable prompting pattern | Repeated clarification of folders, packaging and Git; real configuration/console/screenshot examples; comparison of tunnel options; follow-up request to integrate the selected option. |
+| Techniques deliberately used | [Student reflection needed]; observable patterns do not establish intentional technique selection. |
+| Iterations | Several setup/debugging exchanges are preserved in order; exact work-iteration count [Not documented]. |
+| Debugging / refinement | The user supplied startup logs, CLI installation/PATH failure and tunnel connection-refusal screenshots, then confirmed working operation. AI guided configuration and reported a Windows classpath fix. |
+| Failed / rejected approaches | Newly installed CLI was not recognized in the existing shell. Other tunnel/hosting options were compared; they are not all failed experiments. |
+| Strategy changes | Moved from manual Cloudflare/Microsoft commands toward a portable launcher with integrated tunnel settings after the user's explicit request. |
+| Verification | User screenshots and "works" support server/manual tunnel operation. AI reported unit, GUI and package checks; these historical reports were not rerun for the log. Use of the integrated Microsoft controls on the second PC [Not documented]. |
+| Code impact | Launcher, packaging scripts, configuration and run guides; commits c8ecf8f, 7dd5706, 2c66fb3, 43bbe64 and 1461fd4. Student-estimated percentage [Not documented]. |
+| Time | Active AI interaction/debugging time [Not documented]. |
+| Outcome | Portable server distribution and Microsoft Dev Tunnels controls implemented; server readiness remains separate from route generation success. |
+| Productivity / learning reflection | [Student reflection needed]. |
+
+## M3-A10 - Realtime feed visibility and exo bus integration
+
+**Contributor:** Requester; individual attribution [Not documented]. **Logged:** 2026-11-14; individual session dates [Not documented].
+**Conversation:** [Current shared chat](https://chatgpt.com/share/6af7f15e-aa4c-83ea-b62e-5c7ed9db2532).
+**Decision record:** [M3-A10](ML3-AI-Decision-Log.md#m3-a10---realtime-feed-visibility-and-exo-bus-integration). **Available prompts:** [P40-P45](ML3-Server-Realtime-Chat-Prompts.md#p40), including the Chrono screenshot context.
+
+| Field | Student record |
+| --- | --- |
+| Challenge addressed / context | Show per-feed freshness/credentials and extend existing STM/exo train integration to exo bus sectors. |
+| AI(s) used | ChatGPT/Codex; exact model and additional AI use [Not documented]. |
+| Observable prompting pattern | Asked what already exists, supplied an API screenshot, requested a specific panel, then requested bus implementation and commits. |
+| Techniques deliberately used | [Student reflection needed]. |
+| Iterations | Related panel and bus requests grouped as one challenge; exact engineering iteration count [Not documented]. |
+| Debugging / refinement | Kept process readiness separate from agency health; matched feed entities to sector schedule IDs, trip/route pairs and graph inputs. AI reported regression fixtures and preparation/package checks. |
+| Failed / rejected approaches | Live download/network limits prevented a complete live bus demonstration. Screenshot/API shape alone was insufficient evidence of working bus access. |
+| Strategy changes | Extended train-only exo handling with separate bus namespaces, credentials and prepared graph inputs; added an explicit health panel instead of relying on Bridge Ready. |
+| Verification | AI reported launcher/backend tests, bus/STM/train fixtures, Windows graph-preparation checks and GUI/package checks. Restricted Gradle cache/sockets required alternate compilation/test runners. User acceptance of an authenticated live bus trip [Not documented]; historical checks were not rerun for logging. |
+| Code impact | Feed panel/credentials in 1461fd4; bus bridge, graph preparation, launcher support and generation health handling in 92b9efe. Percentage [Not documented]. |
+| Time | [Not documented]. |
+| Outcome | Source integration committed. Real bus graph preparation, authorized fresh feeds and Android end-to-end deployment remain unverified by this conversation. |
+| Productivity / learning reflection | [Student reflection needed]. |
+
+## M3-A11 - Duration matching and generation loading proposal
+
+**Contributor:** Requester; individual attribution [Not documented]. **Logged:** 2026-11-14; individual session dates [Not documented].
+**Conversation:** [Current shared chat](https://chatgpt.com/share/6af7f15e-aa4c-83ea-b62e-5c7ed9db2532).
+**Decision record:** [M3-A11](ML3-AI-Decision-Log.md#m3-a11---duration-matching-and-generation-loading-proposal). **Available prompts:** [P25-P26](ML3-Server-Realtime-Chat-Prompts.md#p25), [P46-P47](ML3-Server-Realtime-Chat-Prompts.md#p46), and [partial S01](ML3-Server-Realtime-Chat-Prompts.md#s01---additional-earlier-prompt-excerpt-visible-only-in-the-shared-rendering).
+
+| Field | Student record |
+| --- | --- |
+| Challenge addressed / context | Failed 30/60-minute bus requests; prefer valid routes closer to the requested maximum while respecting selected alternative modes; improve loading feedback. |
+| AI(s) used | ChatGPT/Codex; exact model [Not documented]. The next-chat prompt is a handoff draft, not evidence another AI executed it. |
+| Observable prompting pattern | Concrete failure reports and desired behavior; correction of mode semantics; request for discussion first, then a complete implementation prompt for a new chat. |
+| Techniques deliberately used | [Student reflection needed]. |
+| Iterations | Failure clarification followed by design discussion and handoff request; exact engineering iterations [Not documented]. |
+| Debugging / refinement | AI discussed first-valid search, disconnected geographic candidates and the search cap as possible causes. Exact cause of those failed requests was not established. |
+| Failed / rejected approaches | User rejected forcing every selected mode. Existing arbitrary geographic destinations must remain; this is not authorization to revert to stop-only selection. |
+| Strategy changes | Proposed retaining/comparing valid candidates, scaling search time by requested duration, and replacing the loading display with an animated bar and casual status text. |
+| Verification | Suggested deadline, cancellation, duration, mode and UI-state checks are future work. No completed tests for this proposal are claimed. |
+| Code impact | No implementation attributed to this chat; proposed source locations were part of the handoff. Code percentage not applicable to the unimplemented proposal. |
+| Time | [Not documented]. No measured benefit from starting a new chat. |
+| Outcome | Review-first proposal and future implementation prompt supplied. The 20-second base and optional 95% early exit are AI suggestions, not independently confirmed requirements. A later repository commit, 1aef8de, implements duration/loading work; its implementation conversation and checks are outside the supplied chat evidence. |
+| Productivity / learning reflection | [Student reflection needed]. |
+
+## M3-A12 - Current conversation logging
+
+**Contributor:** Requester; individual attribution [Not documented]. **Date:** 2026-11-14 logging update.
+**Conversation:** [Current shared chat](https://chatgpt.com/share/6af7f15e-aa4c-83ea-b62e-5c7ed9db2532).
+**Decision record:** [M3-A12](ML3-AI-Decision-Log.md#m3-a12---current-conversation-logging). **Available prompts:** [P48-P49](ML3-Server-Realtime-Chat-Prompts.md#p48).
+
+| Field | Student record |
+| --- | --- |
+| Challenge addressed / context | Add this exact chat to the existing milestone decision and technique logs without executing its historical requests. |
+| AI(s) used | ChatGPT/Codex; exact model [Not documented]. |
+| Observable prompting pattern | Explicit logging request followed by the exact share URL identifying the current chat. |
+| Techniques deliberately used | [Student reflection needed]. |
+| Iterations | Two visible logging requests; this is a prompt count, not a measured development-iteration count. |
+| Debugging / refinement | Web retrieval failed; browser verified the share and partially exposed its contents. Used available conversation text, preserved privacy omissions and separated implemented features from future suggestions. |
+| Failed / rejected approaches | Web reader access failed. Partial browser rendering cannot establish complete raw transcript coverage. |
+| Strategy changes | Stored available prompts once in a separate archive and cross-linked matching challenge IDs in both existing logs. |
+| Verification | Checked documentation numbering, prompt references, fences, relative links and whitespace; preserved existing local gradle.properties edits. No app tests needed or rerun. |
+| Code impact | Documentation only; application code percentage not applicable. |
+| Time | [Not documented]. |
+| Outcome | Four linked challenge records, session-index rows and an archive of 49 available human messages plus one labeled earlier excerpt; logging changes remain uncommitted and unpushed. |
+| Productivity / learning reflection | [Student reflection needed]. |

@@ -6,6 +6,8 @@ ML3 scope is supplied by the requester. This log records six shared URLs coverin
 
 The web reader returned cache misses for all six URLs; the browser successfully displayed their contents. Full visible human prompt text is retained below, with rendered links on separate lines. Attachment images in the brainstorming session were visible as attachment controls; original filenames and image contents were not extracted. Collapsed work traces are not included. Historical code/test reports are attributed to AI and have not been rerun in this documentation session.
 
+**2026-11-14 coverage update:** M3-A9 through M3-A12 add the supplied current chat, "Propose Integration Solutions," covering Windows server setup, tunnel integration, realtime feeds, generation planning and this logging request. The web reader failed; the browser verified the share and exposed only part of its history. Available human requests from the current conversation are retained in a [separate prompt archive](ML3-Server-Realtime-Chat-Prompts.md), with explicit privacy omissions and attachment/source limits. These entries extend the backend work in M3-A8. Contributor: requester; individual attribution and exact model version [Not documented]. Earlier verification reports are historical evidence, not checks rerun for this documentation update.
+
 ## Linked AI sessions
 
 | Entry | Conversation | Scope |
@@ -17,6 +19,11 @@ The web reader returned cache misses for all six URLs; the browser successfully 
 | M3-A5 | [ChatGPT — ML3 Figma alignment, trip screens and issue 30 planning](https://chatgpt.com/s/cx_6ae7b476302081919f02267cac33adfb) | ML3 — ML3 Figma alignment, trip screens and issue 30 planning |
 | M3-A6 | Codex desktop; [Conversation link needed] | ML3 log organization and repository preparation |
 | M3-A7 | Claude Code (Opus 5.5); [Conversation link needed] | Issue #29 (T05.3) gap analysis after syncing feat/typed-ids with main |
+| M3-A8 | [Existing backend integration record](#m3-a8--backend-destination-generation-and-otp-integration-67); original conversation link [Not documented] | Backend generation, geographic destinations and Ktor migration |
+| M3-A9 | [ChatGPT - Windows server and public access](https://chatgpt.com/share/6af7f15e-aa4c-83ea-b62e-5c7ed9db2532) | Portable launcher, second-PC setup and Microsoft Dev Tunnels |
+| M3-A10 | [ChatGPT - Realtime feeds and exo buses](https://chatgpt.com/share/6af7f15e-aa4c-83ea-b62e-5c7ed9db2532) | Agency health panel, credentials and exo bus integration |
+| M3-A11 | [ChatGPT - Duration matching and loading proposal](https://chatgpt.com/share/6af7f15e-aa4c-83ea-b62e-5c7ed9db2532) | Failed generation feedback and a future implementation handoff |
+| M3-A12 | [ChatGPT - Current chat logging](https://chatgpt.com/share/6af7f15e-aa4c-83ea-b62e-5c7ed9db2532) | Decision/technique records and available prompt preservation |
 
 ## M3-A1 - PR 53 review and Android saved-state explanations
 
@@ -660,3 +667,73 @@ JUnit in this restricted session; Android APK assembly and lint passed. PowerShe
 scripts parsed; relocated Java feed fixtures compiled and were checked. Live device,
 agency polling, Docker runtime and public tunnel deployment are not claimed. See
 `backend/README.md` for setup and retained external runtime data.
+
+## M3-A9 - Portable Windows server and public access
+
+**Contributor:** Requester; individual attribution [Not documented]. **Milestone:** ML3 backend deployment. **Logged:** 2026-11-14; individual prompt dates [Not documented]. **AI:** ChatGPT/Codex; exact model [Not documented].
+
+**Source:** [Current shared chat](https://chatgpt.com/share/6af7f15e-aa4c-83ea-b62e-5c7ed9db2532). **Available human prompts:** [P01-P24](ML3-Server-Realtime-Chat-Prompts.md#p01) and [P27-P39](ML3-Server-Realtime-Chat-Prompts.md#p27), in order. These include the configuration snippets, installation output and follow-ups. Screenshots show launcher status and Microsoft tunnel output; uploaded log contents are not reconstructed.
+
+**Task/context:** Make the backend usable on a second Windows PC without Android Studio, explain the launcher/data folder, document how Android reaches the server, and bring public access settings into the launcher.
+
+**AI output summary:** Explained the launcher versus the backend, portable distribution and private runtime data. Compared Cloudflare, ngrok, Tailscale Funnel, self-hosting and Azure-related options, then guided Microsoft Dev Tunnels installation, login, tunnel creation and port forwarding. The same PowerShell session did not recognize the newly installed CLI; reopening the shell was the proposed PATH refresh. Tunnel/domain comparisons were advice at the time of the chat, not a guarantee of current service plans or permanent addresses.
+
+**Student decision / how output was used:** The requester chose a local data directory, confirmed the server worked, manually hosted a Microsoft tunnel for API port 18088, later said "works," and requested integration into the server app. They requested README cleanup and commits. The screenshot with localhost connection refusals preceded that confirmation; its exact failure cause is not independently established.
+
+**Implemented result / evidence:** Git history confirms `c8ecf8f` (service-supervising launcher), `7dd5706` (portable package/runtimes), `2c66fb3` (Windows classpath/startup validation), `43bbe64` (run instructions), and `1461fd4` (Microsoft Dev Tunnels and feed controls). The Swing launcher owns start/stop/retry, imports prepared data and reports service readiness. Packaging includes separate Java runtimes for the API/launcher and OTP. Configuration/logs and prepared GTFS/graph data remain local; build outputs and credentials are excluded from Git/public packages. Cloudflare and Microsoft tunnel settings are in one launcher; only API port 18088 is forwarded. OTP/bridge ports remain private. See [server guide](../../../../backend/launcher/SERVER_GUIDE.md).
+
+**Verification:** The user's screenshots and explicit confirmations support successful server startup and the manual tunnel setup. The assistant reported launcher tests, rendered GUI and portable EXE/package checks during implementation; those are historical reports. Repository source and commit subjects were checked for this log. Target-PC use of the subsequently integrated Microsoft settings is [Not documented]. Successful tunnel access does not establish successful trip generation: the requester separately reported failed 30/60-minute bus requests (M3-A11).
+
+**Limits / reflection:** The local Android endpoint in `gradle.properties` remains outside this documentation change. Private endpoint/key/account values are omitted from the archived prompts. Actual AI interaction time, code percentage and personal learning assessment: [Student reflection needed]. **Technique record:** [M3-A9](ML3-AI-Technique-Log.md#m3-a9---portable-windows-server-and-public-access).
+
+## M3-A10 - Realtime feed visibility and exo bus integration
+
+**Contributor:** Requester; individual attribution [Not documented]. **Milestone:** ML3 transit integration. **Logged:** 2026-11-14; individual prompt dates [Not documented]. **AI:** ChatGPT/Codex; exact model [Not documented].
+
+**Source:** [Current shared chat](https://chatgpt.com/share/6af7f15e-aa4c-83ea-b62e-5c7ed9db2532). **Available human prompts:** [P40-P45](ML3-Server-Realtime-Chat-Prompts.md#p40). **Attachment:** Chrono developer portal screenshot showing GTFS-realtime operations, an agency path parameter and token query parameter; original filename [Not documented].
+
+**Task/context:** Determine what STM/exo realtime support already exists, expose actual feed health rather than only bridge process readiness, and add exo bus support.
+
+**AI output summary:** Distinguished existing STM/exo train updates and alerts from exo bus support. Proposed per-agency connection/freshness rows, last successful updates and credential controls. The Chrono screenshot helped identify the API shape; it did not prove successful bus authorization or supply all bus agency codes. AI reported consulting agency/feed documentation while designing separate bus-sector scopes.
+
+**Student decision / how output was used:** The requester explicitly asked for the "Realtime feeds" panel, requested a commit, then requested exo bus implementation and another commit. Deployment and live acceptance of the resulting bus integration are [Not documented].
+
+**Implemented result / evidence:** `1461fd4` adds the feed status/credential panel alongside Microsoft tunnel integration. `92b9efe` adds bus-sector credentials, bridge feed handling, graph preparation and associated checks. The launcher displays feed-specific status and successful-download times; blank credential fields preserve existing secrets. Exo buses use separate `EXO_BUS_<agency>` namespaces and matching scheduled GTFS archives. Updates/alerts are checked against their schedule scope, including trip/route pairing. The graph-preparation helper builds into a separate data location and records input checksums so the graph and feed archives match. Generation uses feed health for affected itinerary scopes with scheduled fallback. Existing selectable Bus routing can use routes present in the prepared graph. Vehicle-position markers and TripModification handling are not claimed. See [bus setup instructions](../../../../backend/launcher/SERVER_GUIDE.md) and [preparation script](../../../../backend/scripts/Prepare-ExoBusGraph.ps1).
+
+**Verification:** Historical assistant reports cover launcher/backend unit checks, bus feed fixtures, STM/train regression fixtures, Windows preparation checks, GUI/EXE checks and package inspection. Normal Gradle verification encountered cache/socket restrictions; direct compilation/JUnit and fixture runners were reported as the fallback. These checks are not fresh results from this logging task. Live feed downloads encountered network/DNS limits; an authenticated live exo bus feed, a complete real bus graph build and an Android trip through that graph were not demonstrated. The source commit and its changed files were checked while logging.
+
+**Limits / reflection:** Prepared graph data, sector access credentials and an actual successful feed update remain necessary for live bus predictions. A green bridge process alone proves none of those. Time, code percentage and learning/productivity assessment: [Student reflection needed]. **Technique record:** [M3-A10](ML3-AI-Technique-Log.md#m3-a10---realtime-feed-visibility-and-exo-bus-integration).
+
+## M3-A11 - Duration matching and generation loading proposal
+
+**Contributor:** Requester; individual attribution [Not documented]. **Milestone:** ML3 generation design. **Logged:** 2026-11-14; individual prompt dates [Not documented]. **AI:** ChatGPT/Codex; exact model [Not documented].
+
+**Source:** [Current shared chat](https://chatgpt.com/share/6af7f15e-aa4c-83ea-b62e-5c7ed9db2532). **Available human prompts:** [P25-P26](ML3-Server-Realtime-Chat-Prompts.md#p25), [P46-P47](ML3-Server-Realtime-Chat-Prompts.md#p46) and the explicitly partial earlier [S01 excerpt](ML3-Server-Realtime-Chat-Prompts.md#s01---additional-earlier-prompt-excerpt-visible-only-in-the-shared-rendering).
+
+**Task/context:** The requester reported that 30/60-minute requests including Bus in zone A returned "no trip fits these choices." They clarified that selected transport modes are allowed alternatives, not a requirement to use every mode. They then asked for better duration matching, a slightly larger search deadline scaling by one second per additional hour, and a more interesting loading bar styled like the bike-speed selector with casual status text.
+
+**AI output summary / suggestions:** The discussion identified the first-valid-route policy, bounded candidate search and disconnected random coordinates as possible contributors; it did not isolate a proven cause of the failed requests. Proposed evaluating multiple valid routes and preferring effective durations closer to, but within, the selected maximum. Preserve arbitrary geographic destinations from M3-A8, mode/line/zone constraints and walking connections for transit. Walking-only results remain allowed when Walk is selected. Include waits, transfers, walking and orientation allowance when comparing duration.
+
+The AI proposed a 20-second base search deadline plus `floor(selectedMinutes / 60)` seconds (30 minutes: 20 seconds; 60: 21; 120: 22; 360: 26), aligning outer timeouts. The base of 20 seconds and possible early exit near 95% of the duration were AI suggestions, not separately confirmed student choices. The proposed search keeps the best valid route when its own deadline ends, while respecting parent cancellation. The loading design was a noninteractive animated bar with changing casual messages and no fabricated completion percentage; reset it after success, failure or cancellation.
+
+**Student decision / how output was used:** The requester asked for a chat reply before implementation, then specifically requested a full prompt for another chat. The assistant supplied that implementation handoff. This records the intended next task; the supplied conversation does not establish implementation or acceptance of every proposed detail.
+
+**Implemented result / verification:** No new duration-matching, scaled-deadline or loading-bar implementation is attributed to this chat. Existing server/realtime commits belong to M3-A9/M3-A10. Suggested future checks include later/better candidate selection, hard duration limits, selected modes, deadline/cancellation behavior and loading-state reset; these are a test plan, not completed verification. This logging request does not execute the handoff.
+
+**Subsequent repository evidence:** At final documentation review, the branch also contains `1aef8de` ("Improve trip duration matching and generation loading"). This confirms a later implementation commit exists; it does not make the shared chat's proposal a verified implementation report. Its separate implementation conversation and verification evidence are not supplied here. The planning status above describes the handoff stage of this chat, not the latest capability of the branch.
+
+**Limits / reflection:** Opening a new chat may simplify context, but no performance gain was measured. Diagnosis of the particular failed trips and personal learning/time estimates remain [Not documented] / [Student reflection needed]. **Technique record:** [M3-A11](ML3-AI-Technique-Log.md#m3-a11---duration-matching-and-generation-loading-proposal).
+
+## M3-A12 - Current conversation logging
+
+**Contributor:** Requester; individual attribution [Not documented]. **Milestone:** ML3 documentation. **Date:** 2026-11-14 logging update. **AI:** ChatGPT/Codex; exact model [Not documented].
+
+**Source:** [Current shared chat](https://chatgpt.com/share/6af7f15e-aa4c-83ea-b62e-5c7ed9db2532). **Available human prompts:** [P48-P49](ML3-Server-Realtime-Chat-Prompts.md#p48).
+
+**Task / student decision:** Add this chat to the existing AI log using the supplied current-chat link. The request authorizes documentation, not implementation of historical prompts.
+
+**AI output summary / implemented result:** Read the repository's logging guide and existing milestone logs; extended their session index and stable IDs with four challenge records and matching technique entries. Preserved 49 available human messages in order plus one explicitly labeled earlier excerpt in the prompt archive. Sensitive configuration/account/tunnel values have named omissions. Original attachment contents and inaccessible earlier work traces are not reconstructed. Personal learning, deliberate technique choice, time and code-percentage estimates remain for the student.
+
+**Verification / source limits:** The web reader failed; the browser verified the exact shared URL and title and exposed nine human-message blocks plus the final proposal/handoff. Current conversation context supplies the broader prompt archive. Documentation checks cover record IDs, prompt ranges, relative links, fences and whitespace. No application tests were rerun for this documentation-only update. Existing `gradle.properties` edits were left untouched; no logging changes were committed or pushed.
+
+**Reflection:** Student assessment of usefulness and learning: [Student reflection needed]. **Technique record:** [M3-A12](ML3-AI-Technique-Log.md#m3-a12---current-conversation-logging).
