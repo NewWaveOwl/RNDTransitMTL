@@ -27,7 +27,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Run backend and shared regression tests
-        run: ./gradlew :backend:test :shared:jvmTest :shared:testAndroidHostTest
+        run: ./gradlew :backend:test :backend:launcher:test :shared:jvmTest :shared:testAndroidHostTest
 
       - name: Compile Android, Desktop, and Web
         run: ./gradlew :androidApp:assembleDebug :desktopApp:classes :webApp:compileKotlinJs :webApp:compileKotlinWasmJs
@@ -42,5 +42,6 @@ jobs:
           name: validation-reports
           path: |
             backend/build/reports/tests/
+            backend/launcher/build/reports/tests/
             shared/build/reports/tests/
             androidApp/build/reports/lint-results-debug.*

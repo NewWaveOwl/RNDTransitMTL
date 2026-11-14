@@ -1,5 +1,6 @@
 // Allows this server to build independently of Android, Desktop and Web.
 rootProject.name = "backend"
+include(":launcher")
 pluginManagement { repositories { mavenCentral(); gradlePluginPortal() } }
 dependencyResolutionManagement {
     repositories { mavenCentral() }
