@@ -8,6 +8,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -24,6 +25,8 @@ import androidx.compose.ui.unit.sp
 import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.ui.theme.*
 
+internal val LocalCompassControlsVisible = staticCompositionLocalOf { false }
+
 /**
  * Presentation only: supply directionDegrees clockwise from north (0=N, 90=E).
  * No sensor or routing assumptions are made here. Destination names stay private.
@@ -33,7 +36,7 @@ import com.example.rnd_transit_mtl.ui.theme.*
 fun CompassScreen(
     activeTrip: Trip? = null,
     directionDegrees: Float = 45f,
-    controlsVisible: Boolean = true,
+    controlsVisible: Boolean = LocalCompassControlsVisible.current,
     onOpenMap: () -> Unit = {},
     onFinishTrip: (() -> Unit)? = null,
     onOpenPresets: (() -> Unit)? = null,

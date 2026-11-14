@@ -4,6 +4,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.Modifier
 import com.example.rnd_transit_mtl.navigation.*
 import com.example.rnd_transit_mtl.state.trip.LocalTripsStore
@@ -33,6 +38,8 @@ fun MainLayout(
     val tripsState by tripsStore.state
     val currentKey = navigator.current
 
+    val isCompass = currentKey == CompassScreenKey
+    var controlsVisible by remember(currentKey) { mutableStateOf(false) }
     val openCompass = onOpenCompass ?: { navigator.open(CompassScreenKey) }
 
     val displayedTab = selectedTab ?: when (currentKey) {
@@ -49,13 +56,24 @@ fun MainLayout(
     }
 
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().pointerInput(isCompass) {
+            if (isCompass) {
+                try {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            controlsVisible = event.changes.any { it.pressed }
+                        }
+                    }
+                } finally { controlsVisible = false }
+            }
+        },
         containerColor = TransitMain,
         // Top and bottom bars handle their respective system insets.
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = { SharedTopBar() },
+        topBar = { if (!isCompass) SharedTopBar() },
         bottomBar = {
-            SharedBottomBar(
+            if (!isCompass || controlsVisible) SharedBottomBar(
                 selectedTab = displayedTab,
                 enabledTabs = enabledTabs,
                 onSelect = { tab ->
@@ -108,7 +126,9 @@ fun MainLayout(
                     )
                 )
         ) {
-            content()
+            androidx.compose.runtime.CompositionLocalProvider(
+                com.example.rnd_transit_mtl.View.compass.LocalCompassControlsVisible provides controlsVisible
+            ) { content() }
         }
     }
 }
