@@ -7,43 +7,26 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.rnd_transit_mtl.ViewModels.authentication.AuthViewModel
-import com.example.rnd_transit_mtl.ViewModels.authentication.ProfileViewModel
-import com.example.rnd_transit_mtl.data.accounts.LocalAccountRespository
-import com.example.rnd_transit_mtl.data.authentication.AccountSession
-import com.example.rnd_transit_mtl.data.authentication.LocalAccountSession
-import com.example.rnd_transit_mtl.data.authentication.LocalAuthRepository
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.rnd_transit_mtl.ViewModels.Accounts.ProfileViewModel
 import com.example.rnd_transit_mtl.navigation.*
 import com.example.rnd_transit_mtl.state.user.LocalNicknameSession
 import com.example.rnd_transit_mtl.ui.theme.TransitComplementary
 import com.example.rnd_transit_mtl.ui.theme.TransitMain
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.CancellationException
 import org.jetbrains.compose.resources.painterResource
 import rnd_transit_mtl.shared.generated.resources.Res
 import rnd_transit_mtl.shared.generated.resources.ic_account_circle
 
+/** @param viewModel null for guests; otherwise the signed-in user's profile. */
 @Composable
-fun ProfileScreen(viewModel: ProfileViewModel?) {
+internal fun ProfileScreen(viewModel: ProfileViewModel?) {
     val navigator = LocalNavigator.current
-    val scope = rememberCoroutineScope()
-    var signOutError by remember(signedIn?.userId) { mutableStateOf(false) }
-    var signingOut by remember(signedIn?.userId) { mutableStateOf(false) }
-
-
-    var account = viewModel.loadAccount()
-
-
+    val state = viewModel?.state?.collectAsStateWithLifecycle()?.value
 
 
 
@@ -55,36 +38,25 @@ fun ProfileScreen(viewModel: ProfileViewModel?) {
         Text("Your profile", color = TransitComplementary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(4.dp))
         Icon(painterResource(Res.drawable.ic_account_circle), contentDescription = null,
-
             tint = TransitMain, modifier = Modifier.size(56.dp))
-
-        Text( if (viewModel == null) "Guest" else account.username , color = TransitComplementary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-
+        Text(if (viewModel == null) "Guest" else when {
+                state?.account != null -> state.account.username
+                state?.accountLoadFailed == true -> "Couldn’t load profile"
+                else -> "Loading…"
+            },
+            color = TransitComplementary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(2.dp))
-        if (viewModel== null) {
+        if (viewModel == null) {
             ProfileOutlineButton("Sign in", onClick = { navigator.navigate(AuthScreenKey()) })
             ProfileOutlineButton("Create an account", onClick = { navigator.navigate(AuthScreenKey(register = true)) })
         }
         ProfileFilledButton("Your trip history", onClick = { navigator.navigate(HistoryScreenKey) })
         ProfileOutlineButton("About RND Transit", onClick = { navigator.navigate(AboutScreenKey) })
-        if (viewModel == null) {
-            if (signOutError) Text("Couldn’t sign out. Check your connection and try again.",
+        if (viewModel != null && state != null) {
+            if (state.signOutError) Text("Couldn’t sign out. Check your connection and try again.",
                 color = MaterialTheme.colorScheme.error)
-            ProfileOutlineButton(if (signingOut) "Signing out…" else "Sign out", onClick = {
-                if (!signingOut) scope.launch {
-                    signingOut = true
-                    signOutError = false
-                    try {
-                        viewModel?.signOut();
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (_: Exception) {
-                        signOutError = true
-                    } finally {
-                        signingOut = false
-                    }
-                }
-            })
+            ProfileOutlineButton(if (state.signingOut) "Signing out…" else "Sign out",
+                onClick = viewModel::signOut)
         }
     }
 }

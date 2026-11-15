@@ -1,8 +1,6 @@
 package com.example.rnd_transit_mtl.data.accounts
 
-import androidx.compose.runtime.compositionLocalOf
-import com.example.rnd_transit_mtl.data.authentication.AuthRepository
+import androidx.compose.runtime.staticCompositionLocalOf
 
-internal val LocalAccountRespository = compositionLocalOf<AccountRepository?> {
-    null
-}
+/** The signed-in user's account repository; null for guests. */
+internal val LocalAccountRepository = staticCompositionLocalOf<IAccountRepository?> { null }

@@ -4,17 +4,18 @@ import com.example.rnd_transit_mtl.data.supabase.SupabaseBackend
 import com.example.rnd_transit_mtl.model.Accounts.Account
 import com.example.rnd_transit_mtl.model.ids.UserId
 import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.auth.OtpVerifyResult
 import io.github.jan.supabase.postgrest.from
 
 internal class AccountRepository(
-    private val authenticatedUserId: String,
+    private val authenticatedUserId: UserId,
     private val client: SupabaseClient = SupabaseBackend.client,
 ) : IAccountRepository {
 
     override suspend fun deleteAccount() {
         client.from(TABLE).delete {
             filter {
-                eq("user_id", authenticatedUserId)
+                eq("user_id", authenticatedUserId.value)
             }
         }
     }
@@ -28,7 +29,7 @@ internal class AccountRepository(
             {
                 select()
                 filter {
-                    eq("user_id", authenticatedUserId)
+                    eq("user_id", authenticatedUserId.value)
                 }
             }).decodeList<Account>()
 
@@ -39,7 +40,7 @@ internal class AccountRepository(
         return client.from(TABLE)
             .select {
                 filter {
-                    eq("user_id", authenticatedUserId)
+                    eq("user_id", authenticatedUserId.value)
                 }
             }
             .decodeSingleOrNull<Account>()
@@ -48,5 +49,15 @@ internal class AccountRepository(
 
     private companion object {
         const val TABLE = "users"
+    }
+
+    suspend fun ensureAccount(): Unit {
+
+        client.from(TABLE).upsert(Account(authenticatedUserId, UsernameGenerator.generate(), null)) {
+            onConflict = "user_id"
+            ignoreDuplicates = true
+        }
+
+
     }
 }

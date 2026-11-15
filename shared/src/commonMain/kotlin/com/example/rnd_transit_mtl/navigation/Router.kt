@@ -46,8 +46,8 @@ import com.example.rnd_transit_mtl.View.profile.ProfileScreen
 import com.example.rnd_transit_mtl.View.settings.SettingsScreen
 import com.example.rnd_transit_mtl.View.trip_details.TripDetailsScreen
 import com.example.rnd_transit_mtl.View.trip_review.TripReviewScreen
-import com.example.rnd_transit_mtl.ViewModels.authentication.ProfileViewModel
-import com.example.rnd_transit_mtl.data.accounts.LocalAccountRespository
+import com.example.rnd_transit_mtl.ViewModels.Accounts.ProfileViewModel
+import com.example.rnd_transit_mtl.data.accounts.LocalAccountRepository
 
 /**
  * Literal sealed-class route hierarchy required by the assignment.
@@ -351,9 +351,13 @@ fun Router(
             }
 
             entry<ProfileScreenKey> {
-                val repository = LocalAccountRespository.current;
-                val profileViewModel = viewModel { ProfileViewModel(repository)}
-                ProfileScreen(if (profileViewModel == null) null else profileViewModel)
+                val accountRepository = LocalAccountRepository.current
+                val authRepository = LocalAuthRepository.current
+                // Guests have no account repository, so they get no ViewModel.
+                val profileViewModel = accountRepository?.let {
+                    viewModel { ProfileViewModel(it, authRepository) }
+                }
+                ProfileScreen(profileViewModel)
             }
 
             entry<AuthScreenKey> { key ->

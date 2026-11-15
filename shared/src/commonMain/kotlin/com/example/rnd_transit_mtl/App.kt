@@ -16,13 +16,11 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import com.example.rnd_transit_mtl.data.routing.DebugTripLoader
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.navigation3.runtime.rememberNavBackStack
 import com.example.rnd_transit_mtl.data.fake.FakeTransportRouteRepository
 import com.example.rnd_transit_mtl.data.fake.FakeTransportTypeRepository
@@ -52,8 +50,7 @@ import com.example.rnd_transit_mtl.data.authentication.AuthRepository
 import com.example.rnd_transit_mtl.data.authentication.LocalAccountSession
 import com.example.rnd_transit_mtl.data.authentication.LocalAuthRepository
 import com.example.rnd_transit_mtl.data.authentication.SupabaseAuthRepository
-import com.example.rnd_transit_mtl.model.Accounts.Account
-import com.example.rnd_transit_mtl.data.accounts.LocalAccountRespository
+import com.example.rnd_transit_mtl.data.accounts.LocalAccountRepository
 
 private data class TransportData(
     val types: List<TransportType>,
@@ -95,7 +92,7 @@ internal fun App(
     openDebugExoPreview: Boolean = false,
 ) {
 
-    var accountRepository  by remember { mutableStateOf<AccountRepository?>(null) }
+
     var pendingDebugPreview by rememberSaveable {
         mutableStateOf(when {
             openDebugExoPreview && loadDebugExoTrip != null -> DebugTripSource.Exo.name
@@ -141,10 +138,12 @@ internal fun App(
     LaunchedEffect(accountSession.value) {
         when (accountSession.value) {
             is AccountSession.SignedIn -> {
+
                 sessionStores.clearAccountStores(except = signedIdentity)
                 continueAsGuest = false
-                val owner  = (accountSession.value as AccountSession.SignedIn).userId
-                accountRepository = AccountRepository(owner)
+//                val owner  = (accountSession.value as AccountSession.SignedIn).userId
+
+
 
 
 
@@ -176,7 +175,17 @@ internal fun App(
                 CloudTrips(tripRepository(UserId(owner)), tripsStore)
             }
         }
-        accountRepository = remember(owner) { owner?.let { AccountRepository(it) } }
+        val accountRepository = remember(owner) { owner?.let { AccountRepository(UserId(it)) } }
+
+        LaunchedEffect(accountRepository) {
+            try {
+                accountRepository?.ensureAccount()
+            } catch (cancelled: kotlin.coroutines.cancellation.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // Offline or server error: the row is created on the next sign-in.
+            }
+        }
         val tripNavigation = remember(navigator, tripsStore) { TripNavigation(navigator, tripsStore) }
         LaunchedEffect(identity, backStack) {
             if (navigationOwner != identity) {
@@ -198,7 +207,7 @@ internal fun App(
             LocalNicknameSession provides appNicknameSession,
             LocalAuthRepository provides authRepository,
             LocalAccountSession provides accountSession.value,
-            LocalAccountRespository provides accountRepository,
+            LocalAccountRepository provides accountRepository,
         ) {
             when {
                 accountSession.value == AccountSession.Restoring -> androidx.compose.material3.CircularProgressIndicator()

@@ -14,7 +14,7 @@ internal data class AuthUiState(
     val confirmationEmail: String? = null,
 )
 
-class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
+internal class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
     private val mutableState = MutableStateFlow(AuthUiState())
     val state = mutableState.asStateFlow()
 

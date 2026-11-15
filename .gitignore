@@ -17,3 +17,6 @@ captures
 !*.xcworkspace/contents.xcworkspacedata
 **/xcshareddata/WorkspaceSettings.xcsettings
 node_modules/
+
+# Raw AI prompt log (written by the logging hook; readable version is docs/ai-log/conversations.md)
+docs/ai-log/raw/
