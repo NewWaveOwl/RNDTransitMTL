@@ -199,4 +199,98 @@ class GenerationTest {
         assertEquals(2,calls)
     }
 
+    @Test fun candidateFailuresCanRecoverButRepeatedFailuresAreBounded()=runBlocking {
+        val destinations=listOf(end,Point(45.52,-73.6),Point(45.53,-73.6))
+        val failures=listOf(
+            obj("errors" to listOf(obj("message" to "Temporary planning failure"))),
+            obj("data" to obj("planConnection" to obj("edges" to emptyList<Any>(),
+                "routingErrors" to listOf(obj("code" to "UNEXPECTED_CANDIDATE_ERROR"))))),
+            obj("data" to emptyMap<String,Any>())
+        )
+        for(failure in failures) {
+            var calls=0
+            val generator=Generator(emptyList(),zones(),{ query ->
+                if(++calls==1) failure else {
+                    val target=Point(query.field("variables").field("destinationLat").number()!!,
+                        query.field("variables").field("destinationLon").number()!!)
+                    response(28.0,points=listOf(start,target))
+                }
+            },{now},{destinations})
+            assertEquals("success",generator.generate(parseRequest(input()))["status"].text())
+            assertEquals(2,calls)
+        }
+        var calls=0
+        val unavailable=Generator(emptyList(),zones(),{ calls++;failures.first() },{now},{destinations})
+        try { unavailable.generate(parseRequest(input())); fail("Provider failure was hidden as no trip") }
+        catch(_: ProviderError) { }
+        assertEquals(2,calls)
+    }
+
+    @Test fun systemicGraphqlErrorsStopImmediately()=runBlocking {
+        for(error in listOf(
+            obj("message" to "Invalid schema", "extensions" to obj("code" to "GRAPHQL_VALIDATION_FAILED")),
+            obj("message" to "Cannot query field planConnection on type Query")
+        )) {
+            var calls=0
+            val generator=Generator(emptyList(),zones(),{ calls++;obj("errors" to listOf(error)) },{now},
+                {listOf(end,Point(45.52,-73.6))})
+            try { generator.generate(parseRequest(input())); fail("Systemic query error accepted") }
+            catch(_: ProviderError) { }
+            assertEquals(1,calls)
+        }
+    }
+
+    @Test fun responseFailureBudgetPreservesBestAndIncludesTransportErrors()=runBlocking {
+        var calls=0
+        val destinations=listOf(end,Point(45.52,-73.6),Point(45.53,-73.6),Point(45.54,-73.6))
+        val generator=Generator(emptyList(),zones(),{
+            when(++calls) {
+                1 -> response()
+                2 -> throw java.io.IOException("upstream unavailable")
+                else -> obj("errors" to listOf(obj("message" to "Temporary failure")))
+            }
+        },{now},{destinations})
+        assertEquals("success",generator.generate(parseRequest(input()))["status"].text())
+        assertEquals(3,calls)
+    }
+
+    @Test fun aBadCandidateAfterSuccessDoesNotPreventABetterMatch()=runBlocking {
+        var calls=0
+        val generator=Generator(emptyList(),zones(),{ query ->
+            if(++calls==2) obj("errors" to listOf(obj("message" to "Temporary candidate failure"))) else {
+                val target=Point(query.field("variables").field("destinationLat").number()!!,
+                    query.field("variables").field("destinationLon").number()!!)
+                response(if(calls==1) 10.0 else 28.0,points=listOf(start,target))
+            }
+        },{now},{listOf(end,Point(45.52,-73.6),Point(45.53,-73.6))})
+        val result=generator.generate(parseRequest(input()))
+        assertEquals("success",result["status"].text())
+        assertEquals(1740.0,result["elapsedSeconds"].number()!!,0.0)
+        assertEquals(3,calls)
+    }
+
+    @Test fun apiLogsSanitizedFailureWithCorrelationIdAndDoesNotLogCancellation()=runBlocking {
+        val entries=mutableListOf<Pair<String,Throwable>>()
+        val api=Api(generator { response() },authorize={
+            throw NullPointerException("Bearer private-token precise-origin").apply {
+                initCause(IllegalStateException("secret upstream payload"))
+            }
+        },logFailure={ id,error -> entries+=id to error })
+        val result=api.handle("application/json","Bearer private-token") { input().toString() }
+        assertEquals(503,result.first)
+        assertEquals(entries.single().first,result.second["requestId"].text())
+        val trace=entries.single().second.stackTraceToString()
+        assertTrue(trace.contains("NullPointerException"))
+        assertTrue(trace.contains("IllegalStateException"))
+        assertTrue(trace.contains("GenerationTest"))
+        assertFalse(trace.contains("private-token"))
+        assertFalse(trace.contains("precise-origin"))
+        assertFalse(trace.contains("secret upstream payload"))
+        assertFalse(result.second.toString().contains("private-token"))
+        val cancelled=Api(generator { throw CancellationException("cancelled") },logFailure={ id,error -> entries+=id to error })
+        try { cancelled.handle("application/json",null) { input().toString() }; fail("Cancellation swallowed") }
+        catch(_: CancellationException) { }
+        assertEquals(1,entries.size)
+    }
+
 }

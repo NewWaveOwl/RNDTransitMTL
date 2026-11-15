@@ -22,6 +22,9 @@ import java.io.ByteArrayOutputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.net.URI
+import java.util.concurrent.atomic.AtomicLong
+import java.util.logging.Level
+import java.util.logging.Logger
 
 private const val fareSource="https://donnees.artm.quebec/catalogue/dataset/9b19ddd0-f10d-45b9-9cee-8896bacc012d/resource/88c53302-58f7-4d35-9231-dc3d48dce008/download/zone_tarifaire_2026.geojson"
 internal class Upstream : AutoCloseable {
@@ -48,8 +51,28 @@ internal suspend fun loadZones(path: Path, upstream: Upstream): FareZones {
     withContext(Dispatchers.IO) { path.toAbsolutePath().parent?.let { Files.createDirectories(it) }; Files.writeString(path,text) }
     return zones
 }
-/** HTTP boundary is separate from generation so policy tests need no server sockets. */
-internal class Api(private val generator: Generator, private val authorize: suspend (String?)->Boolean = { true }) {
+private val requestSequence = AtomicLong()
+private val failureLogger = Logger.getLogger("transit.generation")
+
+/** Retains exception types and source frames, never messages that may contain tokens or request data.
+ * @param error Failure whose message and suppressed exceptions must not reach the log.
+ * @param depth Bounds cause traversal, including cyclic exception chains.
+ */
+internal fun sanitizedFailure(error: Throwable, depth: Int = 0): Throwable =
+    IllegalStateException(error.javaClass.name).apply {
+        stackTrace = error.stackTrace
+        if (depth < 3) error.cause?.takeIf { it !== error }?.let {
+            initCause(sanitizedFailure(it, depth + 1))
+        }
+    }
+
+/** HTTP boundary is separate from generation so policy tests need no server sockets.
+ * @param logFailure Receives a correlation ID and sanitized exception with source frames.
+ */
+internal class Api(private val generator: Generator, private val authorize: suspend (String?)->Boolean = { true },
+    private val logFailure: (String, Throwable)->Unit = { id, error ->
+        failureLogger.log(Level.WARNING, "Trip generation failed; requestId=$id", error)
+    }) {
     private val capacity=Semaphore(4)
     suspend fun handle(contentType: String?, authorization: String?, read: suspend ()->String): Pair<Int,JsonObject> {
         if(!capacity.tryAcquire()) return 429 to obj("status" to "unavailable","message" to "Trip planner is busy. Try again.")
@@ -64,7 +87,11 @@ internal class Api(private val generator: Generator, private val authorize: susp
         } catch(e: TimeoutCancellationException) { currentCoroutineContext().ensureActive(); return 503 to obj("status" to "unavailable","message" to "Request timed out.") }
         catch(e: CancellationException) { throw e }
         catch(e: InputError) { return 400 to obj("status" to "invalid_input","message" to e.message) }
-        catch(e: Exception) { return 503 to obj("status" to "unavailable","message" to "Routing service unavailable. Try again.") }
+        catch(e: Exception) {
+            val id = "generation-${requestSequence.incrementAndGet()}"
+            logFailure(id, sanitizedFailure(e))
+            return 503 to obj("status" to "unavailable","message" to "Routing service unavailable. Try again.","requestId" to id)
+        }
         finally { capacity.release() }
     }
 }
@@ -112,13 +139,13 @@ fun main() {
             zones to response.field("data").field("routes").items()
         }
         val generator=Generator(routes,zones,{ body -> upstream.json(endpoint,body) })
-        val api=Api(generator) { token ->
+        val api=Api(generator, authorize = { token ->
             if(!authenticated) true else if(token?.startsWith("Bearer ")!=true) false else {
                 val response=withTimeout(5000) { upstream.request(URI(supabase).resolve("/auth/v1/user").toString(),headers=mapOf("Authorization" to token,"apikey" to key!!)) }
                 if(response.status.value>=500) throw ProviderError("Authentication service unavailable.")
                 response.status.isSuccess()
             }
-        }
+        })
         println("Trip generation ready at http://$host:$port (Kotlin/Ktor; random geographic destinations).")
         embeddedServer(CIO,port=port,host=host) { generationRoutes(api) }.start(wait=true)
     }

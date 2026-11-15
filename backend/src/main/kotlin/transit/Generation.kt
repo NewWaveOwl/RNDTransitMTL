@@ -114,6 +114,21 @@ internal fun destinationCandidates(input: Request, routes: List<JsonElement>, zo
 
 internal fun searchBudgetSeconds(minutes: Int): Long = 20L + minutes / 60
 
+/** Query/schema/authentication failures affect all destinations and must not be retried per candidate.
+ * @param body OTP GraphQL response, inspected without logging provider messages.
+ */
+internal fun systemicOtpError(body: JsonObject): Boolean = body["errors"].items().any { error ->
+    val code = error.field("extensions").field("code").text()
+    val message = error.field("message").text().orEmpty()
+    code in setOf("GRAPHQL_VALIDATION_FAILED", "GRAPHQL_PARSE_FAILED", "UNAUTHENTICATED", "FORBIDDEN") ||
+        message.startsWith("Validation error", ignoreCase = true) ||
+        message.startsWith("Syntax Error", ignoreCase = true) ||
+        message.startsWith("Cannot query field", ignoreCase = true) ||
+        message.startsWith("Unknown argument", ignoreCase = true) ||
+        message.startsWith("Unknown type", ignoreCase = true) ||
+        (message.startsWith("Variable ") && ("was not provided" in message || "got invalid value" in message))
+}
+
 /** Bounded on-demand search; timeouts and cancellation propagate through the HTTP client. */
 internal class Generator(private val routes: List<JsonElement>, private val zones: FareZones,
     private val route: suspend (JsonObject)->JsonObject, private val now: ()->Instant = Instant::now,
@@ -142,8 +157,13 @@ internal class Generator(private val routes: List<JsonElement>, private val zone
                 val plan=body.field("data").field("planConnection")
                 val noRoute=setOf("LOCATION_NOT_FOUND","NO_DIRECT_MODE_CONNECTION","NO_STOPS_IN_RANGE","NO_TRANSIT_CONNECTION","NO_TRANSIT_CONNECTION_IN_SEARCH_WINDOW","OUTSIDE_SERVICE_PERIOD","WALKING_BETTER_THAN_TRANSIT","OUTSIDE_BOUNDS")
                 if(body["errors"].items().isNotEmpty() || plan.field("edges") !is JsonArray || plan.field("routingErrors").items().any { it.field("code").text() !in noRoute }) {
-                    if(best!=null) break
-                    throw ProviderError("OTP returned an invalid planning response.")
+                    // A malformed candidate response does not invalidate other destinations.
+                    // Share the existing failure budget with transport errors to bound retries.
+                    if(systemicOtpError(body) || ++failures>=2) {
+                        if(best!=null) break
+                        throw ProviderError("OTP returned an invalid planning response.")
+                    }
+                    continue
                 }
                 for(edge in plan.field("edges").items()) {
                     val itinerary=edge.field("node") ?: continue

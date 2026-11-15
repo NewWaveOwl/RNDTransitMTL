@@ -74,7 +74,7 @@ internal class BackendTripGenerator(
             require(input.selectedTransportIds.distinct().size == input.selectedTransportIds.size)
             require(input.walkingPreference in listOf("Amble", "Walk", "Dash")) { "Choose Amble, Walk or Dash." }
             require(input.selectedTransportIds.all { id -> OtpMode.entries.any { it.id == id } }) {
-                "Choose walking, cycling, STM bus/mГ©tro or exo train. REM routing is not available yet."
+                "Choose walking, cycling, STM bus/métro or exo train. REM routing is not available yet."
             }
             require(input.selectedTransportIds.all { id -> transportTypes.any { it.id == id } })
             Trip.validateTransportZones(

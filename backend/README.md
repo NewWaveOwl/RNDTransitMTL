@@ -206,6 +206,19 @@ Backend and launcher tests run independently of Android. Use the
 realtime fallback fixtures and recorded environment limitations. Live routing,
 feed access and remote phone connectivity require the configured server and graph.
 
+Recoverable malformed OTP candidate responses share the two-failure budget with
+transport errors. Query/schema/authentication errors stop immediately; an accepted
+best route is retained. Invalid destinations with normal no-route codes still
+continue within the overall search deadline and attempt limit.
+
+Unexpected API failures return a generic 503 with a `requestId`. The backend writes
+that ID, exception types and source stack frames to its standard error log (the
+Windows launcher captures this in the Ktor service log). Exception messages,
+request bodies and auth tokens are deliberately omitted. Cancellation is propagated.
+
+Cloud trip saving also requires the [Supabase migrations](../supabase/README.md)
+on the app's database; a working routing server alone does not verify persistence.
+
 ## Hosting
 
 Use the [Windows server launcher](launcher/README.md) to run and supervise Ktor,
