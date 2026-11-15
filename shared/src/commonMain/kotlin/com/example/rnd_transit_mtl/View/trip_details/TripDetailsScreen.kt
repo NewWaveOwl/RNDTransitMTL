@@ -114,6 +114,7 @@ fun TripDetailsScreen(
             scope.launch {
                 try {
                     if (tryCloudAction {
+                        cloud.flushFinalTrip(tripId)
                         cloud.mutate {
                             if (edit) {
                                 check(updateTrip(tripId, title, description)) { "Trip unavailable." }

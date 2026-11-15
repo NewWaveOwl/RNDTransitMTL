@@ -24,7 +24,7 @@ class TripScreensV3Test {
         val scene = ImageComposeScene(412, 720) {
             RNDTransitTheme {
                 when (mode) {
-                    0 -> CompleteV3(trip, { events += "review" }, { events += "skip" }, {})
+                    0 -> CompleteV3(trip, { events += "review" }, { events += "skip" }, {}, syncPending = true)
                     1 -> ReviewV3(trip.title, trip.id.value.takeLast(3), rating, "", { rating = it }, {},
                         { events += "save" }, {}, {}, {}, feedbackEnabled = false)
                     2 -> FeedbackV3(trip.id.value.takeLast(3), "Sample leg", "Preview fixture only", choice,

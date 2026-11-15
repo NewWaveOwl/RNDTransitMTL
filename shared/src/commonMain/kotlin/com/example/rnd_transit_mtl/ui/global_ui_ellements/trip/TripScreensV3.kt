@@ -200,7 +200,8 @@ fun CompleteV3(
     onPlanAnother: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    errorMessage: String? = null
+    errorMessage: String? = null,
+    syncPending: Boolean = false
 ) {
     V3Page(modifier) {
         Column(
@@ -226,7 +227,11 @@ fun CompleteV3(
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold
             )
-            Text("Trip saved as Completed", color = TransitWhite)
+            Text(
+                if (syncPending) "Trip completed. Saved on this device; cloud sync pending."
+                else "Trip saved as Completed",
+                color = TransitWhite
+            )
         }
 
         Column(
