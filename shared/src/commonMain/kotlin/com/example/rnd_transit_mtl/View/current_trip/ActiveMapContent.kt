@@ -9,6 +9,7 @@ import com.example.rnd_transit_mtl.data.assets.toSampleMapPoint
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -34,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.rnd_transit_mtl.model.trip.Trip
+import com.example.rnd_transit_mtl.model.trip.guidanceAt
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.MockTripMap
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.toSampleMapLegs
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.transitions.tripPanelEntrance
@@ -61,18 +63,21 @@ private val ActiveMapRecenterSize = 48.dp
 private val ActiveMapInstructionIconSize = 32.dp
 private val ActiveMapWarningIconSize = 26.dp
 private val ActiveMapWarningMinimumHeight = 88.dp
+private val ActiveMapLegIndicatorSize = 12.dp
 
 /**
- * Supply instructions from routing data.
- * Leave null when using the current mock generator.
+ * Optional presentation override for provider or preview instructions.
+ * With no override, the panel derives guidance from the saved trip legs.
  * @param title Routing instruction heading.
  * @param detail Routing instruction details.
  * @param showLeftTurnIcon Whether to use the exported instruction icon.
+ * @param nextAction Upcoming manoeuvre or section transition, when supplied.
  */
 data class ActiveMapInstruction(
     val title: String,
     val detail: String,
-    val showLeftTurnIcon: Boolean = false
+    val showLeftTurnIcon: Boolean = false,
+    val nextAction: String? = null
 )
 
 /** Explicit location availability; sample progress is not a GPS reading. */
@@ -135,6 +140,14 @@ fun ActiveMapContent(
             retainedMapProgress = fraction
         }
     }
+
+    val guidance = trip.guidanceAt(retainedMapProgress)
+    val currentInstruction = instruction ?: ActiveMapInstruction(
+        title = guidance.section,
+        detail = guidance.currentAction,
+        showLeftTurnIcon = guidance.nextIsLeftTurn,
+        nextAction = guidance.nextAction
+    )
 
     var confirmingFinish by rememberSaveable(trip.id) {
         mutableStateOf(false)
@@ -218,7 +231,12 @@ fun ActiveMapContent(
                                 .padding(horizontal = ActiveMapHorizontalPadding, vertical = ActiveMapPanelPadding),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            if (instruction?.showLeftTurnIcon == true) {
+                            Box(
+                                Modifier.padding(top = 6.dp).size(ActiveMapLegIndicatorSize)
+                                    .background(tripLegColor(guidance.legIndex), RoundedCornerShape(50))
+                                    .border(1.dp, TransitWhite, RoundedCornerShape(50))
+                            )
+                            if (currentInstruction.showLeftTurnIcon) {
                                 Image(
                                     painterResource(Res.drawable.rnd_turn_left),
                                     contentDescription = null,
@@ -231,18 +249,24 @@ fun ActiveMapContent(
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 Text(
-                                    instruction?.title ?: "Current section",
+                                    currentInstruction.title,
                                     color = TransitWhite,
                                     fontSize = 19.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    instruction?.detail
-                                        ?: trip.selectedRoutes.firstOrNull()?.label
-                                        ?: "Following the sample route",
+                                    "Now: ${currentInstruction.detail}",
                                     color = TransitWhite,
                                     fontSize = 13.sp
                                 )
+                                currentInstruction.nextAction?.let { next ->
+                                    Text(
+                                        "Next: $next",
+                                        color = TransitWhite,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
                             }
                         }
                     }

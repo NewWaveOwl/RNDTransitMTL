@@ -71,7 +71,7 @@ import org.jetbrains.compose.resources.painterResource
 import rnd_transit_mtl.shared.generated.resources.Res
 import rnd_transit_mtl.shared.generated.resources.map_sample
 
-// Layout settings — widths/padding in dp; fractions and reference coordinates keep the sheet responsive.
+// Layout settings вЂ” widths/padding in dp; fractions and reference coordinates keep the sheet responsive.
 private val PlannerSheetMaxWidth = 620.dp
 private val PlannerGoBoxHorizontalPadding = 24.dp
 private val PlannerOriginFieldHorizontalPadding = 16.dp
@@ -93,7 +93,7 @@ private val PlannerGoMainGap = 24f
 private val PlannerGoRoutesGap = 7f
 private val PlannerGoPreferencesGap = 12f
 
-// Animation settings — larger millisecond values make snapping and handle taps slower.
+// Animation settings вЂ” larger millisecond values make snapping and handle taps slower.
 private const val PLANNER_SHEET_ANIMATION_DURATION_MILLIS = 300
 private const val PLANNER_ORIGIN_FIELD_ANIMATION_DURATION_MILLIS = 300
 // GO exit timing is shared with navigation/footer transitions: edit ui/global_ui_ellements/transitions/TripTransition.kt.
@@ -168,9 +168,7 @@ internal fun MainPlannerContent(
     onEditOrigin: () -> Unit = {},
     liveOrigin: Place? = null,
     originIsManual: Boolean = true,
-    originStatus: String? = null,
-    onLoadStmTrip: (() -> Unit)? = null,
-    onLoadExoTrip: (() -> Unit)? = null
+    originStatus: String? = null
 ) {
     val liveLocation = LocalPlannerLocation.current
     // Expansion is presentation state, separate from transport and zone selections.
@@ -516,22 +514,6 @@ internal fun MainPlannerContent(
                 }
 
                 LazyColumn(Modifier.fillMaxWidth().weight(1f), state = list, userScrollEnabled = enabled) {
-                    if (onLoadStmTrip != null) {
-                        item {
-                            androidx.compose.material3.Button(
-                                onClick = onLoadStmTrip,
-                                modifier = Modifier.padding(horizontal = 16.dp)
-                            ) { Text("Load STM test trip") }
-                        }
-                    }
-                    if (onLoadExoTrip != null) {
-                        item {
-                            androidx.compose.material3.Button(
-                                onClick = onLoadExoTrip,
-                                modifier = Modifier.padding(horizontal = 16.dp)
-                            ) { Text("Load STM + exo test trip") }
-                        }
-                    }
                     val summary = activeTripSummary ?: pendingReviewSummary
                     if (summary != null || validationMessage.isNotEmpty()) {
                         item(key = "feedback") {

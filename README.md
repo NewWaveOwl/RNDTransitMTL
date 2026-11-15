@@ -1,109 +1,69 @@
 # RNDTransitMTL
 
-## Goal
+RNDTransitMTL is a discovery app for Greater Montreal. Choose how much time you
+have, how you want to travel, and where to start. The app finds a route to a
+surprise destination so you can explore without planning the destination first.
 
-RNDTransitMTL is a Kotlin Multiplatform discovery app for Greater Montréal. Its goal is to generate semi-random adventures based on the user's available time, transportation choices, and interests, helping them explore unfamiliar places without choosing a destination first.
+Built with Kotlin Multiplatform, the current Android prototype combines a map-based
+planner, real walking/cycling and transit routes, account sign-in, trip reviews,
+and History.
 
-The current prototype includes a nickname introduction, a map-based trip planner, simulated trips, reviews with optional image links, and History with review editing and trip details. Profile, About, and Settings remain available. See the [main design document](docs/MainDesignDoc.md) for the planned features and [team practices](docs/TeamPractices.md) for the team's working agreements.
+## What you can do
 
-## Trip and review flow
+- Choose your starting point on the map or use your device location.
+- Set your available time, walking pace, transport choices and transit zones.
+- Preview a real route before starting, or generate another destination from the
+  same origin.
+- Follow coloured trip sections with the current section and next action displayed.
+- Rate completed trips, add comments or image links, and revisit or edit reviews
+  in History.
 
-1. Enter a nickname for the current session.
-2. Use GO to choose your time, transportation, and attraction intensity, then generate a trip. You can resume an active trip after navigating away.
-3. Follow the simulated route on the sample map. The trip information popup shows its details; the map supports pan and zoom.
-4. At completion, tap the 100% progress bar to open the review. Give an overall rating, optionally answer the other questions, add a comment or an HTTPS image link, then save or skip.
-5. Open History to filter completed trips, expand saved feedback, view details, edit a review, or remove a trip. Review photos load when saved feedback is displayed, with retry and browser fallback controls.
+## Plan an adventure
 
-The regular GO flow simulates trips using built-in sample routes and runs without a routing backend. Trips and review drafts support saved-state restoration, but there is no permanent database. A fresh session without restored state starts with empty History. The nickname stays only in process memory.
+1. Sign in, confirm a starting point and choose your trip preferences.
+2. Press **GO**. The app searches for a reachable route close to your available
+   time without exceeding it. Selected transport modes are allowed alternatives;
+   walking connections are available for transit.
+3. Review the proposal. **Generate another** keeps your starting point and looks
+   for another destination; **Start Trip** keeps the route you accepted.
+4. At completion, tap the progress bar to review your trip, then find it in History.
 
-This flow is imported from [Artiom's Assignment 3 repository](https://github.com/NewWaveOwl/As3_APPDEV2_RND_Tranzit_Sova/tree/8b1b538), including its shared state, navigation, resources, previews, and regression tests. The destination's design documents and earlier screenshots remain historical planning material.
+## Android availability
 
-## Quick-start
+APK distribution is planned. For now, developers can build and install the Android
+app from source using the [Android development guide](docs/AndroidDevelopment.md).
+APK download and installation details will be added here when a release is published.
 
-### Requirements
+The current app requires Android 7.0 / API 24 or newer and internet access for
+sign-in, maps and trip generation. Remote trip generation requires a running
+configured server and a signed-in account. Guest mode is available for local
+development; it cannot access the authenticated public generation service.
 
-- Android Studio with support for the project's Android Gradle Plugin version, listed in `gradle/libs.versions.toml`.
-- JDK 21 selected as the Gradle JDK.
-- Android SDK Platform 37 and Android SDK Platform-Tools.
-- An Android emulator or device running Android 7.0 / API 24 or newer.
-- Internet access for the first dependency download.
+## Current prototype limits
 
-### Get the source
+Trip progress is **simulated**; this is not live GPS navigation. Route timing and
+realtime estimates can change after a trip is generated. Available transit routes
+depend on the server's imported schedules and configured feeds.
 
-```powershell
-git clone https://github.com/NewWaveOwl/RNDTransitMTL.git
-cd RNDTransitMTL
-```
+Attraction preferences are saved but do not yet rank destinations. Trips and review
+drafts support saved-state restoration; permanent trip storage is not implemented
+by the current flow. Desktop and Web previews use sample trips unless connected to
+a generation service.
 
-Open this repository folder in Android Studio, let Gradle sync, and install any requested SDK components. Use the included Gradle wrapper; a separate Gradle installation is not required.
+## Project documentation
 
-### Build and launch Android
+- [Android development, APK builds and client tests](docs/AndroidDevelopment.md)
+- [Backend setup, server updates and hosting](backend/README.md)
+- [Routing rules and generation verification](backend/TripGeneration.md)
+- [Trip playback and guidance checks](docs/RunTripSimulation.md)
+- [Design document and planned features](docs/MainDesignDoc.md)
+- [Team practices](docs/TeamPractices.md)
 
-Select the `androidApp` run configuration and an emulator or connected device, then click **Run**. This builds and installs the debug version from source.
+The trip/review flow originated in
+[Artiom's Assignment 3 repository](https://github.com/NewWaveOwl/As3_APPDEV2_RND_Tranzit_Sova/tree/8b1b538)
+and has since been integrated with the real-route backend.
 
-Alternatively, from the repository root in PowerShell, with a device or emulator connected:
-
-```powershell
-.\gradlew.bat :androidApp:installDebug
-adb shell am start -n com.example.rnd_transit_mtl/.MainActivity
-```
-
-For a physical device, enable USB debugging. If `adb` is not on your PATH, run it from your Android SDK's `platform-tools` folder.
-
-### Run the STM test trip on Windows
-
-Start an Android emulator, then run this from the repository root in PowerShell:
-
-```powershell
-.\tool\otp\stm-scheduled\Run-StmTestTrip.ps1 -Emulator
-```
-
-The first run downloads any missing routing dependencies and builds a Montréal graph. The script starts OpenTripPlanner, checks that the scheduled STM sample returns a bus route with geometry, and installs and opens the debug app. It requires no STM API key.
-
-In the app, open **Map**, expand the planner, and tap **Load STM test trip**. Tap **Start Trip** in the preview to run the simulation.
-
-Use `-Phone` for an authorized USB device, or omit the device flag to run just the backend check. See the [routing simulation guide](docs/RunTripSimulation.md) for timetable refresh, troubleshooting, and the STM realtime and exo setup.
-
-### Build and launch a release
-
-Build the release variant from source:
-
-```powershell
-.\gradlew.bat :androidApp:assembleRelease
-```
-
-The output is in `androidApp/build/outputs/apk/release/`. The project currently has no release signing configuration, so this command produces an unsigned APK.
-
-To create an installable release, use Android Studio's **Build → Generate Signed Bundle / APK**, choose **APK** and the `androidApp` module, create or select a signing key, and choose the **release** variant. Install the resulting signed APK on your device, then launch RNDTransitMTL from the app launcher. You can also install and launch it using:
-
-```powershell
-adb install -r "PATH_TO_SIGNED_RELEASE_APK"
-adb shell am start -n com.example.rnd_transit_mtl/.MainActivity
-```
-
-Replace `PATH_TO_SIGNED_RELEASE_APK` with the actual signed APK path. When switching from a debug build to a release signed with a different key, uninstall the debug app first; uninstalling removes its local app data.
-
-### Other platforms
-
-From the repository root:
-
-- Desktop: `.\gradlew.bat :desktopApp:run`
-- Web with Wasm: `.\gradlew.bat :webApp:wasmJsBrowserDevelopmentRun`
-- Web with JavaScript: `.\gradlew.bat :webApp:jsBrowserDevelopmentRun`
-- iOS: on macOS, open `iosApp/iosApp.xcodeproj` in Xcode, select a simulator or device, and run the app.
-
-On macOS or Linux, use `./gradlew` in place of `.\gradlew.bat`.
-
-### Regression tests and compilation checks
-
-```powershell
-.\gradlew.bat :shared:jvmTest :shared:testAndroidHostTest
-.\gradlew.bat :androidApp:assembleDebug :shared:compileKotlinJs :shared:compileKotlinWasmJs
-```
-
-The imported tests cover trip generation and completion, review state, navigation and Back behavior, History presentation, simulation, and map geometry. iOS compilation requires macOS and Xcode.
-
-## Screenshots of application
+## Earlier milestone screenshots
 
 ### Main map and trip controls
 

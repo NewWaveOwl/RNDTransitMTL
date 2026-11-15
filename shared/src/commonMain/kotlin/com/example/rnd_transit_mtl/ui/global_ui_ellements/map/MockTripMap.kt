@@ -44,7 +44,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.rnd_transit_mtl.model.trip.TripPoint
 import com.example.rnd_transit_mtl.ui.theme.TransitMain
-import com.example.rnd_transit_mtl.ui.theme.TransitOrange
+import com.example.rnd_transit_mtl.ui.theme.tripLegColor
 import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 import org.jetbrains.compose.resources.painterResource
 import rnd_transit_mtl.shared.generated.resources.Res
@@ -228,12 +228,13 @@ fun MockTripMap(
                 val dashes = if (legs[index].isRouted) null else PathEffect.dashPathEffect(
                     floatArrayOf(routeWidth * 1.6f, routeWidth * 1.6f)
                 )
-                drawRouteLine(positions, TransitMain, routeWidth, dashes)
+                drawRouteLine(positions, Color.White, routeWidth * 1.5f, dashes)
+                drawRouteLine(positions, tripLegColor(index), routeWidth, dashes)
                 val travelled = travelledFractions[index]
                 if (travelled > 0f) {
                     drawRouteLine(
                         positionAlongPolyline(positions, travelled).travelled,
-                        TransitOrange, routeWidth * 0.65f, dashes
+                        Color.White.copy(alpha = 0.5f), routeWidth * 0.3f, dashes
                     )
                 }
             }

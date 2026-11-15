@@ -70,7 +70,12 @@ data class TripDto(
     @SerialName("cancelled_at") val cancelledAt: String? = null,
     val review: TripReviewDto? = null,
     @SerialName("zone_ids") val zoneIds: List<String> = emptyList(),
-    @SerialName("zones_by_transport") val zonesByTransport: Map<String, List<String>> = emptyMap()
+    @SerialName("zones_by_transport") val zonesByTransport: Map<String, List<String>> = emptyMap(),
+    @SerialName("routed_duration_seconds") val routedDurationSeconds: Long? = null,
+    @SerialName("waiting_time_seconds") val waitingTimeSeconds: Long? = null,
+    @SerialName("walking_preference") val walkingPreference: String? = null,
+    @SerialName("orientation_buffer_seconds") val orientationBufferSeconds: Long = 0,
+    @SerialName("requested_transport_ids") val requestedTransportIds: List<String>? = null
 )
 
 /** Converts a trip into its backend form. */
@@ -95,6 +100,11 @@ fun Trip.toDto(): TripDto = TripDto(
         TripReviewDto(it.overall, it.quality, it.interesting, it.`fun`, it.comment, it.imageUrl)
     },
     zoneIds = selectedZoneIds.map { it.value },
+    routedDurationSeconds = routedDurationSeconds,
+    waitingTimeSeconds = waitingTimeSeconds,
+    walkingPreference = walkingPreference,
+    orientationBufferSeconds = orientationBufferSeconds,
+    requestedTransportIds = requestedTransportIds?.map { it.value },
     zonesByTransport = selectedZonesByTransport.entries.associate { (mode, zones) ->
         mode.value to zones.map { it.value }
     }
@@ -128,6 +138,11 @@ fun TripDto.toDomainOrNull(): Trip? = runCatchingInvalid {
             TripReview(it.overall, it.quality, it.interesting, it.funRating, it.comment, it.imageUrl)
         },
         selectedZoneIds = zoneIds.map(::ZoneId),
+        routedDurationSeconds = routedDurationSeconds,
+        waitingTimeSeconds = waitingTimeSeconds,
+        walkingPreference = walkingPreference,
+        orientationBufferSeconds = orientationBufferSeconds,
+        requestedTransportIds = requestedTransportIds?.map(::TransportId),
         selectedZonesByTransport = zonesByTransport.entries.associate { (mode, zones) ->
             TransportId(mode) to zones.map(::ZoneId)
         }

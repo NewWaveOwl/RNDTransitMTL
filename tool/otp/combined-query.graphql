@@ -1,5 +1,0 @@
-query {
-  walk: planConnection(origin:{location:{coordinate:{latitude:45.50455,longitude:-73.55610}}},destination:{location:{coordinate:{latitude:45.50905,longitude:-73.55118}}},modes:{directOnly:true,direct:[WALK]},first:1){...Route}
-  bike: planConnection(origin:{location:{coordinate:{latitude:45.50455,longitude:-73.55610}}},destination:{location:{coordinate:{latitude:45.50905,longitude:-73.55118}}},modes:{directOnly:true,direct:[BICYCLE]},first:1){...Route}
-}
-fragment Route on PlanConnection { routingErrors {code description} edges {node {duration legs {mode distance legGeometry {length points}}}} }
