@@ -27,7 +27,11 @@ internal class CloudTrips(
     }
 
     suspend fun details(id: TripId): Trip? = mutex.withLock {
-        repository.getTrip(id).also { if (it != null) store.acceptStoredTrip(it) }
+        if (id in store.state.value.pendingFinalTripIds) {
+            store.findInHistory(id)
+        } else {
+            repository.getTrip(id).also { if (it != null) store.acceptStoredTrip(it) }
+        }
     }
 
     suspend fun flushFinalTrips() = mutex.withLock {

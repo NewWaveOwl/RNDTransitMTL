@@ -12,6 +12,25 @@ import kotlin.test.*
 
 class CloudTripsTest {
     @Test
+    fun pendingTripDetailsStayAvailableAfterFailedSave() = runTest {
+        val trip = unreviewedHistoryPreviewTrip
+        val store = TripsStore()
+        store.restorePendingFinalTrips(listOf(trip))
+        val repository = RecordingRepository().apply { failSave = true }
+        val cloud = CloudTrips(repository, store)
+
+        assertFailsWith<IllegalStateException> { cloud.flushFinalTrips() }
+        assertEquals(trip, cloud.details(trip.id))
+        assertTrue(trip.id in store.state.value.pendingFinalTripIds)
+
+        repository.failSave = false
+        cloud.flushFinalTrip(trip.id)
+        assertFalse(trip.id in store.state.value.pendingFinalTripIds)
+        assertEquals(trip, cloud.history().single())
+        assertEquals(1, cloud.revision)
+    }
+
+    @Test
     fun reviewParentIsSavedOnceWithoutFlushingUnrelatedTrips() = runTest {
         val trip = unreviewedHistoryPreviewTrip
         val other = trip.copy(id = TripId("other-pending-trip"))

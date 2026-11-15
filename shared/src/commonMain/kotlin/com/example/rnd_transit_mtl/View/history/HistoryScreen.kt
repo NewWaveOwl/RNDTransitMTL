@@ -85,10 +85,17 @@ fun HistoryScreen(
     val filter = TripHistoryFilter.entries.firstOrNull { it.name == filterName } ?: TripHistoryFilter.ALL
 
     // History lists completed trips and cancelled trips the user chose to keep.
+    val snapshot by tripsStore.state
+    val localRecords = snapshot.completedTrips + snapshot.cancelledTrips
     val historyRecords = if (cloud != null) {
-        cloudRecords.filterNot { it.id in tripsStore.state.value.pendingFinalTripIds }
+        // Pending records remain visible offline. Keep acknowledged local records
+        // visible until History has fetched the corresponding cloud revision.
+        val localVisible = localRecords.filter {
+            it.id in snapshot.pendingFinalTripIds || loadedRevision != cloud.revision
+        }
+        (localVisible + cloudRecords).distinctBy { it.id }
     } else {
-        tripsStore.completedTrips + tripsStore.cancelledTrips
+        localRecords
     }
     val pendingRemovalTrip = historyRecords.firstOrNull {
         it.id == pendingRemovalId
@@ -159,6 +166,7 @@ fun HistoryScreen(
             scope.launch {
                 try {
                     if (tryCloudAction {
+                        cloud.flushFinalTrip(tripId)
                         cloud.mutate {
                             deleteTrip(tripId)
                             tripsStore.removeFromHistory(tripId)
