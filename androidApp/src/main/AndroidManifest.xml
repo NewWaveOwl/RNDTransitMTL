@@ -14,6 +14,9 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        <meta-data
+            android:name="com.example.rnd_transit_mtl.GENERATION_ENDPOINT"
+            android:value="${generationEndpoint}" />
 
         <activity
             android:exported="true"
