@@ -5,6 +5,7 @@ import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMapData
 import com.example.rnd_transit_mtl.data.assets.toSampleMapPoint
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
@@ -31,7 +32,10 @@ import com.example.rnd_transit_mtl.View.main.components.TripSearchBar
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -239,31 +243,7 @@ internal fun TripProposalContent(
     scheduled: Boolean = false,
     onRename: ((String) -> Unit)? = null
 ) {
-    var editingName by rememberSaveable(trip.id.value) { mutableStateOf(false) }
     var nameDraft by rememberSaveable(trip.id.value) { mutableStateOf(trip.title) }
-    if (editingName) {
-        AlertDialog(
-            onDismissRequest = { editingName = false },
-            title = { Text("Trip name") },
-            text = {
-                OutlinedTextField(
-                    value = nameDraft,
-                    onValueChange = { nameDraft = it },
-                    label = { Text("Name") },
-                    singleLine = true
-                )
-            },
-            confirmButton = {
-                TextButton(enabled = nameDraft.isNotBlank(), onClick = {
-                    onRename?.invoke(nameDraft.trim())
-                    editingName = false
-                }) { Text("Save") }
-            },
-            dismissButton = {
-                TextButton(onClick = { editingName = false }) { Text("Cancel") }
-            }
-        )
-    }
     val nowMillis by produceState(initialValue = Clock.System.now().toEpochMilliseconds(), key1 = trip.id) {
         if (trip.legs.none { it.transitTiming != null }) return@produceState
         while (true) {
@@ -313,16 +293,9 @@ internal fun TripProposalContent(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             TripLabelValueField(
-                label = "Trip name",
-                value = trip.title,
-                modifier = Modifier.clickable(
-                    enabled = onRename != null,
-                    role = Role.Button,
-                    onClickLabel = "Edit trip name"
-                ) {
-                    nameDraft = trip.title
-                    editingName = true
-                }
+                label = "Starting point",
+                value = trip.origin.label,
+                showLocationIcon = true
             )
             Surface(
                 shape = RoundedCornerShape(16.dp),
@@ -367,6 +340,24 @@ internal fun TripProposalContent(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                BasicTextField(
+                    value = nameDraft,
+                    onValueChange = { name ->
+                        nameDraft = name
+                        if (name.isNotBlank()) onRename?.invoke(name.trim())
+                    },
+                    readOnly = onRename == null,
+                    singleLine = true,
+                    textStyle = TextStyle(
+                        color = TransitWhite,
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    cursorBrush = SolidColor(TransitWhite),
+                    modifier = Modifier.fillMaxWidth()
+                        .semantics { contentDescription = "Trip name" }
+                        .onFocusChanged { if (!it.isFocused && nameDraft.isBlank()) nameDraft = trip.title }
+                )
                 val distanceTenths = (trip.distanceKm * 10).roundToInt()
                 val distance = "${distanceTenths / 10},${distanceTenths % 10}"
                 val timedLegs = trip.legs.filter { it.transitTiming != null }
@@ -386,6 +377,11 @@ internal fun TripProposalContent(
                     color = TransitWhite,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = trip.selectedTransports.joinToString(" + ") { it.label },
+                    color = TransitWhite,
+                    fontSize = 15.sp
                 )
 
                 if (timedLegs.size > 1) ProposalButton("Start Trip", true, onStart)

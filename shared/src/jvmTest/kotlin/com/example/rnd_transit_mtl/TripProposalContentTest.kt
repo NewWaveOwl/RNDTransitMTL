@@ -72,16 +72,14 @@ class TripProposalContentTest {
                 .map { it.text }
             assertFalse(reviewedHistoryPreviewTrip.description in texts)
             assertFalse("Trip destination" in texts)
-            assertEquals(1, texts.count { it == proposal.title })
-            click(proposal.title)
-            render("Trip-proposal-rename.png")
+            assertEquals(1, texts.count { it == "Starting point" })
+            assertEquals(1, texts.count { it == proposal.selectedTransports.joinToString(" + ") { mode -> mode.label } })
             val editor = scene.semanticsOwners.flatMap { all(it.rootSemanticsNode) }.first {
                 it.config.getOrNull(SemanticsActions.SetText) != null
             }
+            assertEquals(proposal.title, editor.config[SemanticsProperties.EditableText].text)
             editor.config[SemanticsActions.SetText].action?.invoke(AnnotatedString("  Evening walk  "))
             render("Trip-proposal-name-draft.png")
-            click("Save")
-            render("Trip-proposal-renamed.png")
             assertEquals("Evening walk", proposal.title)
             click("Generate another")
             click("Edit settings")
