@@ -12,6 +12,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
@@ -65,6 +66,12 @@ sealed class ScreenKey : NavKey {
 @SerialName("com.example.rnd_transit_mtl.MainScreenKey")
 data object MainScreenKey : ScreenKey() {
     override val screenTitle = "Home"
+}
+
+@Serializable
+@SerialName("com.example.rnd_transit_mtl.CompassScreenKey")
+data object CompassScreenKey : ScreenKey() {
+    override val screenTitle = "Compass"
 }
 
 @Serializable
@@ -162,6 +169,7 @@ val backStackConfig = SavedStateConfiguration {
     serializersModule = SerializersModule {
         polymorphic(NavKey::class) {
             subclass(MainScreenKey::class, MainScreenKey.serializer())
+            subclass(CompassScreenKey::class, CompassScreenKey.serializer())
             subclass(ProfileScreenKey::class, ProfileScreenKey.serializer())
             subclass(AuthScreenKey::class, AuthScreenKey.serializer())
             subclass(AboutScreenKey::class, AboutScreenKey.serializer())
@@ -367,6 +375,18 @@ private fun DestinationDisplay(
                         navigation.finishReview(key)
                     },
                     registerBackHandler = registerBack
+                )
+            }
+
+            entry<CompassScreenKey> {
+                val trips by com.example.rnd_transit_mtl.state.trip.LocalTripsStore.current.state
+                com.example.rnd_transit_mtl.View.compass.CompassScreen(
+                    activeTrip = trips.activeTrip?.trip,
+                    onOpenMap = {
+                        val active = trips.activeTrip?.trip
+                        if (active != null) navigation.openCurrentTrip(active)
+                        else navigation.returnToPlanner()
+                    }
                 )
             }
 
