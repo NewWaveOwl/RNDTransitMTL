@@ -17,7 +17,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.foundation.layout.Column
 import com.example.rnd_transit_mtl.data.trips.LocalCloudTrips
 import com.example.rnd_transit_mtl.data.trips.tryCloudAction
 import com.example.rnd_transit_mtl.model.trip.Trip
@@ -48,13 +47,24 @@ fun HistoryScreen(
     val cloud = LocalCloudTrips.current
     val scope = rememberCoroutineScope()
     var cloudRecords by remember(cloud) { mutableStateOf(emptyList<Trip>()) }
+    var loadedRevision by remember(cloud) { mutableStateOf(-1) }
+    var loading by remember(cloud) { mutableStateOf(cloud != null) }
     var loadFailed by remember { mutableStateOf(false) }
     var retry by remember { mutableStateOf(0) }
     var removing by remember { mutableStateOf(false) }
 
     LaunchedEffect(cloud, cloud?.revision, isDestinationActive, retry) {
         if (cloud != null && isDestinationActive) {
-            loadFailed = !tryCloudAction { cloudRecords = cloud.history() }
+            loading = true
+            try {
+                val requestedRevision = cloud.revision
+                loadFailed = !tryCloudAction {
+                    cloudRecords = cloud.history()
+                    loadedRevision = requestedRevision
+                }
+            } finally {
+                loading = false
+            }
         }
     }
 
@@ -202,6 +212,11 @@ fun HistoryScreen(
 
     Column(modifier.fillMaxSize()) {
         PageTitle(title = HistoryScreenKey.screenTitle, layoutScale = 1f, highlighted = false)
+        if (loadFailed) {
+            TextButton(onClick = { retry++ }, enabled = isDestinationActive && !loading) {
+                Text("Could not load cloud history. Retry")
+            }
+        }
         HistoryContent(
             trips = historyTrips(historyRecords, filter),
             filter = filter,
@@ -216,7 +231,8 @@ fun HistoryScreen(
             onReview = reviewCallback,
             onRemove = { requestRemoval(it) },
             actionsEnabled = isDestinationActive,
-            errorMessage = errorMessage
+            errorMessage = errorMessage,
+            isLoading = loading
         )
     }
     if (isDestinationActive && pendingRemovalTrip != null) {
