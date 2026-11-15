@@ -1,6 +1,7 @@
 package com.example.rnd_transit_mtl
 
 import android.animation.ValueAnimator
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -32,10 +33,8 @@ class MainActivity : ComponentActivity() {
 
         val showStartup = savedInstanceState == null &&
             (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || ValueAnimator.areAnimatorsEnabled())
-        val loadStmTrip = stmTripLoader(this)
-        val loadExoTrip = exoTripLoader(this)
-        val openStmPreview = loadStmTrip != null && intent.getBooleanExtra("openStmPreview", false)
-        val openExoPreview = loadExoTrip != null && intent.getBooleanExtra("openExoPreview", false)
+        val generationEndpoint = packageManager.getApplicationInfo(packageName, PackageManager.GET_META_DATA)
+            .metaData?.getString("com.example.rnd_transit_mtl.GENERATION_ENDPOINT")?.takeIf { it.isNotBlank() }
         setContent {
             var mapReady by remember { mutableStateOf(false) }
             ProvideAndroidTransitMap(
@@ -44,8 +43,7 @@ class MainActivity : ComponentActivity() {
             ) {
                 Box(Modifier.fillMaxSize()) {
                     App(
-                        loadDebugStmTrip = loadStmTrip, openDebugStmPreview = openStmPreview,
-                        loadDebugExoTrip = loadExoTrip, openDebugExoPreview = openExoPreview
+                        generationEndpoint = generationEndpoint
                     )
                     if (showStartup) AnimatedStartupOverlay(readyToReveal = { mapReady })
                 }

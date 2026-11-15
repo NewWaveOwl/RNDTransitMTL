@@ -17,6 +17,46 @@ import kotlin.test.*
 class ActiveMapContentTest {
     @OptIn(ExperimentalComposeUiApi::class)
     @Test
+    fun guidanceFollowsTheVisibleLegAndKeepsItsLastPositionWhenLocationIsStale() {
+        var progress by mutableStateOf(0f)
+        var location by mutableStateOf(TripLocationState.Sample)
+        val trip = guidanceTestTrip()
+        val scene = ImageComposeScene(320, 640) {
+            RNDTransitTheme {
+                ActiveMapContent(trip, progress, true, {}, {}, locationState = location)
+            }
+        }
+        var time = 0L
+        fun render(name: String? = null) {
+            repeat(16) { time += 16_000_000; scene.render(time).close() }
+            if (name != null) scene.render(time).use { image ->
+                val folder = File("build/planner-previews").apply { mkdirs() }
+                image.encodeToData()!!.use { File(folder, name).writeBytes(it.bytes) }
+            }
+        }
+        fun all(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::all)
+        fun texts() = scene.semanticsOwners.flatMap { all(it.rootSemanticsNode) }
+            .flatMap { it.config.getOrNull(SemanticsProperties.Text).orEmpty() }.map { it.text }
+        try {
+            render("Leg-guidance-walk-small.png")
+            assertContains(texts(), "Section 1 of 3: Walk")
+            assertContains(texts(), "Next: In 50 m, turn left onto Rue Saint-Denis")
+            progress = 0.5f
+            render("Leg-guidance-bus-small.png")
+            assertContains(texts(), "Section 2 of 3: Bus 24")
+            assertContains(texts(), "Now: Ride Bus 24 towards East")
+            location = TripLocationState.Stale
+            progress = 0.9f
+            render()
+            assertContains(texts(), "Section 2 of 3: Bus 24")
+            location = TripLocationState.Sample
+            render()
+            assertContains(texts(), "Section 3 of 3: Walk")
+        } finally { scene.close() }
+    }
+
+    @OptIn(ExperimentalComposeUiApi::class)
+    @Test
     fun staleAndMissingLocationsKeepTheRouteWithoutAdvancingTheMarker() {
         var progress by mutableStateOf(0.4f)
         var location by mutableStateOf(TripLocationState.Sample)

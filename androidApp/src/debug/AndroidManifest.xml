@@ -1,7 +1,4 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application android:networkSecurityConfig="@xml/debug_network_security_config">
-        <meta-data
-            android:name="com.example.rnd_transit_mtl.STM_OTP_ENDPOINT"
-            android:value="${stmOtpEndpoint}" />
     </application>
 </manifest>

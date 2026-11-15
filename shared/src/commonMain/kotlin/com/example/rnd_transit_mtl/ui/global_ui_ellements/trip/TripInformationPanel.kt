@@ -3,6 +3,9 @@ package com.example.rnd_transit_mtl.ui.global_ui_ellements.trip
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,11 +15,18 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import com.example.rnd_transit_mtl.model.trip.Trip
+import com.example.rnd_transit_mtl.model.trip.legLabel
+import com.example.rnd_transit_mtl.ui.theme.tripLegColor
 import com.example.rnd_transit_mtl.ui.theme.TransitMain
 import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 import kotlin.math.roundToInt
+
+// Layout settings - colour key dimensions in dp.
+private val TripLegKeySize = 12.dp
+private val TripLegKeySpacing = 8.dp
 
 /**
  * Displays the stored planner snapshot and its separate reference image.
@@ -90,6 +100,14 @@ fun TripInformationPanel(
             color = TransitMain
         )
 
+        Text("Trip sections", style = MaterialTheme.typography.titleMedium, color = TransitMain)
+        trip.legs.forEachIndexed { index, _ ->
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(TripLegKeySpacing)) {
+                Box(Modifier.size(TripLegKeySize).background(tripLegColor(index), RoundedCornerShape(50)))
+                Text("${index + 1}. ${trip.legLabel(index)}", color = TransitMain, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+
         Text(
             text = "Attraction intensity: " +
                     "${trip.attractionIntensity.roundToInt()} / 100",
@@ -130,8 +148,9 @@ fun TripInformationPanel(
         }
 
         Text(
-            text = "The bundled map shows a straight-line demo route. " +
-                    "Its distance is simulated. The animation lasts " +
+            text = (if (trip.legs.any { it.isRouted }) "The map follows the saved routing geometry. "
+                    else "Dashed sections are straight-line previews. ") +
+                    "Position and instructions follow simulated progress. The animation lasts " +
                     "10 seconds of active time, independently of your " +
                     "planned minutes.",
             style = MaterialTheme.typography.bodySmall,

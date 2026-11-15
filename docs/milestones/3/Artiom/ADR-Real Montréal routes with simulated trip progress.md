@@ -54,7 +54,11 @@ The exo prediction integration is complete for the prototype. Chrono documents e
 
 ## Local setup and evidence
 
-The graph, bridge scripts, and sanitized evidence live under `tool/otp` at the repository root. Follow the [simulation runbook](../../../RunTripSimulation.md) for startup and Android instructions. Start `stm-scheduled/Start-StmRealtimeStack.ps1` with the local feeds and credentials configured. The verified setup used OTP on `127.0.0.1:18085` and the bridge on port `18086`. The emulator defaults to `http://10.0.2.2:18086/otp/gtfs/v1`. For a USB phone, `stm-scheduled/Install-StmAndroid.ps1` sets up `adb reverse` and installs the debug build with a loopback endpoint. Then use **Load STM test trip** or **Load STM + exo test trip**.
+Current startup uses the root `backend/` folder. Follow the
+[backend runbook](../../../../backend/README.md) for Ktor, OTP and realtime startup.
+Android sends GO requests to the generation backend; fixed STM/exo test-trip buttons
+and the direct phone-to-OTP demo client have been removed. Earlier captured test
+journeys in this ADR remain historical evidence of the feed integration.
 
 | Evidence | Files relative to `tool/otp/` |
 | --- | --- |

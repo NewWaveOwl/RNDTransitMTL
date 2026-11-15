@@ -1,0 +1,32 @@
+query GenerateTrip(
+  $originLat: CoordinateValue!, $originLon: CoordinateValue!,
+  $destinationLat: CoordinateValue!, $destinationLon: CoordinateValue!,
+  $departure: OffsetDateTime!, $modes: PlanModesInput!, $filters: [TransitFilterInput!], $excludeRealtime: Boolean!, $walkSpeed: Speed!
+) {
+  planConnection(
+    origin: {location: {coordinate: {latitude: $originLat, longitude: $originLon}}}
+    destination: {location: {coordinate: {latitude: $destinationLat, longitude: $destinationLon}}}
+    dateTime: {earliestDeparture: $departure}
+    modes: $modes
+    preferences: {street: {walk: {speed: $walkSpeed}}, transit: {filters: $filters, timetable: {excludeRealTimeUpdates: $excludeRealtime}}}
+    first: 4
+  ) {
+    routingErrors { code inputField }
+    edges { node {
+      duration waitingTime
+      legs {
+        mode distance duration realTime
+        route { gtfsId shortName longName }
+        headsign
+        from { name }
+        to { name }
+        steps { relativeDirection streetName distance bogusName exit }
+        start { scheduledTime estimated { time delay } }
+        end { scheduledTime estimated { time delay } }
+        alerts { alertHash alertHeaderText alertDescriptionText activityPeriods { start end } }
+        trip { pattern { code alerts { alertHash alertHeaderText alertDescriptionText activityPeriods { start end } } } }
+        legGeometry { length points }
+      }
+    } }
+  }
+}
