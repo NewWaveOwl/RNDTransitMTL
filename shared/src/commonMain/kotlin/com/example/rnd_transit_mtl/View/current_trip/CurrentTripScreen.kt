@@ -283,7 +283,7 @@ fun CurrentTripScreen(
     if (completedTrip != null) {
         CompleteV3(completedTrip, onReview = { requestReview() },
             onSkipToHistory = { skipCompletion(true) }, onPlanAnother = { skipCompletion(false) },
-            onGo = { skipCompletion(false) }, enabled = isDestinationActive && isAppResumed && trip.id !in currentState.pendingFinalTripIds,
+            enabled = isDestinationActive && isAppResumed && trip.id !in currentState.pendingFinalTripIds,
             errorMessage = operationMessage, modifier = modifier)
     } else if (storedTrip == null) {
         Column(

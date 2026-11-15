@@ -198,14 +198,11 @@ fun CompleteV3(
     onReview: () -> Unit,
     onSkipToHistory: () -> Unit,
     onPlanAnother: () -> Unit,
-    onGo: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     errorMessage: String? = null
 ) {
     V3Page(modifier) {
-        V3Heading("Adventure complete", null, onGo, enabled)
-
         Column(
             Modifier
                 .fillMaxWidth()
