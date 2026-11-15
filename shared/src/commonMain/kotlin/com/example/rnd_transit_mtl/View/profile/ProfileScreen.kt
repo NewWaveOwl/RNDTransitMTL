@@ -17,6 +17,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.rnd_transit_mtl.ViewModels.authentication.AuthViewModel
+import com.example.rnd_transit_mtl.ViewModels.authentication.ProfileViewModel
+import com.example.rnd_transit_mtl.data.accounts.LocalAccountRespository
 import com.example.rnd_transit_mtl.data.authentication.AccountSession
 import com.example.rnd_transit_mtl.data.authentication.LocalAccountSession
 import com.example.rnd_transit_mtl.data.authentication.LocalAuthRepository
@@ -31,15 +34,18 @@ import rnd_transit_mtl.shared.generated.resources.Res
 import rnd_transit_mtl.shared.generated.resources.ic_account_circle
 
 @Composable
-fun ProfileScreen() {
+fun ProfileScreen(viewModel: ProfileViewModel?) {
     val navigator = LocalNavigator.current
-    val nickname = LocalNicknameSession.current.nickname.orEmpty()
-    val session = LocalAccountSession.current
-    val repository = LocalAuthRepository.current
     val scope = rememberCoroutineScope()
-    val signedIn = session as? AccountSession.SignedIn
     var signOutError by remember(signedIn?.userId) { mutableStateOf(false) }
     var signingOut by remember(signedIn?.userId) { mutableStateOf(false) }
+
+
+    var account = viewModel.loadAccount()
+
+
+
+
 
     Column(
         Modifier.fillMaxSize().background(Color(0xFFF8F8F8))
@@ -49,18 +55,19 @@ fun ProfileScreen() {
         Text("Your profile", color = TransitComplementary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(4.dp))
         Icon(painterResource(Res.drawable.ic_account_circle), contentDescription = null,
+
             tint = TransitMain, modifier = Modifier.size(56.dp))
-        Text(signedIn?.email?.substringBefore("@")?.ifBlank { null } ?: if (signedIn != null) "Account" else nickname.ifBlank { "Guest" },
-            color = TransitComplementary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        Text(signedIn?.email ?: "Guest", color = TransitComplementary, fontSize = 12.sp)
+
+        Text( if (viewModel == null) "Guest" else account.username , color = TransitComplementary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+
         Spacer(Modifier.height(2.dp))
-        if (signedIn == null) {
+        if (viewModel== null) {
             ProfileOutlineButton("Sign in", onClick = { navigator.navigate(AuthScreenKey()) })
             ProfileOutlineButton("Create an account", onClick = { navigator.navigate(AuthScreenKey(register = true)) })
         }
         ProfileFilledButton("Your trip history", onClick = { navigator.navigate(HistoryScreenKey) })
         ProfileOutlineButton("About RND Transit", onClick = { navigator.navigate(AboutScreenKey) })
-        if (signedIn != null) {
+        if (viewModel == null) {
             if (signOutError) Text("Couldn’t sign out. Check your connection and try again.",
                 color = MaterialTheme.colorScheme.error)
             ProfileOutlineButton(if (signingOut) "Signing out…" else "Sign out", onClick = {
@@ -68,7 +75,7 @@ fun ProfileScreen() {
                     signingOut = true
                     signOutError = false
                     try {
-                        repository.signOut()
+                        viewModel?.signOut();
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (_: Exception) {

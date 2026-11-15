@@ -9,6 +9,6 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class AccountDto(
-    val preferences: Preferences,
+    val preferences: Preferences?,
     val username: String
 )

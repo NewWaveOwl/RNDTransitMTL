@@ -7,14 +7,14 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.from
 
 internal class AccountRepository(
-    private val authenticatedUserId: UserId,
+    private val authenticatedUserId: String,
     private val client: SupabaseClient = SupabaseBackend.client,
 ) : IAccountRepository {
 
     override suspend fun deleteAccount() {
         client.from(TABLE).delete {
             filter {
-                eq("user_id", authenticatedUserId.value)
+                eq("user_id", authenticatedUserId)
             }
         }
     }
@@ -28,7 +28,7 @@ internal class AccountRepository(
             {
                 select()
                 filter {
-                    eq("user_id", authenticatedUserId.value)
+                    eq("user_id", authenticatedUserId)
                 }
             }).decodeList<Account>()
 
@@ -39,7 +39,7 @@ internal class AccountRepository(
         return client.from(TABLE)
             .select {
                 filter {
-                    eq("user_id", authenticatedUserId.value)
+                    eq("user_id", authenticatedUserId)
                 }
             }
             .decodeSingleOrNull<Account>()

@@ -9,7 +9,7 @@ import kotlinx.serialization.Serializable
 data class Account(
     @SerialName("user_id") val userId: UserId,
     val username: String,
-    val preferences: Preferences
+    val preferences: Preferences?
 ) {
 
     fun toDto(): AccountDto {

@@ -46,6 +46,8 @@ import com.example.rnd_transit_mtl.View.profile.ProfileScreen
 import com.example.rnd_transit_mtl.View.settings.SettingsScreen
 import com.example.rnd_transit_mtl.View.trip_details.TripDetailsScreen
 import com.example.rnd_transit_mtl.View.trip_review.TripReviewScreen
+import com.example.rnd_transit_mtl.ViewModels.authentication.ProfileViewModel
+import com.example.rnd_transit_mtl.data.accounts.LocalAccountRespository
 
 /**
  * Literal sealed-class route hierarchy required by the assignment.
@@ -349,7 +351,9 @@ fun Router(
             }
 
             entry<ProfileScreenKey> {
-                ProfileScreen()
+                val repository = LocalAccountRespository.current;
+                val profileViewModel = viewModel { ProfileViewModel(repository)}
+                ProfileScreen(if (profileViewModel == null) null else profileViewModel)
             }
 
             entry<AuthScreenKey> { key ->
