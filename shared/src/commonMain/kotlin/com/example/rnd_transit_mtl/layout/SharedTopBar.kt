@@ -73,10 +73,6 @@ internal fun SharedTopBarContent(
     currentKey: ScreenKey?,
     onOpenSection: (ScreenKey) -> Unit
 ) {
-    val profileSelected =
-        currentKey == ProfileScreenKey ||
-            currentKey == AboutScreenKey
-
     val historySelected =
         currentKey == HistoryScreenKey ||
             currentKey is TripDetailsScreenKey ||
@@ -168,7 +164,7 @@ internal fun SharedTopBarContent(
             PageTitle(
                 title = currentKey?.screenTitle ?: "RND Transit",
                 layoutScale = 1f,
-                highlighted = profileSelected
+                highlighted = false
             )
         }
     }
