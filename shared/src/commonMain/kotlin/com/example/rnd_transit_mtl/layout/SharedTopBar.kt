@@ -159,7 +159,8 @@ internal fun SharedTopBarContent(
         }
 
         if (currentKey != MainScreenKey && currentKey !is CurrentTripScreenKey &&
-            currentKey != HistoryScreenKey && currentKey != SettingsScreenKey
+            currentKey != HistoryScreenKey && currentKey != SettingsScreenKey &&
+            currentKey != ProfileScreenKey
         ) {
             PageTitle(
                 title = currentKey?.screenTitle ?: "RND Transit",
