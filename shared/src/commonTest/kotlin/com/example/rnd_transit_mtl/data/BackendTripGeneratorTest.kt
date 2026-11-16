@@ -87,14 +87,14 @@ class BackendTripGeneratorTest {
         val busInput = input.copy(selectedTransportIds = listOf(bus), selectedZoneIds = listOf(zone),
             selectedZonesByTransport = mapOf(bus to listOf(zone)))
         val catalogue = listOf(TransportType(bus, "Bus", true), TransportType(walk, "Walk", false))
-        val trip = assertIs<TripGenerationResult.Success>(BackendTripGenerator(post = { body.toString() })
+        val trip = assertIs<TripGenerationResult.Success>(BackendTripGenerator(post = { _, _ -> body.toString() })
             .generate(busInput, catalogue, emptySet())).trip
         assertEquals(setOf(bus, walk), trip.selectedTransports.map { it.id }.toSet())
         for (restored in listOf(Json.decodeFromString<Trip>(Json.encodeToString(trip)), assertNotNull(trip.toDto().toDomainOrNull()))) {
             val planner = MainPlannerViewModel()
             planner.copyTripPreferences(restored, liveMap = true)
             assertEquals(listOf(bus), planner.uiState.value.selectedTransportIds)
-            BackendTripGenerator(post = { request ->
+            BackendTripGenerator(post = { request, _ ->
                 assertEquals(listOf("bus"), Json.decodeFromString<BackendGenerationRequest>(request).modes)
                 """{"status":"no_trip"}"""
             }).generate(busInput.copy(selectedTransportIds = planner.uiState.value.selectedTransportIds), catalogue, emptySet())
@@ -109,7 +109,7 @@ class BackendTripGeneratorTest {
     @Test
     fun oneBackendCallPreservesExactPinGeometryBudgetAndSavedTiming() = runTest {
         var calls = 0
-        val generator = BackendTripGenerator(post = { body ->
+        val generator = BackendTripGenerator(post = { body, _ ->
             calls++
             val request = Json.decodeFromString<BackendGenerationRequest>(body)
             assertEquals(origin, request.origin)
@@ -152,7 +152,7 @@ class BackendTripGeneratorTest {
         val updatedPlan = JsonObject(plan + ("edges" to JsonArray(listOf(buildJsonObject { put("node", updatedNode) }))))
         val body = JsonObject(numberedResponse + ("otp" to buildJsonObject { put("data", buildJsonObject { put("planConnection", updatedPlan) }) }))
         val bus = TransportId("bus")
-        val trip = assertIs<TripGenerationResult.Success>(BackendTripGenerator(post = { body.toString() })
+        val trip = assertIs<TripGenerationResult.Success>(BackendTripGenerator(post = { _, _ -> body.toString() })
             .generate(input.copy(selectedTransportIds = listOf(bus)), listOf(TransportType(bus, "Bus", true)), emptySet())).trip
         val navigation = assertNotNull(trip.legs.first { it.isRouted }.navigation)
         assertEquals("24", navigation.routeShortName)
@@ -163,14 +163,14 @@ class BackendTripGeneratorTest {
     @Test
     fun rejectsChangedOriginAndOverBudgetResponse() = runTest {
         for (body in listOf(response(origin.copy(label = "Changed")), response(elapsed = 1801))) {
-            val generator = BackendTripGenerator(post = { body })
+            val generator = BackendTripGenerator(post = { _, _ -> body })
             assertIs<TripGenerationResult.RoutingUnavailable>(generator.generate(input, modes, emptySet()))
         }
     }
 
     @Test
     fun sendsTheChosenPaceAndPreservesTheOrientationReserve() = runTest {
-        val generator = BackendTripGenerator(post = { body ->
+        val generator = BackendTripGenerator(post = { body, _ ->
             assertEquals("Dash", Json.decodeFromString<BackendGenerationRequest>(body).walkingPreference)
             response(elapsed = 634, buffer = 34)
         })
@@ -183,20 +183,21 @@ class BackendTripGeneratorTest {
 
     @Test
     fun failuresRemainDistinctAndCancellationIsPropagated() = runTest {
-        assertIs<TripGenerationResult.NoRoute>(BackendTripGenerator(post = { """{"status":"no_trip"}""" })
+        assertIs<TripGenerationResult.NoRoute>(BackendTripGenerator(post = { _, _ -> """{"status":"no_trip"}""" })
             .generate(input, modes, emptySet()))
-        assertIs<TripGenerationResult.RoutingUnavailable>(BackendTripGenerator(post = { error("Offline") })
+        assertIs<TripGenerationResult.RoutingUnavailable>(BackendTripGenerator(post = { _, _ -> error("Offline") })
             .generate(input, modes, emptySet()))
         assertFailsWith<CancellationException> {
-            BackendTripGenerator(post = { throw CancellationException("Cancelled") }).generate(input, modes, emptySet())
+            BackendTripGenerator(post = { _, _ -> throw CancellationException("Cancelled") }).generate(input, modes, emptySet())
         }
     }
     @Test fun bikeSpeedAndRequestIdReachBackendAndBikeRemainsBike()=runTest {
         val bike=TransportId("bike")
-        val trip=assertIs<TripGenerationResult.Success>(BackendTripGenerator(post={ body ->
+        val trip=assertIs<TripGenerationResult.Success>(BackendTripGenerator(post={ body, requestId ->
             val request=Json.decodeFromString<BackendGenerationRequest>(body)
             assertEquals(26,request.bikeSpeedKmh)
-            assertTrue(request.requestId.isNotBlank())
+            assertTrue(requestId.isNotBlank())
+            assertFalse(Json.parseToJsonElement(body).jsonObject.containsKey("requestId"))
             response().replace("WALK","BICYCLE")
         }).generate(input.copy(selectedTransportIds=listOf(bike),bikeSpeedKmh=26),
             listOf(TransportType(bike,"Bike",false)),emptySet())).trip
@@ -206,36 +207,49 @@ class BackendTripGeneratorTest {
 
     @Test fun diagnosticsIdentifyFailureStageWithoutLeakingExceptionMessages()=runTest {
         val events=mutableListOf<String>()
-        val result=BackendTripGenerator(post={ throw IllegalStateException("Bearer SECRET origin=-73.6") },
+        val result=BackendTripGenerator(post={ _, _ -> throw IllegalStateException("Bearer SECRET origin=-73.6") },
             diagnostic={events+=it}).generate(input,modes,emptySet())
         assertIs<TripGenerationResult.RoutingUnavailable>(result)
         assertTrue(events.any { "stage=http" in it && "IllegalStateException" in it })
         assertFalse(events.joinToString().contains("SECRET"))
         assertFalse(events.joinToString().contains("-73.6"))
         events.clear()
-        BackendTripGenerator(post={ "<html>tunnel unavailable</html>" },diagnostic={events+=it})
+        BackendTripGenerator(post={ _, _ -> "<html>tunnel unavailable</html>" },diagnostic={events+=it})
             .generate(input,modes,emptySet())
         assertTrue(events.any { "stage=decode" in it })
         events.clear()
-        BackendTripGenerator(post={ response(elapsed=1801) },diagnostic={events+=it})
+        BackendTripGenerator(post={ _, _ -> response(elapsed=1801) },diagnostic={events+=it})
             .generate(input,modes,emptySet())
         assertTrue(events.any { "stage=validate" in it })
     }
 
     @Test fun httpFailuresAndSearchTimeoutHaveActionableMessages()=runTest {
         for((status,expected) in mapOf(401 to "Sign in",403 to "Sign in",429 to "requests",503 to "unavailable")) {
-            val result=assertIs<TripGenerationResult.RoutingUnavailable>(BackendTripGenerator(post={ throw GenerationHttpFailure(status) })
+            val result=assertIs<TripGenerationResult.RoutingUnavailable>(BackendTripGenerator(post={ _, _ -> throw GenerationHttpFailure(status) })
                 .generate(input,modes,emptySet()))
             assertTrue(result.message.contains(expected))
         }
-        val result=BackendTripGenerator(post={ """{"status":"timeout"}""" }).generate(input,modes,emptySet())
+        val result=BackendTripGenerator(post={ _, _ -> """{"status":"timeout"}""" }).generate(input,modes,emptySet())
         assertTrue(assertIs<TripGenerationResult.RoutingUnavailable>(result).message.contains("timed out"))
     }
 
     @Test fun socketTimeoutHasATimeoutMessageInsteadOfAGenericProviderError()=runTest {
-        val result=BackendTripGenerator(post={ throw io.ktor.client.network.sockets.SocketTimeoutException("fixture") })
+        val result=BackendTripGenerator(post={ _, _ -> throw io.ktor.client.network.sockets.SocketTimeoutException("fixture") })
             .generate(input,modes,emptySet())
         assertTrue(assertIs<TripGenerationResult.RoutingUnavailable>(result).message.contains("timed out"))
+    }
+
+    @Test fun busyActiveAndCooldownResponsesHaveDistinctActionableMessages()=runTest {
+        for((status,reason,expected) in listOf(
+            Triple(503,"capacity","planner is busy"), Triple(429,"capacity","planner is busy"),
+            Triple(429,"active","already being generated"), Triple(429,"cooldown","wait 2 seconds")
+        )) {
+            val result=BackendTripGenerator(post={ _, _ -> throw GenerationHttpFailure(status,2,reason) })
+                .generate(input,modes,emptySet())
+            val message=assertIs<TripGenerationResult.RoutingUnavailable>(result).message
+            assertTrue(message.contains(expected),message)
+            if(reason=="capacity") assertFalse(message.contains("already"))
+        }
     }
 
     @Test fun walkBikeRejectsSingleModeResponsesEvenFromAnOldBackend()=runTest {
@@ -243,7 +257,7 @@ class BackendTripGeneratorTest {
         val request=input.copy(selectedTransportIds=listOf(walk,bike))
         val catalogue=listOf(TransportType(walk,"Walk",false),TransportType(bike,"Bike",false))
         for(body in listOf(response(),response().replace("WALK","BICYCLE"))) {
-            assertIs<TripGenerationResult.RoutingUnavailable>(BackendTripGenerator(post={body}).generate(request,catalogue,emptySet()))
+            assertIs<TripGenerationResult.RoutingUnavailable>(BackendTripGenerator(post={ _, _ ->body}).generate(request,catalogue,emptySet()))
         }
     }
 
@@ -274,7 +288,7 @@ class BackendTripGeneratorTest {
         val updatedPlan=JsonObject(plan+("edges" to buildJsonArray { add(buildJsonObject {put("node",combined)}) }))
         val body=JsonObject(raw+("otp" to JsonObject(otp+("data" to JsonObject(data+("planConnection" to updatedPlan))))))
         val walk=TransportId("walk");val bike=TransportId("bike")
-        val trip=assertIs<TripGenerationResult.Success>(BackendTripGenerator(post={body.toString()}).generate(
+        val trip=assertIs<TripGenerationResult.Success>(BackendTripGenerator(post={ _, _ ->body.toString()}).generate(
             input.copy(selectedTransportIds=listOf(walk,bike)),listOf(TransportType(walk,"Walk",false),TransportType(bike,"Bike",false)),emptySet())).trip
         assertEquals(listOf(walk,bike),trip.legs.filter {it.durationSeconds>0}.map {it.transportId})
         assertEquals(trip,Json.decodeFromString<Trip>(Json.encodeToString(trip)))

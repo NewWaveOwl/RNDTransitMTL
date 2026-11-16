@@ -3,6 +3,8 @@ package transit
 import org.junit.Test
 import org.junit.Assert.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.serialization.json.*
 import java.time.Instant
 import kotlin.random.Random
@@ -114,7 +116,11 @@ class GenerationTest {
         var identity=0
         val api=Api(generator { if(++count==4) entered.complete(Unit); release.await(); response() },authorize={ "user-${identity++}" })
         val jobs=List(4) { async { api.handle("application/json",null) { input().toString() } } }
-        entered.await(); assertEquals(429,api.handle("application/json",null) { input().toString() }.first)
+        entered.await()
+        val busy=api.handle("application/json",null) { input().toString() }
+        assertEquals(503,busy.first)
+        assertEquals("capacity",busy.second["reason"].text())
+        assertEquals(1.0,busy.second["retryAfterSeconds"].number()!!,0.0)
         release.complete(Unit); jobs.awaitAll()
         Unit
     }
@@ -386,6 +392,53 @@ class GenerationTest {
         assertEquals("no_trip",result["status"].text())
         assertEquals(128,calls)
         assertEquals(128.0,result["attempts"].number()!!,0.0)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test fun walkBikeBusReservesTimeForTransitAndUsesOnlyOneDirectFallback()=runTest {
+        var directCalls=0
+        val preparedModes=mutableListOf<List<String>>()
+        val request=parseRequest(input(modes=listOf("walk","bike","bus"))).copy(lines=listOf("bus:55"))
+        val routes=listOf(obj("gtfsId" to "STM:55","mode" to "BUS","shortName" to "55"))
+        val g=Generator(routes,zones(),{ query ->
+            if(query.field("variables").field("modes").field("directOnly")==JsonPrimitive(true)) {
+                directCalls++
+                delay(4500)
+                response(10.0)
+            } else {
+                assertEquals(listOf("STM:55"),query.field("variables").field("filters").items().single()
+                    .field("include").items().single().field("routes").strings())
+                delay(12000)
+                response(28.0,mode="BUS")
+            }
+        },{now},sample={ preparedModes+=it.modes; listOf(end) },diagnostic={},
+            preparationDispatcher=StandardTestDispatcher(testScheduler))
+        val result=g.generate(request)
+        assertEquals("success",result["status"].text())
+        assertEquals(1,directCalls)
+        assertEquals(listOf(listOf("walk"),request.modes),preparedModes)
+        assertEquals(16500L,testScheduler.currentTime)
+        assertEquals("BUS",result.field("otp").field("data").field("planConnection").field("edges").items().single()
+            .field("node").field("legs").items().single().field("mode").text())
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test fun stalledMixedFallbackUsesAtMostOneQuarterOfTheDeadline()=runTest {
+        var directCalls=0
+        val g=Generator(emptyList(),zones(),{ query ->
+            if(query.field("variables").field("modes").field("directOnly")==JsonPrimitive(true)) {
+                directCalls++
+                awaitCancellation()
+            } else {
+                assertEquals(5000L,testScheduler.currentTime)
+                delay(12000)
+                response(28.0,mode="BUS")
+            }
+        },{now},{listOf(end)},diagnostic={},preparationDispatcher=StandardTestDispatcher(testScheduler))
+        val result=g.generate(parseRequest(input(modes=listOf("walk","bike","bus"))))
+        assertEquals("success",result["status"].text())
+        assertEquals(1,directCalls)
+        assertEquals(17000L,testScheduler.currentTime)
     }
 
     @Test fun userCooldownHasExactBoundaryAndRejectionsDoNotExtendIt() {

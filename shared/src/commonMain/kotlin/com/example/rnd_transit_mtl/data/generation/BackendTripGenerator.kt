@@ -31,8 +31,7 @@ internal data class BackendGenerationRequest(
     val selectedRouteIds: List<String>,
     val excludedDestinations: List<GeoPoint>,
     val walkingPreference: String = "Amble",
-    val bikeSpeedKmh: Int = 18,
-    val requestId: String = ""
+    val bikeSpeedKmh: Int = 18
 )
 
 @Serializable
@@ -49,13 +48,13 @@ internal data class BackendGenerationResponse(
 )
 
 /** One GO request. Destination search and OTP calls execute exclusively on the backend.
- * @param post Cancellable JSON transport to the generation endpoint.
+ * @param post Cancellable transport receiving the JSON body and a separate request ID.
  * @param idFactory Creates IDs for the local trip store.
  * @param now Current epoch milliseconds for the saved trip record.
  * @param reportFailure Optional diagnostics; never handles cancellation.
  */
 internal class BackendTripGenerator(
-    private val post: suspend (String) -> String,
+    private val post: suspend (body: String, requestId: String) -> String,
     private val idFactory: () -> String = { Uuid.random().toString() },
     private val now: () -> Long = { Clock.System.now().toEpochMilliseconds() },
     private val reportFailure: (Exception) -> Unit = {},
@@ -103,11 +102,11 @@ internal class BackendTripGenerator(
             val request = BackendGenerationRequest(
                 origin, input.plannedMinutes, input.selectedTransportIds.map { it.value },
                 input.selectedZonesByTransport.entries.associate { (mode, zones) -> mode.value to zones.map { it.value } },
-                input.selectedRouteIds.map { it.value }, excludedDestinations.takeLast(10), input.walkingPreference, input.bikeSpeedKmh, requestId
+                input.selectedRouteIds.map { it.value }, excludedDestinations.takeLast(10), input.walkingPreference, input.bikeSpeedKmh
             )
             val payload = json.encodeToString(request)
             stage = "http"
-            val text = post(payload)
+            val text = post(payload, requestId)
             currentCoroutineContext().ensureActive()
             stage = "decode"
             require(text.length <= 2_000_000)
@@ -132,7 +131,14 @@ internal class BackendTripGenerator(
                 error is HttpRequestTimeoutException || error is SocketTimeoutException || error is ConnectTimeoutException -> "Trip planner request timed out. Check your connection and retry."
                 error is GenerationHttpFailure -> when(error.status) {
                     401, 403 -> "Sign in again to generate a trip."
-                    429 -> "A trip is already running or requests are too frequent. Try again in ${error.retryAfterSeconds ?: 3} seconds."
+                    429 -> when(error.reason) {
+                        "active" -> "A trip is already being generated. Wait for it or cancel it before retrying."
+                        "cooldown" -> "Please wait ${error.retryAfterSeconds ?: 3} seconds before generating another trip."
+                        "capacity" -> "The trip planner is busy. Try again in ${error.retryAfterSeconds ?: 1} seconds."
+                        else -> "Too many requests. Try again in ${error.retryAfterSeconds ?: 3} seconds."
+                    }
+                    503 -> if(error.reason=="capacity") "The trip planner is busy. Try again in ${error.retryAfterSeconds ?: 1} seconds."
+                        else "Routing service unavailable. Try again shortly."
                     400 -> "The planner rejected these choices. Check your settings and retry."
                     else -> "Routing service unavailable. Try again shortly."
                 }
@@ -193,8 +199,8 @@ internal class BackendTripGenerator(
 
 internal val LocalBackendTripGenerator = staticCompositionLocalOf<BackendTripGenerator?> { null }
 
-/** HTTP status only: never retain response bodies, endpoints or authorization headers. */
-internal class GenerationHttpFailure(val status: Int, val retryAfterSeconds: Long? = null) : Exception("Trip planner HTTP $status")
+/** HTTP status and retry metadata; never retain response bodies, endpoints or authorization headers. */
+internal class GenerationHttpFailure(val status: Int, val retryAfterSeconds: Long? = null, val reason: String? = null) : Exception("Trip planner HTTP $status")
 
 /** Keep exception types and code frames; messages can contain credentials or full request URLs. */
 internal fun generationFailureTrace(error: Throwable, depth: Int = 0): String = buildString {

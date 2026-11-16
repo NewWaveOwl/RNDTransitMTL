@@ -81,16 +81,19 @@ Preview, Active Trip and history show Bike. Candidate distance uses the same spe
 This is simplified cycling: pedestrian paths may contain stairs or restrictions
 unsuitable for riding. It does not claim cycle-safe routing or traffic-aware ETA.
 
-Mixed selections plan bike-only alternatives separately so bike speed never speeds
-up walking access, egress or transfers. Walk + transit first tries up to four
-walking candidates; mixed Bike selections other than Walk + Bike also try up to four bike candidates.
-Each direct phase can use at most one quarter of the existing search deadline.
+Mixed transit selections keep access, egress and transfers at walking pace.
+Before transit, the generator makes at most one direct fallback attempt: Walk when
+selected, otherwise Bike when selected. Walk + Bike + Bus therefore does not run two
+sequential fallback searches. This attempt uses geographic candidates without scanning
+the transit catalogue and can consume at most one quarter of the existing deadline.
 The complete search, including these phases, remains inside
 `20 + floor(selectedMinutes / 60)` seconds and 128 OTP calls. This scheduling change
 reserves time for an allowed direct alternative before potentially slow transit
 search, without increasing client/API/search limits (45/40/20–26 seconds).
-It can reduce time available for transit optimisation, especially if both direct
-modes are selected. Later valid candidates still replace a shorter result.
+At least three quarters of the deadline remain for main-search preparation and routing.
+Later valid candidates still replace a shorter result. The tradeoff is that a failed
+first direct candidate does not trigger more fallback-only attempts; the main search
+can still return walking routes when Walk is selected.
 
 A valid direct result survives later provider failure or deadline expiry. This is
 an actual OTP route, not an invented line and not an offline fallback. If OTP is
@@ -121,7 +124,9 @@ types/upstream HTTP status, routing-error codes, route acceptance/rejection and 
 feed events; request IDs are not yet propagated inside the external bridge/OTP.
 
 Interpret results by stage: no HTTP response suggests connection/request failure;
-401/403 requests sign-in; 429 indicates capacity; 5xx indicates service failure;
+401/403 requests sign-in; 429 with reason `active` or `cooldown` indicates the user
+request limit; 503 with reason `capacity` means the server is busy. Other 5xx responses
+indicate service failure;
 `decode` can expose an HTML tunnel response; `validate` identifies rejected route
 invariants. A working HTTP exchange does not establish that the itinerary is valid.
 Keep origin/settings and retry; cancellation continues to propagate and a cancelled
@@ -441,7 +446,11 @@ seconds. Extra calls return HTTP 429 with `Retry-After` in whole seconds, rounde
 up. Rejections never advance the cooldown or run OTP. Completion, provider failure,
 timeout and cancellation release the active slot in `finally`; the start-based
 cooldown remains until three seconds have passed. The existing global four-request
-cap stays in place. Policy state is memory-only, bounded and scoped to a single
+cap stays in place and returns HTTP 503 with reason `capacity` and `Retry-After`.
+The app distinguishes capacity, active-request and cooldown messages. Request IDs
+travel separately from the JSON payload into the `X-Request-ID` header; the client
+does not parse its own request JSON for this ID.
+Policy state is memory-only, bounded and scoped to a single
 server process; it resets on restart and is not a distributed rate limiter.
 
 Request-protection validation: 36 backend generation tests and 9 shared generator
@@ -522,3 +531,20 @@ before assertions because Windows denied a loopback connection (`SocketException
 Permission denied: connect`). It remains enabled for unrestricted Gradle/CI execution.
 Rebuild/restart the generation backend and rebuild/install Android before device
 checks; keep the existing graph, schedules, bridge, credentials and tunnel settings.
+
+
+## PR #82 review regressions
+
+Virtual-time fixtures cover Walk + Bike + Bus with a 4.5-second direct attempt and
+a 12-second bus response, and a stalled fallback capped at five seconds followed by
+a successful bus response. Both fit the unchanged 20-second search budget. Existing
+fallback, cancellation, selected-line, fare-zone and elapsed-time checks remain enabled.
+
+Deleting a locally queued completed/cancelled trip removes it from History and the
+persistent outbox without an upload or delete request. Deletion shares the cloud-sync
+mutex: if a save is already running, deletion waits for its outcome, then deletes the
+acknowledged remote record or removes the still-pending local record. A failed remote
+deletion of an already synced trip keeps the local record available for retry. Tests
+cover offline removal, outbox restoration and successful/failed in-flight saves.
+
+These deterministic checks do not replace the live server/Android/Azure matrix in #77.

@@ -151,7 +151,7 @@ class Trip33FlowTest {
     fun goGeneratesTwoBackendProposalsFromTheSamePinAndStartsTheAcceptedRoute() = runBlocking(Dispatchers.Main) {
         val origin = Place("Confirmed origin", GeoPoint(45.5, -73.6))
         val requests = mutableListOf<BackendGenerationRequest>()
-        val backend = BackendTripGenerator(post = { body ->
+        val backend = BackendTripGenerator(post = { body, _ ->
             val request = Json.decodeFromString<BackendGenerationRequest>(body)
             requests.add(request)
             val destination = Place("Destination ${requests.size}", GeoPoint(45.5 + requests.size * .005, -73.6))

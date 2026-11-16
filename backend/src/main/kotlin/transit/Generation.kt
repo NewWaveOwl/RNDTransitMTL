@@ -42,7 +42,7 @@ internal val planQuery=object {}.javaClass.getResource("/plan.graphql")!!.readTe
 internal fun otpRequest(input: Request, end: Point, departure: Instant, allowed: Set<String>?): JsonObject {
     val transit=input.modes.filter { it !in listOf("walk","bike") }
     // Bike deliberately uses the pedestrian graph at the chosen cycling speed.
-    // Combined requests use a separate bike-only search so transit access stays at walking pace.
+    // Combined requests keep transit access at walking pace; a direct fallback is bounded separately.
     val direct=if(input.bikeOnly || "walk" in input.modes) listOf("WALK") else emptyList()
     val modes=mutableMapOf<String,Any?>("direct" to direct,"directOnly" to transit.isEmpty(),"transitOnly" to direct.isEmpty())
     if(transit.isNotEmpty()) modes["transit"]=mapOf("access" to listOf("WALK"),"egress" to listOf("WALK"),"transfer" to listOf("WALK"),"transit" to transit.map { mapOf("mode" to modeNames.getValue(it)) })
@@ -116,7 +116,8 @@ internal fun elapsed(itinerary: JsonElement,start: Instant): Long? {
 }
 /** Stops are linked network anchors; direct-mode alternatives retain geographic sampling. */
 internal suspend fun destinationCandidates(input: Request, routes: List<JsonElement>, zones: FareZones, allowed: Set<String>?,
-    checkpoint: suspend ()->Unit = { yield() }, zoneCheck: ((Point,List<String>)->Boolean)? = null): List<Point> = withContext(Dispatchers.Default) {
+    checkpoint: suspend ()->Unit = { yield() }, zoneCheck: ((Point,List<String>)->Boolean)? = null,
+    dispatcher: CoroutineDispatcher = Dispatchers.Default): List<Point> = withContext(dispatcher) {
     val context=currentCoroutineContext()
     val transitSelected=input.modes.any { it !in listOf("walk","bike") }
     val seen=mutableSetOf<Pair<String,Point>>()
@@ -179,7 +180,8 @@ internal class Generator(private val routes: List<JsonElement>, private val zone
     private val route: suspend (JsonObject)->JsonObject, private val now: ()->Instant = Instant::now,
     private val sample: (suspend (Request)->List<Point>)? = null, private val timeoutMillis: Long?=null,
     private val maxAttempts: Int=128,
-    private val diagnostic: (String)->Unit = { println("RndTransitGeneration $it") }) {
+    private val diagnostic: (String)->Unit = { println("RndTransitGeneration $it") },
+    private val preparationDispatcher: CoroutineDispatcher = Dispatchers.Default) {
     suspend fun generate(input: Request, requestId: String = "internal"): JsonObject {
         val timer=TimeSource.Monotonic.markNow()
         fun log(event: String) = diagnostic("request=$requestId elapsedMs=${timer.elapsedNow().inWholeMilliseconds} $event")
@@ -190,18 +192,21 @@ internal class Generator(private val routes: List<JsonElement>, private val zone
         val budget=timeoutMillis ?: searchBudgetSeconds(input.minutes)*1000
         val result=withTimeoutOrNull(budget) {
             val searchContext=currentCoroutineContext()
-            val allowed=withContext(Dispatchers.Default) { allowedLines(input,routes) { searchContext.ensureActive() } }
-            // Establish a direct alternative before slow transit can consume the entire deadline.
-            // Nested searches share departure, restrictions and the outer cancellation/deadline.
-            val alternatives=buildList {
-                if("walk" in input.modes && input.modes.any { it !in listOf("walk","bike") }) add("walk")
-                if("bike" in input.modes && !input.bikeOnly && !input.walkBike) add("bike")
+            val allowed=withContext(preparationDispatcher) { allowedLines(input,routes) { searchContext.ensureActive() } }
+            // Reserve at least three quarters of the deadline for the main search.
+            // One direct attempt uses geographic candidates, never another scan of transit stops.
+            val alternative=when {
+                "walk" in input.modes && input.modes.any { it !in listOf("walk","bike") } -> "walk"
+                "bike" in input.modes && !input.bikeOnly && !input.walkBike -> "bike"
+                else -> null
             }
-            for(mode in alternatives) {
+            if(alternative!=null && maxAttempts>0) {
+                val mode=alternative
                 val directInput=input.copy(modes=listOf(mode),zones=emptyMap(),lines=emptyList())
                 val fallback=try {
-                    Generator(routes,zones,{ query -> attempts++; route(query) },{start},sample,(budget/4).coerceAtLeast(1),4,
-                        { event -> diagnostic("phase=$mode $event") }).generate(directInput,requestId)
+                    Generator(emptyList(),zones,{ query -> attempts++; route(query) },{start},
+                        sample ?: { request -> candidates(request) },(budget/4).coerceAtLeast(1),1,
+                        { event -> diagnostic("phase=$mode $event") },preparationDispatcher).generate(directInput,requestId)
                 } catch(e: CancellationException) { throw e } catch(_: ProviderError) { null }
                 val total=fallback?.field("elapsedSeconds")?.number()?.toLong()
                 if(fallback?.field("status").text()=="success" && total!=null && total>bestTotal) {
@@ -210,7 +215,8 @@ internal class Generator(private val routes: List<JsonElement>, private val zone
             }
             var failures=0
             log("candidates=start")
-            val pending = ArrayDeque((sample?.invoke(input) ?: destinationCandidates(input,routes,zones,allowed)).filter { p ->
+            val pending = ArrayDeque((sample?.invoke(input) ?: destinationCandidates(input,routes,zones,allowed,
+                dispatcher=preparationDispatcher)).filter { p ->
                 input.excluded.none { distance(p,it)<100 } && inServiceArea(p) &&
                     (input.modes.any { it in listOf("walk","bike") } || input.zones.values.any { zones.allows(p,it) { searchContext.ensureActive() } })
             })

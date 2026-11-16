@@ -102,7 +102,8 @@ internal class Api(private val generator: Generator, private val authorize: susp
     }, private val userLimit: UserGenerationLimit = UserGenerationLimit()) {
     private val capacity=Semaphore(4)
     suspend fun handle(contentType: String?, authorization: String?, requestId: String = "generation-${requestSequence.incrementAndGet()}", read: suspend ()->String): Pair<Int,JsonObject> {
-        if(!capacity.tryAcquire()) return 429 to obj("status" to "rate_limited","message" to "Trip planner is busy. Try again.","retryAfterSeconds" to 1)
+        if(!capacity.tryAcquire()) return 503 to obj("status" to "unavailable","reason" to "capacity",
+            "message" to "Trip planner is busy. Try again.","retryAfterSeconds" to 1)
         var admittedUser: String? = null
         try {
             return withTimeout(40_000) {
@@ -150,7 +151,9 @@ internal fun Application.generationRoutes(api: Api) {
                 output.toString(Charsets.UTF_8.name())
             }
             println("RndTransitGeneration request=$requestId api=$status elapsedMs=${(System.nanoTime()-started)/1_000_000}")
-            if(status==429) call.response.headers.append(HttpHeaders.RetryAfter,result["retryAfterSeconds"].number()!!.toLong().toString())
+            result["retryAfterSeconds"].number()?.toLong()?.let {
+                call.response.headers.append(HttpHeaders.RetryAfter,it.toString())
+            }
             call.response.headers.append("X-Request-ID",requestId)
             call.response.headers.append(HttpHeaders.CacheControl,"no-store")
             call.respondText(result.toString(),ContentType.Application.Json,HttpStatusCode.fromValue(status))

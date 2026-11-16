@@ -23,8 +23,7 @@ internal fun rememberBackendTripGenerator(endpoint: String?): BackendTripGenerat
     DisposableEffect(client) { onDispose { client?.close() } }
     return remember(endpoint, client) {
         client?.let {
-            BackendTripGenerator(post = { body ->
-                val requestId = Json.parseToJsonElement(body).jsonObject["requestId"]!!.jsonPrimitive.content
+            BackendTripGenerator(post = { body, requestId ->
                 val started = TimeSource.Monotonic.markNow()
                 println("RndTransitGeneration request=$requestId http=start")
                 val response = it.post(requireNotNull(endpoint)) {
@@ -34,8 +33,12 @@ internal fun rememberBackendTripGenerator(endpoint: String?): BackendTripGenerat
                     setBody(body)
                 }
                 println("RndTransitGeneration request=$requestId http=${response.status.value} elapsedMs=${started.elapsedNow().inWholeMilliseconds}")
-                if(response.status.value !in 200..299) throw GenerationHttpFailure(response.status.value, response.headers["Retry-After"]?.toLongOrNull())
-                response.bodyAsText()
+                val text = response.bodyAsText()
+                if(response.status.value !in 200..299) {
+                    val reason = runCatching { Json.parseToJsonElement(text).jsonObject["reason"]?.jsonPrimitive?.contentOrNull }.getOrNull()
+                    throw GenerationHttpFailure(response.status.value, response.headers["Retry-After"]?.toLongOrNull(), reason)
+                }
+                text
             }, diagnostic = { event -> println("RndTransitGeneration $event") })
         }
     }
