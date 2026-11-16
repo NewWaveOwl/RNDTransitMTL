@@ -23,6 +23,7 @@ import androidx.compose.runtime.*
 import kotlinx.coroutines.flow.first
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.geometry.center
@@ -38,6 +39,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.rnd_transit_mtl.ViewModels.main.isPlannerTransportAvailable
 import com.example.rnd_transit_mtl.ViewModels.main.MainPlannerViewModel
 import com.example.rnd_transit_mtl.model.transport.TransportType
 import com.example.rnd_transit_mtl.ui.theme.*
@@ -112,17 +114,20 @@ internal fun LazyListScope.PlannerPreferenceBands(
                 ordered.chunked(TransportGridColumnCount).forEach { row ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(PreferenceChoiceSpacing * scale)) {
                         row.forEach { transport ->
-                            val selected = transport.id in selectedTransportIds
+                            val available = isPlannerTransportAvailable(transport.id)
+                            val selected = available && transport.id in selectedTransportIds
                             val title = if (transport.id == TransportId("walk")) "Walk" else transport.label
                             val selectedZoneIds = selectedZonesByTransport[transport.id].orEmpty()
                             val zones = if (selected && transport.usesRoutes && selectedZoneIds.isNotEmpty())
                                 " " + selectedZoneIds.sortedBy { it.value }.joinToString(", ") else ""
                             Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                                PlannerChoice(title + zones, selected, enabled, {
+                                PlannerChoice(title + zones, selected, enabled && available, {
+                                    if (!available) return@PlannerChoice
                                     if (transport.usesRoutes) onExpandedTransportChange(transport.id)
                                     else onToggleTransport(transport.id)
                                 }, scale, Modifier.fillMaxWidth(TransportButtonWidthFraction),
-                                    dropdownExpanded = if (transport.usesRoutes) expandedTransportId == transport.id else null)
+                                    dropdownExpanded = if (available && transport.usesRoutes) expandedTransportId == transport.id else null,
+                                    unavailable = !available)
                             }
                         }
                         repeat(TransportGridColumnCount - row.size) { Spacer(Modifier.weight(1f)) }
@@ -221,7 +226,7 @@ private fun TransitZoneDropdown(
     scale: Float,
     enabled: Boolean
 ) {
-    val requestedMode = transportTypes.firstOrNull { it.usesRoutes && it.id == requestedTransportId }
+    val requestedMode = transportTypes.firstOrNull { it.usesRoutes && it.id == requestedTransportId && isPlannerTransportAvailable(it.id) }
     var displayedTransportId by remember { mutableStateOf<TransportId?>(null) }
     val visibility = remember { MutableTransitionState(false) }
 
@@ -312,11 +317,12 @@ private fun <T> ChoiceGrid(ids: List<T>, selected: List<T>, enabled: Boolean,
  * @param modifier Layout supplied by the row.
  * @param role Checkbox for multi-select choices, radio button for walking style.
  * @param dropdownExpanded Null for ordinary choices; otherwise controls the transit expansion indicator.
+ * @param unavailable Figma State=Disabled (85:94): white/blue chip at 45% opacity.
  */
 @Composable
 private fun PlannerChoice(label: String, selected: Boolean, enabled: Boolean, onClick: () -> Unit,
     scale: Float, modifier: Modifier = Modifier, role: Role = Role.Checkbox,
-    dropdownExpanded: Boolean? = null) {
+    dropdownExpanded: Boolean? = null, unavailable: Boolean = false) {
     val expanded = dropdownExpanded == true
     val animateTransportFill = dropdownExpanded != null
     val selectionFill by animateFloatAsState(
@@ -327,6 +333,8 @@ private fun PlannerChoice(label: String, selected: Boolean, enabled: Boolean, on
     )
     Surface(
         modifier = modifier.height(PreferenceChoiceHeight * scale)
+            .graphicsLayer { alpha = if (unavailable) 0.45f else 1f }
+            .then(if (unavailable) Modifier.semantics { stateDescription = "Not available yet" } else Modifier)
             .then(if (dropdownExpanded == null) {
                 Modifier.toggleable(selected, enabled = enabled, role = role, onValueChange = { onClick() })
             } else {

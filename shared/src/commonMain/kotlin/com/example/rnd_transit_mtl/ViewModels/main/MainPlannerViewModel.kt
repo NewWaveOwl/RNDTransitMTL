@@ -12,6 +12,9 @@ import kotlinx.coroutines.flow.update
 import com.example.rnd_transit_mtl.model.trip.Place
 import kotlinx.serialization.Serializable
 
+/** Modes visible in the planner but not currently offered for new trips. */
+internal fun isPlannerTransportAvailable(id: TransportId): Boolean = id.value !in setOf("train", "rem")
+
 /**
  * Stores the editable planner draft.
  *
@@ -72,6 +75,7 @@ class MainPlannerViewModel(
 
     private val mutableUiState = MutableStateFlow(
         initialState.copy(minutes = Trip.coercePlannedMinutes(initialState.minutes),
+            selectedTransportIds = initialState.selectedTransportIds.filter(::isPlannerTransportAvailable),
             walkingPreference = when (initialState.walkingPreference) {
             "Scenic" -> "Amble"
             "Direct", "Normal", "Stroll" -> "Walk"
@@ -91,7 +95,7 @@ class MainPlannerViewModel(
         mutableUiState.update {
             it.copy(
                 minutes = Trip.coercePlannedMinutes(trip.plannedMinutes),
-                selectedTransportIds = trip.requestedTransportIds ?: trip.selectedTransports.map { it.id },
+                selectedTransportIds = (trip.requestedTransportIds ?: trip.selectedTransports.map { it.id }).filter(::isPlannerTransportAvailable),
                 selectedZoneIds = trip.selectedZoneIds.toList(),
                 selectedZonesByTransport =
                     trip.selectedZonesByTransport.mapValues { entry ->
@@ -146,7 +150,7 @@ class MainPlannerViewModel(
      * @param availableIds IDs from the loaded transport catalogue.
      */
     fun toggleTransport(id: TransportId, availableIds: Set<TransportId>) {
-        if (id !in availableIds) return
+        if (id !in availableIds || !isPlannerTransportAvailable(id)) return
 
         mutableUiState.update {
             it.copy(
@@ -163,7 +167,7 @@ class MainPlannerViewModel(
      * @param id Zone A, B, C, or D; unsupported identifiers are ignored.
      */
     fun toggleZone(transportId: TransportId, id: ZoneId) {
-        if (transportId !in transitIds || id !in zoneIds) return
+        if (transportId !in transitIds || id !in zoneIds || !isPlannerTransportAvailable(transportId)) return
         mutableUiState.update { state ->
             val zones = state.zonesForTransport(transportId).toggled(id)
             val transports = if (zones.isEmpty()) {

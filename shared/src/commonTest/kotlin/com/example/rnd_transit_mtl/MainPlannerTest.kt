@@ -177,8 +177,8 @@ class MainPlannerTest {
         )).uiState.value
         assertEquals(listOf(ZoneId("A"), ZoneId("B")), restored.zonesForTransport(TransportId("bus")))
         assertEquals(listOf(ZoneId("C")), restored.zonesForTransport(TransportId("metro")))
-        assertEquals(listOf(ZoneId("D")), restored.zonesForTransport(TransportId("train")))
-        assertEquals(listOf(ZoneId("B")), restored.zonesForTransport(TransportId("rem")))
+        assertEquals(emptyList(), restored.zonesForTransport(TransportId("train")))
+        assertEquals(emptyList(), restored.zonesForTransport(TransportId("rem")))
         assertEquals(false, restored.selectedZonesByTransport.containsKey(TransportId("walk")))
     }
 
@@ -340,4 +340,16 @@ class MainPlannerTest {
         attractionIntensity = 90f,
         selectedZoneIds = zones
     )
+    @Test fun unavailableTransportCannotBeSelectedOrRestoredIntoANewRequest() {
+        val walk=TransportId("walk"); val train=TransportId("train"); val rem=TransportId("rem")
+        val planner=MainPlannerViewModel(MainPlannerState(selectedTransportIds=listOf(walk,train,rem)))
+        assertEquals(listOf(walk),planner.uiState.value.selectedTransportIds)
+        for(mode in listOf(train,rem)) {
+            planner.toggleTransport(mode,setOf(walk,train,rem))
+            planner.toggleZone(mode,ZoneId("A"))
+        }
+        assertEquals(listOf(walk),planner.uiState.value.selectedTransportIds)
+        assertTrue(planner.uiState.value.selectedZonesByTransport.isEmpty())
+    }
+
 }
