@@ -92,6 +92,13 @@ and has since been integrated with the real-route backend.
 | App tests (for supabase) | 0% | 100% |
 | **Total Code contribution average | 55%  | 45%   |
 
+
+| Final split | Caio      | Claude    |
+|---|-----------|-----------|
+| All code | 233 (44%) | 292 (56%) |
+| Without the Settings UI code | 214 (60%) | 145 (40%) |
+| Without the Settings UI code and the migration | 214 (65%) | 115 (35%) |
+
 ## Milestone 3 screenshots
 
 These Android captures show the implemented planner and trip flow. Trip playback
