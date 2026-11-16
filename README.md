@@ -75,6 +75,16 @@ The trip/review flow originated in
 [Artiom's Assignment 3 repository](https://github.com/NewWaveOwl/As3_APPDEV2_RND_Tranzit_Sova/tree/8b1b538)
 and has since been integrated with the real-route backend.
 
+## Milestone 3 - Code Contribution - Artiom (self-reported estimates)
+
+| Contribution | Artiom | AI |
+| --- | ---: | ---: |
+| UI - original mock-ups and design | 7,312.41 (63%) | 4,294.59 (37%) |
+| Other app logic, maps and integration | 3,039.24 (62%) | 1,862.76 (38%) |
+| App tests | 606.34 (14%) | 3,724.66 (86%) |
+| **Total code contributed excluding AI Level-Up** | **10,957.99 (52.6%)** | **9,882.01 (47.4%)** |
+| **AI Level-Up - excluded from total** | **428.08 (8%)** | **4,922.92 (92%)** |
+
 ## Milestone 3 screenshots
 
 These Android captures show the implemented planner and trip flow. Trip playback
