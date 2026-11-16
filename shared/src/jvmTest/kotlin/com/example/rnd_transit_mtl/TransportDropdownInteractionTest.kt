@@ -28,6 +28,54 @@ import kotlin.test.*
 class TransportDropdownInteractionTest {
     @OptIn(ExperimentalComposeUiApi::class)
     @Test
+    fun returningToGoWithBusAndBikeOpenKeepsBikeAtItsRestoredPosition() {
+        var mounted by mutableStateOf(true)
+        val vm = MainPlannerViewModel()
+        val walk = TransportId("walk")
+        val bike = TransportId("bike")
+        val bus = TransportId("bus")
+        val scene = ImageComposeScene(412, 1200) {
+            RNDTransitTheme {
+                if (mounted) LazyColumn(Modifier.fillMaxSize()) {
+                    PlannerPreferenceBands(
+                        scale = 1f,
+                        transportTypes = listOf(TransportType(walk, "Walk", false),
+                            TransportType(bike, "Bike", false), TransportType(bus, "Bus", true)),
+                        selectedTransportIds = listOf(walk, bike, bus),
+                        selectedZonesByTransport = mapOf(bus to listOf(ZoneId("A"))),
+                        onToggleTransport = {}, onToggleZone = { _, _ -> },
+                        walkingPreference = "Walk", selectedAttractionIds = emptyList(),
+                        onWalkingPreferenceChange = {}, onToggleAttraction = {},
+                        enabled = true, onOpenDetailedSettings = {},
+                        expandedTransportId = bus, onExpandedTransportChange = {},
+                        bikeSpeedKmh = vm.uiState.value.bikeSpeedKmh, onBikeSpeedChange = {}
+                    )
+                }
+            }
+        }
+        var time = 0L
+        fun frames(count: Int) {
+            repeat(count) { time += 16_000_000L; scene.render(time).close() }
+        }
+        fun all(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::all)
+        fun bikeY(): Float = scene.semanticsOwners.flatMap { all(it.rootSemanticsNode) }.first {
+            it.config.getOrNull(SemanticsProperties.Text)?.any { text -> text.text == "Biking speed" } == true
+        }.boundsInRoot.top
+        try {
+            frames(40)
+            val originalY = bikeY()
+            mounted = false
+            frames(2)
+            mounted = true
+            frames(2)
+            assertEquals(originalY, bikeY(), "Restored Bus zones must reserve their full height immediately")
+            frames(40)
+            assertEquals(originalY, bikeY(), "Bike must stay still after returning to GO")
+        } finally { scene.close() }
+    }
+
+    @OptIn(ExperimentalComposeUiApi::class)
+    @Test
     fun clicksCloseSwitchAndKeepSelectionsWhileHeightAnimatesThroughIntermediateFrames() {
         var expanded by mutableStateOf<TransportId?>(null)
         val vm = MainPlannerViewModel()

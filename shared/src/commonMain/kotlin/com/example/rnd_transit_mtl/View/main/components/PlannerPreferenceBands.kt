@@ -227,8 +227,10 @@ private fun TransitZoneDropdown(
     enabled: Boolean
 ) {
     val requestedMode = transportTypes.firstOrNull { it.usesRoutes && it.id == requestedTransportId && isPlannerTransportAvailable(it.id) }
-    var displayedTransportId by remember { mutableStateOf<TransportId?>(null) }
-    val visibility = remember { MutableTransitionState(false) }
+    // A restored open menu starts at its full height. Replaying its entrance when
+    // returning to GO would push the Bike/Walk bands down during tab navigation.
+    var displayedTransportId by remember { mutableStateOf(requestedMode?.id) }
+    val visibility = remember { MutableTransitionState(requestedMode != null) }
 
     LaunchedEffect(requestedMode?.id) {
         if (displayedTransportId != requestedMode?.id) {
