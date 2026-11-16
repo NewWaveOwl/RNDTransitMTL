@@ -179,7 +179,7 @@ class GenerationTest {
         }
     }
 
-    @Test fun networkCandidatesRespectLinesZonesAndExclusions() {
+    @Test fun networkCandidatesRespectLinesZonesAndExclusions()=runBlocking {
         val route=obj("gtfsId" to "STM:55","mode" to "BUS","stops" to listOf(obj("lat" to end.latitude,"lon" to end.longitude)))
         val r=parseRequest(input(modes=listOf("bus")))
         assertEquals(listOf(end),destinationCandidates(r,listOf(route),zones(),setOf("STM:55")))
@@ -406,8 +406,8 @@ class GenerationTest {
 
     @Test fun oneActiveRequestPerVerifiedUserSurvivesTokenRefreshAndReleasesOnCancel()=runBlocking {
         var time=0L; var calls=0
-        val entered=CompletableDeferred<Unit>()
-        val api=Api(generator { calls++; entered.complete(Unit); awaitCancellation() },
+        val entered=CompletableDeferred<Unit>(); val retried=CompletableDeferred<Unit>()
+        val api=Api(generator { calls++; if(calls==1) entered.complete(Unit) else retried.complete(Unit); awaitCancellation() },
             authorize={ if(it=="invalid") null else "verified-user" },userLimit=UserGenerationLimit { time })
         val job=async { api.handle("application/json","old-token") { input().toString() } }
         entered.await(); time=4000
@@ -417,7 +417,7 @@ class GenerationTest {
         assertEquals(401,api.handle("application/json","invalid") { input().toString() }.first)
         job.cancelAndJoin()
         val retry=async { api.handle("application/json","refreshed-token") { input().toString() } }
-        yield(); assertEquals(2,calls); retry.cancelAndJoin()
+        withTimeout(5000) { retried.await() }; assertEquals(2,calls); retry.cancelAndJoin()
     }
 
     @Test fun failureReleasesUserSlotAfterStartBasedCooldown()=runBlocking {
@@ -429,6 +429,48 @@ class GenerationTest {
         time=3000
         assertEquals(503,api.handle("application/json",null) { input().toString() }.first)
         assertEquals(2,calls)
+    }
+
+    @Test fun duplicateStopsAreZoneCheckedOncePerModeAndRetainZoneAlternatives()=runBlocking {
+        val stop=obj("lat" to end.latitude,"lon" to end.longitude)
+        val routes=List(100) { obj("gtfsId" to "STM:$it","mode" to "BUS","stops" to List(100) {stop}) }
+        var checks=0
+        val result=destinationCandidates(parseRequest(input(modes=listOf("bus"))),routes,zones(),null,
+            zoneCheck={_,_-> checks++; true })
+        assertEquals(listOf(end),result); assertEquals(1,checks)
+        val mixed=parseRequest(input(modes=listOf("bus"))).copy(modes=listOf("bus","train"),
+            zones=mapOf("bus" to listOf("A"),"train" to listOf("B")))
+        val train=obj("gtfsId" to "EXO:1","mode" to "RAIL","stops" to listOf(stop))
+        assertEquals(listOf(end),destinationCandidates(mixed,routes+train,zones(),null,zoneCheck={_,selected-> selected==listOf("B") }))
+    }
+
+    @Test fun preparationDeadlineReturnsSavedWalkingFallbackAndParentCancellationPropagates()=runBlocking {
+        val request=parseRequest(input(modes=listOf("walk","bus")))
+        val entered=CompletableDeferred<Unit>()
+        val g=Generator(emptyList(),zones(),{ response() },{now},sample={ candidate ->
+            if(candidate.modes==listOf("walk")) listOf(end) else { entered.complete(Unit); awaitCancellation() }
+        },timeoutMillis=200,diagnostic={})
+        val result=g.generate(request)
+        assertTrue(entered.isCompleted)
+        assertEquals("success",result["status"].text())
+        assertEquals(1260.0,result["elapsedSeconds"].number()!!,0.0)
+        var checks=0
+        val route=obj("gtfsId" to "STM:55","mode" to "BUS","stops" to List(500) {
+            obj("lat" to end.latitude,"lon" to end.longitude)
+        })
+        val job=async {
+            destinationCandidates(request,listOf(route),zones(),null,checkpoint={
+                if(++checks==2) currentCoroutineContext().cancel()
+                yield()
+            })
+        }
+        try { job.await(); fail("Preparation ignored cancellation") } catch(_: CancellationException) { }
+        assertEquals(2,checks)
+        try {
+            accepts(response().field("data").field("planConnection").field("edges").items().single().field("node")!!,
+                parseRequest(input()),end,zones(),null) { throw CancellationException("cancel") }
+            fail("Validation swallowed cancellation")
+        } catch(_: CancellationException) { }
     }
 
 }

@@ -46,22 +46,7 @@ internal fun destination(origin: Point, meters: Double, bearing: Double): Point 
     return Point(Math.toDegrees(y), (Math.toDegrees(x)+540)%360-180)
 }
 /** Polygon rings include boundaries, with holes excluded. */
-internal fun inPolygon(p: Point, geometry: JsonElement): Boolean {
-    fun ring(r: JsonElement): Boolean {
-        val coords=r.items().map { it.items().map { n -> n.number() ?: error("Invalid polygon") } }
-        var inside=false
-        for (i in coords.indices) {
-            val (xi,yi)=coords[i]; val (xj,yj)=coords[(i+coords.size-1)%coords.size]
-            val cross=(p.longitude-xi)*(yj-yi)-(p.latitude-yi)*(xj-xi)
-            if(abs(cross)<1e-12 && p.longitude in min(xi,xj)..max(xi,xj) && p.latitude in min(yi,yj)..max(yi,yj)) return true
-            if((yi>p.latitude)!=(yj>p.latitude) && p.longitude<(xj-xi)*(p.latitude-yi)/(yj-yi)+xi) inside=!inside
-        }
-        return inside
-    }
-    val c=geometry.field("coordinates") ?: error("Missing polygon")
-    val polygons=if(geometry.field("type").text()=="Polygon") listOf(c) else c.items()
-    return polygons.any { polygon -> val rings=polygon.items(); rings.isNotEmpty() && ring(rings.first()) && rings.drop(1).none(::ring) }
-}
+internal fun inPolygon(p: Point, geometry: JsonElement): Boolean = PreparedGeometry(geometry).contains(p)
 internal val modeNames=mapOf("walk" to "WALK", "bike" to "BICYCLE", "bus" to "BUS", "metro" to "SUBWAY", "train" to "RAIL")
 internal val walkingSpeeds=mapOf("Amble" to 3.0,"Walk" to 4.8,"Dash" to 6.8)
 internal fun orientationSeconds(meters: Double)=ceil(meters*60/1000).toLong()
@@ -104,19 +89,21 @@ internal fun parseRequest(v: JsonElement): Request {
     return Request(clean,minutes.toInt(),modes,pace,zones,lines,excluded,bikeSpeed.toInt())
 }
 /** Uniform-area arbitrary coordinates, independent of stops or a POI catalogue. */
-internal fun candidates(input: Request, random: Random=Random.Default): List<Point> {
+internal fun candidates(input: Request, random: Random=Random.Default, check: ()->Unit = {}): List<Point> {
     val speed=when { input.modes.any { it in listOf("train","metro") } -> 30.0; "bus" in input.modes -> 15.0; "bike" in input.modes -> input.bikeSpeedKmh/3.6; else -> input.speed }
     val radius=min(100_000.0,input.minutes*60/(1/speed+0.06)); val inner=cos(min(250.0,radius/4)/earthRadius); val outer=cos(radius/earthRadius)
     val result=mutableListOf<Point>()
-    repeat(128*64) {
+    val origin=input.start
+    repeat(128*64) { index ->
+        if(index%64==0) check()
         if(result.size==128) return result
         val meters=earthRadius*acos((inner-random.nextDouble()*(inner-outer)).coerceIn(-1.0,1.0))
-        val p=destination(input.start,meters,random.nextDouble()*2*PI)
+        val p=destination(origin,meters,random.nextDouble()*2*PI)
         if(inServiceArea(p) && input.excluded.none { distance(p,it)<100 } && result.none { distance(p,it)<100 }) result+=p
     }
     return result
 }
-internal fun decodePolyline(text: String): List<Point> {
+internal fun decodePolyline(text: String, check: ()->Unit = {}): List<Point> {
     require(text.length<=1_000_000)
     var index=0; var lat=0; var lon=0
     fun delta(): Int {
@@ -124,5 +111,5 @@ internal fun decodePolyline(text: String): List<Point> {
         do { require(index<text.length && shift<=25); chunk=text[index++].code-63; require(chunk in 0..63); bits=bits or ((chunk and 31) shl shift); shift+=5 } while(chunk>=32)
         return (bits ushr 1) xor -(bits and 1)
     }
-    return buildList { while(index<text.length) { lat+=delta(); lon+=delta(); add(Point(lat/100_000.0,lon/100_000.0)) } }
+    return buildList { var decoded=0; while(index<text.length) { if(decoded++%256==0) check(); lat+=delta(); lon+=delta(); add(Point(lat/100_000.0,lon/100_000.0)) } }
 }

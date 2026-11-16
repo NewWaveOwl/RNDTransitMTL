@@ -448,3 +448,25 @@ Request-protection validation: 36 backend generation tests and 9 shared generato
 tests passed with the cached compiler/JUnit workflow. HTTP header/socket lifecycle
 assertions are present but could not execute under the previously recorded socket
 restrictions. The app UI guard was inspected; a fresh Android UI run is pending.
+
+## Candidate preparation and cancellation (#77)
+
+Fare polygons are decoded once at backend startup into immutable rings with bounding
+boxes, reused by candidate and route validation. Repeated stops are deduplicated by
+mode/coordinate before fare-zone work; a stop rejected for one mode remains eligible
+under another mode's selected zones. Origin-distance, service-area and exclusion
+filters run before polygon queries. Candidate preparation runs on the CPU dispatcher,
+yields between routes and every 128 stops, and checks cancellation inside long polygon
+rings. Sampling also checks cancellation. Search diagnostics bracket preparation with
+`candidates=start` and `candidates=ready` so its cost is visible separately from OTP.
+
+A deadline during preparation returns the saved valid direct fallback; parent
+cancellation still propagates and never publishes that result. The search/API limits
+and mode/line/zone/exclusion policy are unchanged. Regression fixtures cover 10,000
+repeated stops with one zone query, a shared stop accepted through another mode's zone,
+preparation cancellation, and a deadline after an accepted walking fallback.
+
+Candidate-preparation validation: 38 backend tests passed through direct cached
+compilation/JUnit, including existing line/zone/hole/exclusion checks. The limiter
+retry test now waits for its coroutine's explicit entry signal instead of assuming
+one `yield` completes CPU-dispatched setup. Live server timings remain pending.
