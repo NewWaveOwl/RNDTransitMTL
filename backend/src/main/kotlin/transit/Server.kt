@@ -66,23 +66,58 @@ internal fun sanitizedFailure(error: Throwable, depth: Int = 0): Throwable =
         }
     }
 
+/** In-memory policy for one server process; identities come only from verified authentication. */
+internal class UserGenerationLimit(private val clockMillis: ()->Long = { System.nanoTime()/1_000_000 }) {
+    private data class Entry(val started: Long, var active: Boolean)
+    private val users=mutableMapOf<String,Entry>()
+    data class Rejection(val reason: String, val retryAfterSeconds: Long)
+
+    @Synchronized fun acquire(user: String): Rejection? {
+        val now=clockMillis()
+        val previous=users[user]
+        if(previous?.active==true) return Rejection("active",3)
+        if(previous!=null && now-previous.started<3000)
+            return Rejection("cooldown",(3000-(now-previous.started)+999)/1000)
+        // Bound retention without ever evicting an active request or bypassing its cooldown.
+        if(users.size>=10_000) {
+            users.entries.removeIf { !it.value.active && now-it.value.started>=3000 }
+            if(users.size>=10_000 && previous==null) return Rejection("capacity",1)
+        }
+        users[user]=Entry(now,true)
+        return null
+    }
+    @Synchronized fun release(user: String) {
+        val entry=users[user] ?: return
+        entry.active=false
+        if(clockMillis()-entry.started>=3000) users.remove(user)
+    }
+}
+
 /** HTTP boundary is separate from generation so policy tests need no server sockets.
  * @param logFailure Receives a correlation ID and sanitized exception with source frames.
  */
-internal class Api(private val generator: Generator, private val authorize: suspend (String?)->Boolean = { true },
+internal class Api(private val generator: Generator, private val authorize: suspend (String?)->String? = { "local-guest" },
     private val logFailure: (String, Throwable)->Unit = { id, error ->
         failureLogger.log(Level.WARNING, "Trip generation failed; requestId=$id", error)
-    }) {
+    }, private val userLimit: UserGenerationLimit = UserGenerationLimit()) {
     private val capacity=Semaphore(4)
     suspend fun handle(contentType: String?, authorization: String?, requestId: String = "generation-${requestSequence.incrementAndGet()}", read: suspend ()->String): Pair<Int,JsonObject> {
-        if(!capacity.tryAcquire()) return 429 to obj("status" to "unavailable","message" to "Trip planner is busy. Try again.")
+        if(!capacity.tryAcquire()) return 429 to obj("status" to "rate_limited","message" to "Trip planner is busy. Try again.","retryAfterSeconds" to 1)
+        var admittedUser: String? = null
         try {
             return withTimeout(40_000) {
-                if(!authorize(authorization)) return@withTimeout 401 to obj("status" to "unauthorized")
+                val user=authorize(authorization) ?: return@withTimeout 401 to obj("status" to "unauthorized")
                 checkInput(contentType?.substringBefore(';')?.trim()=="application/json","Send application/json.")
                 val text=read(); checkInput(text.toByteArray().size<=16_384,"Request is too large.")
                 val body=try { json.parseToJsonElement(text) } catch(_: Exception) { throw InputError("Invalid JSON request.") }
-                200 to generator.generate(parseRequest(body),requestId)
+                val input=parseRequest(body)
+                val rejected=userLimit.acquire(user)
+                if(rejected!=null) return@withTimeout 429 to obj("status" to "rate_limited",
+                    "message" to if(rejected.reason=="active") "A trip is already being generated. Wait or cancel it before retrying."
+                        else "Too many requests. Try again shortly.",
+                    "reason" to rejected.reason,"retryAfterSeconds" to rejected.retryAfterSeconds)
+                admittedUser=user
+                200 to generator.generate(input,requestId)
             }
         } catch(e: TimeoutCancellationException) { currentCoroutineContext().ensureActive(); return 503 to obj("status" to "unavailable","message" to "Request timed out.") }
         catch(e: CancellationException) { throw e }
@@ -92,7 +127,7 @@ internal class Api(private val generator: Generator, private val authorize: susp
             logFailure(id, sanitizedFailure(e))
             return 503 to obj("status" to "unavailable","message" to "Routing service unavailable. Try again.","requestId" to id)
         }
-        finally { capacity.release() }
+        finally { admittedUser?.let(userLimit::release); capacity.release() }
     }
 }
 internal fun Application.generationRoutes(api: Api) {
@@ -115,6 +150,7 @@ internal fun Application.generationRoutes(api: Api) {
                 output.toString(Charsets.UTF_8.name())
             }
             println("RndTransitGeneration request=$requestId api=$status elapsedMs=${(System.nanoTime()-started)/1_000_000}")
+            if(status==429) call.response.headers.append(HttpHeaders.RetryAfter,result["retryAfterSeconds"].number()!!.toLong().toString())
             call.response.headers.append("X-Request-ID",requestId)
             call.response.headers.append(HttpHeaders.CacheControl,"no-store")
             call.respondText(result.toString(),ContentType.Application.Json,HttpStatusCode.fromValue(status))
@@ -146,10 +182,15 @@ fun main() {
         }
         val generator=Generator(routes,zones,{ body -> upstream.json(endpoint,body) })
         val api=Api(generator, authorize = { token ->
-            if(!authenticated) true else if(token?.startsWith("Bearer ")!=true) false else {
+            if(!authenticated) "local-guest" else if(token?.startsWith("Bearer ")!=true) null else {
                 val response=withTimeout(5000) { upstream.request(URI(supabase).resolve("/auth/v1/user").toString(),headers=mapOf("Authorization" to token,"apikey" to key!!)) }
-                if(response.status.value>=500) throw ProviderError("Authentication service unavailable.")
-                response.status.isSuccess()
+                if(response.status.value in listOf(401,403)) null else {
+                    if(!response.status.isSuccess()) throw ProviderError("Authentication service unavailable.",httpStatus=response.status.value)
+                    // This ID comes from the authenticated /user response, never unverified JWT claims.
+                    val user=transit.json.parseToJsonElement(response.bodyAsText()).field("id").text()
+                        ?: throw ProviderError("Authentication response omitted user ID.")
+                    java.util.UUID.fromString(user).toString()
+                }
             }
         })
         println("Trip generation ready at http://$host:$port (Kotlin/Ktor; random geographic destinations).")

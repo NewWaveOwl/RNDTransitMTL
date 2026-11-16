@@ -427,3 +427,24 @@ checks during service hours. On Android, build `:androidApp:assembleDebug` and
 small/large sizes, cancel/back/retry repeatedly, and verify Walk + Bus versus Bus
 alone and short/long duration matching. Live routing quality and device behavior
 remain target-environment checks.
+
+## Request protection (#77)
+
+GO is disabled while generation is running, and the coordinator also rejects a
+second invocation while its job is active. On the backend, the verified Supabase
+`/auth/v1/user` response supplies the account ID: refreshed tokens and different
+devices share the same policy. Neither body-supplied IDs nor unverified JWT claims
+are trusted. Private unauthenticated development uses one shared `local-guest` slot.
+
+One account can have one active generation and can start at most once per three
+seconds. Extra calls return HTTP 429 with `Retry-After` in whole seconds, rounded
+up. Rejections never advance the cooldown or run OTP. Completion, provider failure,
+timeout and cancellation release the active slot in `finally`; the start-based
+cooldown remains until three seconds have passed. The existing global four-request
+cap stays in place. Policy state is memory-only, bounded and scoped to a single
+server process; it resets on restart and is not a distributed rate limiter.
+
+Request-protection validation: 36 backend generation tests and 9 shared generator
+tests passed with the cached compiler/JUnit workflow. HTTP header/socket lifecycle
+assertions are present but could not execute under the previously recorded socket
+restrictions. The app UI guard was inspected; a fresh Android UI run is pending.

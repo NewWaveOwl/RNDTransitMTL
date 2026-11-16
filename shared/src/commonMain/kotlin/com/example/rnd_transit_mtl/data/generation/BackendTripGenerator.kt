@@ -130,7 +130,7 @@ internal class BackendTripGenerator(
                 error is HttpRequestTimeoutException -> "Trip planner request timed out. Check your connection and retry."
                 error is GenerationHttpFailure -> when(error.status) {
                     401, 403 -> "Sign in again to generate a trip."
-                    429 -> "Trip planner is busy. Try again shortly."
+                    429 -> "A trip is already running or requests are too frequent. Try again in ${error.retryAfterSeconds ?: 3} seconds."
                     400 -> "The planner rejected these choices. Check your settings and retry."
                     else -> "Routing service unavailable. Try again shortly."
                 }
@@ -183,7 +183,7 @@ internal class BackendTripGenerator(
 internal val LocalBackendTripGenerator = staticCompositionLocalOf<BackendTripGenerator?> { null }
 
 /** HTTP status only: never retain response bodies, endpoints or authorization headers. */
-internal class GenerationHttpFailure(val status: Int) : Exception("Trip planner HTTP $status")
+internal class GenerationHttpFailure(val status: Int, val retryAfterSeconds: Long? = null) : Exception("Trip planner HTTP $status")
 
 /** Keep exception types and code frames; messages can contain credentials or full request URLs. */
 internal fun generationFailureTrace(error: Throwable, depth: Int = 0): String = buildString {

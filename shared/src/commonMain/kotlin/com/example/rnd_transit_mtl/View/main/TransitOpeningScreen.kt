@@ -314,7 +314,7 @@ internal fun TransitOpeningScreen(
 
     fun performPrimaryAction() {
         if (!latestDestinationActive ||
-            processingAction ||
+            processingAction || generationJob?.isActive == true ||
             pendingOpenTripId != null
         ) return
 
@@ -860,7 +860,7 @@ internal fun TransitOpeningScreen(
             validationMessage = validationMessage,
             actionLabel = pendingActionLabel ?: actionLabel,
             actionEnabled = isDestinationActive &&
-                !processingAction &&
+                !processingAction && generationJob?.isActive != true &&
                 pendingOpenTripId == null &&
                 actionHasCallback &&
                 (

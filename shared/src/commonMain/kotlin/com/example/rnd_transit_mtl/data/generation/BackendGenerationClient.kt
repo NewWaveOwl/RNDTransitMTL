@@ -34,7 +34,7 @@ internal fun rememberBackendTripGenerator(endpoint: String?): BackendTripGenerat
                     setBody(body)
                 }
                 println("RndTransitGeneration request=$requestId http=${response.status.value} elapsedMs=${started.elapsedNow().inWholeMilliseconds}")
-                if(response.status.value !in 200..299) throw GenerationHttpFailure(response.status.value)
+                if(response.status.value !in 200..299) throw GenerationHttpFailure(response.status.value, response.headers["Retry-After"]?.toLongOrNull())
                 response.bodyAsText()
             }, diagnostic = { event -> println("RndTransitGeneration $event") })
         }

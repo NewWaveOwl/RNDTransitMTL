@@ -105,13 +105,14 @@ class GenerationTest {
         assertEquals(400,api.handle("application/json",null) { "{" }.first)
         assertEquals(400,api.handle("text/plain",null) { input().toString() }.first)
         assertEquals(400,api.handle("application/json",null) { "x".repeat(16385) }.first)
-        assertEquals(401,Api(generator { response() },{false}).handle("application/json",null) { input().toString() }.first)
+        assertEquals(401,Api(generator { response() },{null}).handle("application/json",null) { input().toString() }.first)
         assertEquals(503,Api(generator { throw ProviderError("offline") }).handle("application/json",null) { input().toString() }.first)
         assertEquals(200,api.handle("application/json",null) { input().toString() }.first)
     }
     @Test fun apiCapsConcurrentGeneration()=runBlocking {
         val entered=CompletableDeferred<Unit>(); val release=CompletableDeferred<Unit>(); var count=0
-        val api=Api(generator { if(++count==4) entered.complete(Unit); release.await(); response() })
+        var identity=0
+        val api=Api(generator { if(++count==4) entered.complete(Unit); release.await(); response() },authorize={ "user-${identity++}" })
         val jobs=List(4) { async { api.handle("application/json",null) { input().toString() } } }
         entered.await(); assertEquals(429,api.handle("application/json",null) { input().toString() }.first)
         release.complete(Unit); jobs.awaitAll()
@@ -385,6 +386,49 @@ class GenerationTest {
         assertEquals("no_trip",result["status"].text())
         assertEquals(128,calls)
         assertEquals(128.0,result["attempts"].number()!!,0.0)
+    }
+
+    @Test fun userCooldownHasExactBoundaryAndRejectionsDoNotExtendIt() {
+        var time=0L
+        val limit=UserGenerationLimit { time }
+        assertNull(limit.acquire("user-a")); limit.release("user-a")
+        assertEquals(3L,limit.acquire("user-a")!!.retryAfterSeconds)
+        time=2001
+        assertEquals(1L,limit.acquire("user-a")!!.retryAfterSeconds)
+        assertNull(limit.acquire("user-b"))
+        time=3000
+        assertNull(limit.acquire("user-a"))
+        time=30_000
+        assertEquals("active",limit.acquire("user-a")!!.reason)
+        limit.release("user-a")
+        assertNull(limit.acquire("user-a"))
+    }
+
+    @Test fun oneActiveRequestPerVerifiedUserSurvivesTokenRefreshAndReleasesOnCancel()=runBlocking {
+        var time=0L; var calls=0
+        val entered=CompletableDeferred<Unit>()
+        val api=Api(generator { calls++; entered.complete(Unit); awaitCancellation() },
+            authorize={ if(it=="invalid") null else "verified-user" },userLimit=UserGenerationLimit { time })
+        val job=async { api.handle("application/json","old-token") { input().toString() } }
+        entered.await(); time=4000
+        val rejected=api.handle("application/json","refreshed-token") { input().toString() }
+        assertEquals(429,rejected.first); assertEquals("active",rejected.second["reason"].text())
+        assertEquals(1,calls)
+        assertEquals(401,api.handle("application/json","invalid") { input().toString() }.first)
+        job.cancelAndJoin()
+        val retry=async { api.handle("application/json","refreshed-token") { input().toString() } }
+        yield(); assertEquals(2,calls); retry.cancelAndJoin()
+    }
+
+    @Test fun failureReleasesUserSlotAfterStartBasedCooldown()=runBlocking {
+        var time=0L; var calls=0
+        val api=Api(generator { calls++; throw ProviderError("offline") },authorize={"a"},
+            userLimit=UserGenerationLimit { time },logFailure={_,_->})
+        assertEquals(503,api.handle("application/json",null) { input().toString() }.first)
+        assertEquals(429,api.handle("application/json",null) { input().toString() }.first)
+        time=3000
+        assertEquals(503,api.handle("application/json",null) { input().toString() }.first)
+        assertEquals(2,calls)
     }
 
 }

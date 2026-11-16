@@ -223,7 +223,7 @@ class BackendTripGeneratorTest {
     }
 
     @Test fun httpFailuresAndSearchTimeoutHaveActionableMessages()=runTest {
-        for((status,expected) in mapOf(401 to "Sign in",403 to "Sign in",429 to "busy",503 to "unavailable")) {
+        for((status,expected) in mapOf(401 to "Sign in",403 to "Sign in",429 to "requests",503 to "unavailable")) {
             val result=assertIs<TripGenerationResult.RoutingUnavailable>(BackendTripGenerator(post={ throw GenerationHttpFailure(status) })
                 .generate(input,modes,emptySet()))
             assertTrue(result.message.contains(expected))
