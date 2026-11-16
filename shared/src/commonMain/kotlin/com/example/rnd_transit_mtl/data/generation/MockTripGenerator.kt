@@ -47,7 +47,8 @@ data class TripGenerationInput(
     val origin: TripPoint? = null,
     val ownerId: UserId? = null,
     val originPlace: Place? = null,
-    val walkingPreference: String = "Amble"
+    val walkingPreference: String = "Amble",
+    val bikeSpeedKmh: Int = 18
 )
 
 /**

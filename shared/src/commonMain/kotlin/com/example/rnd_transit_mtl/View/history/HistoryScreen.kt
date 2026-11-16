@@ -166,12 +166,8 @@ fun HistoryScreen(
             scope.launch {
                 try {
                     if (tryCloudAction {
-                        cloud.flushFinalTrip(tripId)
-                        cloud.mutate {
-                            deleteTrip(tripId)
-                            tripsStore.removeFromHistory(tripId)
-                            cloudRecords = cloudRecords.filterNot { it.id == tripId }
-                        }
+                        cloud.removeTrip(tripId)
+                        cloudRecords = cloudRecords.filterNot { it.id == tripId }
                     }) {
                         pendingRemovalId = null
                         errorMessage = null

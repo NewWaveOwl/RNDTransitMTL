@@ -46,6 +46,13 @@ internal class CloudTrips(
         Unit
     }
 
+    /** Serialize deletion with sync so an in-flight save cannot restore a removed trip. */
+    suspend fun removeTrip(id: TripId) = mutex.withLock {
+        if (id !in store.state.value.pendingFinalTripIds) repository.deleteTrip(id)
+        store.removeFromHistory(id)
+        revision++
+    }
+
     private suspend fun persistFinalTrip(trip: Trip) {
         val stored = repository.saveFinalTrip(trip)
         store.acceptStoredTrip(stored, acknowledgeWrite = true)

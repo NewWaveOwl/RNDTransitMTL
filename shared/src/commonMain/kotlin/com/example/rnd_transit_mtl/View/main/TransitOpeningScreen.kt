@@ -314,7 +314,7 @@ internal fun TransitOpeningScreen(
 
     fun performPrimaryAction() {
         if (!latestDestinationActive ||
-            processingAction ||
+            processingAction || generationJob?.isActive == true ||
             pendingOpenTripId != null
         ) return
 
@@ -417,7 +417,8 @@ internal fun TransitOpeningScreen(
                     selectedZonesByTransport = zones,
                     origin = origin?.copy(),
                     originPlace = planner.originPlace,
-                    walkingPreference = planner.walkingPreference
+                    walkingPreference = planner.walkingPreference,
+                    bikeSpeedKmh = planner.bikeSpeedKmh
                 )
 
                 // Explicit samples are distinct from validation failures.
@@ -859,7 +860,7 @@ internal fun TransitOpeningScreen(
             validationMessage = validationMessage,
             actionLabel = pendingActionLabel ?: actionLabel,
             actionEnabled = isDestinationActive &&
-                !processingAction &&
+                !processingAction && generationJob?.isActive != true &&
                 pendingOpenTripId == null &&
                 actionHasCallback &&
                 (

@@ -10,6 +10,8 @@ The web reader returned cache misses for all six URLs; the browser successfully 
 
 **2026-11-14 PR 75 review/fix coverage:** M3-A13 and M3-A14 document the current Codex conversation, separate from the shared chat in M3-A9 through M3-A12. The requester first limited the agent to an independent review, then explicitly authorized fixes, two commits, conflict resolution and a push, followed by this logging/commit/push-command request. All three available human prompts are preserved in the [PR 75 prompt archive](ML3-PR75-Review-Fixes-Chat-Prompts.md). Current conversation URL: [Conversation link needed]. Student reflections, active time, code-percentage estimates and exact model version remain [Not documented] or [Student reflection needed].
 
+**2026-11-15 bus-generation/UI coverage update:** M3-A18 through M3-A22 record the current issue #77 conversation, its visible log investigation, separately authorized commits, student-reported successful rebuild and disabled-chip design. The supplied current-chat share is preserved exactly. Available human prompts are archived once in [ML3-Bus-Timeouts-Chat-Prompts.md](ML3-Bus-Timeouts-Chat-Prompts.md); it is not a fresh shared-page export. Automated checks, blocked/live scenarios and student acceptance are distinguished. No subagents were used in this conversation. Exact model and personal reflection/time estimates remain [Not documented] or [Student reflection needed].
+
 ## Linked AI sessions
 
 | Entry | Conversation | Scope |
@@ -32,6 +34,16 @@ The web reader returned cache misses for all six URLs; the browser successfully 
 | M3-A15 | [ChatGPT - PR 75 review follow-up](https://chatgpt.com/share/6af88f56-58f0-83ea-aa4b-739d9e77f32f); [prompts](ML3-PR75-Followup-Chat-Prompts.md) | CLI review handoff, issue acceptance, Git ownership/time log and branch guidance |
 | M3-A16 | [Same chat](https://chatgpt.com/share/6af88f56-58f0-83ea-aa4b-739d9e77f32f); [P07-P10](ML3-PR75-Followup-Chat-Prompts.md#p07---existing-geohash-use) | Spatial sampling and concurrent discovery investigation, issue #78 |
 | M3-A17 | [Same chat](https://chatgpt.com/share/6af88f56-58f0-83ea-aa4b-739d9e77f32f); [P15 onward](ML3-PR75-Followup-Chat-Prompts.md#p15---peer-review-findings) | Peer findings, Docker removal, UTF-8 fixes, App.kt conflict guidance and logging |
+
+### Current issue 77 conversation
+
+| Entry | Conversation | Scope |
+| --- | --- | --- |
+| M3-A18 | [Current shared chat](https://chatgpt.com/share/6afa6007-e4d8-83ea-94a7-02031003227e); [available prompts](ML3-Bus-Timeouts-Chat-Prompts.md) | Bus generation diagnostics and deadlines |
+| M3-A19 | [Current shared chat](https://chatgpt.com/share/6afa6007-e4d8-83ea-94a7-02031003227e); [available prompts](ML3-Bus-Timeouts-Chat-Prompts.md) | Cycling speed and required mixed legs |
+| M3-A20 | [Current shared chat](https://chatgpt.com/share/6afa6007-e4d8-83ea-94a7-02031003227e); [available prompts](ML3-Bus-Timeouts-Chat-Prompts.md) | Per-user generation protection |
+| M3-A21 | [Current shared chat](https://chatgpt.com/share/6afa6007-e4d8-83ea-94a7-02031003227e); [available prompts](ML3-Bus-Timeouts-Chat-Prompts.md) | Figma disabled transport choices |
+| M3-A22 | [Current shared chat](https://chatgpt.com/share/6afa6007-e4d8-83ea-94a7-02031003227e); [available prompts](ML3-Bus-Timeouts-Chat-Prompts.md) | Current bus chat logging |
 
 ## M3-A1 - PR 53 review and Android saved-state explanations
 
@@ -838,3 +850,107 @@ The AI proposed a 20-second base search deadline plus `floor(selectedMinutes / 6
 **Logging follow-up:** Read docs/HowToLog_AI.md and both existing logs; added M3-A15 through M3-A17 and the source archive, preserving existing IDs and distinguishing this chat from the independent CLI review. Supplied share URL identifies the source; the visible conversation is used as evidence without claiming a freshly exported complete transcript. Documentation-only checks are recorded with the logging commit; commit/push outcomes must be taken from actual Git output.
 
 **Reflection / limits:** Student-estimated active time, assignment-code percentage, deliberate technique selection and productivity/learning judgment: [Student reflection needed]. No subagents were used in this chat. **Technique record:** [M3-A17](ML3-AI-Technique-Log.md#m3-a17---peer-findings-deployment-simplification-and-appkt-merge-guidance).
+
+## M3-A18 - Bus generation diagnostics and deadlines
+
+**Contributor:** Requester; Artiom / NewWaveOwl supported by repository context, individual attribution not independently confirmed. **Logged:** 2026-11-15 (America/Toronto); individual prompt dates [Not documented]. **AI:** ChatGPT/Codex; exact model [Not documented]. No subagents used.
+
+**Source:** [Current shared chat](https://chatgpt.com/share/6afa6007-e4d8-83ea-94a7-02031003227e). **Available human prompts:** P01-P20 (especially P02-P10 and P14-P19); [full available prompt archive](ML3-Bus-Timeouts-Chat-Prompts.md). **Milestone:** ML3, linked to issue #77 and related transport UI.
+
+**Task/context:** Investigate issue #77's intermittent Bus/Walk + Bus failure without assuming every retry prompt is a timeout. Prepare an isolated branch from `adventure-completion-history-` and preserve settings, duration/zone/line restrictions, exclusions and cancellation. The source is the current visible conversation, including supplied logs; its share URL was supplied by the requester rather than independently exported during logging.
+
+**AI suggestion:** First trace Android, Ktor, bridge and OTP with credential-free correlation IDs and timings; distinguish HTTP/network, decoding, route validation, no-route and internal deadline outcomes. Keep a valid explicit walking alternative before transit can exhaust the existing search budget. Later proposed deduplicating stops before fare-zone queries, caching prepared polygons, cooperative cancellation and aligning socket/request deadlines.
+
+**Student decision / how output was used:** The requester explicitly required discussion before code (P04), asked what diagnostics mean (P05), supplied more logs (P06-P09/P14), authorized the initial implementation (P10), requested a commit (P18), then approved candidate/socket fixes with separate commits (P19). They asked how to rebuild/update a separate server while preserving its data (P11-P13/P20). P21 reports "Good, iw works!!!"; this is student-reported acceptance after rebuilding, not an independently captured complete live matrix.
+
+**AI output summary / findings:** The first Logcat attachment contained no RNDTransit generation error, and P09 only contained back-navigation callbacks. After diagnostics were added, `Pasted text(5).txt` identified an HTTP/2 socket timeout at 10.052 seconds. The matching Ktor request had accepted a walking fallback in 522 ms, then logged no transit attempt in the provided tail. Source inspection found expensive per-stop polygon checks before deduplication. That is evidence for investigating/preventing preparation stalls, not a measured before/after production CPU profile. The latest bridge log showed fresh STM predictions/alerts during those requests; earlier stale-alert/503 polling errors do not establish the captured GO failure's cause.
+
+**Implemented result / evidence:** Git confirms `b9d8119` (diagnostics/direct fallback and Bike groundwork), `5b2182a` (prepared polygon rings, deduplicated candidates, CPU-dispatched/cancellation-aware preparation) and `634ce86` (Android 45-second socket timeout plus the existing 45-second overall cap; backend upstream socket aligned with its existing 30-second cap). Search remains 20 + floor(minutes/60), API 40 seconds, at most 128 provider calls. See `backend/src/main/kotlin/transit/{Generation,PreparedGeometry,Model,Server}.kt`, shared generation client/generator and [troubleshooting/evidence documentation](../../../../backend/TripGeneration.md). A local worktree, not a successful remote clone, was created at `RNDTransitMTL-bus-timeouts` on `fix/77-bus-trip-timeouts` after clone/network/shell failures.
+
+**Verification:** Engineering-stage evidence includes deterministic exact-duration/orientation, exclusion, provider-failure, deadline-after-valid-result and cancellation fixtures. A repeated-stop fixture checks 10,000 copies with one zone query. Final generation suite: 41 backend tests; shared generation suite: 12 tests. These suites also cover M3-A19/A20 and must not be counted again as independent new runs for this documentation task. Cached Kotlin/JUnit compilation substituted for blocked normal Gradle execution. The real HTTP lifecycle test failed before assertions with Windows loopback `Permission denied: connect`. No new Android APK or complete second-PC/Azure matrix was independently verified by the agent. Rebuild commands and safe backend-lib replacement instructions were supplied; successful command execution beyond the student's P21 report is [Not documented].
+
+**Limitations:** No exhaustive GTFS expiry/night-service/sector/tunnel-outage/auth-refresh live matrix, independent post-fix latency comparison, issue closure or remote push is established. OTP graph, feed data, credentials and tunnel settings were not changed by this agent. The source supports targeted fixes and student-reported improvement, not complete issue #77 acceptance.
+
+**Reflection:** Student-estimated active time, code percentage, deliberate technique choice and productivity/learning assessment: [Student reflection needed]. **Technique record:** [M3-A18](ML3-AI-Technique-Log.md#m3-a18---bus-generation-diagnostics-and-deadlines).
+
+## M3-A19 - Cycling speed and required mixed legs
+
+**Contributor:** Requester; Artiom / NewWaveOwl supported by repository context, individual attribution not independently confirmed. **Logged:** 2026-11-15 (America/Toronto); individual prompt dates [Not documented]. **AI:** ChatGPT/Codex; exact model [Not documented]. No subagents used.
+
+**Source:** [Current shared chat](https://chatgpt.com/share/6afa6007-e4d8-83ea-94a7-02031003227e). **Available human prompts:** P03-P04, P10-P14, P19-P21; [full available prompt archive](ML3-Bus-Timeouts-Chat-Prompts.md). **Milestone:** ML3, linked to issue #77 and related transport UI.
+
+**Task/context:** Make Bike behave like faster walking, forward its selected speed, and later ensure Walk + Bike actually includes walking and cycling with Bike as the main transport.
+
+**AI suggestion:** Use the pedestrian graph at the selected cycling speed (8-32 km/h; default 18), preserving provider geometry/timing and identifying Bike legs. Initially selected direct modes remained alternatives ranked by closeness to the maximum. After the student's correction, route a real walking approach and a separately routed cycling section at their respective speeds, and require cycling to dominate distance and time.
+
+**Student decision / how output was used:** P03 requested the simplified faster-walking behaviour; P10 approved implementation. In P14 the student rejected walking-only output for Walk + Bike and required a walking leg plus Bike as main transport. P19 explicitly authorized that rule and separate commits. These corrections are student decisions; the concrete 5% approach with 10-100 m bounds is an AI implementation choice, not a separately supplied student parameter.
+
+**AI output summary / findings:** The speed slider previously was not sent to the backend. The new Ktor trace showed a valid 1,786-second Bike candidate replaced by a 1,794-second walking candidate under duration-only ranking. This explained the student's observation under the old alternatives policy; it did not satisfy the newly clarified mixed-leg requirement.
+
+**Implemented result / evidence:** `b9d8119` forwards Bike speed, plans simplified pedestrian-graph cycling and retains Bike identity. `bdd162d` adds `WalkBike.kt` and client validation: selecting exactly Walk + Bike requires positive walking/cycling sections, cycling greater in both distance and travel time, sequential provider routing and a shared total duration/orientation/attempt budget. A waypoint is chosen along provider guide geometry, then origin-to-waypoint walking and waypoint-to-destination cycling are separately routed. Missing sections are rejected rather than fabricated. Other mode combinations retain their alternative rules, including explicit Walk + Bus fallback. Saved route geometry and DTO round trips are retained.
+
+**Verification:** Backend fixtures cover own-speed section queries, timestamp order, cycling dominance, exact budget and orientation limits, missing sections, cancellation and call caps. Shared fixtures reject old-backend single-mode output for Walk + Bike and verify a valid mixed trip survives serialization/DTO restoration. The final 41-backend/12-shared suite totals are shared evidence with M3-A18/A20, not extra test counts. P21 is a generic student success report, without a new route capture proving each mixed-leg boundary live.
+
+**Limitations:** Pedestrian-graph cycling can include stairs/pedestrian restrictions and is not cycle-safe navigation or traffic-aware ETA. No full real-device cycling safety/ETA evaluation is established. Full Android assembly was not performed by the agent.
+
+**Reflection:** Student-estimated active time, code percentage, deliberate technique choice and productivity/learning assessment: [Student reflection needed]. **Technique record:** [M3-A19](ML3-AI-Technique-Log.md#m3-a19---cycling-speed-and-required-mixed-legs).
+
+## M3-A20 - Per-user generation protection
+
+**Contributor:** Requester; Artiom / NewWaveOwl supported by repository context, individual attribution not independently confirmed. **Logged:** 2026-11-15 (America/Toronto); individual prompt dates [Not documented]. **AI:** ChatGPT/Codex; exact model [Not documented]. No subagents used.
+
+**Source:** [Current shared chat](https://chatgpt.com/share/6afa6007-e4d8-83ea-94a7-02031003227e). **Available human prompts:** P17-P19; [full available prompt archive](ML3-Bus-Timeouts-Chat-Prompts.md). **Milestone:** ML3, linked to issue #77 and related transport UI.
+
+**Task/context:** Defend generation against repeated GO/retry requests, including more than one start within three seconds and overlapping searches from the same account.
+
+**AI suggestion:** Reject excess requests immediately with HTTP 429 and `Retry-After`, rather than timing out/signing out the user. Combine one active search per verified account with a three-second start-based cooldown, retain the global four-request cap and release active slots on all exit paths.
+
+**Student decision / how output was used:** P17 proposed a one-request-per-three-seconds measure and asked whether it was logical. P18 authorized only committing existing work; the agent did not claim rate limiting was included in that commit. P19 then explicitly authorized the app/backend/cooldown protections and a separate commit.
+
+**Implemented result / evidence:** `37d010e` adds `UserGenerationLimit`, backend 429 responses and `Retry-After`, client retry guidance and an active-job GO guard. GO was already disabled through processing state; the added job check is a second guard, not a wholly new loading lock. Production identity is taken from the verified Supabase `/auth/v1/user` response ID, never an unverified JWT claim/body user ID or raw token. Refreshed tokens/devices for one account use one key. Private unauthenticated development shares a `local-guest` key. Accepted starts begin the cooldown; rejections do not extend it or call OTP. Slots are released in `finally` after success, failure, timeout or cancellation.
+
+**Verification:** Deterministic tests cover exact three-second boundaries/rounded waits, independent users, overlapping requests for a verified identity after token refresh, provider-error release, cancellation/retry and the existing global capacity cap. The limiter retry fixture was later made scheduling-independent when candidate preparation moved onto the CPU dispatcher. The engineering-stage 36-backend/9-shared check passed before later combined suites expanded. A real HTTP test includes Retry-After assertions but could not reach them because the environment denied loopback setup. Authentication-provider live verification is not established here; source documentation was consulted while implementing.
+
+**Limitations:** Policy is bounded in-memory state for one server process, resets on restart and is not a distributed/multi-instance abuse system. No account ban or forced sign-out was implemented. Student live multi-device/concurrent-user testing is [Not documented].
+
+**Reflection:** Student-estimated active time, code percentage, deliberate technique choice and productivity/learning assessment: [Student reflection needed]. **Technique record:** [M3-A20](ML3-AI-Technique-Log.md#m3-a20---per-user-generation-protection).
+
+## M3-A21 - Figma disabled transport choices
+
+**Contributor:** Requester; Artiom / NewWaveOwl supported by repository context, individual attribution not independently confirmed. **Logged:** 2026-11-15 (America/Toronto); individual prompt dates [Not documented]. **AI:** ChatGPT/Codex; exact model [Not documented]. No subagents used.
+
+**Source:** [Current shared chat](https://chatgpt.com/share/6afa6007-e4d8-83ea-94a7-02031003227e). **Available human prompts:** P21; [full available prompt archive](ML3-Bus-Timeouts-Chat-Prompts.md). **Milestone:** ML3, linked to issue #77 and related transport UI.
+
+**Task/context:** Disable REM and Train UI choices using the supplied Figma `chipDisabled` / `RND / Selection chip` design, then commit. This is a planner-availability decision, not evidence that all existing backend train support was removed.
+
+**AI output summary / design evidence:** Read the existing Compose chip and planner state code. Design-context requests on the page returned no selection; metadata located `RND / Selection chip` and its Disabled variant `85:94` under the supplied node `9:2`. High-fidelity context and a screenshot showed white `#F8F8F8`, blue `#0076B3`, bold 14 px label, 44 px height, 14 px corners and 45% group opacity. Existing component/tokens were reused. No Figma design was edited and no static asset download was needed for this text-only component.
+
+**Student decision / how output was used:** P21 explicitly chose the disabled design and requested both modes be unavailable in the UI and committed. The preceding "it works" statement refers to earlier generation changes, not post-implementation acceptance of this disabled-chip change.
+
+**Implemented result / evidence:** `b05dbd3` changes `PlannerPreferenceBands.kt`, `MainPlannerViewModel.kt` and two test files. REM/Train remain visible but disabled/unselected at 45% opacity, with an accessible not-available description and no zone dropdown. Planner initialization, preference copying and toggle/zone callbacks exclude these modes from new selections, preventing restored drafts from silently submitting them. Historical trips and backend routing capabilities are not rewritten. Only Android needs rebuilding for this UI change.
+
+**Verification:** Fresh cached compilation and 32 shared/planner/rendered-interaction tests passed. The UI fixture clicks both disabled choices, checks that no zone menu/selection appears and verifies Bus/Metro interactions. A freshly rendered preference-panel PNG was visually inspected against the disabled variant. Initial direct-render runs encountered stale/mixed cached dependency ABIs (collection, resources, typography); the test classpath was aligned with project Compose versions and current theme sources. No dependency changes were committed to solve that harness issue. An Android APK build/device verification is not claimed.
+
+**Limitations:** No later student confirmation of this specific UI change is present. Existing time-log and local configuration edits were preserved outside the UI commit.
+
+**Reflection:** Student-estimated active time, code percentage, deliberate technique choice and productivity/learning assessment: [Student reflection needed]. **Technique record:** [M3-A21](ML3-AI-Technique-Log.md#m3-a21---figma-disabled-transport-choices).
+
+## M3-A22 - Current bus chat logging
+
+**Contributor:** Requester; Artiom / NewWaveOwl supported by repository context, individual attribution not independently confirmed. **Logged:** 2026-11-15 (America/Toronto); individual prompt dates [Not documented]. **AI:** ChatGPT/Codex; exact model [Not documented]. No subagents used.
+
+**Source:** [Current shared chat](https://chatgpt.com/share/6afa6007-e4d8-83ea-94a7-02031003227e). **Available human prompts:** P22; source coverage P01-P21; [full available prompt archive](ML3-Bus-Timeouts-Chat-Prompts.md). **Milestone:** ML3, linked to issue #77 and related transport UI.
+
+**Task/context:** Apply `docs/HowToLog_AI.md` to this exact shared conversation, extending existing milestone logs without executing historical prompts or replacing other contributors' records.
+
+**AI output summary:** Read the repository instruction and current decision/technique logs, checked for the supplied URL/duplicate IDs, verified the six engineering commits and created a single archive of 22 available human prompts. Added matching M3-A18 through M3-A22 records and session-index rows. Related engineering iterations are grouped by significant challenge; full prompts are not duplicated in the technique log.
+
+**Student decision / how output was used:** P22 supplies the exact current-chat share URL and explicitly requests logging. It does not request a new commit or push. Earlier commit instructions applied to the engineering/UI work; this documentation update remains uncommitted and unpushed.
+
+**Implemented result / evidence:** Updated the existing ML3 decision and technique logs and added `ML3-Bus-Timeouts-Chat-Prompts.md`. The first archive-writing script failed on a string delimiter before writing a file; a literal Markdown approach corrected it. Generated environment blocks and private internal reasoning were not treated as coursework prompts. Log attachment contents/credentials were not republished.
+
+**Verification:** Documentation-only checks verify matching stable IDs, prompt numbering/fences, links/anchors, referenced Git commits and whitespace. Engineering tests are cited as prior task evidence, not rerun as part of logging. No fresh browser export of the share is claimed because the visible current conversation supplies the evidence.
+
+**Limitations:** The archive is the visible available transcript, not a certified complete export. Exact model, student active time, assignment-code percentage and personal learning/productivity judgments remain missing. Unrelated local time/configuration edits are left intact.
+
+**Reflection:** Student-estimated active time, code percentage, deliberate technique choice and productivity/learning assessment: [Student reflection needed]. **Technique record:** [M3-A22](ML3-AI-Technique-Log.md#m3-a22---current-bus-chat-logging).

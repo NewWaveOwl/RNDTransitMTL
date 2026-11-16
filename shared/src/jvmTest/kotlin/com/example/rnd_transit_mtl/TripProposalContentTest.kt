@@ -19,9 +19,53 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import kotlin.test.assertEquals
+import com.example.rnd_transit_mtl.model.ids.TransportId
+import com.example.rnd_transit_mtl.model.ids.RouteId
+import com.example.rnd_transit_mtl.model.ids.ZoneId
+import com.example.rnd_transit_mtl.model.trip.TransitTiming
+import com.example.rnd_transit_mtl.model.trip.LegNavigation
+import com.example.rnd_transit_mtl.model.trip.TripTransportSnapshot
+import com.example.rnd_transit_mtl.model.trip.TripRouteSnapshot
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
 
 /** Verifies the supplied loading/preview controls render and dispatch their separate actions. */
 class TripProposalContentTest {
+    @OptIn(ExperimentalComposeUiApi::class)
+    @Test fun transitPreviewShowsOneCompactDepartureRowWithoutDiagnostics() {
+        val bus = TransportId("bus")
+        val route = RouteId("bus:411")
+        val now = Clock.System.now()
+        val departure = now + 20.minutes
+        val timing = TransitTiming(
+            departure.toString(), (departure + 15.minutes).toString(),
+            receivedAt = now.toEpochMilliseconds(), alerts = listOf("Test service alert"),
+            departureDelay = "PT1M", arrivalDelay = "PT2M")
+        val trip = reviewedHistoryPreviewTrip.copy(
+            legs = reviewedHistoryPreviewTrip.legs.map { it.copy(transportId = bus, routeId = route,
+                transitTiming = timing, navigation = LegNavigation("411")) },
+            selectedTransports = listOf(TripTransportSnapshot(bus, "Bus", true)),
+            selectedRoutes = listOf(TripRouteSnapshot(route, bus, "411")),
+            selectedZoneIds = listOf(ZoneId("A")),
+            selectedZonesByTransport = emptyMap())
+        val scene = ImageComposeScene(412, 720) {
+            RNDTransitTheme { TripProposalContent(trip, {}, {}, {}) }
+        }
+        try {
+            repeat(8) { scene.render((it + 1) * 16_000_000L).close() }
+            fun all(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::all)
+            val texts = scene.semanticsOwners.flatMap { all(it.rootSemanticsNode) }
+                .flatMap { it.config.getOrNull(SemanticsProperties.Text).orEmpty() }.map { it.text }
+            assertEquals(1, texts.count { it.matches(Regex("Bus 411 in [0-9]+ min \\([0-9]{2}:[0-9]{2}\\)")) })
+            assertEquals(1, texts.count { it == "Start Trip" })
+            assertFalse(texts.any { it.contains("delay", true) || it.contains("alert", true) || it.startsWith("Scheduled:") })
+            scene.render(160_000_000L).use { image ->
+                val folder = File("build/planner-previews").apply { mkdirs() }
+                image.encodeToData()!!.use { File(folder, "Trip-proposal-compact-transit.png").writeBytes(it.bytes) }
+            }
+        } finally { scene.close() }
+    }
+
     @OptIn(ExperimentalComposeUiApi::class)
     @Test
     fun loadingAndProposalActionsRemainSeparate() {
