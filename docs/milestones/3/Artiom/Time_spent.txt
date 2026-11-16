@@ -44,3 +44,8 @@ Checkpoint -> work on the OTP/STM/EXO full integration: migrated generation to K
 2026-11-15 16:00-19:30 UI fix, grup codding seeasin + powepoint
 
 
+2026-11-15 19:00-20:50 Fixed back end , made bus and bike work`
+
+
+22:00 - 24:00 fixed ui for depicting trip worked on the app deployment
+
