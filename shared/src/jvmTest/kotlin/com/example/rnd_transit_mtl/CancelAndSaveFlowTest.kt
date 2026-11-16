@@ -37,6 +37,7 @@ class CancelAndSaveFlowTest {
         override suspend fun signIn(email: String, password: String): Unit = error("Unexpected sign-in")
         override suspend fun signUp(email: String, password: String): Boolean = error("Unexpected signup")
         override suspend fun signOut(): Unit = error("Unexpected sign-out")
+        override suspend fun changePassword(password: String): Unit = error("Unexpected password change")
     }
 
     private class Host : AutoCloseable {
