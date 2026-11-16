@@ -384,61 +384,17 @@ internal fun TripProposalContent(
                     fontSize = 15.sp
                 )
 
-                if (timedLegs.size > 1) ProposalButton("Start Trip", true, onStart)
-
-                for (leg in timedLegs) {
-                    val timing = requireNotNull(leg.transitTiming)
-                    val predictionFresh = timing.predictionsFreshAt(nowMillis)
-                    if (timedLegs.size > 1) {
-                        trip.selectedRoutes.firstOrNull { it.id == leg.routeId }?.let { route ->
-                            Text(route.label, color = TransitWhite, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
+                for (leg in trip.legs.filter { it.transportId.value in listOf("bus", "metro", "train", "rem") }) {
+                    val routeLabel = trip.selectedRoutes.firstOrNull { it.id == leg.routeId }?.label
                     Text(
-                        text = when {
-                            timing.realtimeApplied && predictionFresh -> "Realtime estimate"
-                            timing.realtimeApplied -> "Saved realtime estimate · stale"
-                            timing.predictionSourceStatus == "stale" -> "Scheduled · predictions stale"
-                            timing.predictionSourceStatus == "unavailable" -> "Scheduled · predictions unavailable"
-                            timing.predictionSourceStatus == null -> "Scheduled · feed freshness unverified"
-                            else -> "Scheduled"
-                        },
+                        text = transitDepartureSummary(leg, routeLabel, nowMillis),
                         color = TransitWhite,
-                        fontSize = 14.sp
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
                     )
-                    Text(
-                        text = "Scheduled: ${timing.scheduledDeparture} → ${timing.scheduledArrival}",
-                        color = TransitWhite,
-                        fontSize = 12.sp
-                    )
-                    if (timing.realtimeApplied) {
-                        Text(
-                            text = (if (predictionFresh) "Estimated: " else "Saved estimate: ") +
-                                "${timing.estimatedDeparture ?: timing.scheduledDeparture} → " +
-                                (timing.estimatedArrival ?: timing.scheduledArrival),
-                            color = TransitWhite,
-                            fontSize = 12.sp
-                        )
-                        Text(
-                            text = "Departure delay: ${timing.departureDelay ?: "unavailable"} · " +
-                                "Arrival delay: ${timing.arrivalDelay ?: "unavailable"}",
-                            color = TransitWhite,
-                            fontSize = 12.sp
-                        )
-                    }
-                    if (timing.alertsFreshAt(nowMillis)) {
-                        timing.alerts.forEach { alert ->
-                            Text("Service alert: $alert", color = TransitWhite, fontSize = 12.sp)
-                        }
-                        if (timing.skippedAlerts > 0) {
-                            Text("Some service alerts could not be mapped.", color = TransitWhite, fontSize = 12.sp)
-                        }
-                    } else if (timing.alertSourceStatus != null) {
-                        Text("Service alerts unavailable or stale.", color = TransitWhite, fontSize = 12.sp)
-                    }
                 }
 
-                if (timedLegs.size <= 1) ProposalButton("Start Trip", true, onStart)
+                ProposalButton("Start Trip", true, onStart)
 
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     ProposalButton(
