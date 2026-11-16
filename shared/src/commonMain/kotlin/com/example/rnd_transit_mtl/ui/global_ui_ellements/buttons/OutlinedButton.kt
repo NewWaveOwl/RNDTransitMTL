@@ -8,11 +8,13 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.rnd_transit_mtl.ui.theme.TransitMain
 
 /**
@@ -23,8 +25,12 @@ import com.example.rnd_transit_mtl.ui.theme.TransitMain
  */
 @Composable
 fun TransitOutlineButton(label: String, onClick: () -> Unit, height: Dp = 38.dp,
-    fontSize: TextUnit = 12.sp) {
-    OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth().height(height),
+    fontSize: TextUnit = 12.sp, enabled: Boolean = true) {
+
+
+    val modifier = if (enabled) Modifier.fillMaxWidth().height(height) else Modifier.fillMaxWidth().height(height);
+
+    OutlinedButton(onClick = onClick, modifier = modifier, enabled = enabled,
         shape = RoundedCornerShape(height / 2), border = BorderStroke(1.dp, TransitMain)) {
         Text(label, fontSize = fontSize, fontWeight = FontWeight.SemiBold, color = TransitMain)
     }

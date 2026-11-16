@@ -20,3 +20,6 @@ node_modules/
 
 # Raw AI prompt log (written by the logging hook; readable version is docs/ai-log/conversations.md)
 docs/ai-log/raw/
+
+# Local OTP runtime: downloaded JDK, otp.jar, graph data and zips (backend/otp/ holds the tracked sources)
+tool/

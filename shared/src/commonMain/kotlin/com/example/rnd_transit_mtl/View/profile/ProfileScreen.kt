@@ -54,13 +54,18 @@ internal fun ProfileScreen(viewModel: ProfileViewModel?) {
 
             Spacer(Modifier.height(2.dp))
 
-            TransitOutlineButton(
-                "Edit profile",
-                onClick = {
-                    navigator.navigate(SettingsScreenKey)
-                }
-            )
+            if (viewModel != null) {
 
+                TransitOutlineButton(
+                    "Edit profile",
+                    onClick = {
+                        navigator.navigate(SettingsScreenKey)
+                    },
+                    enabled = viewModel != null
+
+                )
+
+            }
 
 
 
