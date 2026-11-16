@@ -4,6 +4,8 @@ See the [decision log](ML3-AI-Decision-Log.md) for full prompts and source cover
 
 M3-A13 and M3-A14 cover a separate current Codex conversation logged on 2026-11-14. Its three available human prompts are in the [PR 75 archive](ML3-PR75-Review-Fixes-Chat-Prompts.md); its verified conversation URL remains [Conversation link needed].
 
+**2026-11-15 bus-generation/UI coverage update:** M3-A18 through M3-A22 record the current issue #77 conversation, its visible log investigation, separately authorized commits, student-reported successful rebuild and disabled-chip design. The supplied current-chat share is preserved exactly. Available human prompts are archived once in [ML3-Bus-Timeouts-Chat-Prompts.md](ML3-Bus-Timeouts-Chat-Prompts.md); it is not a fresh shared-page export. Automated checks, blocked/live scenarios and student acceptance are distinguished. No subagents were used in this conversation. Exact model and personal reflection/time estimates remain [Not documented] or [Student reflection needed].
+
 ## M3-A1 - PR 53 review and Android saved-state explanations
 
 **Conversations:** [Shared chat](https://chatgpt.com/s/cx_6ae7b432fc4081919e59a08ce2eaf35d)
@@ -395,3 +397,98 @@ dependencies. Live device/tunnel checks remain unverified.
 | Time | Student-estimated active interaction time [Not documented]. |
 | Outcome | Local commit created; pushes failed and manual command provided. Current follow-up adds linked logs/archive, with Git outcome reported separately. |
 | Productivity/learning reflection | [Student reflection needed]. |
+
+## M3-A18 - Bus generation diagnostics and deadlines
+
+**Contributor:** Requester; individual attribution not independently confirmed. **Logged:** 2026-11-15 (America/Toronto). **Conversation:** [Current shared chat](https://chatgpt.com/share/6afa6007-e4d8-83ea-94a7-02031003227e). **Decision record / full prompts:** [M3-A18](ML3-AI-Decision-Log.md#m3-a18---bus-generation-diagnostics-and-deadlines); P01-P20 (especially P02-P10 and P14-P19) in the [available prompt archive](ML3-Bus-Timeouts-Chat-Prompts.md).
+
+| Field | Student record |
+| --- | --- |
+| Challenge addressed / context | Bus generation diagnostics and deadlines; ML3 issue #77/related transport UI, as detailed in the linked decision record. |
+| AI(s) used | ChatGPT/Codex; exact model and additional AI use [Not documented]. No subagents were used. |
+| Observable prompting pattern | Supplied issue criteria and attachments; requested discussion before edits, clarified filenames, tested builds and supplied a second correlated log capture. |
+| Techniques deliberately used | [Student reflection needed]; observable prompting does not prove deliberate technique selection. |
+| Iterations | Multiple related prompt/implementation/refinement steps are grouped here; exact engineering iteration count [Not documented]. The archive contains 22 visible human messages for the full session, not 22 engineering iterations. |
+| Debugging / refinement | The first capture lacked generation errors. Diagnostic logging exposed a 10.052-second socket timeout and an early valid fallback; source review then identified repeated polygon work. Candidate preparation was moved off I/O work with cooperative cancellation. |
+| Failed / rejected approaches | Initial remote/local clone attempts failed; a worktree was used. Normal Gradle/HTTP checks were blocked by cache/socket restrictions. Stale STM alerts were not adopted as the proven cause of the captured request failure. |
+| Strategy changes | Changed from a generic timeout suspicion to request-ID evidence and targeted preparation/deadline fixes; retained the existing total search limits. |
+| Verification | Deterministic timing/constraint/cancellation suites passed during engineering; real HTTP lifecycle setup was blocked. The student reported it working after rebuild; no exhaustive before/after live matrix is established. |
+| Code impact / outcome | b9d8119, 5b2182a and 634ce86; diagnostics, direct fallback, prepared/deduplicated candidates and socket alignment. Code percentage [Not documented]. |
+| Time | Student-estimated active AI interaction/debugging time [Not documented]; build/test duration and unrelated time-log changes are not substituted. |
+| Productivity / learning reflection | [Student reflection needed]. |
+
+## M3-A19 - Cycling speed and required mixed legs
+
+**Contributor:** Requester; individual attribution not independently confirmed. **Logged:** 2026-11-15 (America/Toronto). **Conversation:** [Current shared chat](https://chatgpt.com/share/6afa6007-e4d8-83ea-94a7-02031003227e). **Decision record / full prompts:** [M3-A19](ML3-AI-Decision-Log.md#m3-a19---cycling-speed-and-required-mixed-legs); P03-P04, P10-P14, P19-P21 in the [available prompt archive](ML3-Bus-Timeouts-Chat-Prompts.md).
+
+| Field | Student record |
+| --- | --- |
+| Challenge addressed / context | Cycling speed and required mixed legs; ML3 issue #77/related transport UI, as detailed in the linked decision record. |
+| AI(s) used | ChatGPT/Codex; exact model and additional AI use [Not documented]. No subagents were used. |
+| Observable prompting pattern | Requested faster walking-style Bike routing, then corrected an observed walking-only result and explicitly required both modes with cycling primary. |
+| Techniques deliberately used | [Student reflection needed]; observable prompting does not prove deliberate technique selection. |
+| Iterations | Multiple related prompt/implementation/refinement steps are grouped here; exact engineering iteration count [Not documented]. The archive contains 22 visible human messages for the full session, not 22 engineering iterations. |
+| Debugging / refinement | The selected Bike speed was not forwarded originally. Later logs showed a 1,786-second Bike route replaced by a 1,794-second walking route under duration-only ranking. |
+| Failed / rejected approaches | Treating Walk + Bike as interchangeable alternatives did not satisfy the clarified requirement. Merely relabelling a pure walk or inventing a missing section was not retained as the fix. |
+| Strategy changes | Moved to separate provider-routed walking and cycling sections at their own speeds, with sequential timing and cycling dominance. The waypoint bounds are AI implementation choices. |
+| Verification | Backend tests cover speeds/sections, exact budget/orientation, cancellation, missing sections and call caps; shared tests cover old-server rejection and save/restore. Real cycling safety/ETA was not independently checked. |
+| Code impact / outcome | b9d8119 and bdd162d. Walk + Bike now requires both positive sections; cycling remains simplified pedestrian-graph routing. Code percentage [Not documented]. |
+| Time | Student-estimated active AI interaction/debugging time [Not documented]; build/test duration and unrelated time-log changes are not substituted. |
+| Productivity / learning reflection | [Student reflection needed]. |
+
+## M3-A20 - Per-user generation protection
+
+**Contributor:** Requester; individual attribution not independently confirmed. **Logged:** 2026-11-15 (America/Toronto). **Conversation:** [Current shared chat](https://chatgpt.com/share/6afa6007-e4d8-83ea-94a7-02031003227e). **Decision record / full prompts:** [M3-A20](ML3-AI-Decision-Log.md#m3-a20---per-user-generation-protection); P17-P19 in the [available prompt archive](ML3-Bus-Timeouts-Chat-Prompts.md).
+
+| Field | Student record |
+| --- | --- |
+| Challenge addressed / context | Per-user generation protection; ML3 issue #77/related transport UI, as detailed in the linked decision record. |
+| AI(s) used | ChatGPT/Codex; exact model and additional AI use [Not documented]. No subagents were used. |
+| Observable prompting pattern | Proposed one request per user per three seconds, asked for evaluation, then explicitly authorized app/backend protections and separate commits. |
+| Techniques deliberately used | [Student reflection needed]; observable prompting does not prove deliberate technique selection. |
+| Iterations | Multiple related prompt/implementation/refinement steps are grouped here; exact engineering iteration count [Not documented]. The archive contains 22 visible human messages for the full session, not 22 engineering iterations. |
+| Debugging / refinement | GO was already disabled through processing state; an active-job guard was added. Tests cover stable verified identity across refreshed tokens, independent users, overlap, cooldown boundaries and cleanup. |
+| Failed / rejected approaches | Timing out or signing out the user was replaced by immediate 429/Retry-After guidance. A three-second limit alone was insufficient for long overlapping searches. |
+| Strategy changes | Combined one active request per verified account with a start-based cooldown and existing global capacity cap; used verified auth-response identity rather than untrusted IDs. |
+| Verification | Deterministic concurrency/cooldown/failure/cancellation tests passed. Header lifecycle assertions exist but real loopback execution was blocked. Live authenticated multi-device behavior [Not documented]. |
+| Code impact / outcome | 37d010e. In-memory single-process rate protection, no account ban; code percentage [Not documented]. |
+| Time | Student-estimated active AI interaction/debugging time [Not documented]; build/test duration and unrelated time-log changes are not substituted. |
+| Productivity / learning reflection | [Student reflection needed]. |
+
+## M3-A21 - Figma disabled transport choices
+
+**Contributor:** Requester; individual attribution not independently confirmed. **Logged:** 2026-11-15 (America/Toronto). **Conversation:** [Current shared chat](https://chatgpt.com/share/6afa6007-e4d8-83ea-94a7-02031003227e). **Decision record / full prompts:** [M3-A21](ML3-AI-Decision-Log.md#m3-a21---figma-disabled-transport-choices); P21 in the [available prompt archive](ML3-Bus-Timeouts-Chat-Prompts.md).
+
+| Field | Student record |
+| --- | --- |
+| Challenge addressed / context | Figma disabled transport choices; ML3 issue #77/related transport UI, as detailed in the linked decision record. |
+| AI(s) used | ChatGPT/Codex; exact model and additional AI use [Not documented]. No subagents were used. |
+| Observable prompting pattern | Supplied a node-specific Figma link and named disabled-chip state, identified REM/Train as unavailable, and requested a commit. |
+| Techniques deliberately used | [Student reflection needed]; observable prompting does not prove deliberate technique selection. |
+| Iterations | Multiple related prompt/implementation/refinement steps are grouped here; exact engineering iteration count [Not documented]. The archive contains 22 visible human messages for the full session, not 22 engineering iterations. |
+| Debugging / refinement | Page-level context returned no selection; metadata located the Disabled variant. Existing Compose components/tokens were adapted to its 45% group opacity and disabled interactions. |
+| Failed / rejected approaches | Initial direct-render checks failed on mixed cached collection/resource/typography ABIs, not the intended UI behavior. The harness was aligned with project versions; no dependency changes were committed. |
+| Strategy changes | Added state/callback safeguards as well as appearance, so restored/copied preferences cannot re-enable unsupported choices. Read-only Figma inspection did not alter the design. |
+| Verification | 32 targeted shared/planner/rendered tests passed, including disabled clicks and supported Bus/Metro behavior. The fresh panel render was visually inspected; Android device verification remains unclaimed. |
+| Code impact / outcome | b05dbd3, four files. Disabled chips remain visible; backend train capabilities and historical trips remain unchanged. Code percentage [Not documented]. |
+| Time | Student-estimated active AI interaction/debugging time [Not documented]; build/test duration and unrelated time-log changes are not substituted. |
+| Productivity / learning reflection | [Student reflection needed]. |
+
+## M3-A22 - Current bus chat logging
+
+**Contributor:** Requester; individual attribution not independently confirmed. **Logged:** 2026-11-15 (America/Toronto). **Conversation:** [Current shared chat](https://chatgpt.com/share/6afa6007-e4d8-83ea-94a7-02031003227e). **Decision record / full prompts:** [M3-A22](ML3-AI-Decision-Log.md#m3-a22---current-bus-chat-logging); P22; source coverage P01-P21 in the [available prompt archive](ML3-Bus-Timeouts-Chat-Prompts.md).
+
+| Field | Student record |
+| --- | --- |
+| Challenge addressed / context | Current bus chat logging; ML3 issue #77/related transport UI, as detailed in the linked decision record. |
+| AI(s) used | ChatGPT/Codex; exact model and additional AI use [Not documented]. No subagents were used. |
+| Observable prompting pattern | Explicitly invoked HowToLog_AI and supplied the current share URL. |
+| Techniques deliberately used | [Student reflection needed]; observable prompting does not prove deliberate technique selection. |
+| Iterations | Multiple related prompt/implementation/refinement steps are grouped here; exact engineering iteration count [Not documented]. The archive contains 22 visible human messages for the full session, not 22 engineering iterations. |
+| Debugging / refinement | Read existing instructions/logs; grouped significant challenges and preserved 22 available human prompts once. A string-delimiter failure in the first archive script was corrected without partial file output. |
+| Failed / rejected approaches | Did not treat a share link as proof of complete transcript coverage, engineering test claims as fresh documentation checks, time-log entries as AI interaction estimates, or earlier commit requests as new Git authorization. |
+| Strategy changes | Added M3-A18-M3-A22 with shared prompt references and explicit evidence/reflection gaps, preserving earlier contributors and IDs. |
+| Verification | Checked IDs, prompt fences/numbering, relative links/anchors, commit references and whitespace. No application tests were rerun for this logging task. |
+| Code impact / outcome | Documentation update only: two existing logs plus one archive, left uncommitted/unpushed. Application-code percentage not applicable to this documentation step. |
+| Time | Student-estimated active AI interaction/debugging time [Not documented]; build/test duration and unrelated time-log changes are not substituted. |
+| Productivity / learning reflection | [Student reflection needed]. |
