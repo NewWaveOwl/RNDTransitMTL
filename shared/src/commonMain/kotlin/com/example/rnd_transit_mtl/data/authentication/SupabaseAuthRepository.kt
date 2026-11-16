@@ -64,4 +64,10 @@ internal class SupabaseAuthRepository(
     override suspend fun signOut() {
         auth.signOut()
     }
+
+    override suspend fun changePassword(password: String) {
+        auth.updateUser(config = {
+            this.password = password
+        })
+    }
 }

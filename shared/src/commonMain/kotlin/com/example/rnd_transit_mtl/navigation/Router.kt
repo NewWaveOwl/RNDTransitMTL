@@ -32,7 +32,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
-import com.example.rnd_transit_mtl.App
 import com.example.rnd_transit_mtl.View.about.AboutScreen
 import com.example.rnd_transit_mtl.View.authentication.AuthScreen
 import com.example.rnd_transit_mtl.ViewModels.authentication.AuthViewModel
@@ -114,6 +113,7 @@ data class TripDetailsScreenKey(
 ) : ScreenKey() {
     override val screenTitle = "Trip details"
 }
+
 
 /**
  * Restricted, serializable return destinations for review editing.

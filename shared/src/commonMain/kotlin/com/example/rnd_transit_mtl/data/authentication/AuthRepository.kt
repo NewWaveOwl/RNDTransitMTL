@@ -20,4 +20,6 @@ internal interface AuthRepository {
     /** True when signup requires email verification before a session exists. */
     suspend fun signUp(email: String, password: String): Boolean
     suspend fun signOut()
+
+    suspend fun changePassword(password: String)
 }

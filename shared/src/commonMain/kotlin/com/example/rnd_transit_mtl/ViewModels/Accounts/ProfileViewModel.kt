@@ -27,22 +27,21 @@ internal class ProfileViewModel(
     private val mutableState = MutableStateFlow(ProfileUiState())
     val state = mutableState.asStateFlow()
 
+
     init {
         viewModelScope.launch {
             try {
-                val account = loadAccount()
-                mutableState.update { it.copy(account = account, accountLoadFailed = account == null) }
+                viewModelScope.launch {
+                    accountRepository.loadedAccount.collect { account ->
+                        mutableState.update { it.copy(account = account) }
+                    }
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
                 mutableState.update { it.copy(accountLoadFailed = true) }
             }
         }
-    }
-
-    suspend fun loadAccount(): AccountDto? {
-
-        return accountRepository.getAccount()
 
     }
 

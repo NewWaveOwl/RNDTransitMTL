@@ -15,7 +15,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.rnd_transit_mtl.ViewModels.Accounts.ProfileViewModel
 import com.example.rnd_transit_mtl.navigation.*
-import com.example.rnd_transit_mtl.state.user.LocalNicknameSession
 import com.example.rnd_transit_mtl.ui.theme.TransitComplementary
 import com.example.rnd_transit_mtl.ui.theme.TransitMain
 import org.jetbrains.compose.resources.painterResource
@@ -37,15 +36,29 @@ internal fun ProfileScreen(viewModel: ProfileViewModel?) {
     ) {
         Text("Your profile", color = TransitComplementary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(4.dp))
+
         Icon(painterResource(Res.drawable.ic_account_circle), contentDescription = null,
             tint = TransitMain, modifier = Modifier.size(56.dp))
+
         Text(if (viewModel == null) "Guest" else when {
                 state?.account != null -> state.account.username
                 state?.accountLoadFailed == true -> "Couldn’t load profile"
                 else -> "Loading…"
             },
             color = TransitComplementary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+
         Spacer(Modifier.height(2.dp))
+
+        ProfileOutlineButton(
+            "Edit profile",
+            onClick = {
+                navigator.navigate(SettingsScreenKey)
+            }
+        )
+
+
+
+
         if (viewModel == null) {
             ProfileOutlineButton("Sign in", onClick = { navigator.navigate(AuthScreenKey()) })
             ProfileOutlineButton("Create an account", onClick = { navigator.navigate(AuthScreenKey(register = true)) })
