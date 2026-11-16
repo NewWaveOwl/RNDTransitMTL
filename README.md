@@ -75,7 +75,7 @@ The trip/review flow originated in
 [Artiom's Assignment 3 repository](https://github.com/NewWaveOwl/As3_APPDEV2_RND_Tranzit_Sova/tree/8b1b538)
 and has since been integrated with the real-route backend.
 
-## Milestone 3 - Code Contribution - Artiom (self-reported estimates)
+## Milestone 3 - Code Contribution - Artiom
 
 | Contribution | Artiom | AI |
 | --- | ---: | ---: |
