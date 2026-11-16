@@ -126,10 +126,10 @@ class Trip33FlowTest {
             scene.sendPointerEvent(PointerEventType.Release, point, timeMillis = time / 1_000_000 + 1)
         }
         suspend fun back() { input.back(); render() }
-        suspend fun await(label: String) {
+        suspend fun await(label: String, ready: () -> Boolean = { has(label) }) {
             repeat(100) {
                 render(2)
-                if (has(label)) return
+                if (ready()) return
                 delay(5)
             }
             snapshot("Trip33-test-failure.png")
@@ -177,7 +177,11 @@ class Trip33FlowTest {
             assertNull(host.store.activeTrip)
             host.snapshot("Backend-first-proposal.png")
             host.click("Generate another")
-            host.await("Destination 2")
+            // The preview shows an editable trip name, not the destination label.
+            // Wait for both the proposal actions and the newly published route.
+            host.await("second backend proposal") {
+                host.has("Start Trip") && host.mapData.trip?.destination?.label == "Destination 2"
+            }
             val second = assertNotNull(host.mapData.trip)
             assertEquals(origin, second.origin)
             assertNotEquals(first.destination, second.destination)
