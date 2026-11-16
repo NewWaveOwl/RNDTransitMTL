@@ -17,7 +17,7 @@ import kotlin.time.TimeSource
 internal fun rememberBackendTripGenerator(endpoint: String?): BackendTripGenerator? {
     val client = remember(endpoint) {
         if (endpoint.isNullOrBlank()) null else HttpClient {
-            install(HttpTimeout) { requestTimeoutMillis = 45_000; connectTimeoutMillis = 5_000 }
+            install(HttpTimeout) { requestTimeoutMillis = 45_000; socketTimeoutMillis = 45_000; connectTimeoutMillis = 5_000 }
         }
     }
     DisposableEffect(client) { onDispose { client?.close() } }

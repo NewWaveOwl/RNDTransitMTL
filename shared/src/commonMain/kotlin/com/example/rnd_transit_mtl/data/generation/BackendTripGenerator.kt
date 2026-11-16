@@ -12,6 +12,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import io.ktor.client.plugins.HttpRequestTimeoutException
+import io.ktor.client.network.sockets.SocketTimeoutException
+import io.ktor.client.network.sockets.ConnectTimeoutException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -127,7 +129,7 @@ internal class BackendTripGenerator(
             log("failed stage=$stage ${generationFailureTrace(error)}")
             reportFailure(error)
             val message = when {
-                error is HttpRequestTimeoutException -> "Trip planner request timed out. Check your connection and retry."
+                error is HttpRequestTimeoutException || error is SocketTimeoutException || error is ConnectTimeoutException -> "Trip planner request timed out. Check your connection and retry."
                 error is GenerationHttpFailure -> when(error.status) {
                     401, 403 -> "Sign in again to generate a trip."
                     429 -> "A trip is already running or requests are too frequent. Try again in ${error.retryAfterSeconds ?: 3} seconds."

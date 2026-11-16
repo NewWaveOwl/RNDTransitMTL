@@ -232,4 +232,10 @@ class BackendTripGeneratorTest {
         assertTrue(assertIs<TripGenerationResult.RoutingUnavailable>(result).message.contains("timed out"))
     }
 
+    @Test fun socketTimeoutHasATimeoutMessageInsteadOfAGenericProviderError()=runTest {
+        val result=BackendTripGenerator(post={ throw io.ktor.client.network.sockets.SocketTimeoutException("fixture") })
+            .generate(input,modes,emptySet())
+        assertTrue(assertIs<TripGenerationResult.RoutingUnavailable>(result).message.contains("timed out"))
+    }
+
 }

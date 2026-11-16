@@ -470,3 +470,19 @@ Candidate-preparation validation: 38 backend tests passed through direct cached
 compilation/JUnit, including existing line/zone/hole/exclusion checks. The limiter
 retry test now waits for its coroutine's explicit entry signal instead of assuming
 one `yield` completes CPU-dispatched setup. Live server timings remain pending.
+
+## Explicit socket deadlines (#77)
+
+Android now sets `socketTimeoutMillis=45000` alongside the unchanged 45-second
+request and five-second connection limits. This overrides OkHttp's ten-second
+read timeout observed in the uploaded HTTP/2 Logcat trace. Ktor's upstream client
+also explicitly uses a 30-second socket timeout within its existing 30-second
+request cap. The generation API remains capped at 40 seconds and search at
+20–26 seconds. Socket, connection and overall-request timeout exceptions show an
+explicit timeout/retry message. This fixes deadline alignment; it does not imply
+that a disconnected tunnel or an unavailable provider will succeed.
+
+Timeout validation: 38 backend and 10 shared generator tests passed through direct
+cached compilation/JUnit. The socket-exception fixture verifies the actionable
+message. Real HTTP/2 delays over ten seconds and Azure tunnel checks remain pending;
+no live timing success is inferred from these tests.

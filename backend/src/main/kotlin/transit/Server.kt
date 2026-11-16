@@ -28,7 +28,7 @@ import java.util.logging.Logger
 
 private const val fareSource="https://donnees.artm.quebec/catalogue/dataset/9b19ddd0-f10d-45b9-9cee-8896bacc012d/resource/88c53302-58f7-4d35-9231-dc3d48dce008/download/zone_tarifaire_2026.geojson"
 internal class Upstream : AutoCloseable {
-    private val client=HttpClient(OkHttp) { install(HttpTimeout) { requestTimeoutMillis=30_000; connectTimeoutMillis=5_000 }; followRedirects=true }
+    private val client=HttpClient(OkHttp) { install(HttpTimeout) { requestTimeoutMillis=30_000; socketTimeoutMillis=30_000; connectTimeoutMillis=5_000 }; followRedirects=true }
     suspend fun request(url: String, body: JsonObject?=null, headers: Map<String,String> = emptyMap()): HttpResponse {
         require(URI(url).scheme in listOf("http","https")) { "Endpoint must use HTTP(S)." }
         return client.request(url) { method=if(body==null) HttpMethod.Get else HttpMethod.Post
