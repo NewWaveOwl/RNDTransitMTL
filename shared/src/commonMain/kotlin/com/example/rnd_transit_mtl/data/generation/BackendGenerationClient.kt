@@ -9,6 +9,8 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import kotlinx.serialization.json.*
+import kotlin.time.TimeSource
 
 /** Reuses one cancellable client. Tokens are read at request time after session refresh. */
 @Composable
@@ -22,13 +24,19 @@ internal fun rememberBackendTripGenerator(endpoint: String?): BackendTripGenerat
     return remember(endpoint, client) {
         client?.let {
             BackendTripGenerator(post = { body ->
+                val requestId = Json.parseToJsonElement(body).jsonObject["requestId"]!!.jsonPrimitive.content
+                val started = TimeSource.Monotonic.markNow()
+                println("RndTransitGeneration request=$requestId http=start")
                 val response = it.post(requireNotNull(endpoint)) {
+                    header("X-Request-ID", requestId)
                     contentType(ContentType.Application.Json)
                     SupabaseBackend.client.auth.currentSessionOrNull()?.accessToken?.let { token -> bearerAuth(token) }
                     setBody(body)
                 }
-                response.bodyAsText().also { text -> require(text.length <= 2_000_000) }
-            })
+                println("RndTransitGeneration request=$requestId http=${response.status.value} elapsedMs=${started.elapsedNow().inWholeMilliseconds}")
+                if(response.status.value !in 200..299) throw GenerationHttpFailure(response.status.value)
+                response.bodyAsText()
+            }, diagnostic = { event -> println("RndTransitGeneration $event") })
         }
     }
 }

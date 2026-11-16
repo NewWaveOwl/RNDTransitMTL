@@ -38,7 +38,7 @@ internal class Upstream : AutoCloseable {
     }
     suspend fun json(url: String, body: JsonObject?=null): JsonObject {
         val response=request(url,body)
-        if(!response.status.isSuccess()) throw ProviderError("Upstream returned HTTP ${response.status.value}.")
+        if(!response.status.isSuccess()) throw ProviderError("Upstream returned HTTP ${response.status.value}.", httpStatus=response.status.value)
         return try { transit.json.parseToJsonElement(response.bodyAsText()).jsonObject } catch(e: Exception) { throw ProviderError("Invalid upstream JSON.",e) }
     }
     override fun close()=client.close()
@@ -74,7 +74,7 @@ internal class Api(private val generator: Generator, private val authorize: susp
         failureLogger.log(Level.WARNING, "Trip generation failed; requestId=$id", error)
     }) {
     private val capacity=Semaphore(4)
-    suspend fun handle(contentType: String?, authorization: String?, read: suspend ()->String): Pair<Int,JsonObject> {
+    suspend fun handle(contentType: String?, authorization: String?, requestId: String = "generation-${requestSequence.incrementAndGet()}", read: suspend ()->String): Pair<Int,JsonObject> {
         if(!capacity.tryAcquire()) return 429 to obj("status" to "unavailable","message" to "Trip planner is busy. Try again.")
         try {
             return withTimeout(40_000) {
@@ -82,13 +82,13 @@ internal class Api(private val generator: Generator, private val authorize: susp
                 checkInput(contentType?.substringBefore(';')?.trim()=="application/json","Send application/json.")
                 val text=read(); checkInput(text.toByteArray().size<=16_384,"Request is too large.")
                 val body=try { json.parseToJsonElement(text) } catch(_: Exception) { throw InputError("Invalid JSON request.") }
-                200 to generator.generate(parseRequest(body))
+                200 to generator.generate(parseRequest(body),requestId)
             }
         } catch(e: TimeoutCancellationException) { currentCoroutineContext().ensureActive(); return 503 to obj("status" to "unavailable","message" to "Request timed out.") }
         catch(e: CancellationException) { throw e }
         catch(e: InputError) { return 400 to obj("status" to "invalid_input","message" to e.message) }
         catch(e: Exception) {
-            val id = "generation-${requestSequence.incrementAndGet()}"
+            val id = requestId
             logFailure(id, sanitizedFailure(e))
             return 503 to obj("status" to "unavailable","message" to "Routing service unavailable. Try again.","requestId" to id)
         }
@@ -100,7 +100,11 @@ internal fun Application.generationRoutes(api: Api) {
         install(HttpRequestLifecycle) { cancelCallOnClose = true }
         get("/health") { call.respondText(obj("status" to "ready").toString(),ContentType.Application.Json) }
         post("/v1/trips/generate") {
-            val (status,result)=api.handle(call.request.headers[HttpHeaders.ContentType],call.request.headers[HttpHeaders.Authorization]) {
+            val requestId=call.request.headers["X-Request-ID"]?.takeIf { it.matches(Regex("[A-Za-z0-9-]{1,64}")) }
+                ?: "generation-${requestSequence.incrementAndGet()}"
+            val started=System.nanoTime()
+            println("RndTransitGeneration request=$requestId api=start")
+            val (status,result)=api.handle(call.request.headers[HttpHeaders.ContentType],call.request.headers[HttpHeaders.Authorization],requestId) {
                 val channel=call.receiveChannel(); val output=ByteArrayOutputStream(); val buffer=ByteArray(4096)
                 while(true) {
                     val size=channel.readAvailable(buffer,0,buffer.size)
@@ -110,6 +114,8 @@ internal fun Application.generationRoutes(api: Api) {
                 }
                 output.toString(Charsets.UTF_8.name())
             }
+            println("RndTransitGeneration request=$requestId api=$status elapsedMs=${(System.nanoTime()-started)/1_000_000}")
+            call.response.headers.append("X-Request-ID",requestId)
             call.response.headers.append(HttpHeaders.CacheControl,"no-store")
             call.respondText(result.toString(),ContentType.Application.Json,HttpStatusCode.fromValue(status))
         }

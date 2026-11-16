@@ -22,7 +22,7 @@ internal fun JsonElement?.number(): Double? = (this as? JsonPrimitive)?.takeUnle
 internal fun JsonElement?.items(): List<JsonElement> = (this as? JsonArray)?.toList() ?: emptyList()
 internal fun JsonElement?.strings() = items().map { it.text() ?: throw InputError("Expected text selections.") }
 internal class InputError(message: String) : IllegalArgumentException(message)
-internal class ProviderError(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
+internal class ProviderError(message: String, cause: Throwable? = null, val httpStatus: Int? = null) : RuntimeException(message, cause)
 internal fun checkInput(condition: Boolean, message: String) { if (!condition) throw InputError(message) }
 
 internal data class Point(val latitude: Double, val longitude: Double) {
@@ -66,9 +66,11 @@ internal val modeNames=mapOf("walk" to "WALK", "bike" to "BICYCLE", "bus" to "BU
 internal val walkingSpeeds=mapOf("Amble" to 3.0,"Walk" to 4.8,"Dash" to 6.8)
 internal fun orientationSeconds(meters: Double)=ceil(meters*60/1000).toLong()
 internal data class Request(val origin: JsonObject, val minutes: Int, val modes: List<String>, val pace: String,
-    val zones: Map<String,List<String>>, val lines: List<String>, val excluded: List<Point>) {
+    val zones: Map<String,List<String>>, val lines: List<String>, val excluded: List<Point>, val bikeSpeedKmh: Int = 18) {
     val start get()=point(origin["point"])
     val speed get()=walkingSpeeds.getValue(pace)/3.6
+    val bikeOnly get()=modes==listOf("bike")
+    val directSpeed get()=if(bikeOnly) bikeSpeedKmh/3.6 else speed
 }
 internal fun parseRequest(v: JsonElement): Request {
     val origin=v.field("origin") as? JsonObject ?: throw InputError("Choose a starting point.")
@@ -80,6 +82,8 @@ internal fun parseRequest(v: JsonElement): Request {
     checkInput(modes.isNotEmpty() && modes.distinct()==modes && modes.all { it in modeNames },"Choose supported transport modes.")
     val pace=v.field("walkingPreference")?.text() ?: if(v.field("walkingPreference")==null) "Amble" else throw InputError("Choose Amble, Walk or Dash.")
     checkInput(pace in walkingSpeeds,"Choose Amble, Walk or Dash.")
+    val bikeSpeed=v.field("bikeSpeedKmh")?.number() ?: if(v.field("bikeSpeedKmh")==null) 18.0 else throw InputError("Choose a valid bike speed.")
+    checkInput(bikeSpeed in 8.0..32.0 && bikeSpeed%1==0.0,"Choose a bike speed from 8 to 32 km/h.")
     val rawZones=v.field("zonesByTransport")
     checkInput(rawZones==null || rawZones is JsonObject,"Invalid transit zones.")
     val zones=(rawZones as? JsonObject)?.mapValues { (_,z) -> z.strings() } ?: emptyMap()
@@ -97,11 +101,11 @@ internal fun parseRequest(v: JsonElement): Request {
         checkInput(ref.field("type").text() in listOf("Node","Way","Relation") && id!=null && id>0 && id<=9_007_199_254_740_991.0 && id%1==0.0,"Invalid origin reference.")
     }
     val clean=JsonObject(origin.filterKeys { it in listOf("label","point","osmReference") })
-    return Request(clean,minutes.toInt(),modes,pace,zones,lines,excluded)
+    return Request(clean,minutes.toInt(),modes,pace,zones,lines,excluded,bikeSpeed.toInt())
 }
 /** Uniform-area arbitrary coordinates, independent of stops or a POI catalogue. */
 internal fun candidates(input: Request, random: Random=Random.Default): List<Point> {
-    val speed=when { input.modes.any { it in listOf("train","metro") } -> 30.0; "bus" in input.modes -> 15.0; "bike" in input.modes -> 8.0; else -> input.speed }
+    val speed=when { input.modes.any { it in listOf("train","metro") } -> 30.0; "bus" in input.modes -> 15.0; "bike" in input.modes -> input.bikeSpeedKmh/3.6; else -> input.speed }
     val radius=min(100_000.0,input.minutes*60/(1/speed+0.06)); val inner=cos(min(250.0,radius/4)/earthRadius); val outer=cos(radius/earthRadius)
     val result=mutableListOf<Point>()
     repeat(128*64) {

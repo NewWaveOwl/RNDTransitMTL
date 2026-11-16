@@ -191,4 +191,45 @@ class BackendTripGeneratorTest {
             BackendTripGenerator(post = { throw CancellationException("Cancelled") }).generate(input, modes, emptySet())
         }
     }
+    @Test fun bikeSpeedAndRequestIdReachBackendAndBikeRemainsBike()=runTest {
+        val bike=TransportId("bike")
+        val trip=assertIs<TripGenerationResult.Success>(BackendTripGenerator(post={ body ->
+            val request=Json.decodeFromString<BackendGenerationRequest>(body)
+            assertEquals(26,request.bikeSpeedKmh)
+            assertTrue(request.requestId.isNotBlank())
+            response().replace("WALK","BICYCLE")
+        }).generate(input.copy(selectedTransportIds=listOf(bike),bikeSpeedKmh=26),
+            listOf(TransportType(bike,"Bike",false)),emptySet())).trip
+        assertTrue(trip.legs.all { it.transportId==bike })
+        assertEquals(listOf(bike),trip.requestedTransportIds)
+    }
+
+    @Test fun diagnosticsIdentifyFailureStageWithoutLeakingExceptionMessages()=runTest {
+        val events=mutableListOf<String>()
+        val result=BackendTripGenerator(post={ throw IllegalStateException("Bearer SECRET origin=-73.6") },
+            diagnostic={events+=it}).generate(input,modes,emptySet())
+        assertIs<TripGenerationResult.RoutingUnavailable>(result)
+        assertTrue(events.any { "stage=http" in it && "IllegalStateException" in it })
+        assertFalse(events.joinToString().contains("SECRET"))
+        assertFalse(events.joinToString().contains("-73.6"))
+        events.clear()
+        BackendTripGenerator(post={ "<html>tunnel unavailable</html>" },diagnostic={events+=it})
+            .generate(input,modes,emptySet())
+        assertTrue(events.any { "stage=decode" in it })
+        events.clear()
+        BackendTripGenerator(post={ response(elapsed=1801) },diagnostic={events+=it})
+            .generate(input,modes,emptySet())
+        assertTrue(events.any { "stage=validate" in it })
+    }
+
+    @Test fun httpFailuresAndSearchTimeoutHaveActionableMessages()=runTest {
+        for((status,expected) in mapOf(401 to "Sign in",403 to "Sign in",429 to "busy",503 to "unavailable")) {
+            val result=assertIs<TripGenerationResult.RoutingUnavailable>(BackendTripGenerator(post={ throw GenerationHttpFailure(status) })
+                .generate(input,modes,emptySet()))
+            assertTrue(result.message.contains(expected))
+        }
+        val result=BackendTripGenerator(post={ """{"status":"timeout"}""" }).generate(input,modes,emptySet())
+        assertTrue(assertIs<TripGenerationResult.RoutingUnavailable>(result).message.contains("timed out"))
+    }
+
 }

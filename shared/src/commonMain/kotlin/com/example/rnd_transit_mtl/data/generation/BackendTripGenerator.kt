@@ -9,10 +9,14 @@ import com.example.rnd_transit_mtl.model.ids.TripId
 import com.example.rnd_transit_mtl.model.transport.TransportType
 import com.example.rnd_transit_mtl.model.trip.*
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import io.ktor.client.plugins.HttpRequestTimeoutException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlin.time.TimeSource
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
@@ -24,7 +28,9 @@ internal data class BackendGenerationRequest(
     val zonesByTransport: Map<String, List<String>>,
     val selectedRouteIds: List<String>,
     val excludedDestinations: List<GeoPoint>,
-    val walkingPreference: String = "Amble"
+    val walkingPreference: String = "Amble",
+    val bikeSpeedKmh: Int = 18,
+    val requestId: String = ""
 )
 
 @Serializable
@@ -50,7 +56,8 @@ internal class BackendTripGenerator(
     private val post: suspend (String) -> String,
     private val idFactory: () -> String = { Uuid.random().toString() },
     private val now: () -> Long = { Clock.System.now().toEpochMilliseconds() },
-    private val reportFailure: (Exception) -> Unit = {}
+    private val reportFailure: (Exception) -> Unit = {},
+    private val diagnostic: (String) -> Unit = {}
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -72,6 +79,7 @@ internal class BackendTripGenerator(
                 input.plannedMinutes, input.attractionIntensity)
             require(input.selectedTransportIds.isNotEmpty()) { "Choose at least one transport type." }
             require(input.selectedTransportIds.distinct().size == input.selectedTransportIds.size)
+            require(input.bikeSpeedKmh in 8..32) { "Choose a bike speed from 8 to 32 km/h." }
             require(input.walkingPreference in listOf("Amble", "Walk", "Dash")) { "Choose Amble, Walk or Dash." }
             require(input.selectedTransportIds.all { id -> OtpMode.entries.any { it.id == id } }) {
                 "Choose walking, cycling, STM bus/métro or exo train. REM routing is not available yet."
@@ -84,30 +92,59 @@ internal class BackendTripGenerator(
         } catch (invalid: IllegalArgumentException) {
             return TripGenerationResult.InvalidInput(invalid.message ?: "Check your trip choices.")
         }
+        val requestId = Uuid.random().toString()
+        val started = TimeSource.Monotonic.markNow()
+        var stage = "encode"
+        fun log(event: String) = diagnostic("request=$requestId elapsedMs=${started.elapsedNow().inWholeMilliseconds} $event")
         return try {
+            log("start modes=${input.selectedTransportIds.joinToString { it.value }} minutes=${input.plannedMinutes} bikeSpeedKmh=${input.bikeSpeedKmh}")
             val request = BackendGenerationRequest(
                 origin, input.plannedMinutes, input.selectedTransportIds.map { it.value },
                 input.selectedZonesByTransport.entries.associate { (mode, zones) -> mode.value to zones.map { it.value } },
-                input.selectedRouteIds.map { it.value }, excludedDestinations.takeLast(10), input.walkingPreference
+                input.selectedRouteIds.map { it.value }, excludedDestinations.takeLast(10), input.walkingPreference, input.bikeSpeedKmh, requestId
             )
-            val response = json.decodeFromString<BackendGenerationResponse>(post(json.encodeToString(request)))
+            val payload = json.encodeToString(request)
+            stage = "http"
+            val text = post(payload)
+            currentCoroutineContext().ensureActive()
+            stage = "decode"
+            require(text.length <= 2_000_000)
+            val response = json.decodeFromString<BackendGenerationResponse>(text)
+            log("response status=${response.status}")
+            stage = "validate"
             when (response.status) {
                 "no_trip" -> TripGenerationResult.NoRoute
                 "invalid_input" -> TripGenerationResult.InvalidInput(response.message ?: "Check your trip choices.")
+                "timeout" -> TripGenerationResult.RoutingUnavailable("Trip search timed out. Retry or adjust your choices.")
                 "unauthorized" -> TripGenerationResult.RoutingUnavailable("Sign in again to generate a trip.")
-                "success" -> acceptedTrip(response, input, origin, existingTripIds)
+                "success" -> acceptedTrip(response, input, origin, existingTripIds, requestId).also { log("validated result=${it::class.simpleName}") }
                 else -> TripGenerationResult.RoutingUnavailable(response.message ?: "Routing service unavailable. Try again.")
             }
         } catch (cancelled: CancellationException) {
+            log("cancelled stage=$stage")
             throw cancelled
         } catch (error: Exception) {
+            log("failed stage=$stage ${generationFailureTrace(error)}")
             reportFailure(error)
-            TripGenerationResult.RoutingUnavailable("Could not reach the trip planner. Try again.")
+            val message = when {
+                error is HttpRequestTimeoutException -> "Trip planner request timed out. Check your connection and retry."
+                error is GenerationHttpFailure -> when(error.status) {
+                    401, 403 -> "Sign in again to generate a trip."
+                    429 -> "Trip planner is busy. Try again shortly."
+                    400 -> "The planner rejected these choices. Check your settings and retry."
+                    else -> "Routing service unavailable. Try again shortly."
+                }
+                stage == "decode" -> "The planner returned an unreadable response. Retry; check the server or tunnel if this continues."
+                stage == "validate" -> "The planner returned an invalid route. Retry or adjust your choices."
+                else -> "Could not reach the trip planner. Check your connection and retry."
+            }
+            if(error is GenerationHttpFailure && error.status == 400) TripGenerationResult.InvalidInput(message)
+            else TripGenerationResult.RoutingUnavailable(message)
         }
     }
 
     private fun acceptedTrip(
-        response: BackendGenerationResponse, input: TripGenerationInput, origin: Place, existingIds: Set<TripId>
+        response: BackendGenerationResponse, input: TripGenerationInput, origin: Place, existingIds: Set<TripId>, requestId: String
     ): TripGenerationResult {
         require(response.origin == origin) { "The backend changed the confirmed origin." }
         val destination = requireNotNull(response.destination)
@@ -117,7 +154,10 @@ internal class BackendTripGenerator(
         response.travelTimeSeconds?.let { require(it > 0 && it + response.orientationBufferSeconds == elapsed) }
         val request = TripRequest(input.ownerId, origin, destination, input.plannedMinutes, input.selectedTransportIds,
             input.selectedZonesByTransport)
-        val decoder = OtpItineraryDecoder(reportFailure = reportFailure)
+        val decoder = OtpItineraryDecoder(reportFailure = { error ->
+            diagnostic("request=$requestId failed stage=itinerary-decode ${generationFailureTrace(error)}")
+            reportFailure(error)
+        })
         val route = decoder.decodeResponse(requireNotNull(response.otp), request)
         if (route !is RoutingResult.Success) return TripGenerationResult.RoutingUnavailable("The trip planner returned an invalid route.")
         require(route.durationSeconds <= elapsed)
@@ -141,3 +181,18 @@ internal class BackendTripGenerator(
 }
 
 internal val LocalBackendTripGenerator = staticCompositionLocalOf<BackendTripGenerator?> { null }
+
+/** HTTP status only: never retain response bodies, endpoints or authorization headers. */
+internal class GenerationHttpFailure(val status: Int) : Exception("Trip planner HTTP $status")
+
+/** Keep exception types and code frames; messages can contain credentials or full request URLs. */
+internal fun generationFailureTrace(error: Throwable, depth: Int = 0): String = buildString {
+    append(error::class.simpleName)
+    // Remove the message line, retaining source frames only.
+    val frames = error.stackTraceToString().lineSequence().drop(1)
+        .filter { it.trimStart().startsWith("at ") }.take(8)
+    frames.forEach { append("\n"); append(it) }
+    if(depth < 3) error.cause?.takeIf { it !== error }?.let {
+        append("\nCaused by: "); append(generationFailureTrace(it, depth + 1))
+    }
+}

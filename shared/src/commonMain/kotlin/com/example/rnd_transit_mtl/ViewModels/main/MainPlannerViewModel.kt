@@ -20,7 +20,7 @@ import kotlinx.serialization.Serializable
  * @property selectedZoneIds Legacy shared zones used to restore older drafts.
  * @property intensity Attraction intensity from 0 to 100.
  * @property walkingPreference Backend pace: Amble 3, Walk 4.8, or Dash 6.8 km/h.
- * @property bikeSpeedKmh Preferred cycling speed in km/h, retained for future routing.
+ * @property bikeSpeedKmh Preferred cycling speed in km/h, used for accelerated pedestrian routing.
  * @property selectedAttractionIds Attraction preferences retained for future routing.
  * @property selectedZonesByTransport Independent zones for each transit mode, including disabled modes.
  * @property origin Selected source-image point; default coordinates are labelled sample data.

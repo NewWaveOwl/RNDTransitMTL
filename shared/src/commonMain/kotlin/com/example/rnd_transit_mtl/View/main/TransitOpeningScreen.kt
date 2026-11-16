@@ -417,7 +417,8 @@ internal fun TransitOpeningScreen(
                     selectedZonesByTransport = zones,
                     origin = origin?.copy(),
                     originPlace = planner.originPlace,
-                    walkingPreference = planner.walkingPreference
+                    walkingPreference = planner.walkingPreference,
+                    bikeSpeedKmh = planner.bikeSpeedKmh
                 )
 
                 // Explicit samples are distinct from validation failures.

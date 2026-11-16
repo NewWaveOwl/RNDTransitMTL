@@ -97,7 +97,7 @@ class GenerationTest {
     }
     @Test fun cancellationAndTimeoutDoNotFabricateRoutes()=runBlocking {
         val slow=Generator(emptyList(),zones(),{ delay(1000);response() },{now},{listOf(end)},10)
-        assertEquals("no_trip",slow.generate(parseRequest(input()))["status"].text())
+        assertEquals("timeout",slow.generate(parseRequest(input()))["status"].text())
         try { generator { throw CancellationException("cancelled") }.generate(parseRequest(input())); fail() } catch(_: CancellationException) { }
     }
     @Test fun apiDistinguishesInvalidAuthAndProviderFailures()=runBlocking {
@@ -291,6 +291,100 @@ class GenerationTest {
         try { cancelled.handle("application/json",null) { input().toString() }; fail("Cancellation swallowed") }
         catch(_: CancellationException) { }
         assertEquals(1,entries.size)
+    }
+
+    @Test fun bikeUsesPedestrianGraphAndSelectedSpeedWithoutChangingGeometry()=runBlocking {
+        for(speed in listOf(8,18,32)) {
+            val request=parseRequest(JsonObject(input(modes=listOf("bike")) + ("bikeSpeedKmh" to JsonPrimitive(speed))))
+            val result=generator { query ->
+                assertEquals(listOf("WALK"),query.field("variables").field("modes").field("direct").strings())
+                assertEquals(speed/3.6,query.field("variables").field("walkSpeed").number()!!,1e-9)
+                response()
+            }.generate(request)
+            assertEquals("success",result["status"].text())
+            val leg=result.field("otp").field("data").field("planConnection").field("edges").items().single()
+                .field("node").field("legs").items().single()
+            assertEquals("BICYCLE",leg.field("mode").text())
+            assertEquals(response().field("data").field("planConnection").field("edges").items().single()
+                .field("node").field("legs").items().single().field("legGeometry"),leg.field("legGeometry"))
+        }
+        for(speed in listOf(JsonPrimitive(7),JsonPrimitive(33),JsonPrimitive(18.5),JsonPrimitive("18"))) {
+            try { parseRequest(JsonObject(input() + ("bikeSpeedKmh" to speed))); fail("Invalid speed accepted") }
+            catch(_: InputError) { }
+        }
+    }
+
+    @Test fun bikeTransitAccessKeepsWalkingPace()=runBlocking {
+        val request=parseRequest(input("Dash",listOf("bike","bus"))).copy(bikeSpeedKmh=32)
+        val query=otpRequest(request,end,now,null)
+        assertEquals(6.8/3.6,query.field("variables").field("walkSpeed").number()!!,1e-9)
+        assertEquals(emptyList<String>(),query.field("variables").field("modes").field("direct").strings())
+        val result=generator { q ->
+            if(q.field("variables").field("modes").field("directOnly")==JsonPrimitive(true)) response() else response(mode="BUS")
+        }.generate(request)
+        assertEquals("success",result["status"].text())
+    }
+
+    @Test fun explicitWalkingFallbackSurvivesTransitFailureAndDeadline()=runBlocking {
+        for(slow in listOf(false,true)) {
+            val log=mutableListOf<String>()
+            val g=Generator(emptyList(),zones(),{ query ->
+                if(query.field("variables").field("modes").field("directOnly")==JsonPrimitive(true)) response()
+                else if(slow) { delay(10_000); response(mode="BUS") }
+                else throw ProviderError("offline")
+            },{now},{listOf(end)},200,diagnostic={log+=it})
+            val result=g.generate(parseRequest(input(modes=listOf("walk","bus"))),"fixture-77")
+            assertEquals("success",result["status"].text())
+            assertEquals(1260.0,result["elapsedSeconds"].number()!!,0.0)
+            assertTrue(log.any { "request=fixture-77" in it })
+            assertFalse(log.any { "-73.6" in it })
+        }
+        try { generator { throw ProviderError("offline") }.generate(parseRequest(input(modes=listOf("bus")))); fail() }
+        catch(_: ProviderError) { }
+    }
+
+    @Test fun fallbackStillHonoursExclusionsBudgetAndParentCancellation()=runBlocking {
+        val request=parseRequest(input(modes=listOf("walk","bus")))
+        var calls=0
+        val excluded=Generator(emptyList(),zones(),{ calls++; response() },{now},{listOf(end)})
+        assertEquals("no_trip",excluded.generate(request.copy(excluded=listOf(end)))["status"].text())
+        assertEquals(0,calls)
+        assertEquals("no_trip",generator { response(29.5) }.generate(request)["status"].text())
+        assertEquals(1800.0,generator { response(29.0) }.generate(request)["elapsedSeconds"].number()!!,0.0)
+        val entered=CompletableDeferred<Unit>()
+        val g=generator { entered.complete(Unit); awaitCancellation() }
+        val job=async { g.generate(request) }
+        entered.await(); job.cancel()
+        try { job.await(); fail("Cancelled fallback returned") } catch(_: CancellationException) { }
+    }
+
+    @Test fun laterTransitMatchCanImproveWalkingFallbackWithoutLosingLineFilter()=runBlocking {
+        val request=parseRequest(input(modes=listOf("walk","bus"))).copy(lines=listOf("bus:55"))
+        val routes=listOf(obj("gtfsId" to "STM:55","mode" to "BUS","shortName" to "55"))
+        val g=Generator(routes,zones(),{ query ->
+            if(query.field("variables").field("modes").field("directOnly")==JsonPrimitive(true)) response(10.0)
+            else {
+                assertEquals(listOf("STM:55"),query.field("variables").field("filters").items().single()
+                    .field("include").items().single().field("routes").strings())
+                response(28.0,mode="BUS")
+            }
+        },{now},{listOf(end)})
+        val result=g.generate(request)
+        assertEquals(1740.0,result["elapsedSeconds"].number()!!,0.0)
+        assertEquals("BUS",result.field("otp").field("data").field("planConnection").field("edges").items().single()
+            .field("node").field("legs").items().single().field("mode").text())
+    }
+
+    @Test fun directPhasesAndTransitShareTheAttemptLimit()=runBlocking {
+        var calls=0
+        val points=(1..130).map { Point(45.5+it*0.001,-73.6) }
+        val g=Generator(emptyList(),zones(),{ calls++
+            obj("data" to obj("planConnection" to obj("edges" to emptyList<Any>(),"routingErrors" to emptyList<Any>())))
+        },{now},{points},diagnostic={})
+        val result=g.generate(parseRequest(input(modes=listOf("walk","bike","bus"))))
+        assertEquals("no_trip",result["status"].text())
+        assertEquals(128,calls)
+        assertEquals(128.0,result["attempts"].number()!!,0.0)
     }
 
 }

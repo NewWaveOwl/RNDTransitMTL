@@ -1,7 +1,7 @@
 # Backend trip generation (#67)
 
 Android **GO** sends the confirmed WGS84 origin, time budget, allowed modes and
-per-mode transit zones and walking pace to a Kotlin/Ktor service. The backend evaluates network-linked stops and geographic destinations, validates routes
+per-mode transit zones, walking pace and bike speed to a Kotlin/Ktor service. The backend evaluates network-linked stops and geographic destinations, validates routes
 through OTP, and returns the valid itinerary closest to the selected duration. The app decodes that itinerary once and reuses its geometry
 in Preview, Active Trip and saved state. Android does not fall back to invented routes
 when the backend is unavailable. Desktop/Web previews retain their existing sample
@@ -70,6 +70,91 @@ cannot override them. This pace applies to walking access and transfers as well.
 OTP defines walking speed as the maximum on flat ground; crossings and terrain may
 reduce actual average speed. The candidate radius accounts for both the selected
 pace and orientation reserve, and the routed itinerary receives the final budget check.
+
+## Bike and direct alternatives (#77)
+
+Bike currently uses the pedestrian street graph with the selected speed (8–32 km/h,
+18 by default). The client sends `bikeSpeedKmh`; the server validates it and uses
+metres per second for OTP. Accepted pedestrian-only bike itineraries keep OTP's
+geometry, duration, timestamps and navigation steps, but return `BICYCLE` legs so
+Preview, Active Trip and history show Bike. Candidate distance uses the same speed.
+This is simplified cycling: pedestrian paths may contain stairs or restrictions
+unsuitable for riding. It does not claim cycle-safe routing or traffic-aware ETA.
+
+Mixed selections plan bike-only alternatives separately so bike speed never speeds
+up walking access, egress or transfers. Walk + transit first tries up to four
+walking candidates; any mixed Bike selection also tries up to four bike candidates.
+Each direct phase can use at most one quarter of the existing search deadline.
+The complete search, including these phases, remains inside
+`20 + floor(selectedMinutes / 60)` seconds and 128 OTP calls. This scheduling change
+reserves time for an allowed direct alternative before potentially slow transit
+search, without increasing client/API/search limits (45/40/20–26 seconds).
+It can reduce time available for transit optimisation, especially if both direct
+modes are selected. Later valid candidates still replace a shorter result.
+
+A valid direct result survives later provider failure or deadline expiry. This is
+an actual OTP route, not an invented line and not an offline fallback. If OTP is
+unreachable for all requests, generation still fails. Walking-only results require
+Walk; Bus alone never returns an all-walking route. The fallback retains the exact
+origin, walking pace, exclusions and service-area checks. Transit candidates still
+obey line/zone restrictions. Waiting, transfers and orientation reserve remain
+inside the selected maximum. An internal deadline without a valid result now
+returns `status: timeout`, distinct from `no_trip` after a completed search.
+
+## Capturing a failed GO request
+
+Android writes `RndTransitGeneration` messages to Logcat (`System.out` tag). Use
+`package:com.example.rnd_transit_mtl` and search for `RndTransitGeneration`.
+Clear the log, press GO and retain the entire request through success/error.
+Messages include a generated request ID, elapsed milliseconds, selected mode IDs,
+maximum minutes, bike speed, HTTP status, backend status and failure stage
+(`encode`, `http`, `decode`, `validate` or `itinerary-decode`). Exception diagnostics
+retain types, source frames and bounded causes, omitting exception messages because
+those may contain URLs, tokens or request data. They omit origin coordinates,
+authorization headers, request/response bodies and endpoint URLs.
+
+The same ID is sent as `X-Request-ID`. Ktor accepts only 1–64 alphanumeric/hyphen
+characters, creates an ID otherwise, echoes it in the response, and logs API
+start/status/timing. Generation logs include search/attempt timing, provider-error
+types/upstream HTTP status, routing-error codes, route acceptance/rejection and deadline outcome. Direct-phase records carry
+`phase=walk` or `phase=bike`. Use API logs plus the Bridge/OTP timestamps to correlate
+feed events; request IDs are not yet propagated inside the external bridge/OTP.
+
+Interpret results by stage: no HTTP response suggests connection/request failure;
+401/403 requests sign-in; 429 indicates capacity; 5xx indicates service failure;
+`decode` can expose an HTML tunnel response; `validate` identifies rejected route
+invariants. A working HTTP exchange does not establish that the itinerary is valid.
+Keep origin/settings and retry; cancellation continues to propagate and a cancelled
+request is checked before decoding/publishing. Diagnostics do not enable live GPS.
+
+### Evidence and remaining checks
+
+The supplied Bridge/OTP logs show recurring STM alerts 503 responses and rejected
+realtime updates alongside many successful updates. They do **not** identify the
+failed GO request or establish that stale alerts cause trip-generation failure.
+The supplied Logcat capture lacked RNDTransit generation diagnostics. These changes
+make the next reproduction diagnosable; they do not establish the live root cause.
+
+| Coverage | Evidence/status |
+| --- | --- |
+| Bike at 8/18/32 km/h, invalid speeds, output mode/geometry, walking transit access | Deterministic regression tests added |
+| Explicit walking fallback, provider failure after valid result, deadline after valid result | Deterministic regression tests added |
+| Exact duration/orientation boundaries, exclusions and parent cancellation | Deterministic regression tests added; existing timing tests retained |
+| HTTP failure messages, decode/validation stages, credential-free traces, bike speed request | Shared regression tests added |
+| Real Android and separate server PC, local versus Azure tunnel | Not run; requires updated app and backend deployment and correlated captures |
+| Real STM/exo sectors, late-night/expired GTFS, cold/warm graph, fresh/stale/recovering feeds | Not run in this environment |
+| Real network loss/tunnel interruptions, auth expiry/session refresh, restarts and concurrent users | Not run in this environment; existing deterministic capacity/cancellation tests retained |
+
+
+Validation in this workspace: 33 backend generation tests and 9 shared generator
+tests passed using the cached Kotlin compiler and JUnit directly. The shared check
+compiled the changed generation/HTTP code and relevant current model/decoder/DTO
+sources with cached dependencies; it is not a complete multiplatform or Android
+build. Gradle validation was blocked by user-cache permissions and local daemon
+connection failures. The real HTTP socket lifecycle test, Android build/install
+and separate-PC/Azure tests have not been run for this change. Before reproducing,
+rebuild/restart the generation backend and install the updated Android app; an
+old backend ignores bike speed and lacks the new direct fallback scheduling.
 
 ## Run with the Windows launcher
 

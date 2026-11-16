@@ -114,8 +114,8 @@ internal enum class PlannerSheetPosition { Main, Routes, Preferences, Collapsed 
  * @param selectedZonesByTransport Independently selected zone IDs for each transit mode.
  * @param onToggleTransport Requests an independent transport toggle.
  * @param onToggleZone Requests a zone toggle for the supplied transport ID and zone ID.
- * @param walkingPreference Selected walking style, retained for future routing.
- * @param bikeSpeedKmh Selected cycling speed in km/h, retained for future routing.
+ * @param walkingPreference Selected walking style, used for walking routes and transit access.
+ * @param bikeSpeedKmh Selected cycling speed in km/h, used for accelerated pedestrian routing.
  * @param onBikeSpeedChange Requests a cycling-speed change.
  * @param selectedAttractionIds Selected attraction labels, retained for future routing.
  * @param onWalkingPreferenceChange Requests a walking-style change.
