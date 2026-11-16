@@ -2,7 +2,11 @@ package com.example.rnd_transit_mtl.View.history
 
 import com.example.rnd_transit_mtl.state.NullableTripIdSaver
 import com.example.rnd_transit_mtl.model.ids.TripId
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.AlertDialog
+import com.example.rnd_transit_mtl.layout.PageTitle
+import com.example.rnd_transit_mtl.navigation.HistoryScreenKey
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -13,7 +17,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.foundation.layout.Column
 import com.example.rnd_transit_mtl.data.trips.LocalCloudTrips
 import com.example.rnd_transit_mtl.data.trips.tryCloudAction
 import com.example.rnd_transit_mtl.model.trip.Trip
@@ -44,13 +47,24 @@ fun HistoryScreen(
     val cloud = LocalCloudTrips.current
     val scope = rememberCoroutineScope()
     var cloudRecords by remember(cloud) { mutableStateOf(emptyList<Trip>()) }
+    var loadedRevision by remember(cloud) { mutableStateOf(-1) }
+    var loading by remember(cloud) { mutableStateOf(cloud != null) }
     var loadFailed by remember { mutableStateOf(false) }
     var retry by remember { mutableStateOf(0) }
     var removing by remember { mutableStateOf(false) }
 
     LaunchedEffect(cloud, cloud?.revision, isDestinationActive, retry) {
         if (cloud != null && isDestinationActive) {
-            loadFailed = !tryCloudAction { cloudRecords = cloud.history() }
+            loading = true
+            try {
+                val requestedRevision = cloud.revision
+                loadFailed = !tryCloudAction {
+                    cloudRecords = cloud.history()
+                    loadedRevision = requestedRevision
+                }
+            } finally {
+                loading = false
+            }
         }
     }
 
@@ -71,10 +85,17 @@ fun HistoryScreen(
     val filter = TripHistoryFilter.entries.firstOrNull { it.name == filterName } ?: TripHistoryFilter.ALL
 
     // History lists completed trips and cancelled trips the user chose to keep.
+    val snapshot by tripsStore.state
+    val localRecords = snapshot.completedTrips + snapshot.cancelledTrips
     val historyRecords = if (cloud != null) {
-        cloudRecords.filterNot { it.id in tripsStore.state.value.pendingFinalTripIds }
+        // Pending records remain visible offline. Keep acknowledged local records
+        // visible until History has fetched the corresponding cloud revision.
+        val localVisible = localRecords.filter {
+            it.id in snapshot.pendingFinalTripIds || loadedRevision != cloud.revision
+        }
+        (localVisible + cloudRecords).distinctBy { it.id }
     } else {
-        tripsStore.completedTrips + tripsStore.cancelledTrips
+        localRecords
     }
     val pendingRemovalTrip = historyRecords.firstOrNull {
         it.id == pendingRemovalId
@@ -145,11 +166,8 @@ fun HistoryScreen(
             scope.launch {
                 try {
                     if (tryCloudAction {
-                        cloud.mutate {
-                            deleteTrip(tripId)
-                            tripsStore.removeFromHistory(tripId)
-                            cloudRecords = cloudRecords.filterNot { it.id == tripId }
-                        }
+                        cloud.removeTrip(tripId)
+                        cloudRecords = cloudRecords.filterNot { it.id == tripId }
                     }) {
                         pendingRemovalId = null
                         errorMessage = null
@@ -196,9 +214,12 @@ fun HistoryScreen(
             { tripId -> openExistingTrip(tripId, callback) }
         }
 
-    Column(modifier) {
+    Column(modifier.fillMaxSize()) {
+        PageTitle(title = HistoryScreenKey.screenTitle, layoutScale = 1f, highlighted = false)
         if (loadFailed) {
-            TextButton(onClick = { retry++ }) { Text("Could not load History. Retry") }
+            TextButton(onClick = { retry++ }, enabled = isDestinationActive && !loading) {
+                Text("Could not load cloud history. Retry")
+            }
         }
         HistoryContent(
             trips = historyTrips(historyRecords, filter),
@@ -215,7 +236,7 @@ fun HistoryScreen(
             onRemove = { requestRemoval(it) },
             actionsEnabled = isDestinationActive,
             errorMessage = errorMessage,
-            modifier = Modifier
+            isLoading = loading
         )
     }
     if (isDestinationActive && pendingRemovalTrip != null) {

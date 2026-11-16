@@ -24,6 +24,9 @@ import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMapData
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.bundledMapSize
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.mapImageRect
 import com.example.rnd_transit_mtl.ui.theme.RNDTransitTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
 import java.io.File
 import kotlin.test.*
 
@@ -31,7 +34,7 @@ import kotlin.test.*
 @OptIn(ExperimentalComposeUiApi::class)
 class PlannerOriginUiTest {
     @Test
-    fun sheetAccessibilityActionsHideAndRestoreMapControls() {
+    fun sheetAccessibilityActionsHideAndRestoreMapControls() = runBlocking(Dispatchers.Main) {
         var edited = 0
         var mapData = TransitMapData()
         val scene = ImageComposeScene(412, 800) {
@@ -44,8 +47,11 @@ class PlannerOriginUiTest {
             }
         }
         var time = 0L
-        // Sheet motion and the field exit can run in sequence on slower CI hosts.
-        fun render() { repeat(60) { time += 16_000_000; scene.render(time).close() } }
+        // Render and run Compose effects on the same dispatcher. Yield between frames so
+        // sheet motion and the field exit finish without racing a layout on the AWT thread.
+        suspend fun render() {
+            repeat(60) { yield(); time += 16_000_000; scene.render(time).close() }
+        }
         fun all(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::all)
         fun nodes() = scene.semanticsOwners.flatMap { all(it.rootSemanticsNode) }
         fun originField() = nodes().firstOrNull {
@@ -54,7 +60,7 @@ class PlannerOriginUiTest {
         fun control(description: String) = nodes().first {
             it.config.getOrNull(SemanticsProperties.ContentDescription)?.contains(description) == true
         }
-        fun changeSheet(label: String) {
+        suspend fun changeSheet(label: String) {
             assertTrue(control("Trip preferences").config[SemanticsActions.CustomActions]
                 .first { it.label == label }.action())
             render()
@@ -87,7 +93,7 @@ class PlannerOriginUiTest {
     }
 
     @Test
-    fun tapsUseTheRenderedSourceRectangleInPortraitAndLandscape() {
+    fun tapsUseTheRenderedSourceRectangleInPortraitAndLandscape() = runBlocking(Dispatchers.Main) {
         for ((width, height) in listOf(412 to 720, 720 to 412)) {
             var picked: TripPoint? = null
             val scene = ImageComposeScene(width, height) {
@@ -96,7 +102,7 @@ class PlannerOriginUiTest {
                 }
             }
             try {
-                repeat(4) { scene.render(it * 16_000_000L).close() }
+                repeat(4) { yield(); scene.render(it * 16_000_000L).close() }
                 val tap = Offset(width * 0.27f, height * 0.24f)
                 scene.sendPointerEvent(PointerEventType.Press, tap, timeMillis = 80)
                 scene.sendPointerEvent(PointerEventType.Release, tap, timeMillis = 81)
@@ -110,15 +116,15 @@ class PlannerOriginUiTest {
     }
 
     @Test
-    fun recenterRestoresTheCameraWithoutEditingOrigin() {
+    fun recenterRestoresTheCameraWithoutEditingOrigin() = runBlocking(Dispatchers.Main) {
         val origin = TripPoint("Saved starting point", 0.5f, 0.35f)
         var recenter by mutableStateOf(0)
         val scene = ImageComposeScene(412, 720) {
             RNDTransitTheme { FigmaOriginMap(origin, Modifier.fillMaxSize(), recenterRequest = recenter) }
         }
         var time = 0L
-        fun snapshot(): ByteArray {
-            repeat(4) { time += 16_000_000; scene.render(time).close() }
+        suspend fun snapshot(): ByteArray {
+            repeat(4) { yield(); time += 16_000_000; scene.render(time).close() }
             return scene.render(time + 1).use { image -> image.encodeToData()!!.use { it.bytes } }
         }
         try {
@@ -135,7 +141,7 @@ class PlannerOriginUiTest {
     }
 
     @Test
-    fun permissionOptionsAndPointConfirmationRenderAtSmallSizes() {
+    fun permissionOptionsAndPointConfirmationRenderAtSmallSizes() = runBlocking(Dispatchers.Main) {
         for ((width, height) in listOf(412 to 716, 320 to 480)) {
             var picking by mutableStateOf(false)
             var draft by mutableStateOf<TripPoint?>(null)
@@ -151,8 +157,8 @@ class PlannerOriginUiTest {
                 }
             }
             var time = 0L
-            fun render(name: String) {
-                repeat(4) { time += 16_000_000; scene.render(time).close() }
+            suspend fun render(name: String) {
+                repeat(4) { yield(); time += 16_000_000; scene.render(time).close() }
                 scene.render(time + 1).use { image ->
                     val folder = File("build/planner-previews").apply { mkdirs() }
                     image.encodeToData()!!.use { File(folder, "$name-$width.png").writeBytes(it.bytes) }

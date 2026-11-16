@@ -1,19 +1,21 @@
 package com.example.rnd_transit_mtl
 
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ClipOp
@@ -33,6 +35,9 @@ import androidx.compose.ui.unit.dp
 import com.example.rnd_transit_mtl.ui.theme.TransitComplementary
 import com.example.rnd_transit_mtl.ui.theme.TransitMain
 import com.example.rnd_transit_mtl.ui.theme.TransitSelected
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.currentCoroutineContext
 import kotlin.math.acos
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -50,19 +55,42 @@ private const val WrapRadius = 196f
 private val ringMask = Path().apply { addOval(Rect(Offset.Zero, RingMaskRadius)) }
 private val wrapBounds = Rect(Offset.Zero, WrapRadius)
 private const val RopeSamples = 48
+private const val StartupTimelineMillis = 2_000L
+private const val MaximumVisualFrameNanos = 50_000_000L
 private val routeStroke = Stroke(width = 64f, cap = StrokeCap.Round, join = StrokeJoin.Round)
 
 private val compassEasing = CubicBezierEasing(0.35f, 0.15f, 0.5f, 1f)
 private val spreadColor = lerp(TransitComplementary, TransitMain, 0.40f)
 
 @Composable
-fun AnimatedStartupOverlay() {
-    val progress = remember { Animatable(0f) }
+fun AnimatedStartupOverlay(readyToReveal: () -> Boolean = { true }) {
+    var progress by remember { mutableFloatStateOf(0f) }
     var finished by remember { mutableStateOf(false) }
+    val latestReadyToReveal by rememberUpdatedState(readyToReveal)
 
     LaunchedEffect(Unit) {
-        // Compose applies the device's animator duration scale to this timeline.
-        progress.animateTo(1f, tween(durationMillis = 1100, easing = LinearEasing))
+        suspend fun advanceTo(target: Float) {
+            var previousFrame = withFrameNanos { it }
+            while (progress < target) {
+                val durationScale = currentCoroutineContext()[MotionDurationScale]?.scaleFactor ?: 1f
+                if (durationScale <= 0f) {
+                    progress = target
+                    break
+                }
+                withFrameNanos { frame ->
+                    // Keep cold-start stalls from skipping the visible arrow flight.
+                    // Normal frames still advance by their actual elapsed time.
+                    val delta = (frame - previousFrame).coerceIn(0L, MaximumVisualFrameNanos)
+                    previousFrame = frame
+                    progress = (progress + delta.toFloat() /
+                        (StartupTimelineMillis * 1_000_000L) / durationScale).coerceAtMost(target)
+                }
+            }
+        }
+        advanceTo(RevealStart)
+        withTimeoutOrNull(3_000) { snapshotFlow { latestReadyToReveal() }.first { it } }
+        // Begin a fresh frame baseline after waiting for the map.
+        advanceTo(1f)
         finished = true
     }
 
@@ -81,7 +109,7 @@ fun AnimatedStartupOverlay() {
             }
         }
     ) {
-        val time = progress.value
+        val time = progress
         val cornerRadius = hypot(center.x, center.y)
 
         if (time >= RevealStart) {

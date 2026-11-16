@@ -19,7 +19,9 @@ internal data class TransitMapData(
     val cameraInsetsReady: Boolean = true,
     val browsing: Boolean = false,
     val pickerOpen: Boolean = false,
+    val attributionHandledByScreen: Boolean = false,
     val pin: GeoPoint? = null,
+    val centerOnPin: Boolean = true,
     val onPick: ((GeoPoint) -> Unit)? = null,
     val followPosition: Boolean = false,
     val onManualCameraMove: () -> Unit = {}
@@ -28,6 +30,9 @@ internal data class TransitMapData(
 internal val LocalTransitMap = staticCompositionLocalOf<(@Composable (TransitMapData, Modifier) -> Unit)?> {
     null
 }
+
+// Android hosts the shared map outside navigation so tab transitions never move its surface.
+internal val LocalSharedTransitMapHost = staticCompositionLocalOf<(@Composable (Modifier, Boolean) -> Unit)?> { null }
 
 @Composable
 internal fun TransitMap(

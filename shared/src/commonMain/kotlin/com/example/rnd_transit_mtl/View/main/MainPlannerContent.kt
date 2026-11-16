@@ -71,7 +71,7 @@ import org.jetbrains.compose.resources.painterResource
 import rnd_transit_mtl.shared.generated.resources.Res
 import rnd_transit_mtl.shared.generated.resources.map_sample
 
-// Layout settings — widths/padding in dp; fractions and reference coordinates keep the sheet responsive.
+// Layout settings вЂ” widths/padding in dp; fractions and reference coordinates keep the sheet responsive.
 private val PlannerSheetMaxWidth = 620.dp
 private val PlannerGoBoxHorizontalPadding = 24.dp
 private val PlannerOriginFieldHorizontalPadding = 16.dp
@@ -93,7 +93,7 @@ private val PlannerGoMainGap = 24f
 private val PlannerGoRoutesGap = 7f
 private val PlannerGoPreferencesGap = 12f
 
-// Animation settings — larger millisecond values make snapping and handle taps slower.
+// Animation settings вЂ” larger millisecond values make snapping and handle taps slower.
 private const val PLANNER_SHEET_ANIMATION_DURATION_MILLIS = 300
 private const val PLANNER_ORIGIN_FIELD_ANIMATION_DURATION_MILLIS = 300
 // GO exit timing is shared with navigation/footer transitions: edit ui/global_ui_ellements/transitions/TripTransition.kt.
@@ -114,8 +114,8 @@ internal enum class PlannerSheetPosition { Main, Routes, Preferences, Collapsed 
  * @param selectedZonesByTransport Independently selected zone IDs for each transit mode.
  * @param onToggleTransport Requests an independent transport toggle.
  * @param onToggleZone Requests a zone toggle for the supplied transport ID and zone ID.
- * @param walkingPreference Selected walking style, retained for future routing.
- * @param bikeSpeedKmh Selected cycling speed in km/h, retained for future routing.
+ * @param walkingPreference Selected walking style, used for walking routes and transit access.
+ * @param bikeSpeedKmh Selected cycling speed in km/h, used for accelerated pedestrian routing.
  * @param onBikeSpeedChange Requests a cycling-speed change.
  * @param selectedAttractionIds Selected attraction labels, retained for future routing.
  * @param onWalkingPreferenceChange Requests a walking-style change.
@@ -131,7 +131,7 @@ internal enum class PlannerSheetPosition { Main, Routes, Preferences, Collapsed 
  * @param modifier Layout supplied by the caller.
  * @param controlsVisible Whether planner controls should remain visible.
  * @param onMapViewportReady Reports normalized map-generation bounds.
- * @param onControlsHidden Runs only after the complete slide-down transition.
+ * @param onControlsHidden Runs after the controls fade out.
  * @param initialSheetPosition Initial position for previews or a new planner entry.
  * @param origin Selected sample-map starting point, or none.
  * @param onEditOrigin Opens the origin options without changing saved choices.
@@ -167,8 +167,8 @@ internal fun MainPlannerContent(
     origin: TripPoint? = TripPoint("Current location", 0.5f, 0.35f),
     onEditOrigin: () -> Unit = {},
     liveOrigin: Place? = null,
-    onLoadStmTrip: (() -> Unit)? = null,
-    onLoadExoTrip: (() -> Unit)? = null
+    originIsManual: Boolean = true,
+    originStatus: String? = null
 ) {
     val liveLocation = LocalPlannerLocation.current
     // Expansion is presentation state, separate from transport and zone selections.
@@ -177,11 +177,11 @@ internal fun MainPlannerContent(
         mutableStateOf(0)
     }
 
-    val exit = remember { Animatable(if (controlsVisible) 0f else 1f) }
+    val controlsOpacity = remember { Animatable(if (controlsVisible) 1f else 0f) }
     val latestControlsHidden by rememberUpdatedState(onControlsHidden)
     LaunchedEffect(controlsVisible) {
-        if (controlsVisible) exit.snapTo(0f) else {
-            exit.animateTo(1f, tween(GO_TRIP_TRANSITION_MILLIS))
+        if (controlsVisible) controlsOpacity.snapTo(1f) else {
+            controlsOpacity.animateTo(0f, tween(GO_TRIP_TRANSITION_MILLIS))
             latestControlsHidden()
         }
     }
@@ -285,9 +285,11 @@ internal fun MainPlannerContent(
                 topInset = visibleMapTop,
                 bottomInset = if (controlsVisible) with(density) { (heightPx - goTop).toDp() } else 0.dp,
                 sharedTripFlow = true,
+                attributionHandledByScreen = true,
                 cameraInsetsReady = !showMapControls || originFieldHeight > 0,
                 browsing = true,
-                pin = liveOrigin?.point
+                pin = liveOrigin?.point,
+                centerOnPin = originIsManual
             ),
             modifier = Modifier.fillMaxSize()
         ) {
@@ -300,12 +302,8 @@ internal fun MainPlannerContent(
         }
 
 
-        // Move GO and the sheet together on trip opening; keep the map outside this layer.
-        Box(Modifier.width(panelWidth).fillMaxHeight().graphicsLayer {
-            translationY = exit.value * heightPx
-        }) {
-            // Keep the field in the shared moving layer during GO's slide-down exit.
-            // Sheet expansion hides it upward; pulling the sheet down reveals it smoothly.
+        Box(Modifier.width(panelWidth).fillMaxHeight()) {
+            // Sheet expansion can hide the field while navigation leaves it in place.
             AnimatedVisibility(
                 visible = goTop >= 100f * unitPx,
                 enter = slideInVertically(
@@ -320,17 +318,29 @@ internal fun MainPlannerContent(
                     .padding(horizontal = PlannerOriginFieldHorizontalPadding * scale)
                     .offset(y = PlannerOriginFieldTopPadding * scale)
             ) {
-                TripLabelValueField(
-                    label = "Starting point",
-                    value = liveOrigin?.label ?: origin?.label ?: "Search a place or address",
-                    showLocationIcon = true,
-                    modifier = Modifier.onSizeChanged { originFieldHeight = it.height }.clickable(
-                        enabled = enabled && showMapControls,
-                        role = Role.Button,
-                        onClickLabel = "Choose starting point",
-                        onClick = onEditOrigin
+                Column(Modifier.onSizeChanged { originFieldHeight = it.height }) {
+                    TripLabelValueField(
+                        label = "Starting point",
+                        value = liveOrigin?.label ?: origin?.label ?: "Search a place or address",
+                        showLocationIcon = true,
+                        modifier = Modifier.clickable(
+                            enabled = enabled && showMapControls,
+                            role = Role.Button,
+                            onClickLabel = "Choose starting point",
+                            onClick = onEditOrigin
+                        )
                     )
-                )
+                    if (originStatus != null) {
+                        Surface(color = TransitWhite, shape = RoundedCornerShape(4.dp)) {
+                            Text(
+                                originStatus,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                color = TransitComplementary,
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                    }
+                }
             }
 
             if (showMapControls) {
@@ -359,7 +369,7 @@ internal fun MainPlannerContent(
                 )
             }
 
-            if (goTop > with(density) { 120.dp.toPx() }) {
+            if (controlsVisible && goTop > with(density) { 120.dp.toPx() }) {
                 val liveMap = LocalTransitMap.current != null
                 val uriHandler = LocalUriHandler.current
                 Surface(
@@ -381,17 +391,19 @@ internal fun MainPlannerContent(
                 onMinutesChange = onMinutesChange,
                 onGo = onPrimaryAction,
                 actionLabel = actionLabel,
-                actionEnabled = actionEnabled,
-                minutesEnabled = inputsEnabled,
+                actionEnabled = actionEnabled && controlsVisible,
+                minutesEnabled = enabled,
                 layoutScale = scale,
                 compact = true,
                 modifier = Modifier.offset { IntOffset(0, goTop.roundToInt()) }
                     .fillMaxWidth().padding(horizontal = PlannerGoBoxHorizontalPadding * scale)
+                    .graphicsLayer { alpha = controlsOpacity.value }
             )
             Column(
                 Modifier.offset { IntOffset(0, sheetOffset.roundToInt()) }
                     .fillMaxWidth()
                     .height(with(density) { (heightPx - sheetOffset).coerceAtLeast(0f).toDp() })
+                    .graphicsLayer { alpha = controlsOpacity.value }
                     .background(TransitMain)
                     .nestedScroll(nestedScroll)
                     .anchoredDraggable(sheet, Orientation.Vertical, enabled = enabled)
@@ -502,22 +514,6 @@ internal fun MainPlannerContent(
                 }
 
                 LazyColumn(Modifier.fillMaxWidth().weight(1f), state = list, userScrollEnabled = enabled) {
-                    if (onLoadStmTrip != null) {
-                        item {
-                            androidx.compose.material3.Button(
-                                onClick = onLoadStmTrip,
-                                modifier = Modifier.padding(horizontal = 16.dp)
-                            ) { Text("Load STM test trip") }
-                        }
-                    }
-                    if (onLoadExoTrip != null) {
-                        item {
-                            androidx.compose.material3.Button(
-                                onClick = onLoadExoTrip,
-                                modifier = Modifier.padding(horizontal = 16.dp)
-                            ) { Text("Load STM + exo test trip") }
-                        }
-                    }
                     val summary = activeTripSummary ?: pendingReviewSummary
                     if (summary != null || validationMessage.isNotEmpty()) {
                         item(key = "feedback") {

@@ -49,7 +49,7 @@ class ReturnToMainArtworkTest {
         var destination: ScreenKey? = null
         val scene = ImageComposeScene(380, 100) {
             RNDTransitTheme {
-                SharedTopBarContent(MainScreenKey, false, {}, { destination = it })
+                SharedTopBarContent(MainScreenKey) { destination = it }
             }
         }
         try {

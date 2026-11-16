@@ -12,11 +12,33 @@ import com.example.rnd_transit_mtl.data.location.PlannerLocation
 import com.example.rnd_transit_mtl.model.geo.GeoBounds
 import com.example.rnd_transit_mtl.model.geo.GeoPoint
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filterNotNull
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.spatialk.geojson.Position
+import kotlin.math.PI
+import kotlin.math.asin
+import kotlin.math.cos
+import kotlin.math.sin
 
-// Provisional regional bounds until the official buffered territory can be bundled.
-internal val MontrealBrowsingBounds = GeoBounds(north = 46.11, south = 45.10, west = -74.54, east = -72.90)
+internal val MontrealCenter = GeoPoint(latitude = 45.5019, longitude = -73.5673)
+
+// Farthest CMM vertex from MontrealCenter in Québec's SDA 1:20,000 layer 4 (V2026-10).
+// https://servicescarto.mern.gouv.qc.ca/pes/rest/services/Territoire/SDA_WMS/MapServer/4
+private val farthestCmmPoint = GeoPoint(latitude = 45.98474970, longitude = -73.18629259)
+private val montrealServiceRadiusMeters = MontrealCenter.distanceMetersTo(farthestCmmPoint) + 5_000.0
+
+internal val MontrealBrowsingBounds = run {
+    val angularRadius = montrealServiceRadiusMeters / GeoPoint.EARTH_RADIUS_METERS
+    val latitudeOffset = angularRadius * 180.0 / PI
+    val centerLatitude = MontrealCenter.latitude * PI / 180.0
+    val longitudeOffset = asin(sin(angularRadius) / cos(centerLatitude)) * 180.0 / PI
+    GeoBounds(
+        north = MontrealCenter.latitude + latitudeOffset,
+        south = MontrealCenter.latitude - latitudeOffset,
+        west = MontrealCenter.longitude - longitudeOffset,
+        east = MontrealCenter.longitude + longitudeOffset
+    )
+}
 
 internal class AndroidPlannerMapSession(context: Context) : PlannerLocation {
     private val preferences = context.getSharedPreferences("planner_map", Context.MODE_PRIVATE)
@@ -26,20 +48,30 @@ internal class AndroidPlannerMapSession(context: Context) : PlannerLocation {
     var recenter by mutableIntStateOf(0)
     override var fix by mutableStateOf<LocationUpdate.Fix?>(null)
     override val containsPoint: (GeoPoint) -> Boolean = { point ->
-        point.latitude in MontrealBrowsingBounds.south..MontrealBrowsingBounds.north &&
-            point.longitude in MontrealBrowsingBounds.west..MontrealBrowsingBounds.east
+        MontrealCenter.distanceMetersTo(point) <= montrealServiceRadiusMeters
     }
 
     var pendingResult: ((LocationUpdate.Fix?) -> Unit)? by mutableStateOf(null)
     lateinit var askPermission: () -> Unit
     lateinit var hasPermission: () -> Boolean
     var permitted by mutableStateOf(false)
+    var permissionChecked by mutableStateOf(false)
+    var latestLocationUpdate by mutableStateOf<LocationUpdate?>(null)
+    override val automaticOriginUpdates = snapshotFlow {
+        when {
+            !permissionChecked -> null
+            !permitted -> LocationUpdate.PermissionDenied
+            else -> latestLocationUpdate
+        }
+    }.filterNotNull()
     var locationAttempt by mutableIntStateOf(0)
         private set
 
     override fun request(onResult: ((LocationUpdate.Fix?) -> Unit)?) {
         autoCenterPending = false
-        pendingResult = onResult ?: { result -> if (result != null) recenter++ }
+        pendingResult = onResult ?: { result ->
+            if (result != null && containsPoint(result.point)) recenter++
+        }
         permitted = hasPermission()
         if (permitted) {
             val currentFix = fix
@@ -56,6 +88,7 @@ internal class AndroidPlannerMapSession(context: Context) : PlannerLocation {
     }
 
     fun saveCamera(position: CameraPosition) {
+        if (camera?.center == position.center && camera?.zoom == position.zoom) return
         camera = position
         preferences.edit()
             .putString("longitude", position.center.longitude.toString())
@@ -93,15 +126,18 @@ internal fun rememberAndroidPlannerMapSession(): AndroidPlannerMapSession {
     var started by remember { mutableStateOf(false) }
     LifecycleStartEffect(session) {
         session.permitted = source.hasPermission()
+        session.permissionChecked = true
         started = true
         onStopOrDispose {
             started = false
             session.fix = null
+            session.latestLocationUpdate = null
         }
     }
     LaunchedEffect(session.permitted, started, session.locationAttempt) {
         if (session.permitted && started) source.updates.collect { update ->
             session.fix = update as? LocationUpdate.Fix
+            session.latestLocationUpdate = update
             session.complete(session.fix)
         }
     }

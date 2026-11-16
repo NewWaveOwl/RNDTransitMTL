@@ -9,6 +9,7 @@ import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Bundle
 import android.os.Looper
+import android.os.SystemClock
 import com.example.rnd_transit_mtl.data.location.LocationSource
 import com.example.rnd_transit_mtl.data.location.LocationUpdate
 import com.example.rnd_transit_mtl.model.geo.GeoPoint
@@ -38,6 +39,8 @@ internal class AndroidLocationSource(private val context: Context) : LocationSou
             override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) = Unit
 
             override fun onLocationChanged(location: Location) {
+                val ageNanos = SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos
+                if (ageNanos !in 0L..15_000_000_000L) return
                 trySend(LocationUpdate.Fix(
                     GeoPoint(location.latitude, location.longitude),
                     if (location.hasAccuracy()) location.accuracy.toDouble() else 0.0

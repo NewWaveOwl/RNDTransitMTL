@@ -1,6 +1,7 @@
 package com.example.rnd_transit_mtl
 
 import android.animation.ValueAnimator
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -9,6 +10,10 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.ProvideAndroidTransitMap
@@ -28,18 +33,19 @@ class MainActivity : ComponentActivity() {
 
         val showStartup = savedInstanceState == null &&
             (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || ValueAnimator.areAnimatorsEnabled())
-        val loadStmTrip = stmTripLoader(this)
-        val loadExoTrip = exoTripLoader(this)
-        val openStmPreview = loadStmTrip != null && intent.getBooleanExtra("openStmPreview", false)
-        val openExoPreview = loadExoTrip != null && intent.getBooleanExtra("openExoPreview", false)
+        val generationEndpoint = packageManager.getApplicationInfo(packageName, PackageManager.GET_META_DATA)
+            .metaData?.getString("com.example.rnd_transit_mtl.GENERATION_ENDPOINT")?.takeIf { it.isNotBlank() }
         setContent {
-            ProvideAndroidTransitMap(styleUrl = getString(R.string.map_style_url)) {
+            var mapReady by remember { mutableStateOf(false) }
+            ProvideAndroidTransitMap(
+                styleUrl = getString(R.string.map_style_url),
+                onMapReady = { mapReady = true }
+            ) {
                 Box(Modifier.fillMaxSize()) {
                     App(
-                        loadDebugStmTrip = loadStmTrip, openDebugStmPreview = openStmPreview,
-                        loadDebugExoTrip = loadExoTrip, openDebugExoPreview = openExoPreview
+                        generationEndpoint = generationEndpoint
                     )
-                    if (showStartup) AnimatedStartupOverlay()
+                    if (showStartup) AnimatedStartupOverlay(readyToReveal = { mapReady })
                 }
             }
         }

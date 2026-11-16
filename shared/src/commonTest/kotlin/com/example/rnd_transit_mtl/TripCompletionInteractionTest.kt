@@ -32,6 +32,29 @@ import kotlinx.coroutines.test.runTest
 
 class TripCompletionInteractionTest {
     @Test
+    fun pendingCloudCompletionCanOpenReviewAndSkipToHistory() = runTest {
+        val trip = generatedTrip()
+        val store = TripsStore(nowEpochMillis = { 20_000L })
+        store.onPendingFinalTripsChanged = {}
+        val stack = NavBackStack<NavKey>(MainScreenKey)
+        val navigator = Navigator(stack)
+        val navigation = TripNavigation(navigator, store)
+
+        store.start(trip)
+        navigation.openCurrentTrip(trip)
+        store.updateElapsed(trip.id, 10_000L)
+
+        assertTrue(trip.id in store.state.value.pendingFinalTripIds)
+        assertTrue(navigation.openInitialReview(trip.id))
+        val review = assertIs<TripReviewScreenKey>(navigator.current)
+        assertEquals(TripActionResult.Applied, store.skipReview(trip.id))
+        assertTrue(navigation.finishReview(review))
+        assertEquals(HistoryScreenKey, navigator.current)
+        assertEquals(trip.id, store.completedTrips.single().id)
+        assertTrue(trip.id in store.state.value.pendingFinalTripIds)
+    }
+
+    @Test
     fun bundledMapTripNeedsNoReferenceUrl() = runTest {
         val trip = generatedTrip()
         assertEquals("", trip.imageUrl)

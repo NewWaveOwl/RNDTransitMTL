@@ -54,12 +54,6 @@ fun SharedTopBar() {
 
     SharedTopBarContent(
         currentKey = currentKey,
-        hasPrevious = navigator.hasPrevious(),
-        onBack = {
-            if (navigator.current == currentKey) {
-                navigation.back()
-            }
-        },
         onOpenSection = { destination ->
             if (navigator.current == currentKey) {
                 navigation.openSection(destination)
@@ -72,21 +66,13 @@ fun SharedTopBar() {
  * Displays the blue header and the existing contextual page title.
  *
  * @param currentKey Destination currently displayed.
- * @param hasPrevious Whether Back has an earlier destination.
- * @param onBack Requests the existing guarded Back operation.
  * @param onOpenSection Opens a shared section without creating a trip.
  */
 @Composable
 internal fun SharedTopBarContent(
     currentKey: ScreenKey?,
-    hasPrevious: Boolean,
-    onBack: () -> Unit,
     onOpenSection: (ScreenKey) -> Unit
 ) {
-    val profileSelected =
-        currentKey == ProfileScreenKey ||
-            currentKey == AboutScreenKey
-
     val historySelected =
         currentKey == HistoryScreenKey ||
             currentKey is TripDetailsScreenKey ||
@@ -172,17 +158,14 @@ internal fun SharedTopBarContent(
             }
         }
 
-        // Preserve the existing title and review-aware Back behavior.
-        if (
-            currentKey !is CurrentTripScreenKey &&
-            (currentKey != MainScreenKey || hasPrevious)
+        if (currentKey != MainScreenKey && currentKey !is CurrentTripScreenKey &&
+            currentKey != HistoryScreenKey && currentKey != SettingsScreenKey &&
+            currentKey != ProfileScreenKey
         ) {
             PageTitle(
                 title = currentKey?.screenTitle ?: "RND Transit",
                 layoutScale = 1f,
-                highlighted = profileSelected,
-                showBack = hasPrevious,
-                onBack = onBack
+                highlighted = false
             )
         }
     }

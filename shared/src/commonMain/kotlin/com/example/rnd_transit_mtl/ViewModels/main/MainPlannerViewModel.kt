@@ -12,6 +12,9 @@ import kotlinx.coroutines.flow.update
 import com.example.rnd_transit_mtl.model.trip.Place
 import kotlinx.serialization.Serializable
 
+/** Modes visible in the planner but not currently offered for new trips. */
+internal fun isPlannerTransportAvailable(id: TransportId): Boolean = id.value !in setOf("train", "rem")
+
 /**
  * Stores the editable planner draft.
  *
@@ -19,8 +22,8 @@ import kotlinx.serialization.Serializable
  * @property selectedTransportIds Enabled transport-mode IDs.
  * @property selectedZoneIds Legacy shared zones used to restore older drafts.
  * @property intensity Attraction intensity from 0 to 100.
- * @property walkingPreference Walking pace (Amble, Walk, or Dash), retained for future routing.
- * @property bikeSpeedKmh Preferred cycling speed in km/h, retained for future routing.
+ * @property walkingPreference Backend pace: Amble 3, Walk 4.8, or Dash 6.8 km/h.
+ * @property bikeSpeedKmh Preferred cycling speed in km/h, used for accelerated pedestrian routing.
  * @property selectedAttractionIds Attraction preferences retained for future routing.
  * @property selectedZonesByTransport Independent zones for each transit mode, including disabled modes.
  * @property origin Selected source-image point; default coordinates are labelled sample data.
@@ -72,6 +75,7 @@ class MainPlannerViewModel(
 
     private val mutableUiState = MutableStateFlow(
         initialState.copy(minutes = Trip.coercePlannedMinutes(initialState.minutes),
+            selectedTransportIds = initialState.selectedTransportIds.filter(::isPlannerTransportAvailable),
             walkingPreference = when (initialState.walkingPreference) {
             "Scenic" -> "Amble"
             "Direct", "Normal", "Stroll" -> "Walk"
@@ -91,15 +95,14 @@ class MainPlannerViewModel(
         mutableUiState.update {
             it.copy(
                 minutes = Trip.coercePlannedMinutes(trip.plannedMinutes),
-                selectedTransportIds = trip.selectedTransports.map { mode ->
-                    mode.id
-                },
+                selectedTransportIds = (trip.requestedTransportIds ?: trip.selectedTransports.map { it.id }).filter(::isPlannerTransportAvailable),
                 selectedZoneIds = trip.selectedZoneIds.toList(),
                 selectedZonesByTransport =
                     trip.selectedZonesByTransport.mapValues { entry ->
                         entry.value.toList()
                     },
                 intensity = trip.attractionIntensity,
+                walkingPreference = trip.walkingPreference ?: it.walkingPreference,
                 origin = if (liveMap) null else trip.origin.toSampleMapPoint(),
                 originPlace = trip.origin.takeIf { liveMap },
                 originIsManual = true
@@ -107,13 +110,19 @@ class MainPlannerViewModel(
         }
     }
 
-    /** Updates the selected sample-map origin.
-     * @param point Source-image coordinates and a nonblank display label.
-     */
+    /** Installs the first usable fix while the planner still has no chosen origin. */
+    fun setDefaultOrigin(place: Place) {
+        mutableUiState.update { state ->
+            if (state.originPlace != null || state.originIsManual) state
+            else state.copy(origin = null, originPlace = place)
+        }
+    }
+
     fun setOrigin(place: Place) {
         mutableUiState.update { it.copy(origin = null, originPlace = place, originIsManual = true) }
     }
 
+    /** Updates the sample-map origin using source-image coordinates and a nonblank label. */
     fun setOrigin(point: TripPoint) {
         val label = point.label.trim()
         if (label.isBlank()) return
@@ -141,7 +150,7 @@ class MainPlannerViewModel(
      * @param availableIds IDs from the loaded transport catalogue.
      */
     fun toggleTransport(id: TransportId, availableIds: Set<TransportId>) {
-        if (id !in availableIds) return
+        if (id !in availableIds || !isPlannerTransportAvailable(id)) return
 
         mutableUiState.update {
             it.copy(
@@ -158,7 +167,7 @@ class MainPlannerViewModel(
      * @param id Zone A, B, C, or D; unsupported identifiers are ignored.
      */
     fun toggleZone(transportId: TransportId, id: ZoneId) {
-        if (transportId !in transitIds || id !in zoneIds) return
+        if (transportId !in transitIds || id !in zoneIds || !isPlannerTransportAvailable(transportId)) return
         mutableUiState.update { state ->
             val zones = state.zonesForTransport(transportId).toggled(id)
             val transports = if (zones.isEmpty()) {

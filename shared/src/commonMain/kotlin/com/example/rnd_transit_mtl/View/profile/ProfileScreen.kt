@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.rnd_transit_mtl.ViewModels.Accounts.ProfileViewModel
 import com.example.rnd_transit_mtl.navigation.*
+import com.example.rnd_transit_mtl.layout.PageTitle
 import com.example.rnd_transit_mtl.ui.theme.TransitComplementary
 import com.example.rnd_transit_mtl.ui.theme.TransitMain
 import org.jetbrains.compose.resources.painterResource
@@ -31,47 +32,50 @@ internal fun ProfileScreen(viewModel: ProfileViewModel?) {
 
 
 
-    Column(
-        Modifier.fillMaxSize().background(Color(0xFFF8F8F8))
-            .verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Text("Your profile", color = TransitComplementary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(4.dp))
+    Column(Modifier.fillMaxSize()) {
+        PageTitle(title = ProfileScreenKey.screenTitle, layoutScale = 1f, highlighted = false)
+        Column(
+            Modifier.fillMaxWidth().weight(1f).background(Color(0xFFF8F8F8))
+                .verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text("Your profile", color = TransitComplementary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(4.dp))
 
-        Icon(painterResource(Res.drawable.ic_account_circle), contentDescription = null,
-            tint = TransitMain, modifier = Modifier.size(56.dp))
+            Icon(painterResource(Res.drawable.ic_account_circle), contentDescription = null,
+                tint = TransitMain, modifier = Modifier.size(56.dp))
 
-        Text(if (viewModel == null) "Guest" else when {
-                state?.account != null -> state.account.username
-                state?.accountLoadFailed == true -> "Couldn’t load profile"
-                else -> "Loading…"
-            },
-            color = TransitComplementary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            Text(if (viewModel == null) "Guest" else when {
+                    state?.account != null -> state.account.username
+                    state?.accountLoadFailed == true -> "Couldn’t load profile"
+                    else -> "Loading…"
+                },
+                color = TransitComplementary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
 
-        Spacer(Modifier.height(2.dp))
+            Spacer(Modifier.height(2.dp))
 
-        TransitOutlineButton(
-            "Edit profile",
-            onClick = {
-                navigator.navigate(SettingsScreenKey)
+            TransitOutlineButton(
+                "Edit profile",
+                onClick = {
+                    navigator.navigate(SettingsScreenKey)
+                }
+            )
+
+
+
+
+            if (viewModel == null) {
+                TransitOutlineButton("Sign in", onClick = { navigator.navigate(AuthScreenKey()) })
+                TransitOutlineButton("Create an account", onClick = { navigator.navigate(AuthScreenKey(register = true)) })
             }
-        )
-
-
-
-
-        if (viewModel == null) {
-            TransitOutlineButton("Sign in", onClick = { navigator.navigate(AuthScreenKey()) })
-            TransitOutlineButton("Create an account", onClick = { navigator.navigate(AuthScreenKey(register = true)) })
-        }
-        TransitFilledButton("Your trip history", onClick = { navigator.navigate(HistoryScreenKey) })
-        TransitOutlineButton("About RND Transit", onClick = { navigator.navigate(AboutScreenKey) })
-        if (viewModel != null && state != null) {
-            if (state.signOutError) Text("Couldn’t sign out. Check your connection and try again.",
-                color = MaterialTheme.colorScheme.error)
-            TransitOutlineButton(if (state.signingOut) "Signing out…" else "Sign out",
-                onClick = viewModel::signOut)
+            TransitFilledButton("Your trip history", onClick = { navigator.navigate(HistoryScreenKey) })
+            TransitOutlineButton("About RND Transit", onClick = { navigator.navigate(AboutScreenKey) })
+            if (viewModel != null && state != null) {
+                if (state.signOutError) Text("Couldn’t sign out. Check your connection and try again.",
+                    color = MaterialTheme.colorScheme.error)
+                TransitOutlineButton(if (state.signingOut) "Signing out…" else "Sign out",
+                    onClick = viewModel::signOut)
+            }
         }
     }
 }

@@ -77,6 +77,8 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(libs.kotlinx.coroutinesCore)
             implementation(libs.kotlinx.serializationJson)
+            implementation(libs.kotlinx.datetime)
+            implementation("io.ktor:ktor-client-core:$ktorVersion")
             implementation(libs.androidx.navigation3.ui)
 
             implementation("io.coil-kt.coil3:coil-compose:3.6.3")

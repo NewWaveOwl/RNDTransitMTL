@@ -56,7 +56,11 @@ internal class SupabaseTripRepository(
         val stored = checkNotNull(getTrip(trip.id)) {
             "The saved trip could not be read back."
         }
-        check(stored.copy(review = null) == ownedTrip.copy(review = null)) {
+        // A prior insert may have succeeded before its response was lost. Remote edits
+        // must not prevent acknowledging that insert; only record identity is stable.
+        check(stored.id == ownedTrip.id &&
+                stored.ownerId == ownedTrip.ownerId &&
+                stored.createdAt == ownedTrip.createdAt) {
             "The trip ID is already associated with a different record."
         }
         return stored

@@ -51,6 +51,8 @@ import com.example.rnd_transit_mtl.ui.theme.TransitComplementary
 import com.example.rnd_transit_mtl.ui.theme.TransitMain
 import com.example.rnd_transit_mtl.ui.theme.TransitSelected
 import com.example.rnd_transit_mtl.ui.theme.TransitWhite
+import com.example.rnd_transit_mtl.navigation.SettingsScreenKey
+import com.example.rnd_transit_mtl.layout.PageTitle
 
 // Layout settings — dimensions in dp from SettingsUIDesign.png (412 px reference width).
 private val SettingsHorizontalPadding = 16.dp
@@ -111,44 +113,47 @@ internal fun SettingsContent(
     onOpenTripPreferences: () -> Unit,
     onSave: () -> Unit,
 ) {
-    Column(
-        modifier = Modifier.fillMaxSize().background(TransitWhite)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = SettingsHorizontalPadding, vertical = SettingsVerticalPadding),
-        verticalArrangement = Arrangement.spacedBy(SettingsSectionSpacing)
-    ) {
-        Text("Settings", color = TransitComplementary, fontSize = 28.sp, lineHeight = 36.sp,
-            fontWeight = FontWeight.Bold)
-
-        TripLabelValueField(
-            label = "Default available time",
-            value = "${state.availableTime.duration.inWholeMinutes} minutes",
-            showLocationIcon = true
-        )
-
-        DefaultTransportSection(state.mode, onModeSelected)
-
-        TransitOutlineButton("Open trip preferences", onClick = onOpenTripPreferences,
-            height = SettingsButtonHeight, fontSize = 15.sp)
-
-        SettingsTextField("Display name", state.username, onUsernameChange)
-
-        SettingsTextField("New password", newPassword, onNewPasswordChange, isPassword = true)
-
-        val saving = state.saveStatus == SaveStatus.Saving
-        TransitFilledButton(if (saving) "Saving…" else "Save changes", onClick = onSave,
-            height = SettingsButtonHeight, fontSize = 15.sp, enabled = state.username.isNotBlank() && !saving)
-
-        when (state.saveStatus) {
-            SaveStatus.Saved -> Text("Changes saved.", color = TransitComplementary, fontSize = 13.sp,
+    Column(Modifier.fillMaxSize().background(TransitWhite)) {
+        PageTitle(title = SettingsScreenKey.screenTitle, layoutScale = 1f, highlighted = false)
+        Column(
+            modifier = Modifier.fillMaxWidth().weight(1f).background(TransitWhite)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = SettingsHorizontalPadding, vertical = SettingsVerticalPadding),
+            verticalArrangement = Arrangement.spacedBy(SettingsSectionSpacing)
+        ) {
+            Text("Settings", color = TransitComplementary, fontSize = 28.sp, lineHeight = 36.sp,
                 fontWeight = FontWeight.Bold)
-            SaveStatus.Failed -> Text("Couldn’t save your changes. Check your connection and try again.",
-                color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
-            else -> {}
-        }
 
-        Text("Saved defaults apply to the next request, not the route already in progress.",
-            color = TransitComplementary, fontSize = 13.sp, lineHeight = 19.sp)
+            TripLabelValueField(
+                label = "Default available time",
+                value = "${state.availableTime.duration.inWholeMinutes} minutes",
+                showLocationIcon = true
+            )
+
+            DefaultTransportSection(state.mode, onModeSelected)
+
+            TransitOutlineButton("Open trip preferences", onClick = onOpenTripPreferences,
+                height = SettingsButtonHeight, fontSize = 15.sp)
+
+            SettingsTextField("Display name", state.username, onUsernameChange)
+
+            SettingsTextField("New password", newPassword, onNewPasswordChange, isPassword = true)
+
+            val saving = state.saveStatus == SaveStatus.Saving
+            TransitFilledButton(if (saving) "Saving…" else "Save changes", onClick = onSave,
+                height = SettingsButtonHeight, fontSize = 15.sp, enabled = state.username.isNotBlank() && !saving)
+
+            when (state.saveStatus) {
+                SaveStatus.Saved -> Text("Changes saved.", color = TransitComplementary, fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold)
+                SaveStatus.Failed -> Text("Couldn’t save your changes. Check your connection and try again.",
+                    color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
+                else -> {}
+            }
+
+            Text("Saved defaults apply to the next request, not the route already in progress.",
+                color = TransitComplementary, fontSize = 13.sp, lineHeight = 19.sp)
+        }
     }
 }
 
