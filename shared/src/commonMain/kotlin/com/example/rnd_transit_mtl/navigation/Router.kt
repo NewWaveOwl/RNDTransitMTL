@@ -46,6 +46,7 @@ import com.example.rnd_transit_mtl.View.settings.SettingsScreen
 import com.example.rnd_transit_mtl.View.trip_details.TripDetailsScreen
 import com.example.rnd_transit_mtl.View.trip_review.TripReviewScreen
 import com.example.rnd_transit_mtl.ViewModels.Accounts.ProfileViewModel
+import com.example.rnd_transit_mtl.ViewModels.Settings.SettingsViewModel
 import com.example.rnd_transit_mtl.data.accounts.LocalAccountRepository
 
 /**
@@ -378,7 +379,11 @@ fun Router(
             }
 
             entry<SettingsScreenKey> {
-                SettingsScreen()
+                val accountRepository = LocalAccountRepository.current
+                val authRepository = LocalAuthRepository.current
+                val settingsViewModel = viewModel { SettingsViewModel(accountRepository!!, authRepository) }
+
+                SettingsScreen(settingsViewModel)
             }
         },
         transitionSpec = {

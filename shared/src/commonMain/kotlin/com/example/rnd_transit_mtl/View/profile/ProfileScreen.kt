@@ -20,6 +20,8 @@ import com.example.rnd_transit_mtl.ui.theme.TransitMain
 import org.jetbrains.compose.resources.painterResource
 import rnd_transit_mtl.shared.generated.resources.Res
 import rnd_transit_mtl.shared.generated.resources.ic_account_circle
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.buttons.TransitFilledButton
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.buttons.TransitOutlineButton
 
 /** @param viewModel null for guests; otherwise the signed-in user's profile. */
 @Composable
@@ -49,7 +51,7 @@ internal fun ProfileScreen(viewModel: ProfileViewModel?) {
 
         Spacer(Modifier.height(2.dp))
 
-        ProfileOutlineButton(
+        TransitOutlineButton(
             "Edit profile",
             onClick = {
                 navigator.navigate(SettingsScreenKey)
@@ -60,33 +62,17 @@ internal fun ProfileScreen(viewModel: ProfileViewModel?) {
 
 
         if (viewModel == null) {
-            ProfileOutlineButton("Sign in", onClick = { navigator.navigate(AuthScreenKey()) })
-            ProfileOutlineButton("Create an account", onClick = { navigator.navigate(AuthScreenKey(register = true)) })
+            TransitOutlineButton("Sign in", onClick = { navigator.navigate(AuthScreenKey()) })
+            TransitOutlineButton("Create an account", onClick = { navigator.navigate(AuthScreenKey(register = true)) })
         }
-        ProfileFilledButton("Your trip history", onClick = { navigator.navigate(HistoryScreenKey) })
-        ProfileOutlineButton("About RND Transit", onClick = { navigator.navigate(AboutScreenKey) })
+        TransitFilledButton("Your trip history", onClick = { navigator.navigate(HistoryScreenKey) })
+        TransitOutlineButton("About RND Transit", onClick = { navigator.navigate(AboutScreenKey) })
         if (viewModel != null && state != null) {
             if (state.signOutError) Text("Couldn’t sign out. Check your connection and try again.",
                 color = MaterialTheme.colorScheme.error)
-            ProfileOutlineButton(if (state.signingOut) "Signing out…" else "Sign out",
+            TransitOutlineButton(if (state.signingOut) "Signing out…" else "Sign out",
                 onClick = viewModel::signOut)
         }
     }
 }
 
-@Composable
-private fun ProfileFilledButton(label: String, onClick: () -> Unit) {
-    Button(onClick = onClick, modifier = Modifier.fillMaxWidth().height(38.dp),
-        shape = RoundedCornerShape(18.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = TransitMain)) {
-        Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-    }
-}
-
-@Composable
-private fun ProfileOutlineButton(label: String, onClick: () -> Unit) {
-    OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth().height(38.dp),
-        shape = RoundedCornerShape(18.dp)) {
-        Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TransitMain)
-    }
-}

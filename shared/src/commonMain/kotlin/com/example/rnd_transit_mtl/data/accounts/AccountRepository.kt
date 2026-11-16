@@ -39,9 +39,11 @@ internal class AccountRepository(
                 filter {
                     eq("user_id", authenticatedUserId.value)
                 }
-            }).decodeList<Account>()
+            }).decodeList<Account>().firstOrNull()?.toDto()
 
-        return updated.isNotEmpty()
+        // Publish the saved row so screens reading loadedAccount (Profile, Settings) see the change.
+        if (updated != null) mutableAccount.value = updated
+        return updated != null
     }
 
     override suspend fun getAccount(): AccountDto? {
