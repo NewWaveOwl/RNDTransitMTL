@@ -85,6 +85,13 @@ and has since been integrated with the real-route backend.
 | **Total code contributed excluding AI Level-Up** | **10,957.99 (52.6%)** | **9,882.01 (47.4%)** |
 | **AI Level-Up - excluded from total** | **428.08 (8%)** | **4,922.92 (92%)** |
 
+| Contribution (rough estimates) | Jimmy | AI |
+| --- | ---: | ---: |
+| UI - original mock-ups and design (history screen, compass screen, based on PREMADE MOCKUPS | 50% | 50% |
+| Supabase connection and setup|  60%  | 40% |
+| App tests (for supabase) | 0% | 100% |
+| **Total Code contribution average | 55%  | 45%   |
+
 ## Milestone 3 screenshots
 
 These Android captures show the implemented planner and trip flow. Trip playback
