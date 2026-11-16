@@ -2,13 +2,16 @@ package com.example.rnd_transit_mtl.ui.global_ui_ellements.cards
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.rnd_transit_mtl.ui.theme.TransitComplementary
@@ -23,13 +26,15 @@ import com.example.rnd_transit_mtl.ui.theme.TransitWhite
  * @param layoutScale Scale factor for dimensions and text relative to the 402-unit reference width.
  */
 @Composable
-internal fun PlaceholderCard(label: String, layoutScale: Float) {
+internal fun PlaceholderCard(label: String, description: String, layoutScale: Float) {
     Box(
         modifier = Modifier.fillMaxWidth().padding(end = 24.dp * layoutScale)
-            .height(88.dp * layoutScale).background(TransitComplementary)
-            .padding(horizontal = 24.dp * layoutScale),
+            .height(88.dp * layoutScale).padding(horizontal = 24.dp * layoutScale),
         contentAlignment = Alignment.CenterStart
     ) {
-        Text(label, color = TransitWhite, fontSize = 28.sp * layoutScale)
+        Text(label, color = TransitWhite, fontSize = 16.sp * layoutScale)
+        Spacer(Modifier.height(2.dp))
+        Text(label, color = Color.Black, fontSize = 10.sp * layoutScale)
+
     }
 }
