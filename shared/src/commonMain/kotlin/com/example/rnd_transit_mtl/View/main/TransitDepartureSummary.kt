@@ -18,7 +18,15 @@ internal fun transitDepartureSummary(leg: RouteLeg, routeLabel: String?, nowMill
     val name = leg.navigation?.routeShortName?.takeIf { it.isNotBlank() }
         ?: routeLabel?.takeIf { it.isNotBlank() }
         ?: ""
-    val line = if (name.isBlank()) mode else "$mode $name"
+    val metroColour = if (leg.transportId.value == "metro") when (name.trim()) {
+        "1" -> "Green"
+        "2" -> "Orange"
+        "4" -> "Yellow"
+        "5" -> "Blue"
+        else -> null
+    } else null
+    val lineName = metroColour?.let { "$name ($it)" } ?: name
+    val line = if (lineName.isBlank()) mode else "$mode $lineName"
     val timing = leg.transitTiming ?: return "$line - time unavailable"
     val estimate = timing.estimatedDeparture.takeIf { timing.realtimeApplied && timing.predictionsFreshAt(nowMillis) }
     val departure = listOfNotNull(estimate, timing.scheduledDeparture).firstNotNullOfOrNull {

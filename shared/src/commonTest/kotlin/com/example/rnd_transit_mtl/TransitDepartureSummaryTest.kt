@@ -53,6 +53,16 @@ class TransitDepartureSummaryTest {
         }
     }
 
+    @Test fun metroLinesIncludeTheirColours() {
+        for ((number, colour) in listOf("1" to "Green", "2" to "Orange", "4" to "Yellow", "5" to "Blue")) {
+            val metro = leg(name = number).copy(transportId = TransportId("metro"))
+            assertEquals("Metro $number ($colour) in 20 min (16:45)", transitDepartureSummary(metro, null, now))
+            assertEquals("Metro $number ($colour) in 20 min (16:45)", transitDepartureSummary(
+                metro.copy(navigation = null), number, now))
+        }
+        assertEquals("Bus 1 in 20 min (16:45)", transitDepartureSummary(leg(name = "1"), null, now))
+    }
+
     @Test fun missingNamesAndTimesHaveReadableFallbacks() {
         assertEquals("Bus Orange in 20 min (16:45)", transitDepartureSummary(leg(name = ""), "Orange", now))
         assertEquals("Bus - time unavailable", transitDepartureSummary(leg(null, null), null, now))
