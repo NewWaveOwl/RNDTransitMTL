@@ -642,6 +642,13 @@ internal fun TransitOpeningScreen(
         TripProposalContent(
             trip = proposal,
             scheduled = proposal.routedDurationSeconds != null,
+            onRename = { name ->
+                if (latestDestinationActive && !processingAction &&
+                    proposalGuard.canStart(proposal.id) && name.isNotBlank()
+                ) {
+                    proposalJson = Json.encodeToString(proposal.copy(title = name.trim()))
+                }
+            },
             onStart = {
                 if (latestDestinationActive &&
                     !processingAction &&

@@ -21,6 +21,7 @@ import com.example.rnd_transit_mtl.data.authentication.AccountSession
 import com.example.rnd_transit_mtl.data.authentication.LocalAccountSession
 import com.example.rnd_transit_mtl.data.authentication.LocalAuthRepository
 import com.example.rnd_transit_mtl.navigation.*
+import com.example.rnd_transit_mtl.layout.PageTitle
 import com.example.rnd_transit_mtl.state.user.LocalNicknameSession
 import com.example.rnd_transit_mtl.ui.theme.TransitComplementary
 import com.example.rnd_transit_mtl.ui.theme.TransitMain
@@ -41,43 +42,46 @@ fun ProfileScreen() {
     var signOutError by remember(signedIn?.userId) { mutableStateOf(false) }
     var signingOut by remember(signedIn?.userId) { mutableStateOf(false) }
 
-    Column(
-        Modifier.fillMaxSize().background(Color(0xFFF8F8F8))
-            .verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Text("Your profile", color = TransitComplementary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(4.dp))
-        Icon(painterResource(Res.drawable.ic_account_circle), contentDescription = null,
-            tint = TransitMain, modifier = Modifier.size(56.dp))
-        Text(signedIn?.email?.substringBefore("@")?.ifBlank { null } ?: if (signedIn != null) "Account" else nickname.ifBlank { "Guest" },
-            color = TransitComplementary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        Text(signedIn?.email ?: "Guest", color = TransitComplementary, fontSize = 12.sp)
-        Spacer(Modifier.height(2.dp))
-        if (signedIn == null) {
-            ProfileOutlineButton("Sign in", onClick = { navigator.navigate(AuthScreenKey()) })
-            ProfileOutlineButton("Create an account", onClick = { navigator.navigate(AuthScreenKey(register = true)) })
-        }
-        ProfileFilledButton("Your trip history", onClick = { navigator.navigate(HistoryScreenKey) })
-        ProfileOutlineButton("About RND Transit", onClick = { navigator.navigate(AboutScreenKey) })
-        if (signedIn != null) {
-            if (signOutError) Text("Couldn’t sign out. Check your connection and try again.",
-                color = MaterialTheme.colorScheme.error)
-            ProfileOutlineButton(if (signingOut) "Signing out…" else "Sign out", onClick = {
-                if (!signingOut) scope.launch {
-                    signingOut = true
-                    signOutError = false
-                    try {
-                        repository.signOut()
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (_: Exception) {
-                        signOutError = true
-                    } finally {
-                        signingOut = false
+    Column(Modifier.fillMaxSize()) {
+        PageTitle(title = ProfileScreenKey.screenTitle, layoutScale = 1f, highlighted = false)
+        Column(
+            Modifier.fillMaxWidth().weight(1f).background(Color(0xFFF8F8F8))
+                .verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text("Your profile", color = TransitComplementary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(4.dp))
+            Icon(painterResource(Res.drawable.ic_account_circle), contentDescription = null,
+                tint = TransitMain, modifier = Modifier.size(56.dp))
+            Text(signedIn?.email?.substringBefore("@")?.ifBlank { null } ?: if (signedIn != null) "Account" else nickname.ifBlank { "Guest" },
+                color = TransitComplementary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            Text(signedIn?.email ?: "Guest", color = TransitComplementary, fontSize = 12.sp)
+            Spacer(Modifier.height(2.dp))
+            if (signedIn == null) {
+                ProfileOutlineButton("Sign in", onClick = { navigator.navigate(AuthScreenKey()) })
+                ProfileOutlineButton("Create an account", onClick = { navigator.navigate(AuthScreenKey(register = true)) })
+            }
+            ProfileFilledButton("Your trip history", onClick = { navigator.navigate(HistoryScreenKey) })
+            ProfileOutlineButton("About RND Transit", onClick = { navigator.navigate(AboutScreenKey) })
+            if (signedIn != null) {
+                if (signOutError) Text("Couldn’t sign out. Check your connection and try again.",
+                    color = MaterialTheme.colorScheme.error)
+                ProfileOutlineButton(if (signingOut) "Signing out…" else "Sign out", onClick = {
+                    if (!signingOut) scope.launch {
+                        signingOut = true
+                        signOutError = false
+                        try {
+                            repository.signOut()
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            signOutError = true
+                        } finally {
+                            signingOut = false
+                        }
                     }
-                }
-            })
+                })
+            }
         }
     }
 }

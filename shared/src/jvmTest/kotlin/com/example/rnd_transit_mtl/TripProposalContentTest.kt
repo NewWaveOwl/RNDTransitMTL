@@ -6,7 +6,9 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.text.AnnotatedString
 import com.example.rnd_transit_mtl.View.history.previews.reviewedHistoryPreviewTrip
 import com.example.rnd_transit_mtl.View.main.TripLoadingContent
 import com.example.rnd_transit_mtl.View.main.TripProposalContent
@@ -24,12 +26,14 @@ class TripProposalContentTest {
     @Test
     fun loadingAndProposalActionsRemainSeparate() {
         var loading by mutableStateOf(true)
+        var proposal by mutableStateOf(reviewedHistoryPreviewTrip)
         val events = mutableListOf<String>()
         val scene = ImageComposeScene(412, 720) {
             RNDTransitTheme {
                 if (loading) TripLoadingContent(30, "Walk", { events += "cancel" })
-                else TripProposalContent(reviewedHistoryPreviewTrip,
-                    { events += "start" }, { events += "another" }, { events += "edit" })
+                else TripProposalContent(proposal,
+                    { events += "start:${proposal.title}" }, { events += "another" }, { events += "edit" },
+                    onRename = { proposal = proposal.copy(title = it) })
             }
         }
         var time = 0L
@@ -63,10 +67,24 @@ class TripProposalContentTest {
             click("Cancel search")
             loading = false
             render("Trip-proposal.png")
+            val texts = scene.semanticsOwners.flatMap { all(it.rootSemanticsNode) }
+                .flatMap { it.config.getOrNull(SemanticsProperties.Text).orEmpty() }
+                .map { it.text }
+            assertFalse(reviewedHistoryPreviewTrip.description in texts)
+            assertFalse("Trip destination" in texts)
+            assertEquals(1, texts.count { it == "Starting point" })
+            assertEquals(1, texts.count { it == proposal.selectedTransports.joinToString(" + ") { mode -> mode.label } })
+            val editor = scene.semanticsOwners.flatMap { all(it.rootSemanticsNode) }.first {
+                it.config.getOrNull(SemanticsActions.SetText) != null
+            }
+            assertEquals(proposal.title, editor.config[SemanticsProperties.EditableText].text)
+            editor.config[SemanticsActions.SetText].action?.invoke(AnnotatedString("  Evening walk  "))
+            render("Trip-proposal-name-draft.png")
+            assertEquals("Evening walk", proposal.title)
             click("Generate another")
             click("Edit settings")
             click("Start Trip")
-            assertEquals(listOf("cancel", "another", "edit", "start"), events)
+            assertEquals(listOf("cancel", "another", "edit", "start:Evening walk"), events)
         } finally { scene.close() }
     }
 }

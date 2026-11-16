@@ -283,8 +283,9 @@ fun CurrentTripScreen(
     if (completedTrip != null) {
         CompleteV3(completedTrip, onReview = { requestReview() },
             onSkipToHistory = { skipCompletion(true) }, onPlanAnother = { skipCompletion(false) },
-            onGo = { skipCompletion(false) }, enabled = isDestinationActive && isAppResumed && trip.id !in currentState.pendingFinalTripIds,
-            errorMessage = operationMessage, modifier = modifier)
+            enabled = isDestinationActive && isAppResumed,
+            errorMessage = operationMessage, modifier = modifier,
+            syncPending = trip.id in currentState.pendingFinalTripIds)
     } else if (storedTrip == null) {
         Column(
             modifier = modifier

@@ -27,15 +27,29 @@ internal class CloudTrips(
     }
 
     suspend fun details(id: TripId): Trip? = mutex.withLock {
-        repository.getTrip(id).also { if (it != null) store.acceptStoredTrip(it) }
+        if (id in store.state.value.pendingFinalTripIds) {
+            store.findInHistory(id)
+        } else {
+            repository.getTrip(id).also { if (it != null) store.acceptStoredTrip(it) }
+        }
     }
 
     suspend fun flushFinalTrips() = mutex.withLock {
         for (trip in store.pendingFinalTrips()) {
-            val stored = repository.saveFinalTrip(trip)
-            store.acceptStoredTrip(stored, acknowledgeWrite = true)
-            revision++
+            persistFinalTrip(trip)
         }
+    }
+
+    /** Save this review/edit's parent without waiting for unrelated pending trips. */
+    suspend fun flushFinalTrip(id: TripId) = mutex.withLock {
+        store.pendingFinalTrips().firstOrNull { it.id == id }?.let { persistFinalTrip(it) }
+        Unit
+    }
+
+    private suspend fun persistFinalTrip(trip: Trip) {
+        val stored = repository.saveFinalTrip(trip)
+        store.acceptStoredTrip(stored, acknowledgeWrite = true)
+        revision++
     }
 
     suspend fun mutate(action: suspend TripRepository.() -> Unit) = mutex.withLock {

@@ -11,6 +11,16 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,6 +37,8 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -171,6 +183,9 @@ fun ActiveMapContent(
     var headerHeight by remember { mutableIntStateOf(0) }
     var panelHeight by remember { mutableIntStateOf(0) }
     var recenterRequest by remember(trip.id) { mutableIntStateOf(0) }
+    var panelCollapsed by rememberSaveable(trip.id.value) { mutableStateOf(false) }
+    var panelDrag by remember(trip.id) { mutableFloatStateOf(0f) }
+    val collapseThreshold = with(density) { 24.dp.toPx() }
 
     BoxWithConstraints(modifier.fillMaxSize()) {
         val panelMaxHeight = maxHeight * ActiveMapPanelMaximumHeightFraction
@@ -350,76 +365,128 @@ fun ActiveMapContent(
                     .onSizeChanged { panelHeight = it.height }
                     .tripPanelEntrance(liveMap)
                     .background(TransitComplementary)
-                    .verticalScroll(rememberScrollState())
                     .padding(ActiveMapPanelPadding),
                 verticalArrangement = Arrangement.spacedBy(ActiveMapActionSpacing)
             ) {
-                if (mainOverview) {
-                    Text(
-                        "Your adventure is still running",
-                        color = TransitWhite,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                Text(
-                    "Current trip · #$reference",
-                    color = TransitWhite,
-                    fontSize = 14.sp
-                )
-
-                EstimatedTripProgress(trip, fraction)
-
-                if (operationMessage != null) {
-                    Text(
-                        operationMessage,
-                        color = TransitWhite,
-                        modifier = Modifier.semantics {
-                            liveRegion = LiveRegionMode.Polite
+                Box(
+                    Modifier.fillMaxWidth().height(32.dp)
+                        .semantics {
+                            contentDescription = "Trip panel"
+                            stateDescription = if (panelCollapsed) "Collapsed" else "Expanded"
                         }
-                    )
-                }
-
-                if (mainOverview) {
-                    TripActionButton(
-                        label = "Resume current trip",
-                        enabled = actionsEnabled,
-                        onClick = onResume
-                    )
-                    Text(
-                        "Finish or cancel this trip before generating another.",
-                        color = TransitWhite,
-                        fontSize = 12.sp
-                    )
-                } else {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        TripActionButton(
-                            label = if (completed) "Review trip" else "Finish trip",
+                        .draggable(
+                            state = rememberDraggableState { panelDrag += it },
+                            orientation = Orientation.Vertical,
                             enabled = actionsEnabled,
-                            onClick = {
-                                if (completed) onFinish()
-                                else { confirmingCancel = false; confirmingFinish = true }
-                            },
-                            modifier = Modifier.weight(1f)
+                            onDragStarted = { panelDrag = 0f },
+                            onDragStopped = { velocity ->
+                                if (panelDrag > collapseThreshold || velocity > 600f) panelCollapsed = true
+                                else if (panelDrag < -collapseThreshold || velocity < -600f) panelCollapsed = false
+                            }
                         )
-
-                        TripActionButton(
-                            label = "Cancel",
-                            secondary = true,
-                            enabled = actionsEnabled && !completed,
-                            onClick = { confirmingFinish = false; confirmingCancel = true },
-                            modifier = Modifier.weight(1f)
+                        .clickable(
+                            enabled = actionsEnabled,
+                            role = Role.Button,
+                            onClickLabel = if (panelCollapsed) "Expand trip panel" else "Collapse trip panel"
+                        ) { panelCollapsed = !panelCollapsed },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(Modifier.width(48.dp).height(4.dp)
+                        .background(TransitWhite, RoundedCornerShape(2.dp)))
+                }
+                AnimatedContent(
+                    targetState = panelCollapsed,
+                    transitionSpec = {
+                        (fadeIn(tween(180, delayMillis = 100)) togetherWith fadeOut(tween(100)))
+                            .using(SizeTransform { _, _ ->
+                                tween(durationMillis = 360, easing = FastOutSlowInEasing)
+                            })
+                    },
+                    label = "Trip panel slide"
+                ) { collapsed ->
+                    if (collapsed) {
+                        Text(
+                            "${ceil(trip.plannedMinutes * (1f - fraction)).toInt()} min remaining " +
+                                "(${(trip.distanceKm * (1f - fraction) * 10).roundToInt() / 10.0} km)",
+                            color = TransitWhite,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
                         )
-                    }
+                    } else {
+                        Column(
+                            Modifier.heightIn(max = (panelMaxHeight - 76.dp).coerceAtLeast(0.dp))
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(ActiveMapActionSpacing)
+                        ) {
+                            if (mainOverview) {
+                                Text(
+                                    "Your adventure is still running",
+                                    color = TransitWhite,
+                                    fontSize = 24.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
 
-                    TextButton(
-                        onClick = onShowInformation,
-                        enabled = actionsEnabled
-                    ) {
-                        Text("Trip information", color = TransitWhite)
+                            Text(
+                                "Current trip · #$reference",
+                                color = TransitWhite,
+                                fontSize = 14.sp
+                            )
+
+                            EstimatedTripProgress(trip, fraction)
+
+                            if (operationMessage != null) {
+                                Text(
+                                    operationMessage,
+                                    color = TransitWhite,
+                                    modifier = Modifier.semantics {
+                                        liveRegion = LiveRegionMode.Polite
+                                    }
+                                )
+                            }
+
+                            if (mainOverview) {
+                                TripActionButton(
+                                    label = "Resume current trip",
+                                    enabled = actionsEnabled,
+                                    onClick = onResume
+                                )
+                                Text(
+                                    "Finish or cancel this trip before generating another.",
+                                    color = TransitWhite,
+                                    fontSize = 12.sp
+                                )
+                            } else {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    TripActionButton(
+                                        label = if (completed) "Review trip" else "Finish trip",
+                                        enabled = actionsEnabled,
+                                        onClick = {
+                                            if (completed) onFinish()
+                                            else { confirmingCancel = false; confirmingFinish = true }
+                                        },
+                                        modifier = Modifier.weight(1f)
+                                    )
+
+                                    TripActionButton(
+                                        label = "Cancel",
+                                        secondary = true,
+                                        enabled = actionsEnabled && !completed,
+                                        onClick = { confirmingFinish = false; confirmingCancel = true },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+
+                                TextButton(
+                                    onClick = onShowInformation,
+                                    enabled = actionsEnabled
+                                ) {
+                                    Text("Trip information", color = TransitWhite)
+                                }
+                            }
+                        }
                     }
                 }
             }

@@ -17,6 +17,51 @@ import kotlin.test.*
 class ActiveMapContentTest {
     @OptIn(ExperimentalComposeUiApi::class)
     @Test
+    fun draggingPanelDownRevealsMapAndDraggingUpRestoresActions() {
+        val scene = ImageComposeScene(412, 720) {
+            RNDTransitTheme {
+                ActiveMapContent(reviewedHistoryPreviewTrip, 0.4f, true, {}, {})
+            }
+        }
+        var time = 0L
+        fun render() { repeat(40) { time += 16_000_000; scene.render(time).close() } }
+        fun all(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::all)
+        fun nodes() = scene.semanticsOwners.flatMap { all(it.rootSemanticsNode) }
+        fun handle() = nodes().first {
+            it.config.getOrNull(SemanticsProperties.ContentDescription)?.contains("Trip panel") == true
+        }
+        fun drag(distance: Float) {
+            val start = handle().boundsInRoot.center
+            scene.sendPointerEvent(PointerEventType.Press, start, timeMillis = time / 1_000_000)
+            for (step in 1..6) {
+                scene.sendPointerEvent(PointerEventType.Move,
+                    start.copy(y = start.y + distance * step / 6),
+                    timeMillis = time / 1_000_000 + step * 20)
+            }
+            scene.sendPointerEvent(PointerEventType.Release,
+                start.copy(y = start.y + distance), timeMillis = time / 1_000_000 + 140)
+            time += 160_000_000
+            render()
+        }
+        try {
+            render()
+            val expandedTop = handle().boundsInRoot.top
+            drag(60f)
+            assertEquals("Collapsed", handle().config[SemanticsProperties.StateDescription])
+            assertTrue(handle().boundsInRoot.top > expandedTop)
+            assertFalse(nodes().any {
+                it.config.getOrNull(SemanticsProperties.Text)?.any { text -> text.text == "Finish trip" } == true
+            })
+            drag(-60f)
+            assertEquals("Expanded", handle().config[SemanticsProperties.StateDescription])
+            assertTrue(nodes().any {
+                it.config.getOrNull(SemanticsProperties.Text)?.any { text -> text.text == "Finish trip" } == true
+            })
+        } finally { scene.close() }
+    }
+
+    @OptIn(ExperimentalComposeUiApi::class)
+    @Test
     fun guidanceFollowsTheVisibleLegAndKeepsItsLastPositionWhenLocationIsStale() {
         var progress by mutableStateOf(0f)
         var location by mutableStateOf(TripLocationState.Sample)

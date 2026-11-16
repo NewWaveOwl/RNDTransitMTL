@@ -198,6 +198,8 @@ fun TripReviewScreen(
                 scope.launch {
                     try {
                         if (tryCloudAction {
+                            // A review needs its parent trip even when completion saving is pending.
+                            cloud.flushFinalTrip(tripId)
                             cloud.mutate {
                                 val stored = saveReview(tripId, review)
                                 tripsStore.saveReview(tripId, stored)

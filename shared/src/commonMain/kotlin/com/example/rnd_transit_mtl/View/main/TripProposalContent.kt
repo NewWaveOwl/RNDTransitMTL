@@ -5,6 +5,7 @@ import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMapData
 import com.example.rnd_transit_mtl.data.assets.toSampleMapPoint
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
@@ -20,7 +21,9 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -29,6 +32,10 @@ import com.example.rnd_transit_mtl.View.main.components.TripSearchBar
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -199,16 +206,6 @@ internal fun TripLoadingContent(
             }
 
             Text(
-                text = "Finding your adventure…",
-                color = TransitWhite,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.semantics {
-                    liveRegion = LiveRegionMode.Polite
-                }
-            )
-
-            Text(
                 text = "Checking routes for $minutes minutes with " +
                     "$transportSummary. Your choices stay saved.",
                 color = TransitWhite,
@@ -233,6 +230,7 @@ internal fun TripLoadingContent(
  * @param onStart Requests activation of this proposal.
  * @param onGenerateAnother Requests a fresh proposal.
  * @param onEditSettings Returns to the saved planner choices.
+ * @param onRename Updates the proposal name before it becomes an active trip.
  * @param modifier Parent layout constraints.
  */
 @Composable
@@ -242,8 +240,10 @@ internal fun TripProposalContent(
     onGenerateAnother: () -> Unit,
     onEditSettings: () -> Unit,
     modifier: Modifier = Modifier,
-    scheduled: Boolean = false
+    scheduled: Boolean = false,
+    onRename: ((String) -> Unit)? = null
 ) {
+    var nameDraft by rememberSaveable(trip.id.value) { mutableStateOf(trip.title) }
     val nowMillis by produceState(initialValue = Clock.System.now().toEpochMilliseconds(), key1 = trip.id) {
         if (trip.legs.none { it.transitTiming != null }) return@produceState
         while (true) {
@@ -293,8 +293,9 @@ internal fun TripProposalContent(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             TripLabelValueField(
-                label = "Trip destination",
-                value = if (trip.routedDurationSeconds != null) trip.destination.label else trip.title
+                label = "Starting point",
+                value = trip.origin.label,
+                showLocationIcon = true
             )
             Surface(
                 shape = RoundedCornerShape(16.dp),
@@ -339,22 +340,27 @@ internal fun TripProposalContent(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text(
-                    text = trip.title,
-                    color = TransitWhite,
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.Bold
+                BasicTextField(
+                    value = nameDraft,
+                    onValueChange = { name ->
+                        nameDraft = name
+                        if (name.isNotBlank()) onRename?.invoke(name.trim())
+                    },
+                    readOnly = onRename == null,
+                    singleLine = true,
+                    textStyle = TextStyle(
+                        color = TransitWhite,
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    cursorBrush = SolidColor(TransitWhite),
+                    modifier = Modifier.fillMaxWidth()
+                        .semantics { contentDescription = "Trip name" }
+                        .onFocusChanged { if (!it.isFocused && nameDraft.isBlank()) nameDraft = trip.title }
                 )
-
-                // Round like the active, completion and details screens so one trip shows one distance.
-                val distance = if (scheduled) {
-                    val hundredths = (trip.legs.sumOf { it.distanceMeters } / 10).roundToInt()
-                    "${hundredths / 100}.${(hundredths % 100).toString().padStart(2, '0')}"
-                } else {
-                    ((trip.distanceKm * 10).roundToInt() / 10.0).toString()
-                }
+                val distanceTenths = (trip.distanceKm * 10).roundToInt()
+                val distance = "${distanceTenths / 10},${distanceTenths % 10}"
                 val timedLegs = trip.legs.filter { it.transitTiming != null }
-                val estimates = timedLegs.mapNotNull { it.transitTiming }.filter { it.realtimeApplied }
                 val elapsedSeconds = trip.routedDurationSeconds ?: if (timedLegs.size > 1) {
                     val first = requireNotNull(timedLegs.first().transitTiming)
                     val last = requireNotNull(timedLegs.last().transitTiming)
@@ -363,37 +369,19 @@ internal fun TripProposalContent(
                     runCatching { (Instant.parse(arrival) - Instant.parse(departure)).inWholeSeconds }
                         .getOrNull()?.takeIf { it > 0 } ?: trip.legs.sumOf { it.durationSeconds }
                 } else trip.legs.sumOf { it.durationSeconds }
-                val minutes = (elapsedSeconds / 60.0).roundToInt()
-                val duration = if (estimates.isNotEmpty()) {
-                    val kind = if (estimates.all { it.predictionsFreshAt(nowMillis) }) "estimated" else "saved estimate"
-                    "$minutes min $kind"
-                } else if (scheduled) {
-                    if (timedLegs.isEmpty()) "$minutes min routed" else "$minutes min scheduled"
-                } else {
-                    "${trip.plannedMinutes} min"
-                }
-                val geometryNote = when {
-                    trip.legs.all { it.isRouted } -> ""
-                    trip.legs.any { it.isRouted } -> " · includes short map connections"
-                    else -> " straight line"
-                }
-                val orientationNote = if (trip.orientationBufferSeconds > 0) " incl. orientation" else ""
+                val minutes = if (scheduled || trip.routedDurationSeconds != null) {
+                    (elapsedSeconds / 60.0).roundToInt()
+                } else trip.plannedMinutes
                 Text(
-                    text = "$duration$orientationNote · $distance km$geometryNote · One way",
+                    text = "$minutes min ($distance km)",
                     color = TransitWhite,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
                 )
-
                 Text(
                     text = trip.selectedTransports.joinToString(" + ") { it.label },
                     color = TransitWhite,
                     fontSize = 15.sp
-                )
-                Text(
-                    text = if (liveMap) trip.description else "Sample route · opening hours not confirmed",
-                    color = TransitWhite,
-                    fontSize = 12.sp
                 )
 
                 if (timedLegs.size > 1) ProposalButton("Start Trip", true, onStart)
