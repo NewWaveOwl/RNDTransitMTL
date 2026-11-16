@@ -56,6 +56,8 @@ import com.example.rnd_transit_mtl.state.user.appNicknameSession
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.LocalSharedTransitMapHost
 import com.example.rnd_transit_mtl.ui.theme.RNDTransitTheme
 import kotlinx.coroutines.CancellationException
+import com.example.rnd_transit_mtl.data.accounts.AccountRepository
+import com.example.rnd_transit_mtl.data.accounts.LocalAccountRepository
 
 private data class TransportData(
     val types: List<TransportType>,
@@ -141,8 +143,15 @@ internal fun App(
     LaunchedEffect(accountSession.value) {
         when (accountSession.value) {
             is AccountSession.SignedIn -> {
+
                 sessionStores.clearAccountStores(except = signedIdentity)
                 continueAsGuest = false
+//                val owner  = (accountSession.value as AccountSession.SignedIn).userId
+
+
+
+
+
             }
 
             AccountSession.Guest -> {
@@ -198,6 +207,20 @@ internal fun App(
                 }
             }
 
+            val accountRepository = remember(owner) {
+                owner?.let { AccountRepository(UserId(it)) }
+            }
+
+            LaunchedEffect(accountRepository) {
+                try {
+                    accountRepository?.ensureAccount()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    // Offline or server error: the row is created on the next sign-in.
+                }
+            }
+
             val tripNavigation = remember(navigator, tripsStore) {
                 TripNavigation(navigator, tripsStore)
             }
@@ -218,7 +241,8 @@ internal fun App(
                 LocalTripNavigation provides tripNavigation,
                 LocalNicknameSession provides appNicknameSession,
                 LocalAuthRepository provides authRepository,
-                LocalAccountSession provides accountSession.value
+                LocalAccountSession provides accountSession.value,
+                LocalAccountRepository provides accountRepository,
             ) {
                 val showAccountScreen =
                     accountSession.value !is AccountSession.SignedIn &&

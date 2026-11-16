@@ -38,7 +38,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
-import com.example.rnd_transit_mtl.App
 import com.example.rnd_transit_mtl.View.about.AboutScreen
 import com.example.rnd_transit_mtl.View.authentication.AuthScreen
 import com.example.rnd_transit_mtl.ViewModels.authentication.AuthViewModel
@@ -52,6 +51,9 @@ import com.example.rnd_transit_mtl.View.profile.ProfileScreen
 import com.example.rnd_transit_mtl.View.settings.SettingsScreen
 import com.example.rnd_transit_mtl.View.trip_details.TripDetailsScreen
 import com.example.rnd_transit_mtl.View.trip_review.TripReviewScreen
+import com.example.rnd_transit_mtl.ViewModels.Accounts.ProfileViewModel
+import com.example.rnd_transit_mtl.ViewModels.Settings.SettingsViewModel
+import com.example.rnd_transit_mtl.data.accounts.LocalAccountRepository
 
 /**
  * Literal sealed-class route hierarchy required by the assignment.
@@ -124,6 +126,7 @@ data class TripDetailsScreenKey(
 ) : ScreenKey() {
     override val screenTitle = "Trip details"
 }
+
 
 /**
  * Restricted, serializable return destinations for review editing.
@@ -391,7 +394,13 @@ private fun DestinationDisplay(
             }
 
             entry<ProfileScreenKey> {
-                ProfileScreen()
+                val accountRepository = LocalAccountRepository.current
+                val authRepository = LocalAuthRepository.current
+                // Guests have no account repository, so they get no ViewModel.
+                val profileViewModel = accountRepository?.let {
+                    viewModel { ProfileViewModel(it, authRepository) }
+                }
+                ProfileScreen(profileViewModel)
             }
 
             entry<AuthScreenKey> { key ->
@@ -412,7 +421,11 @@ private fun DestinationDisplay(
             }
 
             entry<SettingsScreenKey> {
-                SettingsScreen()
+                val accountRepository = LocalAccountRepository.current
+                val authRepository = LocalAuthRepository.current
+                val settingsViewModel = viewModel { SettingsViewModel(accountRepository!!, authRepository) }
+
+                SettingsScreen(settingsViewModel)
             }
         },
         transitionSpec = {

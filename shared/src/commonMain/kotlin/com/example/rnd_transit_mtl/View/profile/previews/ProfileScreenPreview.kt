@@ -14,6 +14,6 @@ fun ProfileScreenPreview() {
         MainScreenKey,
         ProfileScreenKey
     ) {
-        ProfileScreen()
+        ProfileScreen(viewModel = null)
     }
 }
