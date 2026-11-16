@@ -4,7 +4,7 @@
 **Prepared:** November 15, 2026 (America/Toronto).
 **Scope:** Milestone 3 / Sprint 3. This placement follows the chats’ Sprint 3 board, #59–#63 and ML3 feature context; the October project-location check is context only.
 
-These records summarize conversations by significant challenge, following [HowToLog_AI.md](../../../HowToLog_AI.md) and Jim’s supplied ADR/ATL examples. Prompt-by-prompt transcripts are omitted at Jim’s explicit request. Conversation links are public, globally shareable ChatGPT snapshots created with Jim’s explicit authorization on November 15, 2026. They do not require local Codex access. Shares are immutable snapshots; later chat updates are not included automatically.
+These records summarize conversations by significant challenge, following [HowToLog_AI.md](../../../HowToLog_AI.md) and Jim’s supplied ADR/ATL examples. Conversation links are public, globally shareable ChatGPT snapshots created with Jim’s explicit authorization on November 15, 2026. They do not require local Codex access. Shares are immutable snapshots; later chat updates are not included automatically.
 
 All historical outcomes and tests below are attributed to the visible conversation reports unless explicitly identified as checked during this documentation pass. No historical application task was rerun. Exact model versions, active AI time, code percentages and measured time savings are [Not documented]. Personal learning and productivity judgments are [Student reflection needed]. Alternatives are those discussed or directly contrasted in the source; they are not an assertion that Jim formally evaluated every option.
 
@@ -22,8 +22,8 @@ Entries group related iterations rather than individual prompts. Observable prom
 * **Iteration & Adaptation:** Initial access was blocked by a signed-out browser; after the login handoff, Jim clarified that labels should cover all epics.
 * **Verification Method:** Historical response reports checking the updated issue list and capturing github-issue-labels.png.
 * **Code / Project Impact:** Project planning metadata; no application source changes.
-* **Time Spent / Saved:** [Not documented]. No measured productivity gain or student time estimate is available for this challenge.
-* **Reflection / Result:** The chat reports the requested issue updates and includes a screenshot. This documentation pass did not recheck the live board. Personal learning/productivity reflection: [Student reflection needed].
+* **Time Spent / Saved:** ~2 hours of issue-making
+* **Reflection / Result:** The chat reports the requested issue updates and includes a screenshot. This documentation pass did not recheck the live board. Personal learning/productivity reflection: Having the AI break down the tasks into actionable steps is a very useful application.
 * **Decision Record:** [JIM-M3-01](ML3-Jim-AI-Decision-Log.md).
 
 ## Entry JIM-M3-02: Scope the persistence work and separate state from storage
@@ -38,8 +38,8 @@ Entries group related iterations rather than individual prompts. Observable prom
 * **Iteration & Adaptation:** Moved from codebase overview and MVVM questions to storage boundaries, a connection-required scope, and four linked delivery steps.
 * **Verification Method:** Historical source review at main 756f5a1; issue creation/board placement were reported. Device behavior was not established by that review.
 * **Code / Project Impact:** Implementation plan for #59–#63 and the state/storage boundary.
-* **Time Spent / Saved:** [Not documented]. No measured productivity gain or student time estimate is available for this challenge.
-* **Reflection / Result:** Jim requested the issue breakdown and explicitly required sign-in → finish trip → restart → same ID/status acceptance on Android and Desktop. AI estimates of 82–144 hours for the wider backlog and 24–40 hours for a usable Supabase release were planning estimates, not measured effort. Personal learning/productivity reflection: [Student reflection needed].
+* **Time Spent / Saved:** None
+* **Reflection / Result:** Jim requested the issue breakdown and explicitly required sign-in → finish trip → restart → same ID/status acceptance on Android and Desktop. AI estimates of 82–144 hours for the wider backlog and 24–40 hours for a usable Supabase release were planning estimates, not measured effort. Personal learning/productivity reflection: AI is not really good at estimating the time to spend on individual issues. This wasn't a very useful use of AI.
 * **Decision Record:** [JIM-M3-02](ML3-Jim-AI-Decision-Log.md).
 
 ## Entry JIM-M3-03: Prove the shared Supabase client before the full account flow
@@ -54,8 +54,8 @@ Entries group related iterations rather than individual prompts. Observable prom
 * **Iteration & Adaptation:** Jim asked for increasingly detailed steps, then asked the agent to apply repairs. Native DLL/JAVA_HOME failures were separated from Kotlin and Yarn failures; the launchers were subsequently restored to App().
 * **Verification Method:** Earlier build attempts stopped before compilation; later Desktop classes and Android assembly were reported successful. Live smoke-test results remain [Not documented].
 * **Code / Project Impact:** Shared Gradle setup, SupabaseBackend, temporary sign-in screen, launchers and auth navigation.
-* **Time Spent / Saved:** [Not documented]. No measured productivity gain or student time estimate is available for this challenge.
-* **Reflection / Result:** The AI acknowledged its older full-file Gradle replacement had dropped existing configuration and reported restoring it. Later in the same chat, Desktop classes and Android debug assembly passed after duplicate AuthScreenKey removal. Successful live sign-in on both targets was not documented. Personal learning/productivity reflection: [Student reflection needed].
+* **Time Spent / Saved:** None.
+* **Reflection / Result:** The AI acknowledged its older full-file Gradle replacement had dropped existing configuration and reported restoring it. Later in the same chat, Desktop classes and Android debug assembly passed after duplicate AuthScreenKey removal. Successful live sign-in on both targets was not documented. Personal learning/productivity reflection: AI is not really good at estimate the time to spend on individual issues. This wasn't a very useful use of AI
 * **Decision Record:** [JIM-M3-03](ML3-Jim-AI-Decision-Log.md).
 
 ## Entry JIM-M3-04: Build session-based authentication and refine the draft UI
@@ -70,8 +70,8 @@ Entries group related iterations rather than individual prompts. Observable prom
 * **Iteration & Adaptation:** Initial implementation was incomplete and initially unbuilt; Jim requested Android validation, styling integration and readability fixes in successive grouped refinements.
 * **Verification Method:** Historical Android debug assembly passed; the agent explicitly did not verify the rendered screen on a device/emulator.
 * **Code / Project Impact:** App.kt, Router.kt, AuthScreen.kt, AuthViewModel.kt and Profile layout.
-* **Time Spent / Saved:** [Not documented]. No measured productivity gain or student time estimate is available for this challenge.
-* **Reflection / Result:** Jim explicitly requested implementation and then corrected missing startup behavior and visual defects. The chat reports Android debug assembly passing after fixes. Display-name editing and password changes remained unconnected. Personal learning/productivity reflection: [Student reflection needed].
+* **Time Spent / Saved:** ~1 hour of documentation navigation.
+* **Reflection / Result:** Jim explicitly requested implementation and then corrected missing startup behavior and visual defects. The chat reports Android debug assembly passing after fixes. Display-name editing and password changes remained unconnected. Personal learning/productivity reflection:  Having the AI assist in Supabase docs is much faster than navigating by hand.
 * **Decision Record:** [JIM-M3-04](ML3-Jim-AI-Decision-Log.md).
 
 ## Entry JIM-M3-05: Isolate account state and harden authentication transitions
@@ -86,8 +86,8 @@ Entries group related iterations rather than individual prompts. Observable prom
 * **Iteration & Adaptation:** Grouped fixes evolved from compile blockers to account retention, confirmation persistence, debug preview access, UI-test animation timing and the sign-in/guest race.
 * **Verification Method:** Chats report shared Android/JVM compilation, Android lint, and later JVM plus Android host tests passing. One earlier regression run was interrupted; live offline refresh/debug preview behavior remained untested.
 * **Code / Project Impact:** Auth sources, App/session trip stores, Profile, debug network configuration and auth/UI tests.
-* **Time Spent / Saved:** [Not documented]. No measured productivity gain or student time estimate is available for this challenge.
-* **Reflection / Result:** Jim clarified that pasted request-changes text was existing review feedback and instructed the agent not to commit or post to GitHub. Changes were reported local and uncommitted. The earlier signup-result interpretation was later refined in JIM-M3-08 to check actual session existence. Personal learning/productivity reflection: [Student reflection needed].
+* **Time Spent / Saved:** ~2 hours.
+* **Reflection / Result:** Jim clarified that pasted request-changes text was existing review feedback and instructed the agent not to commit or post to GitHub. Changes were reported local and uncommitted. The earlier signup-result interpretation was later refined in JIM-M3-08 to check actual session existence. Personal learning/productivity reflection: Once again, AI covers a lot of ground really fast and helps to avoid tedious work.
 * **Decision Record:** [JIM-M3-05](ML3-Jim-AI-Decision-Log.md).
 
 ## Entry JIM-M3-06: Match the database schema to current DTOs and enforce ownership
@@ -103,7 +103,7 @@ Entries group related iterations rather than individual prompts. Observable prom
 * **Verification Method:** Historical source/DTO comparison; no documented live two-account CRUD/RLS test or fresh database check in this documentation pass.
 * **Code / Project Impact:** Proposed trips/reviews schema and versioned migration; owner-scoped repository prerequisites.
 * **Time Spent / Saved:** [Not documented]. No measured productivity gain or student time estimate is available for this challenge.
-* **Reflection / Result:** The conversation iteratively refined proposed SQL and explained why RLS must cover direct review requests. Later local sessions reference 20261108154350_create_trips_and_reviews.sql. Hosted application and the two-account security acceptance results are [Not documented]. Personal learning/productivity reflection: [Student reflection needed].
+* **Reflection / Result:** The conversation iteratively refined proposed SQL and explained why RLS must cover direct review requests. Later local sessions reference 20261108154350_create_trips_and_reviews.sql. Student reflection: AI excels at simple comparison tasks such as table-to-sql conversions.
 * **Decision Record:** [JIM-M3-06](ML3-Jim-AI-Decision-Log.md).
 
 ## Entry JIM-M3-07: Persist final trips and reviews with durable retries
@@ -118,8 +118,8 @@ Entries group related iterations rather than individual prompts. Observable prom
 * **Iteration & Adaptation:** Two related conversations moved from create/read explanations to explicit update/delete/review operations, then full integration and an acceptance handoff.
 * **Verification Method:** Historical Android debug build/Desktop compile passed; final serial runs reported 175 Desktop JVM tests and 152 Android host tests passing. An earlier Compose threading failure passed on rerun. Live relaunch/review/cancel evidence on both targets was handed to Jim and is [Not documented].
 * **Code / Project Impact:** TripRepository, SupabaseTripRepository, CloudTrips, FinalTripOutbox, TripsStore, History/details/review UI.
-* **Time Spent / Saved:** [Not documented]. No measured productivity gain or student time estimate is available for this challenge.
-* **Reflection / Result:** Jim authorized full CRUD and explicitly took over live acceptance testing. The chat reports implementation and tests, including lost-response retry after store recreation and cancelled status. Sign-out handling was subsequently strengthened in JIM-M3-08 to retain each account’s pending outbox. Personal learning/productivity reflection: [Student reflection needed].
+* **Time Spent / Saved:** ~2 hours
+* **Reflection / Result:** Jim authorized full CRUD and explicitly took over live acceptance testing. The chat reports implementation and tests, including lost-response retry after store recreation and cancelled status. Sign-out handling was subsequently strengthened in JIM-M3-08 to retain each account’s pending outbox. Personal learning/productivity reflection: AI is incredibly useful for navigation API documentation such as Supabase's
 * **Decision Record:** [JIM-M3-07](ML3-Jim-AI-Decision-Log.md).
 
 ## Entry JIM-M3-08: Address PR #74 persistence review feedback
@@ -134,8 +134,8 @@ Entries group related iterations rather than individual prompts. Observable prom
 * **Iteration & Adaptation:** An inaccessible GitHub review was replaced with pasted evidence. Jim requested explanations and a commit-format overview; no live migration application was demonstrated.
 * **Verification Method:** Historical :shared:jvmTest and :shared:compileKotlinWasmJs passed. The new review migration was not exercised against live Supabase.
 * **Code / Project Impact:** Wasm dependencies, cloud/outbox declarations, App.kt, repository behavior and atomic review migration.
-* **Time Spent / Saved:** [Not documented]. No measured productivity gain or student time estimate is available for this challenge.
-* **Reflection / Result:** The chat reports fixes, passing JVM/Wasm checks, and migration 20261109160000_save_trip_review.sql. The initial retry comparison still included mutable title/description; JIM-M3-09 records the later correction. Personal learning/productivity reflection: [Student reflection needed].
+* **Time Spent / Saved:** ~30 minutes review
+* **Reflection / Result:** The chat reports fixes, passing JVM/Wasm checks, and migration 20261109160000_save_trip_review.sql. The initial retry comparison still included mutable title/description; JIM-M3-09 records the later correction. Personal learning/productivity reflection:  Having the AI assist in PR reviews covers ground much faster than manual human reviews could.
 * **Decision Record:** [JIM-M3-08](ML3-Jim-AI-Decision-Log.md).
 
 ## Entry JIM-M3-09: Acknowledge retried writes by immutable identity
@@ -150,8 +150,8 @@ Entries group related iterations rather than individual prompts. Observable prom
 * **Iteration & Adaptation:** One focused request supplied the failure condition and required correction; no broader redesign was requested.
 * **Verification Method:** Historical targeted tests passed; no new live multi-device test was performed for these records.
 * **Code / Project Impact:** SupabaseTripRepository retry acknowledgement and regression coverage.
-* **Time Spent / Saved:** [Not documented]. No measured productivity gain or student time estimate is available for this challenge.
-* **Reflection / Result:** The historical final response reports the targeted fix and passing targeted tests. This supersedes the mutable-field comparison described in the earlier PR #74 work. Personal learning/productivity reflection: [Student reflection needed].
+* **Time Spent / Saved:** ~2 hours of debugging
+* **Reflection / Result:** The historical final response reports the targeted fix and passing targeted tests. This supersedes the mutable-field comparison described in the earlier PR #74 work. Personal learning/productivity reflection:  Having the AI assist in PR reviews covers ground much faster than manual human reviews could.
 * **Decision Record:** [JIM-M3-09](ML3-Jim-AI-Decision-Log.md).
 
 ## Entry JIM-M3-10: Review PR #73 offline map fallback
@@ -166,8 +166,8 @@ Entries group related iterations rather than individual prompts. Observable prom
 * **Iteration & Adaptation:** One PR-review request; no follow-up implementation recorded.
 * **Verification Method:** Historical 175 JVM tests, Android debug Kotlin compilation and whitespace check passed. On-device behavior remained unverified.
 * **Code / Project Impact:** Review finding for the Android offline picker; no source change reported.
-* **Time Spent / Saved:** [Not documented]. No measured productivity gain or student time estimate is available for this challenge.
-* **Reflection / Result:** The chat returned one actionable finding. Adoption of the suggested fix is [Not documented]. Personal learning/productivity reflection: [Student reflection needed].
+* **Time Spent / Saved:** ~ 30 minutes
+* **Reflection / Result:** The chat returned one actionable finding. Adoption of the suggested fix is [Not documented]. Personal learning/productivity reflection: Having the AI assist in PR reviews covers ground much faster than manual human reviews could.
 * **Decision Record:** [JIM-M3-10](ML3-Jim-AI-Decision-Log.md).
 
 ## Entry JIM-M3-11: Preserve cloud persistence while resolving conflicts and reviewing PR #75
@@ -182,8 +182,8 @@ Entries group related iterations rather than individual prompts. Observable prom
 * **Iteration & Adaptation:** Jim asked for exact current/incoming choices after the overview, supplied a resolution for checking, then expanded the conversation to PR #75.
 * **Verification Method:** Historical PR #75 backend/launcher tests: 68 passed; shared JVM regression checks and exact-commit CI passed. Docker failure reproduced. Live OTP/realtime and packaged Windows execution were not tested.
 * **Code / Project Impact:** Conflict guidance for App.kt, History, Gradle/auth/session/test files; Dockerfile and UI text review findings.
-* **Time Spent / Saved:** [Not documented]. No measured productivity gain or student time estimate is available for this challenge.
-* **Reflection / Result:** Conflict recommendations were text/source review and were not compiled as Jim’s merged result. PR #75 review reported no tracked changes. The pasted resolution was judged structurally correct subject to checking the trailing declarations. Personal learning/productivity reflection: [Student reflection needed].
+* **Time Spent / Saved:** ~4 hours
+* **Reflection / Result:** Conflict recommendations were text/source review and were not compiled as Jim’s merged result. PR #75 review reported no tracked changes. The pasted resolution was judged structurally correct subject to checking the trailing declarations. Personal learning/productivity reflection: Having AI assistance for Supabase implementation was very helpful, as it navigates the docs much faster than a human could.
 * **Decision Record:** [JIM-M3-11](ML3-Jim-AI-Decision-Log.md).
 
 ## Entry JIM-M3-12: Implement a presentation-only compass from the draft
@@ -199,7 +199,7 @@ Entries group related iterations rather than individual prompts. Observable prom
 * **Verification Method:** Historical JVM compilation and existing regressions passed; visual appearance was not verified in a running app. Commit history was checked during this documentation pass.
 * **Code / Project Impact:** CompassScreen.kt, Router.kt and MainLayout.kt.
 * **Time Spent / Saved:** [Not documented]. No measured productivity gain or student time estimate is available for this challenge.
-* **Reflection / Result:** The chat reports commits 052800e, ef1ddb0, e9bafbc and 429a2e4. Current repository history confirms those four commits. Live direction/sensor behavior was intentionally left for Jim. Personal learning/productivity reflection: [Student reflection needed].
+* **Reflection / Result:** The chat reports commits 052800e, ef1ddb0, e9bafbc and 429a2e4. Current repository history confirms those four commits. Live direction/sensor behavior was intentionally left for Jim. Personal learning/productivity reflection: Having the AI implement the UI based on pre-made mockups by respects the 50% AI and makes the implementation extremely efficient.
 * **Decision Record:** [JIM-M3-12](ML3-Jim-AI-Decision-Log.md).
 
 ## Entry JIM-M3-13: Compile Jim’s conversation overview records
@@ -214,7 +214,7 @@ Entries group related iterations rather than individual prompts. Observable prom
 * **Iteration & Adaptation:** Grouped related sessions, followed older-history cursors, distinguished recommendations from reported implementation, and recorded how immutable retry identity supersedes the earlier mutable-field comparison. The request’s overview format takes precedence over the guide’s full-prompt template.
 * **Verification Method:** Check matching entry IDs, relative document links, retrieved chat IDs, source coverage and whitespace; preserve existing contributors’ files.
 * **Code / Project Impact:** Two Jim-specific Markdown records and a central index link; application code unchanged.
-* **Time Spent / Saved:** [Not documented].
-* **Reflection / Result:** Conversation-based drafts created for Jim’s review. Personal learning and usefulness: [Student reflection needed].
+* **Time Spent / Saved:** ~2 hours
+* **Reflection / Result:** Having the AI compile AI logs is EXTREMELY time-saving and avoids repetitive, redundant work. This is a clear use-case of AI.
 * **Decision Record:** [JIM-M3-13](ML3-Jim-AI-Decision-Log.md).
 
