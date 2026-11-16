@@ -1,8 +1,9 @@
 package com.example.rnd_transit_mtl
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -15,6 +16,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.rememberNavBackStack
@@ -260,7 +263,7 @@ internal fun App(
                     }
                 } else {
                     MainLayout {
-                        Column {
+                        Box(Modifier.fillMaxSize()) {
                             val pending =
                                 tripsStore.state.value.pendingFinalTripIds
 
@@ -283,27 +286,24 @@ internal fun App(
                                 }
                             }
 
-                            if (
-                                cloudTrips != null &&
-                                pending.isNotEmpty()
-                            ) {
-                                if (saveFailed) {
-                                    TextButton(
-                                        onClick = { retry++ }
-                                    ) {
-                                        Text("Trip could not be saved. Retry")
-                                    }
-                                } else {
-                                    Text("Saving trip…")
-                                }
-                            }
-
                             Router(
                                 backStack = backStack,
                                 transportTypes = transportData?.types,
                                 transportRoutes = transportData?.routes,
                                 loadingError = loadingError,
                             )
+
+                            // Save status must not reserve a strip below the shared header.
+                            if (cloudTrips != null && pending.isNotEmpty() && saveFailed) {
+                                Snackbar(
+                                    modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
+                                    action = {
+                                        TextButton(onClick = { retry++ }) { Text("Retry") }
+                                    }
+                                ) {
+                                    Text("Trip saved on this device. Cloud sync failed.")
+                                }
+                            }
                         }
                     }
                 }

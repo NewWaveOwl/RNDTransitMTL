@@ -505,8 +505,10 @@ class TripsStore private constructor(
         }
 
         mutableState.value = current.copy(
-            cancelledTrips = current.cancelledTrips.filterNot { it.id == tripId }
+            cancelledTrips = current.cancelledTrips.filterNot { it.id == tripId },
+            pendingFinalTripIds = current.pendingFinalTripIds - tripId
         )
+        onPendingFinalTripsChanged?.invoke(pendingFinalTrips())
         return TripActionResult.Applied
     }
 
@@ -523,8 +525,11 @@ class TripsStore private constructor(
             },
             pendingReviewTripId = current.pendingReviewTripId
                 .takeUnless { it == tripId },
-            reviewDrafts = current.reviewDrafts - tripId
+            reviewDrafts = current.reviewDrafts - tripId,
+            pendingFinalTripIds = current.pendingFinalTripIds - tripId
         )
+
+        onPendingFinalTripsChanged?.invoke(pendingFinalTrips())
 
         return TripActionResult.Applied
     }

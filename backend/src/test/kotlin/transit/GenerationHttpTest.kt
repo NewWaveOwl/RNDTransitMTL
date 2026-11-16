@@ -19,6 +19,7 @@ class GenerationHttpTest {
         val entered = CompletableDeferred<Unit>()
         val cancelled = CompletableDeferred<Unit>()
         val calls = AtomicInteger()
+        val clock = java.util.concurrent.atomic.AtomicLong()
         val zones = FareZones(obj("type" to "FeatureCollection", "features" to listOf("A", "B", "C", "D").map {
             obj("properties" to obj("zone" to it), "geometry" to obj("type" to "Polygon", "coordinates" to
                 listOf(listOf(listOf(-74,45),listOf(-73,45),listOf(-73,46),listOf(-74,46),listOf(-74,45)))))
@@ -31,7 +32,7 @@ class GenerationHttpTest {
             }
             obj("data" to obj("planConnection" to obj("routingErrors" to emptyList<Any>(), "edges" to emptyList<Any>())))
         }, sample = { listOf(Point(45.51, -73.6)) })
-        val server = embeddedServer(CIO, port = 0, host = "127.0.0.1") { generationRoutes(Api(generator)) }.start(wait = false)
+        val server = embeddedServer(CIO, port = 0, host = "127.0.0.1") { generationRoutes(Api(generator,userLimit=UserGenerationLimit { clock.get() })) }.start(wait = false)
         try {
             val port = server.engine.resolvedConnectors().first().port
             val client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build()
@@ -54,6 +55,7 @@ class GenerationHttpTest {
                 }
             }
             withTimeout(5_000) { cancelled.await() }
+            clock.set(3000)
             val next = withContext(Dispatchers.IO) {
                 client.send(HttpRequest.newBuilder(URI("http://127.0.0.1:$port/v1/trips/generate"))
                     .timeout(Duration.ofSeconds(10)).header("Content-Type", "application/json")
@@ -61,6 +63,13 @@ class GenerationHttpTest {
             }
             assertEquals(200, next.statusCode())
             assertEquals("no_trip", json.parseToJsonElement(next.body()).field("status").text())
+            val limited=withContext(Dispatchers.IO) {
+                client.send(HttpRequest.newBuilder(URI("http://127.0.0.1:$port/v1/trips/generate"))
+                    .timeout(Duration.ofSeconds(10)).header("Content-Type","application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(body)).build(),HttpResponse.BodyHandlers.ofString())
+            }
+            assertEquals(429,limited.statusCode())
+            assertEquals("3",limited.headers().firstValue("Retry-After").orElse(""))
         } finally { server.stop(0, 1000) }
     }
 }

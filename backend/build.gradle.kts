@@ -12,5 +12,6 @@ dependencies {
     implementation(libs.kotlinx.coroutinesCore)
     implementation("org.jetbrains.kotlin:kotlin-reflect:2.3.21")
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutinesTest)
 }
 tasks.test { useJUnit() }

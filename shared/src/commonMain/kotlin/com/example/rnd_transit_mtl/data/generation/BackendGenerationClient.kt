@@ -9,26 +9,37 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import kotlinx.serialization.json.*
+import kotlin.time.TimeSource
 
 /** Reuses one cancellable client. Tokens are read at request time after session refresh. */
 @Composable
 internal fun rememberBackendTripGenerator(endpoint: String?): BackendTripGenerator? {
     val client = remember(endpoint) {
         if (endpoint.isNullOrBlank()) null else HttpClient {
-            install(HttpTimeout) { requestTimeoutMillis = 45_000; connectTimeoutMillis = 5_000 }
+            install(HttpTimeout) { requestTimeoutMillis = 45_000; socketTimeoutMillis = 45_000; connectTimeoutMillis = 5_000 }
         }
     }
     DisposableEffect(client) { onDispose { client?.close() } }
     return remember(endpoint, client) {
         client?.let {
-            BackendTripGenerator(post = { body ->
+            BackendTripGenerator(post = { body, requestId ->
+                val started = TimeSource.Monotonic.markNow()
+                println("RndTransitGeneration request=$requestId http=start")
                 val response = it.post(requireNotNull(endpoint)) {
+                    header("X-Request-ID", requestId)
                     contentType(ContentType.Application.Json)
                     SupabaseBackend.client.auth.currentSessionOrNull()?.accessToken?.let { token -> bearerAuth(token) }
                     setBody(body)
                 }
-                response.bodyAsText().also { text -> require(text.length <= 2_000_000) }
-            })
+                println("RndTransitGeneration request=$requestId http=${response.status.value} elapsedMs=${started.elapsedNow().inWholeMilliseconds}")
+                val text = response.bodyAsText()
+                if(response.status.value !in 200..299) {
+                    val reason = runCatching { Json.parseToJsonElement(text).jsonObject["reason"]?.jsonPrimitive?.contentOrNull }.getOrNull()
+                    throw GenerationHttpFailure(response.status.value, response.headers["Retry-After"]?.toLongOrNull(), reason)
+                }
+                text
+            }, diagnostic = { event -> println("RndTransitGeneration $event") })
         }
     }
 }

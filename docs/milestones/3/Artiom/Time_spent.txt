@@ -41,5 +41,11 @@ Checkpoint -> work on the OTP/STM/EXO full integration: arbitrary geographic des
 Checkpoint -> work on the OTP/STM/EXO full integration: migrated generation to Ktor, removed preset map demo trips, consolidated server code under backend/. 15 backend and 176 shared tests, Android build/lint, standalone server build and bridge fixtures passed. Live host checks pending. + Tested server and fixed bug for PR #75
 
 
+2026-11-15 16:00-19:30 UI fix, grup codding seeasin + powepoint
 
+
+2026-11-15 19:00-20:50 Fixed back end , made bus and bike work`
+
+
+22:00 - 24:00 fixed ui for depicting trip worked on the app deployment
 

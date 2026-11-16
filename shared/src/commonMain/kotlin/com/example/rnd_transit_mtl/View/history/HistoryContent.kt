@@ -58,7 +58,8 @@ fun HistoryContent(
     onRemove: (TripId) -> Unit,
     modifier: Modifier = Modifier,
     actionsEnabled: Boolean = true,
-    errorMessage: String? = null
+    errorMessage: String? = null,
+    isLoading: Boolean = false
 ) {
     Box(
         modifier = modifier
@@ -120,15 +121,24 @@ fun HistoryContent(
                 }
             }
 
-            if (trips.isEmpty()) {
+            if (isLoading && trips.isEmpty()) {
+                item {
+                    Text(
+                        "Loading trips…",
+                        modifier = Modifier.fillMaxWidth().background(TransitWhite).padding(24.dp),
+                        color = TransitMain
+                    )
+                }
+            }
+
+            if (!isLoading && trips.isEmpty()) {
                 item {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = HistoryHeadingHorizontalPadding)
                             .background(
                                 color = TransitWhite,
-                                shape = RoundedCornerShape(24.dp)
+                                shape = RoundedCornerShape(0.dp)
                             )
                             .padding(24.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)

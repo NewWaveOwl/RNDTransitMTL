@@ -28,6 +28,54 @@ import kotlin.test.*
 class TransportDropdownInteractionTest {
     @OptIn(ExperimentalComposeUiApi::class)
     @Test
+    fun returningToGoWithBusAndBikeOpenKeepsBikeAtItsRestoredPosition() {
+        var mounted by mutableStateOf(true)
+        val vm = MainPlannerViewModel()
+        val walk = TransportId("walk")
+        val bike = TransportId("bike")
+        val bus = TransportId("bus")
+        val scene = ImageComposeScene(412, 1200) {
+            RNDTransitTheme {
+                if (mounted) LazyColumn(Modifier.fillMaxSize()) {
+                    PlannerPreferenceBands(
+                        scale = 1f,
+                        transportTypes = listOf(TransportType(walk, "Walk", false),
+                            TransportType(bike, "Bike", false), TransportType(bus, "Bus", true)),
+                        selectedTransportIds = listOf(walk, bike, bus),
+                        selectedZonesByTransport = mapOf(bus to listOf(ZoneId("A"))),
+                        onToggleTransport = {}, onToggleZone = { _, _ -> },
+                        walkingPreference = "Walk", selectedAttractionIds = emptyList(),
+                        onWalkingPreferenceChange = {}, onToggleAttraction = {},
+                        enabled = true, onOpenDetailedSettings = {},
+                        expandedTransportId = bus, onExpandedTransportChange = {},
+                        bikeSpeedKmh = vm.uiState.value.bikeSpeedKmh, onBikeSpeedChange = {}
+                    )
+                }
+            }
+        }
+        var time = 0L
+        fun frames(count: Int) {
+            repeat(count) { time += 16_000_000L; scene.render(time).close() }
+        }
+        fun all(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::all)
+        fun bikeY(): Float = scene.semanticsOwners.flatMap { all(it.rootSemanticsNode) }.first {
+            it.config.getOrNull(SemanticsProperties.Text)?.any { text -> text.text == "Biking speed" } == true
+        }.boundsInRoot.top
+        try {
+            frames(40)
+            val originalY = bikeY()
+            mounted = false
+            frames(2)
+            mounted = true
+            frames(2)
+            assertEquals(originalY, bikeY(), "Restored Bus zones must reserve their full height immediately")
+            frames(40)
+            assertEquals(originalY, bikeY(), "Bike must stay still after returning to GO")
+        } finally { scene.close() }
+    }
+
+    @OptIn(ExperimentalComposeUiApi::class)
+    @Test
     fun clicksCloseSwitchAndKeepSelectionsWhileHeightAnimatesThroughIntermediateFrames() {
         var expanded by mutableStateOf<TransportId?>(null)
         val vm = MainPlannerViewModel()
@@ -130,19 +178,22 @@ class TransportDropdownInteractionTest {
             frames(40)
             assertNull(expanded)
 
-            // A click with no zone selection still closes before the next type opens.
-            click(206f, 126f) // Train, initially without zones.
+            // Unsupported modes use the disabled Figma chip and never open zone menus.
+            click(206f, 126f) // Train.
             frames(40)
-            assertNotNull(textNode("Train zones"))
+            assertNull(expanded)
+            assertNull(textNode("Train zones"))
             click(330f, 126f) // REM.
-            frames(16)
-            assertNotNull(textNode("Train zones"))
+            frames(40)
+            assertNull(expanded)
             assertNull(textNode("REM zones"))
-            click(330f, 74f) // Latest request wins while the previous switch is collapsing.
-            frames(80)
+            assertFalse(TransportId("train") in vm.uiState.value.selectedTransportIds)
+            assertFalse(TransportId("rem") in vm.uiState.value.selectedTransportIds)
+            save("Disabled-transport-chips.png")
+            click(330f, 74f) // Bus still opens normally.
+            frames(40)
             assertEquals(TransportId("bus"), expanded)
             assertNotNull(textNode("Bus zones"))
-            assertNull(textNode("REM zones"))
             assertEquals(listOf(ZoneId("B")), vm.uiState.value.zonesForTransport(TransportId("bus")))
 
             // Walking uses the exact same 500 ms motion in both directions.
@@ -218,7 +269,7 @@ class TransportDropdownInteractionTest {
             assertTrue(bikeClosing < withBike && bikeClosing > headingY())
             assertNull(textNode("Biking speed"))
             assertEquals(32, vm.uiState.value.bikeSpeedKmh)
-            MainPlannerViewModel.transitIds.forEach { mode ->
+            MainPlannerViewModel.transitIds.filter { it.value !in setOf("train", "rem") }.forEach { mode ->
                 MainPlannerViewModel.zoneIds.forEach { zone ->
                     if (zone !in vm.uiState.value.zonesForTransport(mode)) vm.toggleZone(mode, zone)
                 }
@@ -227,7 +278,7 @@ class TransportDropdownInteractionTest {
             scene.constraints = Constraints.fixed(300, 1000)
             frames(10)
             save("Dropdown-all-zones-ellipsis.png")
-            MainPlannerViewModel.transitIds.forEach { mode ->
+            MainPlannerViewModel.transitIds.filter { it.value !in setOf("train", "rem") }.forEach { mode ->
                 val title = when (mode.value) { "bus" -> "Bus"; "metro" -> "Metro"; "train" -> "Train"; else -> "REM" }
                 val label = "$title A, B, C, D"
                 val node = assertNotNull(textNode(label), "Retain the full zone summary for accessibility")
