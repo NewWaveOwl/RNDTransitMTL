@@ -163,6 +163,15 @@ internal class BackendTripGenerator(
         val route = decoder.decodeResponse(requireNotNull(response.otp), request)
         if (route !is RoutingResult.Success) return TripGenerationResult.RoutingUnavailable("The trip planner returned an invalid route.")
         require(route.durationSeconds <= elapsed)
+        if(input.selectedTransportIds.map { it.value }.toSet()==setOf("walk","bike")) {
+            val walking=route.legs.filter { it.transportId.value=="walk" }
+            val cycling=route.legs.filter { it.transportId.value=="bike" }
+            require(walking.sumOf { it.distanceMeters }>0 && walking.sumOf { it.durationSeconds }>0 &&
+                cycling.sumOf { it.distanceMeters }>walking.sumOf { it.distanceMeters } &&
+                cycling.sumOf { it.durationSeconds }>walking.sumOf { it.durationSeconds }) {
+                "Walk + Bike requires a walking approach and cycling as the main transport."
+            }
+        }
         val id = (1..16).asSequence().map { TripId(idFactory()) }.firstOrNull { it !in existingIds }
             ?: return TripGenerationResult.IdUnavailable
         val modes = (input.selectedTransportIds + route.legs.map { it.transportId }).distinct()

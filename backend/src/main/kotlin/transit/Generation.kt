@@ -72,6 +72,12 @@ internal fun accepts(itinerary: JsonElement,input: Request,end: Point,zones: Far
     val legs=itinerary.field("legs").items()
     require(legs.isNotEmpty())
     require("walk" in input.modes || legs.any { it.field("mode").text() != "WALK" })
+    if(input.walkBike) {
+        fun amount(mode: String,key: String)=legs.filter { it.field("mode").text()==mode }.sumOf { it.field(key).number() ?: 0.0 }
+        val walking=amount("WALK","distance"); val cycling=amount("BICYCLE","distance")
+        val walkingTime=amount("WALK","duration"); val cyclingTime=amount("BICYCLE","duration")
+        require(walking>0 && cycling>walking && walkingTime>0 && cyclingTime>walkingTime)
+    }
     legs.forEach { leg ->
         check()
         val mode=modeNames.entries.firstOrNull { it.value==leg.field("mode").text() }?.key ?: error("Unknown mode")
@@ -189,7 +195,7 @@ internal class Generator(private val routes: List<JsonElement>, private val zone
             // Nested searches share departure, restrictions and the outer cancellation/deadline.
             val alternatives=buildList {
                 if("walk" in input.modes && input.modes.any { it !in listOf("walk","bike") }) add("walk")
-                if("bike" in input.modes && !input.bikeOnly) add("bike")
+                if("bike" in input.modes && !input.bikeOnly && !input.walkBike) add("bike")
             }
             for(mode in alternatives) {
                 val directInput=input.copy(modes=listOf(mode),zones=emptyMap(),lines=emptyList())
@@ -217,9 +223,17 @@ internal class Generator(private val routes: List<JsonElement>, private val zone
                 currentCoroutineContext().ensureActive(); attempts++
                 val routeTimer=TimeSource.Monotonic.markNow()
                 log("attempt=$attempts otp=start")
-                val body=try { bikeResponse(route(otpRequest(input,end,start,allowed)),input).also {
-                    log("attempt=$attempts otp=response latencyMs=${routeTimer.elapsedNow().inWholeMilliseconds}")
-                } }
+                val body=try {
+                    val initial=route(otpRequest(input,end,start,allowed))
+                    val planned=if(input.walkBike) walkBikeResponse(initial,input,end,start,zones) { query ->
+                        if(attempts>=maxAttempts) emptyPlanningResponse() else {
+                            attempts++
+                            log("attempt=$attempts otp=walk-bike-section")
+                            route(query)
+                        }
+                    } else bikeResponse(initial,input)
+                    planned.also { log("attempt=$attempts otp=response latencyMs=${routeTimer.elapsedNow().inWholeMilliseconds}") }
+                }
                     catch(e: CancellationException) { throw e }
                     catch(e: Exception) { log("attempt=$attempts otp=failed type=${e.javaClass.simpleName} http=${(e as? ProviderError)?.httpStatus ?: "none"}"); if(++failures>=2) { if(best!=null) break else throw ProviderError("Routing service unavailable.",e) }; continue }
                 currentCoroutineContext().ensureActive()

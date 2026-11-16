@@ -55,7 +55,8 @@ internal data class Request(val origin: JsonObject, val minutes: Int, val modes:
     val start get()=point(origin["point"])
     val speed get()=walkingSpeeds.getValue(pace)/3.6
     val bikeOnly get()=modes==listOf("bike")
-    val directSpeed get()=if(bikeOnly) bikeSpeedKmh/3.6 else speed
+    val walkBike get()=modes.toSet()==setOf("walk","bike")
+    val directSpeed get()=if(bikeOnly || walkBike) bikeSpeedKmh/3.6 else speed
 }
 internal fun parseRequest(v: JsonElement): Request {
     val origin=v.field("origin") as? JsonObject ?: throw InputError("Choose a starting point.")

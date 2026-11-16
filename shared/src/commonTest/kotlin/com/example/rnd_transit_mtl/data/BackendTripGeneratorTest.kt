@@ -238,4 +238,48 @@ class BackendTripGeneratorTest {
         assertTrue(assertIs<TripGenerationResult.RoutingUnavailable>(result).message.contains("timed out"))
     }
 
+    @Test fun walkBikeRejectsSingleModeResponsesEvenFromAnOldBackend()=runTest {
+        val bike=TransportId("bike"); val walk=TransportId("walk")
+        val request=input.copy(selectedTransportIds=listOf(walk,bike))
+        val catalogue=listOf(TransportType(walk,"Walk",false),TransportType(bike,"Bike",false))
+        for(body in listOf(response(),response().replace("WALK","BICYCLE"))) {
+            assertIs<TripGenerationResult.RoutingUnavailable>(BackendTripGenerator(post={body}).generate(request,catalogue,emptySet()))
+        }
+    }
+
+    @Test fun walkBikeAcceptsAndRestoresWalkingApproachWithDominantCycling()=runTest {
+        fun shape(points: List<GeoPoint>): JsonObject {
+            var lat=0; var lon=0
+            fun delta(n: Int): String {
+                var v=if(n<0) (n shl 1).inv() else n shl 1
+                return buildString { while(v>=32) { append(((32 or (v and 31))+63).toChar()); v=v ushr 5 }; append((v+63).toChar()) }
+            }
+            val encoded=points.joinToString("") {
+                val a=kotlin.math.round(it.latitude*1e5).toInt(); val b=kotlin.math.round(it.longitude*1e5).toInt()
+                val text=delta(a-lat)+delta(b-lon);lat=a;lon=b;text
+            }
+            return buildJsonObject { put("length",points.size);put("points",encoded) }
+        }
+        val raw=Json.parseToJsonElement(response(elapsed=214,buffer=34)).jsonObject
+        val otp=raw.getValue("otp").jsonObject;val data=otp.getValue("data").jsonObject
+        val plan=data.getValue("planConnection").jsonObject
+        val node=plan.getValue("edges").jsonArray.single().jsonObject.getValue("node").jsonObject
+        val leg=node.getValue("legs").jsonArray.single().jsonObject
+        val middle=GeoPoint(45.5005,-73.6)
+        val walking=JsonObject(leg+mapOf("duration" to JsonPrimitive(60),"distance" to JsonPrimitive(56),
+            "steps" to JsonArray(emptyList()),"legGeometry" to shape(listOf(origin.point,middle))))
+        val cycling=JsonObject(leg+mapOf("mode" to JsonPrimitive("BICYCLE"),"duration" to JsonPrimitive(120),
+            "distance" to JsonPrimitive(504),"steps" to JsonArray(emptyList()),"legGeometry" to shape(listOf(middle,destination.point))))
+        val combined=JsonObject(node+mapOf("duration" to JsonPrimitive(180),"legs" to JsonArray(listOf(walking,cycling))))
+        val updatedPlan=JsonObject(plan+("edges" to buildJsonArray { add(buildJsonObject {put("node",combined)}) }))
+        val body=JsonObject(raw+("otp" to JsonObject(otp+("data" to JsonObject(data+("planConnection" to updatedPlan))))))
+        val walk=TransportId("walk");val bike=TransportId("bike")
+        val trip=assertIs<TripGenerationResult.Success>(BackendTripGenerator(post={body.toString()}).generate(
+            input.copy(selectedTransportIds=listOf(walk,bike)),listOf(TransportType(walk,"Walk",false),TransportType(bike,"Bike",false)),emptySet())).trip
+        assertEquals(listOf(walk,bike),trip.legs.filter {it.durationSeconds>0}.map {it.transportId})
+        assertEquals(trip,Json.decodeFromString<Trip>(Json.encodeToString(trip)))
+        assertEquals(trip,trip.toDto().toDomainOrNull())
+        assertEquals(listOf(walk,bike),trip.requestedTransportIds)
+    }
+
 }

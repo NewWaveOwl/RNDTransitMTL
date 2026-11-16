@@ -473,4 +473,79 @@ class GenerationTest {
         } catch(_: CancellationException) { }
     }
 
+    private fun streetResponse(query: JsonObject, extraSeconds: Long=0): JsonObject {
+        val variables=query.field("variables")
+        val origin=Point(variables.field("originLat").number()!!,variables.field("originLon").number()!!)
+        val target=Point(variables.field("destinationLat").number()!!,variables.field("destinationLon").number()!!)
+        val departure=Instant.parse(variables.field("departure").text())
+        val meters=distance(origin,target)
+        val seconds=kotlin.math.ceil(meters/variables.field("walkSpeed").number()!!).toLong()+extraSeconds
+        val leg=obj("mode" to "WALK","distance" to meters,"duration" to seconds,
+            "start" to obj("scheduledTime" to departure.toString()),
+            "end" to obj("scheduledTime" to departure.plusSeconds(seconds).toString()),
+            "legGeometry" to obj("length" to 2,"points" to encode(listOf(origin,target))))
+        return obj("data" to obj("planConnection" to obj("routingErrors" to emptyList<Any>(),"edges" to
+            listOf(obj("node" to obj("duration" to seconds,"waitingTime" to 0,"legs" to listOf(leg)))))))
+    }
+
+    @Test fun walkBikeRoutesBothSectionsAtTheirOwnSpeedAndKeepsCyclingMain()=runBlocking {
+        val queries=mutableListOf<JsonObject>()
+        val request=parseRequest(input(modes=listOf("walk","bike")))
+        val g=generator { query -> queries+=query; streetResponse(query) }
+        val result=g.generate(request)
+        assertEquals("success",result["status"].text()); assertEquals(3,queries.size)
+        assertEquals(request.bikeSpeedKmh/3.6,queries[0].field("variables").field("walkSpeed").number()!!,1e-9)
+        assertEquals(request.speed,queries[1].field("variables").field("walkSpeed").number()!!,1e-9)
+        assertEquals(request.bikeSpeedKmh/3.6,queries[2].field("variables").field("walkSpeed").number()!!,1e-9)
+        val node=result.field("otp").field("data").field("planConnection").field("edges").items().single().field("node")!!
+        val legs=node.field("legs").items()
+        assertEquals(listOf("WALK","BICYCLE"),legs.map { it.field("mode").text() })
+        assertTrue(legs[1].field("distance").number()!!>legs[0].field("distance").number()!!)
+        assertTrue(legs[1].field("duration").number()!!>legs[0].field("duration").number()!!)
+        assertEquals(legs[0].field("end").field("scheduledTime"),legs[1].field("start").field("scheduledTime"))
+        assertEquals(input()["origin"],result["origin"])
+        val walking=response().field("data").field("planConnection").field("edges").items().single().field("node")!!
+        assertFalse(accepts(walking,request,end,zones(),null))
+        assertFalse(accepts(bikeResponse(response(),request.copy(modes=listOf("bike"))).field("data").field("planConnection")
+            .field("edges").items().single().field("node")!!,request,end,zones(),null))
+    }
+
+    @Test fun walkBikeDoesNotInventMissingSectionsOrExceedAttemptCap()=runBlocking {
+        val request=parseRequest(input(modes=listOf("walk","bike")))
+        for(failedCall in listOf(2,3)) {
+            var calls=0
+            val result=generator { query -> if(++calls==failedCall) emptyPlanningResponse() else streetResponse(query) }.generate(request)
+            assertEquals("no_trip",result["status"].text())
+        }
+        var calls=0
+        val limited=Generator(emptyList(),zones(),{ q-> calls++; streetResponse(q) },{now},{listOf(end)},maxAttempts=2)
+        val result=limited.generate(request)
+        assertEquals("no_trip",result["status"].text()); assertEquals(2,calls)
+        val entered=CompletableDeferred<Unit>()
+        val cancellable=generator { query ->
+            if(query.field("variables").field("walkSpeed").number()==request.speed) { entered.complete(Unit); awaitCancellation() }
+            else streetResponse(query)
+        }
+        val job=async { cancellable.generate(request) }; entered.await(); job.cancelAndJoin()
+        assertTrue(job.isCancelled)
+    }
+
+    @Test fun walkBikeBudgetIncludesBothSectionsAndOrientationAtExactBoundary()=runBlocking {
+        val target=Point(45.504,-73.6)
+        for(over in listOf(0L,1L)) {
+            var calls=0; var approachSeconds=0L
+            val g=Generator(emptyList(),zones(),{ query ->
+                calls++
+                val base=streetResponse(query)
+                val leg=base.field("data").field("planConnection").field("edges").items().single().field("node")!!
+                if(calls==2) approachSeconds=leg.field("duration").number()!!.toLong()
+                if(calls==3) streetResponse(query,300-orientationSeconds(distance(start,target))-approachSeconds-
+                    leg.field("duration").number()!!.toLong()+over) else base
+            },{now},{listOf(target)})
+            val result=g.generate(parseRequest(input(modes=listOf("walk","bike"))).copy(minutes=5))
+            if(over==0L) assertEquals(300.0,result["elapsedSeconds"].number()!!,0.0)
+            else assertEquals("no_trip",result["status"].text())
+        }
+    }
+
 }

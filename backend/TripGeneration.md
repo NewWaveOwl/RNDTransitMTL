@@ -47,7 +47,7 @@ trip records the accepted elapsed time separately from the planner budget and fr
 the existing 10-second **simulated** playback clock. Live GPS navigation is not added
 by this issue. Schedules and estimates describe a proposal and can change afterwards.
 
-Enabled modes are alternatives, not a required leg sequence. Walking-only results
+Enabled modes are alternatives, except the explicit Walk + Bike selection described below. Walking-only results
 require Walk to be selected: Bus alone must include a bus leg; Walk + Bus may use either. Walking access, egress
 and transfers are permitted for transit even if walking-only trips are disabled.
 Supported feeds currently cover walking, cycling, STM bus/m√©tro and exo trains.
@@ -83,7 +83,7 @@ unsuitable for riding. It does not claim cycle-safe routing or traffic-aware ETA
 
 Mixed selections plan bike-only alternatives separately so bike speed never speeds
 up walking access, egress or transfers. Walk + transit first tries up to four
-walking candidates; any mixed Bike selection also tries up to four bike candidates.
+walking candidates; mixed Bike selections other than Walk + Bike also try up to four bike candidates.
 Each direct phase can use at most one quarter of the existing search deadline.
 The complete search, including these phases, remains inside
 `20 + floor(selectedMinutes / 60)` seconds and 128 OTP calls. This scheduling change
@@ -486,3 +486,39 @@ Timeout validation: 38 backend and 10 shared generator tests passed through dire
 cached compilation/JUnit. The socket-exception fixture verifies the actionable
 message. Real HTTP/2 delays over ten seconds and Azure tunnel checks remain pending;
 no live timing success is inferred from these tests.
+
+## Walk + Bike requires both modes (#77)
+
+Selecting exactly Walk + Bike now requires positive walking and cycling distance
+and time, with cycling exceeding walking in both distance and travel time. A pure
+walk or pure bike result no longer qualifies, even if closer to the selected budget.
+Other mode combinations retain their existing alternative/fallback rules.
+
+The backend first asks OTP for a pedestrian-graph guide at cycling speed. It chooses
+a point along that geometry for a short walking approach (about 5% of the route,
+10ñ100 metres), then separately routes origin-to-transition at the chosen walking
+pace and transition-to-destination at the chosen bike speed. Both sections must be
+connected, provider-routed and within the service area. The cycling query departs
+after the walking section's arrival; provider geometry and manoeuvres are retained.
+If either section cannot be routed, the candidate is rejected rather than inventing
+a segment or relabelling a walking-only result. Cycling still uses the documented
+simplified pedestrian graph; this does not guarantee cycle-safe paths.
+
+The complete itinerary is checked against the maximum including both sections,
+waiting and orientation. All guide/section calls share the same 128-attempt cap and
+20ñ26 second search deadline. Failed or cancelled section calls do not publish a
+partial trip. Android also validates both modes and cycling dominance, preventing
+old-backend walking-only responses from silently appearing as Walk + Bike trips.
+
+Walk + Bike validation: 41 backend generation tests and 12 shared generator tests
+passed through fresh cached compilation/JUnit (using the cached OkHttp 5.3.2 runtime).
+Fixtures cover speed forwarding, sequential section timestamps, cycling dominance,
+missing sections, cancellation, attempt limits, exact maximum/orientation boundaries,
+old-server single-mode rejection and saved-trip/DTO round trips. No fresh Android APK
+or live OTP/Azure success is claimed.
+
+The real HTTP lifecycle/Retry-After integration test was attempted again: it failed
+before assertions because Windows denied a loopback connection (`SocketException:
+Permission denied: connect`). It remains enabled for unrestricted Gradle/CI execution.
+Rebuild/restart the generation backend and rebuild/install Android before device
+checks; keep the existing graph, schedules, bridge, credentials and tunnel settings.
