@@ -1,6 +1,7 @@
 package com.example.rnd_transit_mtl
 
 import android.animation.ValueAnimator
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -16,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import com.example.rnd_transit_mtl.launcher.ExternalUriHandler
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.ProvideAndroidTransitMap
 
 /**
@@ -30,6 +32,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+
+        // Handle cold start links
+        intent?.data?.toString()?.let { ExternalUriHandler.onNewUri(it) }
 
         val showStartup = savedInstanceState == null &&
             (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || ValueAnimator.areAnimatorsEnabled())
@@ -50,6 +55,14 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+
+        // Handle links clicked while app is active
+        intent.data?.toString()?.let { ExternalUriHandler.onNewUri(it) }
+    }
+
 }
 
 /**
