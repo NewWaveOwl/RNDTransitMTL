@@ -18,7 +18,7 @@ kotlinx-coroutines = "1.11.0"
 kotlinx-datetime = "0.7.1"
 kotlinx-serialization = "1.8.1"
 material3 = "1.12.0-alpha03"
-multiplatform-nav3-ui = "1.1.1"
+multiplatform-nav3-ui = "1.2.0"
 
 [libraries]
 maplibre-compose = { module = "org.maplibre.compose:maplibre-compose", version.ref = "maplibreCompose" }
