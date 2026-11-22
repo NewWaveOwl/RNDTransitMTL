@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "22298625163",
+    "project_id": "randomtranzitproject",
+    "storage_bucket": "randomtranzitproject.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:22298625163:android:a792497e01d5d03b4c808e",
+        "android_client_info": {
+          "package_name": "com.example.emptyactivity"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAFFvV4l5h4Li6iBGzy0GYmJ1P0ydRLkQA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:22298625163:android:1035fbb9ed6036184c808e",
+        "android_client_info": {
+          "package_name": "com.example.rnd_transit_mtl"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAFFvV4l5h4Li6iBGzy0GYmJ1P0ydRLkQA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

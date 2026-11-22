@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.composeCompiler)
+    id("com.google.gms.google-services")
 }
 
 kotlin {
@@ -11,6 +12,9 @@ kotlin {
     }
 }
 dependencies {
+    implementation(platform("com.google.firebase:firebase-bom:35.2.0"))
+    implementation("com.google.firebase:firebase-analytics")
+
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
     runtimeOnly(libs.maplibre.runtime)
     implementation(project(":shared"))
