@@ -198,12 +198,7 @@ internal fun App(
                 if (owner == null || tripRepository == null) {
                     null
                 } else {
-                    tripsStore.restorePendingFinalTrips(
-                        outbox?.read(owner).orEmpty()
-                    )
-                    tripsStore.onPendingFinalTripsChanged = { pending ->
-                        outbox?.write(owner, pending)
-                    }
+                    outbox?.bind(owner, tripsStore)
                     CloudTrips(
                         tripRepository(UserId(owner)),
                         tripsStore

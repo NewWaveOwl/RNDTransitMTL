@@ -56,20 +56,27 @@ class TripsStore private constructor(
         get() = mutableState
 
     internal var onPendingFinalTripsChanged: ((List<Trip>) -> Unit)? = null
+    internal var onReviewDraftsChanged: (() -> Unit)? = null
     internal val queueFinalTrips: Boolean get() = onPendingFinalTripsChanged != null
 
     internal fun restorePendingFinalTrips(trips: List<Trip>) {
         for (trip in trips) {
             val current = mutableState.value
             if (trip.id in current.pendingFinalTripIds) continue
-            if (current.activeTrip?.trip?.id == trip.id) {
-                mutableState.value = current.copy(activeTrip = null)
-            }
-            acceptStoredTrip(trip)
+            restoreFinalTrip(trip)
             mutableState.value = mutableState.value.copy(
                 pendingFinalTripIds = mutableState.value.pendingFinalTripIds + trip.id
             )
         }
+    }
+
+    /** A durable final record supersedes an older active-trip platform snapshot. */
+    internal fun restoreFinalTrip(trip: Trip) {
+        val current = mutableState.value
+        if (current.activeTrip?.trip?.id == trip.id) {
+            mutableState.value = current.copy(activeTrip = null)
+        }
+        acceptStoredTrip(trip)
     }
 
     internal fun acceptStoredTrip(trip: Trip, acknowledgeWrite: Boolean = false) {
@@ -383,6 +390,7 @@ class TripsStore private constructor(
         mutableState.value = current.copy(
             reviewDrafts = current.reviewDrafts + (tripId to draft)
         )
+        onReviewDraftsChanged?.invoke()
         return TripActionResult.Applied
     }
 
@@ -399,6 +407,7 @@ class TripsStore private constructor(
         mutableState.value = current.copy(
             reviewDrafts = current.reviewDrafts + (tripId to draft)
         )
+        onReviewDraftsChanged?.invoke()
         return TripActionResult.Applied
     }
 
@@ -482,6 +491,7 @@ class TripsStore private constructor(
             reviewDrafts = current.reviewDrafts - tripId
         )
 
+        onReviewDraftsChanged?.invoke()
         return TripActionResult.Applied
     }
 
@@ -504,6 +514,7 @@ class TripsStore private constructor(
             reviewDrafts = current.reviewDrafts - tripId
         )
 
+        onReviewDraftsChanged?.invoke()
         return TripActionResult.Applied
     }
 
