@@ -56,7 +56,6 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import com.example.rnd_transit_mtl.View.main.components.GOBox
 import com.example.rnd_transit_mtl.View.main.components.GoBoxCompactHeight
-import com.example.rnd_transit_mtl.View.main.components.plannerGoMovement
 import com.example.rnd_transit_mtl.View.main.components.PlannerPreferenceBands
 import com.example.rnd_transit_mtl.data.generation.TripGenerationBounds
 import com.example.rnd_transit_mtl.model.transport.TransportType
@@ -106,7 +105,8 @@ internal enum class PlannerSheetPosition { Main, Routes, Preferences, Collapsed 
 /**
  * Displays a pannable map and four draggable preference positions.
  *
- * GO follows the sheet. Expanded content scrolls after the sheet reaches its top stop.
+ * GO follows the sheet and provides a larger area to drag the same preferences panel.
+ * Expanded content scrolls after the sheet reaches its top stop.
  * Sheet position is presentation state; all editable choices belong to the caller.
  *
  * @param minutes Available minutes displayed by GO.
@@ -182,9 +182,6 @@ internal fun MainPlannerContent(
     var recenterRequest by rememberSaveable {
         mutableStateOf(0)
     }
-    // Fractions keep a moved GO box reachable after a resize. Null follows the sheet.
-    var goHorizontalFraction by rememberSaveable { mutableStateOf<Float?>(null) }
-    var goVerticalFraction by rememberSaveable { mutableStateOf<Float?>(null) }
 
     val controlsOpacity = remember { Animatable(if (controlsVisible) 1f else 0f) }
     val latestControlsHidden by rememberUpdatedState(onControlsHidden)
@@ -280,21 +277,8 @@ internal fun MainPlannerContent(
 
         val gapPx = geometry.goGap(sheetOffset)
         val goHeightPx = with(density) { (GoBoxCompactHeight * scale).toPx() }
-        val defaultGoTop = (sheetOffset - goHeightPx - gapPx).coerceAtLeast(0f)
-        val goSidePadding = PlannerGoBoxHorizontalPadding * scale
-        val goWidth = (panelWidth - goSidePadding * 2).coerceAtLeast(0.dp)
-        val goTravelX = with(density) { (maxWidth - goWidth).toPx() }
-        val goTravelY = defaultGoTop.coerceAtMost((heightPx - goHeightPx).coerceAtLeast(0f))
-        val goLeft = (goHorizontalFraction ?: 0.5f) * goTravelX
-        val goTop = (goVerticalFraction ?: 1f) * goTravelY
-        fun moveGo(amount: Offset) {
-            goHorizontalFraction = if (goTravelX > 0f) {
-                ((goHorizontalFraction ?: 0.5f) + amount.x / goTravelX).coerceIn(0f, 1f)
-            } else 0.5f
-            goVerticalFraction = if (goTravelY > 0f) {
-                ((goVerticalFraction ?: 1f) + amount.y / goTravelY).coerceIn(0f, 1f)
-            } else 1f
-        }
+        val goTop = (sheetOffset - goHeightPx - gapPx)
+            .coerceIn(0f, (heightPx - goHeightPx).coerceAtLeast(0f))
         val showMapControls = controlsVisible && goTop >= 100f * unitPx
         var originFieldHeight by remember { mutableIntStateOf(0) }
         val visibleMapTop = if (showMapControls) {
@@ -564,20 +548,13 @@ internal fun MainPlannerContent(
             minutesEnabled = enabled,
             layoutScale = scale,
             compact = true,
-            modifier = Modifier.align(Alignment.TopStart)
-                .offset { IntOffset(goLeft.roundToInt(), goTop.roundToInt()) }
-                .width(goWidth)
+            modifier = Modifier.align(Alignment.TopCenter)
+                .offset { IntOffset(0, goTop.roundToInt()) }
+                .width(panelWidth)
+                // GO enlarges the teal panel's drag area; both use the same anchors and state.
+                .anchoredDraggable(sheet, Orientation.Vertical, enabled = enabled)
+                .padding(horizontal = PlannerGoBoxHorizontalPadding * scale)
                 .graphicsLayer { alpha = controlsOpacity.value }
-                .plannerGoMovement(
-                    enabled = enabled,
-                    onMove = ::moveGo,
-                    onReset = { goHorizontalFraction = null; goVerticalFraction = null },
-                    onDragStart = { goHorizontalFraction to goVerticalFraction },
-                    onDragCancel = { (horizontal, vertical) ->
-                        goHorizontalFraction = horizontal
-                        goVerticalFraction = vertical
-                    }
-                )
         )
     }
 }

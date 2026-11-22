@@ -30,11 +30,11 @@ import kotlinx.coroutines.yield
 import java.io.File
 import kotlin.test.*
 
-/** Exercises bounded GO movement alongside the existing minute, action and map gestures. */
+/** Verifies GO is a larger handle for the preferences sheet without taking over its controls. */
 @OptIn(ExperimentalComposeUiApi::class, InternalComposeUiApi::class)
 class PlannerGoMovementTest {
     @Test
-    fun movingGoKeepsItsControlsIndependentAndReachableAfterResize() = runBlocking(Dispatchers.Main) {
+    fun pullingGoMovesThePreferencesSheetAndPreservesItsControlsAfterResize() = runBlocking(Dispatchers.Main) {
         var width by mutableStateOf(412)
         var height by mutableStateOf(800)
         var enabled by mutableStateOf(true)
@@ -62,7 +62,7 @@ class PlannerGoMovementTest {
         fun text(label: String) = nodes().first {
             it.config.getOrNull(SemanticsProperties.Text)?.any { text -> text.text == label } == true
         }
-        fun action(label: String): Boolean = control("Move GO box").config[SemanticsActions.CustomActions]
+        fun action(label: String): Boolean = control("Trip preferences").config[SemanticsActions.CustomActions]
             .first { it.label == label }.action()
         fun tap(point: Offset) {
             scene.sendPointerEvent(PointerEventType.Press, point, timeMillis = time / 1_000_000)
@@ -80,18 +80,21 @@ class PlannerGoMovementTest {
         }
         try {
             render()
-            val original = control("Move GO box").boundsInRoot
-            val sheetTop = control("Trip preferences").boundsInRoot.top
-            drag(text("I have").boundsInRoot.center, Offset(-20f, -100f))
-            val moved = control("Move GO box").boundsInRoot
-            assertTrue(moved.top < original.top - 40f, "GO should move independently: $original -> $moved")
-            assertEquals(sheetTop, control("Trip preferences").boundsInRoot.top, 1f)
+            val original = control("GO").boundsInRoot
+            val originalSheetTop = control("Trip preferences").boundsInRoot.top
+            drag(text("I have").boundsInRoot.center, Offset(-40f, -180f))
+            val moved = control("GO").boundsInRoot
+            val movedSheetTop = control("Trip preferences").boundsInRoot.top
+            assertTrue(movedSheetTop < originalSheetTop - 60f, "Dragging GO must open the teal preferences sheet")
+            assertTrue(moved.top < original.top - 60f, "GO must follow the same sheet")
+            assertEquals(original.left, moved.left, 1f, "GO stays horizontally aligned with the panel")
             assertEquals(30, minutes)
             assertEquals(0, goActions)
 
             drag(control("Planned time:").boundsInRoot.center, Offset(0f, -75f))
             assertTrue(minutes > 30)
-            assertEquals(moved, control("Move GO box").boundsInRoot)
+            assertEquals(moved, control("GO").boundsInRoot)
+            assertEquals(movedSheetTop, control("Trip preferences").boundsInRoot.top, 1f)
             val previousMinutes = minutes
             tap(control("Increase planned time").boundsInRoot.center)
             render()
@@ -99,47 +102,52 @@ class PlannerGoMovementTest {
             tap(control("GO").boundsInRoot.center)
             render()
             assertEquals(1, goActions)
-            assertTrue(action("Move GO up"))
-            render()
-            assertTrue(control("Move GO box").boundsInRoot.top < moved.top)
-            val beforeKey = control("Move GO box").boundsInRoot.top
-            assertTrue(control("Move GO box").config[SemanticsActions.RequestFocus].action!!.invoke())
-            assertTrue(scene.sendKeyEvent(KeyEvent(Key.DirectionDown, KeyEventType.KeyDown)))
-            render()
-            assertTrue(control("Move GO box").boundsInRoot.top > beforeKey)
+            assertTrue(control("Trip preferences").config[SemanticsActions.RequestFocus].action!!.invoke())
             assertTrue(scene.sendKeyEvent(KeyEvent(Key.MoveHome, KeyEventType.KeyDown)))
             render()
-            assertEquals(original, control("Move GO box").boundsInRoot)
-            assertTrue(action("Move GO up"))
+            assertEquals("Collapsed", control("Trip preferences").config[SemanticsProperties.StateDescription])
+            assertTrue(scene.sendKeyEvent(KeyEvent(Key.DirectionUp, KeyEventType.KeyDown)))
             render()
+            assertEquals("Main", control("Trip preferences").config[SemanticsProperties.StateDescription])
+            assertTrue(scene.sendKeyEvent(KeyEvent(Key.MoveEnd, KeyEventType.KeyDown)))
+            render()
+            assertEquals("Preferences", control("Trip preferences").config[SemanticsProperties.StateDescription])
+            assertTrue(action("Collapse preferences"))
+            render()
+            val expandedSheetTop = control("Trip preferences").boundsInRoot.top
+            drag(text("I have").boundsInRoot.center, Offset(0f, 250f))
+            assertTrue(control("Trip preferences").boundsInRoot.top > expandedSheetTop + 60f,
+                "Pulling GO down must close the same panel")
+
+            repeat(4) { assertTrue(action("Collapse preferences")); render() }
 
             for ((newWidth, newHeight) in listOf(720 to 300, 320 to 480, 320 to 160, 412 to 800)) {
                 width = newWidth
                 height = newHeight
                 render()
-                val bounds = control("Move GO box").boundsInRoot
+                val bounds = control("GO").boundsInRoot
                 assertTrue(bounds.left >= 0f && bounds.top >= 0f, "$newWidth x $newHeight: $bounds")
                 assertTrue(bounds.right <= width + 1f && bounds.bottom <= height + 1f, "$newWidth x $newHeight: $bounds")
                 tap(control("GO").boundsInRoot.center)
                 render()
                 if (newHeight == 160) scene.render(time + 1).use { image ->
                     val folder = File("build/planner-previews").apply { mkdirs() }
-                    image.encodeToData()!!.use { File(folder, "GO-short-window.png").writeBytes(it.bytes) }
+                    image.encodeToData()!!.use { File(folder, "GO-sheet-short-window.png").writeBytes(it.bytes) }
                 }
             }
             assertEquals(5, goActions)
-            assertTrue(action("Reset GO position"))
-            render()
-            assertEquals(original, control("Move GO box").boundsInRoot)
+            val beforeDisabled = control("GO").boundsInRoot
+            val beforeDisabledSheetTop = control("Trip preferences").boundsInRoot.top
             enabled = false
             render()
-            assertFalse(action("Move GO up"))
-            assertFalse(action("Reset GO position"))
+            assertFalse(action("Expand preferences"))
+            assertFalse(action("Collapse preferences"))
             drag(text("I have").boundsInRoot.center, Offset(0f, -100f))
-            assertEquals(original, control("Move GO box").boundsInRoot)
+            assertEquals(beforeDisabled, control("GO").boundsInRoot)
+            assertEquals(beforeDisabledSheetTop, control("Trip preferences").boundsInRoot.top, 1f)
             scene.render(time + 1).use { image ->
                 val folder = File("build/planner-previews").apply { mkdirs() }
-                image.encodeToData()!!.use { File(folder, "GO-movable.png").writeBytes(it.bytes) }
+                image.encodeToData()!!.use { File(folder, "GO-sheet-handle.png").writeBytes(it.bytes) }
             }
         } finally { scene.close() }
     }
