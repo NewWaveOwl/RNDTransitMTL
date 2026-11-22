@@ -77,6 +77,12 @@ data object CompassScreenKey : ScreenKey() {
 }
 
 @Serializable
+@SerialName("com.example.rnd_transit_mtl.CompassConfirmationScreenKey")
+data object CompassConfirmationScreenKey : ScreenKey() {
+    override val screenTitle = "Compass"
+}
+
+@Serializable
 @SerialName("com.example.rnd_transit_mtl.ProfileScreenKey")
 data object ProfileScreenKey : ScreenKey() {
     override val screenTitle = "user"
@@ -173,6 +179,7 @@ val backStackConfig = SavedStateConfiguration {
         polymorphic(NavKey::class) {
             subclass(MainScreenKey::class, MainScreenKey.serializer())
             subclass(CompassScreenKey::class, CompassScreenKey.serializer())
+            subclass(CompassConfirmationScreenKey::class, CompassConfirmationScreenKey.serializer())
             subclass(ProfileScreenKey::class, ProfileScreenKey.serializer())
             subclass(AuthScreenKey::class, AuthScreenKey.serializer())
             subclass(AboutScreenKey::class, AboutScreenKey.serializer())
@@ -382,15 +389,11 @@ private fun DestinationDisplay(
             }
 
             entry<CompassScreenKey> {
-                val trips by com.example.rnd_transit_mtl.state.trip.LocalTripsStore.current.state
-                com.example.rnd_transit_mtl.View.compass.CompassScreen(
-                    activeTrip = trips.activeTrip?.trip,
-                    onOpenMap = {
-                        val active = trips.activeTrip?.trip
-                        if (active != null) navigation.openCurrentTrip(active)
-                        else navigation.returnToPlanner()
-                    }
-                )
+                CompassDestination(navigation)
+            }
+
+            entry<CompassConfirmationScreenKey> {
+                CompassDestination(navigation, sendResult = true)
             }
 
             entry<ProfileScreenKey> {
@@ -477,6 +480,20 @@ private fun DestinationDisplay(
                     slideOutHorizontally(targetOffsetX = { it })
             }
         }
+    )
+}
+
+@Composable
+private fun CompassDestination(navigation: TripNavigation, sendResult: Boolean = false) {
+    val trips by com.example.rnd_transit_mtl.state.trip.LocalTripsStore.current.state
+    com.example.rnd_transit_mtl.View.compass.CompassScreen(
+        activeTrip = trips.activeTrip?.trip,
+        onOpenMap = {
+            val active = trips.activeTrip?.trip
+            if (active != null) navigation.openCurrentTrip(active)
+            else navigation.returnToPlanner()
+        },
+        sendResult = sendResult,
     )
 }
 

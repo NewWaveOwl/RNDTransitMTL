@@ -22,6 +22,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.rnd_transit_mtl.launcher.rememberResultResponder
 import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.ui.theme.*
 
@@ -40,7 +41,8 @@ fun CompassScreen(
     onOpenMap: () -> Unit = {},
     onFinishTrip: (() -> Unit)? = null,
     onOpenPresets: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    sendResult: Boolean = false,
 ) {
     Column(modifier.fillMaxSize().background(TransitComplementary).safeDrawingPadding()) {
         Column(
@@ -60,6 +62,15 @@ fun CompassScreen(
                     .alpha(if (activeTrip == null && controlsVisible) 0.6f else 1f))
             }
             Text("Hold the screen to reveal controls", color = TransitWhite.copy(alpha = 0.65f), fontSize = 12.sp)
+            if (sendResult) {
+                val sendResultAndClose = rememberResultResponder()
+                Spacer(Modifier.height(12.dp))
+                Button(onClick = {
+                    sendResultAndClose("Compass screen acknowledged.")
+                }) {
+                    Text("Acknowledge & Return")
+                }
+            }
         }
         if (controlsVisible) {
             Column(Modifier.fillMaxWidth().background(TransitMain).padding(20.dp)) {

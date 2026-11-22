@@ -38,12 +38,12 @@ fun MainLayout(
     val tripsState by tripsStore.state
     val currentKey = navigator.current
 
-    val isCompass = currentKey == CompassScreenKey
+    val isCompass = currentKey == CompassScreenKey || currentKey == CompassConfirmationScreenKey
     var controlsVisible by remember(currentKey) { mutableStateOf(false) }
     val openCompass = onOpenCompass ?: { navigator.open(CompassScreenKey) }
 
     val displayedTab = selectedTab ?: when (currentKey) {
-        CompassScreenKey -> MainViewTab.Compass
+        CompassScreenKey, CompassConfirmationScreenKey -> MainViewTab.Compass
         MainScreenKey -> MainViewTab.Map
         is CurrentTripScreenKey -> MainViewTab.Map
         else -> null
