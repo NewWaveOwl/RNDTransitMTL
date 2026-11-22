@@ -116,6 +116,7 @@ enum class TripLocationState {
     Missing,
     NotTracking,
     Live,
+    LastKnown,
     Estimated,
     EstimatedStale,
     Waiting,
@@ -168,9 +169,10 @@ fun ActiveMapContent(
     }
     val completed = fraction >= 1f
     val positionAvailable = if (simulationEnabled) locationState == TripLocationState.Sample || locationState == TripLocationState.Stale
-        else userPosition != null && locationState in setOf(TripLocationState.Live, TripLocationState.Estimated, TripLocationState.EstimatedStale, TripLocationState.Stale)
+        else userPosition != null && locationState in setOf(TripLocationState.Live, TripLocationState.LastKnown, TripLocationState.Estimated, TripLocationState.EstimatedStale, TripLocationState.Stale)
     val reference = trip.id.value.takeLast(3)
     val positionLabel = sampleStateLabel ?: when {
+        !simulationEnabled && locationState == TripLocationState.LastKnown -> "Last known position"
         !simulationEnabled && (locationState == TripLocationState.Estimated || locationState == TripLocationState.EstimatedStale) -> "Estimated position"
         !simulationEnabled && locationState == TripLocationState.Stale && userPosition != null -> "Position paused"
         else -> null
@@ -185,7 +187,7 @@ fun ActiveMapContent(
 
     LaunchedEffect(fraction, locationState, simulationEnabled) {
         if (locationState == TripLocationState.Sample || locationState == TripLocationState.Live || locationState == TripLocationState.Estimated || locationState == TripLocationState.EstimatedStale ||
-            (!simulationEnabled && locationState == TripLocationState.Stale)) {
+            (!simulationEnabled && (locationState == TripLocationState.Stale || locationState == TripLocationState.LastKnown))) {
             retainedMapProgress = fraction
         }
     }
@@ -413,7 +415,7 @@ fun ActiveMapContent(
                             }
 
                             TripLocationState.PermissionDenied -> TripWarning("Location permission needed", "Tap recenter to allow location access.")
-                            TripLocationState.NotTracking, TripLocationState.Waiting -> Unit
+                            TripLocationState.NotTracking, TripLocationState.Waiting, TripLocationState.LastKnown -> Unit
                         }
                     }
                 }

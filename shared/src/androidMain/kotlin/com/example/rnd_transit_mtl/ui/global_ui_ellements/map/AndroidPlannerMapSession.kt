@@ -136,9 +136,13 @@ internal fun rememberAndroidPlannerMapSession(): AndroidPlannerMapSession {
     }
     LaunchedEffect(session.permitted, started, session.locationAttempt) {
         if (session.permitted && started) source.updates.collect { update ->
-            session.fix = update as? LocationUpdate.Fix
+            when (update) {
+                is LocationUpdate.Fix -> session.fix = update
+                LocationUpdate.PermissionDenied -> session.fix = null
+                LocationUpdate.Unavailable -> Unit // Keep the shared last position across screen changes.
+            }
             session.latestLocationUpdate = update
-            session.complete(session.fix)
+            session.complete(update as? LocationUpdate.Fix)
         }
     }
     val pending = session.pendingResult

@@ -84,7 +84,7 @@ fun CurrentTripScreen(
     val simulationRunningAllowed = simulationEnabled && !debugMode.isModeChooserVisible
     val location = LocalPlannerLocation.current
     val locationModel = viewModel(key = "trip-location:${trip.id.value}") {
-        CurrentTripLocationViewModel(trip, tripsStore)
+        CurrentTripLocationViewModel(trip, tripsStore, initialFix = location?.fix.takeUnless { simulationEnabled })
     }
     val locationState by locationModel.state.collectAsStateWithLifecycle()
     var locationRequested by rememberSaveable(trip.id.value) { mutableStateOf(false) }
@@ -143,9 +143,10 @@ fun CurrentTripScreen(
             return@LaunchedEffect
         }
         locationModel.startTracking()
+        locationModel.useSharedFix(location.fix)
         if (!locationRequested) {
             locationRequested = true
-            location.request()
+            if (location.fix == null) location.request()
         }
         location.fix?.let(locationModel::receive)
         val collector = launch { location.automaticOriginUpdates?.collect(locationModel::receive) }
@@ -485,6 +486,7 @@ fun CurrentTripScreen(
             onRequestLocation = { location?.request() },
             locationState = if (simulationEnabled) TripLocationState.Sample else when (locationState.availability) {
                 TripLocationAvailability.Available -> TripLocationState.Live
+                TripLocationAvailability.LastKnown -> TripLocationState.LastKnown
                 TripLocationAvailability.Estimated -> TripLocationState.Estimated
                 TripLocationAvailability.Stale -> if (locationState.estimatedPosition != null) TripLocationState.EstimatedStale else TripLocationState.Stale
                 TripLocationAvailability.PermissionDenied -> TripLocationState.PermissionDenied

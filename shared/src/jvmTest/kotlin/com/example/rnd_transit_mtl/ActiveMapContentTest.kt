@@ -23,7 +23,7 @@ class ActiveMapContentTest {
     @Test
     fun estimatedPositionStaysVisibleWithoutAnErrorAndStalePositionWarnsUntilGpsRecovers() {
         val trip = guidanceTestTrip()
-        var location by mutableStateOf(TripLocationState.Estimated)
+        var location by mutableStateOf(TripLocationState.LastKnown)
         var progress by mutableStateOf(0.2f)
         val scene = ImageComposeScene(412, 720) {
             RNDTransitTheme {
@@ -43,6 +43,14 @@ class ActiveMapContentTest {
         fun nodes() = scene.semanticsOwners.flatMap { all(it.rootSemanticsNode) }
         fun texts() = nodes().flatMap { it.config.getOrNull(SemanticsProperties.Text).orEmpty() }.map { it.text }
         try {
+            render("Active-trip-shared-last-position.png")
+            assertTrue(texts().any { "Last known position" in it })
+            assertFalse(texts().any { "Finding your location" in it || "not updating" in it || "Location unavailable" in it })
+            val sharedRecenter = nodes().first {
+                it.config.getOrNull(SemanticsProperties.ContentDescription)?.contains("Recenter on current position") == true
+            }
+            assertFalse(sharedRecenter.config.contains(SemanticsProperties.Disabled))
+            location = TripLocationState.Estimated
             render("Active-trip-estimated-position.png")
             assertTrue(texts().any { "Estimated position" in it })
             assertFalse(texts().any { "not updating" in it || "Location unavailable" in it })

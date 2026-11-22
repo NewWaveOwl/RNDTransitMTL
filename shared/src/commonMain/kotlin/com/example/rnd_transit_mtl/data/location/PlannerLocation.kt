@@ -5,6 +5,7 @@ import com.example.rnd_transit_mtl.model.geo.GeoPoint
 import kotlinx.coroutines.flow.Flow
 
 internal interface PlannerLocation {
+    /** Last measured position, retained during provider outages and shared across screens. */
     val fix: LocationUpdate.Fix?
     val automaticOriginUpdates: Flow<LocationUpdate>? get() = null
     val containsPoint: (GeoPoint) -> Boolean

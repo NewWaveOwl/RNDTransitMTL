@@ -2,6 +2,11 @@
 
 The app starts in **Normal app use**. On Android, accepted trips use the device's
 fresh GPS readings for the position marker, route progress and street guidance.
+The planner and current trip share one location session. Starting a trip immediately
+displays the cached position as **Last known position**, then continues the same live
+updates. Provider outages keep that cached marker; switching screens does not restart
+GPS or reset the 30-second warning deadline for the last reliable measurement.
+Old or imprecise cached positions can be displayed but cannot advance or finish a trip.
 The recenter button requests location permission when needed and follows the
 actual position; panning the map stops following until recenter is tapped again.
 Recenter uses the same eased camera animation as the main Android map. Dragging

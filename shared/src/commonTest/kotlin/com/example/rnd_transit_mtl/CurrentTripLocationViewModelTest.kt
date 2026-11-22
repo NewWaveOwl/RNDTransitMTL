@@ -16,6 +16,82 @@ import kotlin.test.*
 /** Verifies real-position progress, freshness and restoration without advancing a playback clock. */
 class CurrentTripLocationViewModelTest {
     @Test
+    fun plannerPositionIsVisibleImmediatelyAndOnlyLiveCollectionUpdatesTripProgress() {
+        val now = 50_000L
+        val trip = guidanceTestTrip()
+        val store = TripsStore { now }.also { it.start(trip) }
+        val fix = LocationUpdate.Fix(GeoPoint(45.5015, -73.6), 5.0, now)
+        val model = CurrentTripLocationViewModel(trip, store, initialFix = fix) { now }
+        assertEquals(fix, model.state.value.fix)
+        assertEquals(TripLocationAvailability.LastKnown, model.state.value.availability)
+        assertEquals(0f, store.progress, "Displaying a shared position must not mutate the trip during composition")
+        assertNull(model.state.value.estimatedPosition)
+        model.receive(fix)
+        assertEquals(TripLocationAvailability.Available, model.state.value.availability)
+        assertEquals(0.5f, store.progress, 0.001f)
+        model.useSharedFix(LocationUpdate.Fix(trip.destination.point, 5.0, now))
+        assertEquals(fix, model.state.value.fix, "A handoff cannot overwrite live tracking")
+        assertTrue(store.completedTrips.isEmpty())
+    }
+
+    @Test
+    fun handoffAndResumeKeepTheOriginalMeasurementDeadlineAcrossProviderOutages() {
+        var now = 50_000L
+        val trip = guidanceTestTrip()
+        val store = TripsStore { now }.also { it.start(trip) }
+        val fix = LocationUpdate.Fix(trip.origin.point, 5.0, now - 20_000)
+        val model = CurrentTripLocationViewModel(trip, store, initialFix = fix) { now }
+        model.receive(fix) // Too old for progress, but still useful for displaying the position.
+        assertEquals(TripLocationAvailability.LastKnown, model.state.value.availability)
+        assertEquals(fix, model.state.value.fix)
+        model.stop()
+        model.useSharedFix(fix)
+        now += 10_000
+        model.receive(LocationUpdate.Unavailable)
+        assertEquals(TripLocationAvailability.LastKnown, model.state.value.availability)
+        now++
+        model.refreshFreshness()
+        assertEquals(TripLocationAvailability.Stale, model.state.value.availability)
+        assertEquals(fix, model.state.value.fix)
+        model.useSharedFix(fix)
+        model.receive(LocationUpdate.Unavailable)
+        assertEquals(TripLocationAvailability.Stale, model.state.value.availability)
+        val reopened = CurrentTripLocationViewModel(trip, store, initialFix = fix) { now }
+        assertEquals(TripLocationAvailability.Stale, reopened.state.value.availability)
+        assertEquals(0f, store.progress)
+        val recovered = LocationUpdate.Fix(GeoPoint(45.5015, -73.6), 5.0, now)
+        model.receive(recovered)
+        assertEquals(recovered, model.state.value.fix)
+        assertEquals(TripLocationAvailability.Available, model.state.value.availability)
+        assertEquals(0.5f, store.progress, 0.001f)
+    }
+
+    @Test
+    fun coarseSharedPositionRemainsVisibleWithoutConfirmingArrivalAndPermissionDenialClearsIt() {
+        var now = 50_000L
+        val trip = guidanceTestTrip()
+        val store = TripsStore { now }.also { it.start(trip) }
+        val coarse = LocationUpdate.Fix(trip.destination.point, 200.0, now)
+        val model = CurrentTripLocationViewModel(trip, store, initialFix = coarse) { now }
+        model.receive(coarse)
+        assertEquals(coarse, model.state.value.fix)
+        assertEquals(TripLocationAvailability.LastKnown, model.state.value.availability)
+        assertEquals(0f, store.progress)
+        assertTrue(store.completedTrips.isEmpty())
+        now += 30_001
+        model.receive(coarse.copy(timestampEpochMillis = now))
+        assertEquals(TripLocationAvailability.Stale, model.state.value.availability)
+        assertNull(model.state.value.estimatedPosition)
+        model.receive(LocationUpdate.PermissionDenied)
+        model.useSharedFix(coarse)
+        assertNull(model.state.value.fix)
+        assertEquals(TripLocationAvailability.PermissionDenied, model.state.value.availability)
+        val future = CurrentTripLocationViewModel(trip, store, initialFix = coarse.copy(timestampEpochMillis = now + 1)) { now }
+        assertNull(future.state.value.fix)
+        assertEquals(TripLocationAvailability.Waiting, future.state.value.availability)
+    }
+
+    @Test
     fun gpsMovesAlongTheRouteButStaleDeniedAndInaccurateReadingsCannotCompleteIt() {
         var now = 1_000L
         val trip = guidanceTestTrip()

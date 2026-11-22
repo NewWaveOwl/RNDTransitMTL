@@ -21,7 +21,7 @@ private const val TripRouteToleranceMeters = 35.0
 private const val TripArrivalToleranceMeters = 20.0
 
 /** Estimates are explicit and never become recorded GPS progress. */
-internal enum class TripLocationAvailability { Waiting, Available, Estimated, Stale, PermissionDenied, Unsupported }
+internal enum class TripLocationAvailability { Waiting, LastKnown, Available, Estimated, Stale, PermissionDenied, Unsupported }
 
 /** Keeps the real reading separate from a temporary route estimate. */
 internal data class CurrentTripLocationState(
@@ -37,11 +37,13 @@ internal data class CurrentTripLocationState(
  * Platform permission requests and lifecycle collection remain at the screen boundary.
  * @param trip Accepted route; geometry and identity are never regenerated.
  * @param tripsStore Shared authoritative trip state.
+ * @param initialFix Shared position from the planner, displayed before live collection starts.
  * @param nowEpochMillis Clock for freshness and route-bounded, display-only gap estimates.
  */
 internal class CurrentTripLocationViewModel(
     private val trip: Trip,
     private val tripsStore: TripsStore,
+    initialFix: LocationUpdate.Fix? = null,
     private val nowEpochMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(CurrentTripLocationState())
@@ -61,6 +63,24 @@ internal class CurrentTripLocationViewModel(
         ?.takeIf { it.trip.id == trip.id }?.routeProgress
     private var previousProgress = restoredProgress ?: 0f
     private var hasObservedRoute = restoredProgress?.let { it < 0.98f } == true
+
+    init {
+        useSharedFix(initialFix)
+    }
+
+    /** Reuses the app's cached position without treating it as new progress or a motion sample. */
+    fun useSharedFix(fix: LocationUpdate.Fix?) {
+        if (fix == null || mutableState.value.fix != null ||
+            mutableState.value.availability == TripLocationAvailability.PermissionDenied ||
+            mutableState.value.availability == TripLocationAvailability.Unsupported) return
+        val now = nowEpochMillis()
+        val measuredAt = fix.timestampEpochMillis ?: now
+        if (measuredAt > now) return
+        startTracking()
+        if (fix.accuracyMeters <= TripLocationMaximumAccuracyMeters) lastFixAt = measuredAt
+        mutableState.value = CurrentTripLocationState(fix, TripLocationAvailability.LastKnown)
+        refreshFreshness()
+    }
 
     /** Starts the initial-fix grace period when the active screen resumes. */
     fun startTracking() {
@@ -175,6 +195,7 @@ internal class CurrentTripLocationViewModel(
             availability = when {
                 age > TRIP_LOCATION_GRACE_MILLIS -> TripLocationAvailability.Stale
                 estimatedProgress != null -> TripLocationAvailability.Estimated
+                current.availability == TripLocationAvailability.LastKnown -> TripLocationAvailability.LastKnown
                 current.fix != null -> TripLocationAvailability.Available
                 else -> TripLocationAvailability.Waiting
             },
