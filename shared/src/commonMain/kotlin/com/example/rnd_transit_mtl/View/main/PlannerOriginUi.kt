@@ -58,6 +58,8 @@ private val OriginRecenterSize = 48.dp
 private val OriginActionMinimumHeight = 52.dp
 private val OriginActionCornerRadius = 24.dp
 private val OriginPanelTopFraction = 390f / 716f
+private val OriginPickerPanelMinimumHeight = 280.dp
+private val OriginPickerMapMinimumFraction = 0.3f
 
 /**
  * Uses source-image coordinates for both the map and origin.
@@ -67,6 +69,7 @@ private val OriginPanelTopFraction = 390f / 716f
  * @param enabled Whether keyboard and pointer input are accepted.
  * @param recenterRequest Increment to restore the camera to the selected origin.
  * @param onPick Enables point selection when supplied; otherwise dragging pans the camera.
+ * @param onTap Stages a point from the browsing map without changing keyboard camera controls.
  */
 @Composable
 internal fun FigmaOriginMap(
@@ -74,7 +77,8 @@ internal fun FigmaOriginMap(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     recenterRequest: Int = 0,
-    onPick: ((TripPoint) -> Unit)? = null
+    onPick: ((TripPoint) -> Unit)? = null,
+    onTap: ((TripPoint) -> Unit)? = null
 ) {
     val map = painterResource(Res.drawable.map_sample)
     val picking = onPick != null
@@ -120,7 +124,7 @@ internal fun FigmaOriginMap(
 
     val latestRect by rememberUpdatedState(rect)
     val latestOrigin by rememberUpdatedState(origin)
-    val latestPick by rememberUpdatedState(onPick)
+    val latestPick by rememberUpdatedState(onPick ?: onTap)
 
     Canvas(
         modifier
@@ -134,7 +138,7 @@ internal fun FigmaOriginMap(
                     "Choose a sample starting point. Tap the map, " +
                         "or focus it and use the arrow keys."
                 } else {
-                    "Sample map. Arrow keys move the map. " +
+                    "Sample map. Tap to choose a starting point. Arrow keys move the map. " +
                         "Home recenters on the starting point."
                 }
             }
@@ -184,8 +188,8 @@ internal fun FigmaOriginMap(
                 }
             }
             .focusable(enabled)
-            .pointerInput(enabled, picking) {
-                if (!enabled || !picking) return@pointerInput
+            .pointerInput(enabled, picking, onTap != null) {
+                if (!enabled || (onPick == null && onTap == null)) return@pointerInput
 
                 awaitEachGesture {
                     val down = awaitFirstDown()
@@ -357,7 +361,11 @@ internal fun OriginSelectionContent(
             }
     ) {
         val panelWidth = maxWidth.coerceAtMost(OriginPanelMaxWidth)
-        val panelTop = maxHeight * OriginPanelTopFraction
+        val panelTop = if (picking) {
+            (maxHeight * OriginPanelTopFraction)
+                .coerceAtMost((maxHeight - OriginPickerPanelMinimumHeight)
+                    .coerceAtLeast(maxHeight * OriginPickerMapMinimumFraction))
+        } else maxHeight * OriginPanelTopFraction
         val availablePanelHeight =
             (maxHeight - panelTop).coerceAtLeast(1.dp)
 
@@ -445,7 +453,7 @@ internal fun OriginSelectionContent(
 
             if (picking) {
                 OriginAction(
-                    label = "Use this starting point",
+                    label = "Start here",
                     onClick = onConfirm,
                     enabled = enabled && (origin != null || draftLabel != null)
                 )

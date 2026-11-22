@@ -110,7 +110,8 @@ internal fun TransitOpeningScreen(
     var originMode by rememberSaveable {
         mutableStateOf("planner")
     }
-    var liveDraft by remember(originMode == "planner") { mutableStateOf<GeoPoint?>(null) }
+    var liveDraft by remember { mutableStateOf<GeoPoint?>(null) }
+    var originPickerFromMap by rememberSaveable { mutableStateOf(false) }
     var originDraftX by rememberSaveable {
         mutableStateOf<Float?>(null)
     }
@@ -198,6 +199,10 @@ internal fun TransitOpeningScreen(
         pickingOrigin = false
         originMode = "planner"
         originMessage = null
+        liveDraft = null
+        originDraftX = null
+        originDraftY = null
+        originPickerFromMap = false
     }
 
     // Save only the opening intent and temporary labels, not a second Trip.
@@ -794,9 +799,10 @@ internal fun TransitOpeningScreen(
                 originDraftX = null
                 originDraftY = null
                 originMessage = null
-                if (pickingLiveOriginFromFailure) {
+                if (pickingLiveOriginFromFailure || originPickerFromMap) {
                     pickingOrigin = false
                     originMode = "planner"
+                    originPickerFromMap = false
                 } else {
                     originMode = if (originMode == "pick") "options" else "planner"
                 }
@@ -900,8 +906,33 @@ internal fun TransitOpeningScreen(
             liveOrigin = planner.originPlace,
             originIsManual = planner.originIsManual,
             originStatus = defaultOriginStatus,
+            onTapOrigin = { point ->
+                if (canChangeInputs()) {
+                    liveDraft = null
+                    originDraftX = point.x
+                    originDraftY = point.y
+                    originMessage = null
+                    originPickerFromMap = true
+                    originMode = "pick"
+                }
+            },
+            onTapLiveOrigin = { point ->
+                if (canChangeInputs()) {
+                    originDraftX = null
+                    originDraftY = null
+                    val supported = location?.containsPoint?.invoke(point) == true
+                    liveDraft = point.takeIf { supported }
+                    originMessage = if (supported) null else "Choose a point inside the supported area."
+                    originPickerFromMap = true
+                    originMode = "pick"
+                }
+            },
             onEditOrigin = {
                 if (canChangeInputs()) {
+                    liveDraft = null
+                    originDraftX = null
+                    originDraftY = null
+                    originPickerFromMap = false
                     originMessage = null
                     originMode = "options"
                 }

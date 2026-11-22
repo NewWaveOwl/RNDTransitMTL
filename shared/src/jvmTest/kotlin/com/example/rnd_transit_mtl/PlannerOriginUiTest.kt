@@ -177,13 +177,13 @@ class PlannerOriginUiTest {
                 render("Origin-permission")
                 click("Choose a point on the map")
                 render("Origin-picking-empty")
-                click("Use this starting point")
+                click("Start here")
                 assertEquals(emptyList(), events)
                 scene.sendPointerEvent(PointerEventType.Press, Offset(100f, 120f), timeMillis = time / 1_000_000 + 5)
                 scene.sendPointerEvent(PointerEventType.Release, Offset(100f, 120f), timeMillis = time / 1_000_000 + 6)
                 render("Origin-picking-selected")
                 assertNotNull(draft)
-                click("Use this starting point")
+                click("Start here")
                 assertEquals(listOf("confirm"), events)
             } finally { scene.close() }
         }

@@ -56,11 +56,13 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import com.example.rnd_transit_mtl.View.main.components.GOBox
 import com.example.rnd_transit_mtl.View.main.components.GoBoxCompactHeight
+import com.example.rnd_transit_mtl.View.main.components.plannerGoMovement
 import com.example.rnd_transit_mtl.View.main.components.PlannerPreferenceBands
 import com.example.rnd_transit_mtl.data.generation.TripGenerationBounds
 import com.example.rnd_transit_mtl.model.transport.TransportType
 import com.example.rnd_transit_mtl.model.trip.Place
 import com.example.rnd_transit_mtl.model.trip.TripPoint
+import com.example.rnd_transit_mtl.model.geo.GeoPoint
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.plannerTripBounds
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.validMapSourceSize
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.transitions.GO_TRIP_TRANSITION_MILLIS
@@ -135,6 +137,8 @@ internal enum class PlannerSheetPosition { Main, Routes, Preferences, Collapsed 
  * @param initialSheetPosition Initial position for previews or a new planner entry.
  * @param origin Selected sample-map starting point, or none.
  * @param onEditOrigin Opens the origin options without changing saved choices.
+ * @param onTapOrigin Stages a sample-map point for confirmation.
+ * @param onTapLiveOrigin Stages a geographic map point for confirmation.
  */
 @Composable
 internal fun MainPlannerContent(
@@ -168,7 +172,9 @@ internal fun MainPlannerContent(
     onEditOrigin: () -> Unit = {},
     liveOrigin: Place? = null,
     originIsManual: Boolean = true,
-    originStatus: String? = null
+    originStatus: String? = null,
+    onTapOrigin: (TripPoint) -> Unit = {},
+    onTapLiveOrigin: (GeoPoint) -> Unit = {}
 ) {
     val liveLocation = LocalPlannerLocation.current
     // Expansion is presentation state, separate from transport and zone selections.
@@ -176,6 +182,9 @@ internal fun MainPlannerContent(
     var recenterRequest by rememberSaveable {
         mutableStateOf(0)
     }
+    // Fractions keep a moved GO box reachable after a resize. Null follows the sheet.
+    var goHorizontalFraction by rememberSaveable { mutableStateOf<Float?>(null) }
+    var goVerticalFraction by rememberSaveable { mutableStateOf<Float?>(null) }
 
     val controlsOpacity = remember { Animatable(if (controlsVisible) 1f else 0f) }
     val latestControlsHidden by rememberUpdatedState(onControlsHidden)
@@ -271,7 +280,21 @@ internal fun MainPlannerContent(
 
         val gapPx = geometry.goGap(sheetOffset)
         val goHeightPx = with(density) { (GoBoxCompactHeight * scale).toPx() }
-        val goTop = (sheetOffset - goHeightPx - gapPx).coerceAtLeast(0f)
+        val defaultGoTop = (sheetOffset - goHeightPx - gapPx).coerceAtLeast(0f)
+        val goSidePadding = PlannerGoBoxHorizontalPadding * scale
+        val goWidth = (panelWidth - goSidePadding * 2).coerceAtLeast(0.dp)
+        val goTravelX = with(density) { (maxWidth - goWidth).toPx() }
+        val goTravelY = defaultGoTop.coerceAtMost((heightPx - goHeightPx).coerceAtLeast(0f))
+        val goLeft = (goHorizontalFraction ?: 0.5f) * goTravelX
+        val goTop = (goVerticalFraction ?: 1f) * goTravelY
+        fun moveGo(amount: Offset) {
+            goHorizontalFraction = if (goTravelX > 0f) {
+                ((goHorizontalFraction ?: 0.5f) + amount.x / goTravelX).coerceIn(0f, 1f)
+            } else 0.5f
+            goVerticalFraction = if (goTravelY > 0f) {
+                ((goVerticalFraction ?: 1f) + amount.y / goTravelY).coerceIn(0f, 1f)
+            } else 1f
+        }
         val showMapControls = controlsVisible && goTop >= 100f * unitPx
         var originFieldHeight by remember { mutableIntStateOf(0) }
         val visibleMapTop = if (showMapControls) {
@@ -289,7 +312,8 @@ internal fun MainPlannerContent(
                 cameraInsetsReady = !showMapControls || originFieldHeight > 0,
                 browsing = true,
                 pin = liveOrigin?.point,
-                centerOnPin = originIsManual
+                centerOnPin = originIsManual,
+                onPick = if (enabled) onTapLiveOrigin else null
             ),
             modifier = Modifier.fillMaxSize()
         ) {
@@ -297,6 +321,7 @@ internal fun MainPlannerContent(
                 origin = origin,
                 enabled = enabled,
                 recenterRequest = recenterRequest,
+                onTap = onTapOrigin,
                 modifier = Modifier.fillMaxSize()
             )
         }
@@ -386,19 +411,6 @@ internal fun MainPlannerContent(
                         style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 4.dp))
                 }
             }
-            GOBox(
-                minutes = minutes,
-                onMinutesChange = onMinutesChange,
-                onGo = onPrimaryAction,
-                actionLabel = actionLabel,
-                actionEnabled = actionEnabled && controlsVisible,
-                minutesEnabled = enabled,
-                layoutScale = scale,
-                compact = true,
-                modifier = Modifier.offset { IntOffset(0, goTop.roundToInt()) }
-                    .fillMaxWidth().padding(horizontal = PlannerGoBoxHorizontalPadding * scale)
-                    .graphicsLayer { alpha = controlsOpacity.value }
-            )
             Column(
                 Modifier.offset { IntOffset(0, sheetOffset.roundToInt()) }
                     .fillMaxWidth()
@@ -542,6 +554,31 @@ internal fun MainPlannerContent(
                 }
             }
         }
+        // Draw last so even a very short window cannot cover GO with the sheet.
+        GOBox(
+            minutes = minutes,
+            onMinutesChange = onMinutesChange,
+            onGo = onPrimaryAction,
+            actionLabel = actionLabel,
+            actionEnabled = actionEnabled && controlsVisible,
+            minutesEnabled = enabled,
+            layoutScale = scale,
+            compact = true,
+            modifier = Modifier.align(Alignment.TopStart)
+                .offset { IntOffset(goLeft.roundToInt(), goTop.roundToInt()) }
+                .width(goWidth)
+                .graphicsLayer { alpha = controlsOpacity.value }
+                .plannerGoMovement(
+                    enabled = enabled,
+                    onMove = ::moveGo,
+                    onReset = { goHorizontalFraction = null; goVerticalFraction = null },
+                    onDragStart = { goHorizontalFraction to goVerticalFraction },
+                    onDragCancel = { (horizontal, vertical) ->
+                        goHorizontalFraction = horizontal
+                        goVerticalFraction = vertical
+                    }
+                )
+        )
     }
 }
 

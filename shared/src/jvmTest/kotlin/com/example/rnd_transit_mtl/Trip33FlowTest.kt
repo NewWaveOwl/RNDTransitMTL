@@ -220,7 +220,7 @@ class Trip33FlowTest {
             host.render()
             assertNotNull(host.mapData.onPick).invoke(newPoint)
             host.render()
-            host.click("Use this starting point")
+            host.click("Start here")
             host.await("GO")
             assertEquals(Place("Pinned location", newPoint), host.planner.uiState.value.originPlace)
             assertNull(host.planner.uiState.value.origin)
@@ -228,6 +228,74 @@ class Trip33FlowTest {
             assertEquals(newPoint, host.mapData.pin)
             host.click("GO")
             host.await("Check your trip settings")
+        }
+    }
+
+    @Test
+    fun browsingLiveMapStagesEachPinUntilConfirmedAndCancelOrBackKeepsTheDraft() = runBlocking(Dispatchers.Main) {
+        Host(Trip33Sample.Normal, liveMap = true).use { host ->
+            host.render()
+            host.planner.setOrigin(Place("Previous origin", GeoPoint(45.50, -73.58)))
+            host.planner.setMinutes(45)
+            host.render()
+            val previous = host.planner.uiState.value
+            val first = GeoPoint(45.52, -73.56)
+            val second = GeoPoint(45.53, -73.57)
+
+            assertNotNull(host.mapData.onPick).invoke(first)
+            host.render()
+            assertTrue(host.has("Start here"))
+            assertEquals(first, host.mapData.pin)
+            assertEquals(previous, host.planner.uiState.value)
+            host.click("Cancel")
+            host.render()
+            assertTrue(host.has("GO"))
+            assertEquals(previous, host.planner.uiState.value)
+            assertEquals(previous.originPlace?.point, host.mapData.pin)
+
+            assertNotNull(host.mapData.onPick).invoke(first)
+            host.render()
+            host.back()
+            assertTrue(host.has("GO"))
+            assertEquals(previous, host.planner.uiState.value)
+
+            assertNotNull(host.mapData.onPick).invoke(first)
+            host.render()
+            assertNotNull(host.mapData.onPick).invoke(second)
+            host.render()
+            assertEquals(previous, host.planner.uiState.value)
+            host.click("Start here")
+            host.render()
+            assertEquals(previous.copy(origin = null, originPlace = Place("Pinned location", second), originIsManual = true),
+                host.planner.uiState.value)
+            assertEquals(second, host.mapData.pin)
+            assertFalse(host.mapData.pickerOpen)
+            assertNull(host.store.activeTrip)
+        }
+    }
+
+    @Test
+    fun browsingSampleMapStagesATapAndCancelPreservesTheSavedOrigin() = runBlocking(Dispatchers.Main) {
+        Host(Trip33Sample.Normal).use { host ->
+            host.render()
+            val previous = host.planner.uiState.value
+            host.tap(Offset(130f, 150f))
+            host.render()
+            assertTrue(host.has("Start here"))
+            assertEquals(previous, host.planner.uiState.value)
+            host.click("Cancel")
+            host.render()
+            assertTrue(host.has("GO"))
+            assertEquals(previous, host.planner.uiState.value)
+
+            host.tap(Offset(160f, 160f))
+            host.render()
+            host.click("Start here")
+            host.render()
+            val selected = host.planner.uiState.value
+            assertNotEquals(previous.origin, selected.origin)
+            assertEquals(previous.copy(origin = selected.origin, originIsManual = true), selected)
+            assertNull(host.store.activeTrip)
         }
     }
 
