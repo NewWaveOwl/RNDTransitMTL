@@ -9,13 +9,16 @@ import com.example.rnd_transit_mtl.View.history.previews.reviewedHistoryPreviewT
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.trip.*
 import com.example.rnd_transit_mtl.ui.theme.RNDTransitTheme
 import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
 import kotlin.test.*
 
 /** Checks the supplied screens and their explicit, parent-owned actions. */
 class TripScreensV3Test {
     @OptIn(ExperimentalComposeUiApi::class)
     @Test
-    fun screensRenderAndReviewRequiresStars() {
+    fun screensRenderAndReviewRequiresStars() = runBlocking(Dispatchers.Main) {
         val trip = reviewedHistoryPreviewTrip
         var mode by mutableStateOf(0)
         var rating by mutableStateOf<Int?>(null)
@@ -36,8 +39,8 @@ class TripScreensV3Test {
             }
         }
         var time = 0L
-        fun render(name: String) {
-            repeat(4) { time += 16_000_000; scene.render(time).close() }
+        suspend fun render(name: String) {
+            repeat(45) { yield(); time += 16_000_000; scene.render(time).close() }
             scene.render(time).use { image ->
                 val dir = File("build/planner-previews").apply { mkdirs() }
                 image.encodeToData()!!.use { File(dir, name).writeBytes(it.bytes) }
@@ -54,7 +57,7 @@ class TripScreensV3Test {
             scene.sendPointerEvent(PointerEventType.Release, point, timeMillis = time / 1_000_000 + 1)
         }
         try {
-            render("Complete-v3.png"); click("Review this trip"); click("Skip review — view history")
+            render("Complete-v3.png"); click("Trip Review"); click("Skip review — view history")
             mode = 1; render("Review-v3-unrated.png"); click("Save review")
             assertFalse("save" in events)
             click("Rate Overall experience 4 out of 5"); render("Review-v3.png")
