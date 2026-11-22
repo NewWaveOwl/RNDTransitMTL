@@ -17,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
@@ -25,20 +26,28 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.rnd_transit_mtl.ViewModels.current_trip.CurrentTripLocationViewModel
+import com.example.rnd_transit_mtl.ViewModels.current_trip.TripLocationAvailability
+import com.example.rnd_transit_mtl.data.location.LocalPlannerLocation
 import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.simulation.ActiveTripSimulation
+import com.example.rnd_transit_mtl.state.debug.LocalDebugModeState
 import com.example.rnd_transit_mtl.state.trip.LocalTripsStore
 import com.example.rnd_transit_mtl.state.trip.TRIP_SIMULATION_DURATION_MILLIS
 import com.example.rnd_transit_mtl.state.trip.TripActionResult
 import com.example.rnd_transit_mtl.ui.theme.TransitMain
 import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import com.example.rnd_transit_mtl.navigation.LocalTripNavigation
 import com.example.rnd_transit_mtl.navigation.HistoryScreenKey
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.trip.CompleteV3
 
 /**
- * Coordinates one trip's active simulation.
+ * Coordinates one active trip, with playback only after an explicit debug choice.
  *
  * trip is the entered/generated navigation parameter.
  * Its ID resolves the current record from TripsStore. The parameter
@@ -70,6 +79,15 @@ fun CurrentTripScreen(
     val navigation = LocalTripNavigation.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val uriHandler = LocalUriHandler.current
+    val debugMode = LocalDebugModeState.current
+    val simulationEnabled = debugMode?.simulationEnabled == true
+    val simulationRunningAllowed = simulationEnabled && !debugMode.isModeChooserVisible
+    val location = LocalPlannerLocation.current
+    val locationModel = viewModel(key = "trip-location:${trip.id.value}") {
+        CurrentTripLocationViewModel(trip, tripsStore)
+    }
+    val locationState by locationModel.state.collectAsStateWithLifecycle()
+    var locationRequested by rememberSaveable(trip.id.value) { mutableStateOf(false) }
 
     val currentState by tripsStore.state
 
@@ -91,7 +109,7 @@ fun CurrentTripScreen(
         else -> 0L
     }
 
-    val progress = (
+    val progress = if (!simulationEnabled && activeState != null) locationState.estimatedProgress ?: activeState.routeProgress ?: 0f else (
             elapsedMillis.toFloat() /
                     TRIP_SIMULATION_DURATION_MILLIS.toFloat()
             ).coerceIn(0f, 1f)
@@ -115,9 +133,37 @@ fun CurrentTripScreen(
         mutableStateOf<String?>(null)
     }
 
+    LaunchedEffect(location, locationModel, simulationEnabled, isDestinationActive, isAppResumed, hasActiveTrip) {
+        if (simulationEnabled || !isDestinationActive || !isAppResumed || !hasActiveTrip) {
+            locationModel.stop()
+            return@LaunchedEffect
+        }
+        if (location == null) {
+            locationModel.unsupported()
+            return@LaunchedEffect
+        }
+        locationModel.startTracking()
+        if (!locationRequested) {
+            locationRequested = true
+            location.request()
+        }
+        location.fix?.let(locationModel::receive)
+        val collector = launch { location.automaticOriginUpdates?.collect(locationModel::receive) }
+        try {
+            while (isActive) {
+                delay(250)
+                locationModel.refreshFreshness()
+            }
+        } finally {
+            collector.cancel()
+            locationModel.stop()
+        }
+    }
+
     val latestDestinationActive by rememberUpdatedState(
         isDestinationActive
     )
+    val latestSimulationRunningAllowed by rememberUpdatedState(simulationRunningAllowed)
     val latestReviewRequest by rememberUpdatedState(onReviewRequested)
     val latestLeave by rememberUpdatedState(onLeave)
     val latestReturnToPlanner by rememberUpdatedState(onReturnToPlanner)
@@ -133,7 +179,8 @@ fun CurrentTripScreen(
     DisposableEffect(
         simulation,
         lifecycle,
-        isDestinationActive
+        isDestinationActive,
+        simulationRunningAllowed
     ) {
         val observer = LifecycleEventObserver { _, _ ->
             val resumed = lifecycle.currentState
@@ -153,7 +200,7 @@ fun CurrentTripScreen(
 
         isAppResumed = resumedNow
 
-        if (!isDestinationActive || !resumedNow) {
+        if (!simulationRunningAllowed || !isDestinationActive || !resumedNow) {
             simulation.pause()
         }
 
@@ -175,9 +222,11 @@ fun CurrentTripScreen(
         simulation,
         isDestinationActive,
         isAppResumed,
-        hasActiveTrip
+        hasActiveTrip,
+        simulationRunningAllowed
     ) {
         if (
+            !simulationRunningAllowed ||
             !isDestinationActive ||
             !isAppResumed ||
             !hasActiveTrip ||
@@ -194,6 +243,7 @@ fun CurrentTripScreen(
                 withFrameNanos { _ -> }
 
                 if (
+                    !latestSimulationRunningAllowed ||
                     !latestDestinationActive ||
                     !lifecycle.currentState
                         .isAtLeast(Lifecycle.State.RESUMED)
@@ -379,7 +429,7 @@ fun CurrentTripScreen(
                 }
             },
             onFinishRequested = {
-                if (latestDestinationActive &&
+                if (latestSimulationRunningAllowed && latestDestinationActive &&
                     lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
                 ) {
                     simulation.pause()
@@ -429,6 +479,24 @@ fun CurrentTripScreen(
             },
             onShowInformation = {
                 if (latestDestinationActive) navigation.requestTripInformation()
+            },
+            simulationEnabled = simulationEnabled,
+            userPosition = if (simulationEnabled) null else locationState.estimatedPosition ?: locationState.fix?.point,
+            onRequestLocation = { location?.request() },
+            locationState = if (simulationEnabled) TripLocationState.Sample else when (locationState.availability) {
+                TripLocationAvailability.Available -> TripLocationState.Live
+                TripLocationAvailability.Estimated -> TripLocationState.Estimated
+                TripLocationAvailability.Stale -> if (locationState.estimatedPosition != null) TripLocationState.EstimatedStale else TripLocationState.Stale
+                TripLocationAvailability.PermissionDenied -> TripLocationState.PermissionDenied
+                TripLocationAvailability.Waiting -> TripLocationState.Waiting
+                TripLocationAvailability.Unsupported -> TripLocationState.NotTracking
+            },
+            staleMessage = if (simulationEnabled) null else when {
+                locationState.availability == TripLocationAvailability.Stale ->
+                    if (locationState.estimatedPosition != null) "No reliable GPS reading for over 30 seconds. Position is estimated along your saved route."
+                    else "No reliable GPS reading for over 30 seconds. Your last position is kept on the map."
+                locationState.offRoute -> "You are away from the planned route. Your position remains visible."
+                else -> null
             },
             modifier = modifier
         )

@@ -133,7 +133,7 @@ class MainPlannerViewModel(
     }
 
     /**
-     * Updates the time using the existing five-minute bounds.
+     * Updates whole minutes within the supported 5–360 minute range.
      *
      * @param minutes Requested available minutes.
      */

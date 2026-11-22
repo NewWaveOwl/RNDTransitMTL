@@ -37,8 +37,7 @@ data class TripRequest(
      */
     fun validate(supportedModes: Set<TransportId>): List<TripRequestError> = buildList {
         if (
-            plannedMinutes !in Trip.MIN_PLANNED_MINUTES..Trip.MAX_PLANNED_MINUTES ||
-            plannedMinutes % Trip.PLANNED_MINUTES_STEP != 0
+            plannedMinutes !in Trip.MIN_PLANNED_MINUTES..Trip.MAX_PLANNED_MINUTES
         ) {
             add(TripRequestError.InvalidPlannedMinutes(plannedMinutes))
         }
@@ -62,7 +61,7 @@ data class TripRequest(
 
 /** One specific reason a TripRequest cannot be routed. */
 sealed class TripRequestError {
-    /** Minutes must be within the planner's range and steps; zero always fails. */
+    /** Whole minutes must be within the planner's range; zero always fails. */
     data class InvalidPlannedMinutes(val minutes: Int) : TripRequestError()
 
     data object NoModes : TripRequestError()
@@ -84,7 +83,7 @@ sealed class TripRequestError {
 val TripRequestError.message: String
     get() = when (this) {
         is TripRequestError.InvalidPlannedMinutes ->
-            "Choose ${Trip.MIN_PLANNED_MINUTES}–${Trip.MAX_PLANNED_MINUTES} minutes in ${Trip.PLANNED_MINUTES_STEP}-minute steps."
+            "Choose ${Trip.MIN_PLANNED_MINUTES}–${Trip.MAX_PLANNED_MINUTES} minutes."
         TripRequestError.NoModes -> "Choose at least one transport type."
         is TripRequestError.DuplicateMode -> "Each transport type can be chosen once."
         is TripRequestError.UnsupportedMode -> "A selected transport is unavailable: $transportId."

@@ -63,7 +63,7 @@ internal fun parseRequest(v: JsonElement): Request {
     checkInput(inServiceArea(point(origin["point"])),"Starting point is outside the supported area.")
     checkInput(origin["label"].text()?.let { it.isNotBlank() && it.length<=160 } == true,"Choose a named starting point.")
     val minutes=v.field("plannedMinutes").number() ?: throw InputError("Choose 5-360 minutes.")
-    checkInput(minutes in 5.0..360.0 && minutes%5==0.0,"Choose 5-360 minutes in five-minute steps.")
+    checkInput(minutes in 5.0..360.0 && minutes%1==0.0,"Choose 5-360 whole minutes.")
     val modes=v.field("modes").strings()
     checkInput(modes.isNotEmpty() && modes.distinct()==modes && modes.all { it in modeNames },"Choose supported transport modes.")
     val pace=v.field("walkingPreference")?.text() ?: if(v.field("walkingPreference")==null) "Amble" else throw InputError("Choose Amble, Walk or Dash.")

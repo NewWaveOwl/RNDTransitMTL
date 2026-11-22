@@ -23,10 +23,20 @@ sealed class LocationUpdate {
      * @property point Measured position.
      * @property accuracyMeters Radius of likely error; never negative.
      */
-    data class Fix(val point: GeoPoint, val accuracyMeters: Double) : LocationUpdate() {
+    data class Fix(
+        val point: GeoPoint,
+        val accuracyMeters: Double,
+        /** Provider measurement time in UTC milliseconds; null for untimed fixtures. */
+        val timestampEpochMillis: Long? = null,
+        /** Measured provider speed, when available; zero means the device is stationary. */
+        val speedMetersPerSecond: Double? = null,
+    ) : LocationUpdate() {
         init {
             require(accuracyMeters.isFinite() && accuracyMeters >= 0.0) {
                 "Location accuracy must not be negative."
+            }
+            require(speedMetersPerSecond == null || (speedMetersPerSecond.isFinite() && speedMetersPerSecond >= 0.0)) {
+                "Location speed must be finite and nonnegative."
             }
         }
     }

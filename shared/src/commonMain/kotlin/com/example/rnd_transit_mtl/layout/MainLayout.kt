@@ -23,6 +23,7 @@ import com.example.rnd_transit_mtl.ui.theme.TransitMain
  * while that feature is unavailable.
  * @param onOpenTogether Working Together navigation callback, or null
  * while that feature is unavailable.
+ * @param showTopBar Whether to show shared header navigation; false at the initial account gate.
  * @param content Destination content rendered inside scaffold padding.
  */
 @Composable
@@ -30,6 +31,7 @@ fun MainLayout(
     selectedTab: MainViewTab? = null,
     onOpenCompass: (() -> Unit)? = null,
     onOpenTogether: (() -> Unit)? = null,
+    showTopBar: Boolean = true,
     content: @Composable () -> Unit
 ) {
     val navigator = LocalNavigator.current
@@ -71,7 +73,7 @@ fun MainLayout(
         containerColor = TransitMain,
         // Top and bottom bars handle their respective system insets.
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = { if (!isCompass) SharedTopBar() },
+        topBar = { if (showTopBar && !isCompass) SharedTopBar() },
         bottomBar = {
             if (!isCompass || controlsVisible) SharedBottomBar(
                 selectedTab = displayedTab,
@@ -122,7 +124,8 @@ fun MainLayout(
                 .consumeWindowInsets(innerPadding)
                 .windowInsetsPadding(
                     WindowInsets.safeDrawing.only(
-                        WindowInsetsSides.Horizontal
+                        if (showTopBar) WindowInsetsSides.Horizontal
+                        else WindowInsetsSides.Top + WindowInsetsSides.Horizontal
                     )
                 )
         ) {

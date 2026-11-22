@@ -43,14 +43,18 @@ internal class AndroidLocationSource(private val context: Context) : LocationSou
                 if (ageNanos !in 0L..15_000_000_000L) return
                 trySend(LocationUpdate.Fix(
                     GeoPoint(location.latitude, location.longitude),
-                    if (location.hasAccuracy()) location.accuracy.toDouble() else 0.0
+                    if (location.hasAccuracy()) location.accuracy.toDouble() else 0.0,
+                    timestampEpochMillis = System.currentTimeMillis() - ageNanos / 1_000_000L,
+                    speedMetersPerSecond = location.speed.toDouble()
+                        .takeIf { location.hasSpeed() && it.isFinite() && it >= 0.0 },
                 ))
             }
         }
         // Android keeps these listeners registered when location services are toggled.
         for (provider in listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)) {
             runCatching {
-                manager.requestLocationUpdates(provider, 2_000L, 2f, listener, Looper.getMainLooper())
+                // A stationary device still needs fresh fixes, rather than appearing to lose GPS.
+                manager.requestLocationUpdates(provider, 2_000L, 0f, listener, Looper.getMainLooper())
                 registered.add(provider)
             }
         }

@@ -226,7 +226,7 @@ data class Trip(
 
         const val MIN_PLANNED_MINUTES: Int = 5
         const val MAX_PLANNED_MINUTES: Int = 360
-        const val PLANNED_MINUTES_STEP: Int = 5
+        const val PLANNED_MINUTES_STEP: Int = 1
 
         /**
          * Normalizes selector values into the supported 5–360 minute range.
@@ -235,15 +235,13 @@ data class Trip(
          * Submitted generation requests are validated separately.
          */
         fun coercePlannedMinutes(value: Int): Int {
-            val bounded = value.coerceIn(
+            return value.coerceIn(
                 MIN_PLANNED_MINUTES,
                 MAX_PLANNED_MINUTES
             )
-
-            return bounded - bounded % PLANNED_MINUTES_STEP
         }
 
-        /** Moves one five-minute step without crossing either boundary. */
+        /** Moves one minute without crossing either boundary. */
         fun adjustPlannedMinutes(
             value: Int,
             direction: Int
@@ -271,8 +269,8 @@ data class Trip(
         /**
          * Rejects invalid record and generation-request values.
          *
-         * Zero, negative minutes and values outside the supported five-minute
-         * steps fail validation rather than being silently accepted.
+         * Zero, negative minutes and values outside the supported range
+         * fail validation rather than being silently accepted.
          */
         fun validatePlannerValues(
             title: String,
@@ -294,10 +292,9 @@ data class Trip(
             }
 
             require(
-                plannedMinutes in MIN_PLANNED_MINUTES..MAX_PLANNED_MINUTES &&
-                    plannedMinutes % PLANNED_MINUTES_STEP == 0
+                plannedMinutes in MIN_PLANNED_MINUTES..MAX_PLANNED_MINUTES
             ) {
-                "Choose 5–360 minutes in five-minute steps."
+                "Choose 5–360 minutes."
             }
 
             require(

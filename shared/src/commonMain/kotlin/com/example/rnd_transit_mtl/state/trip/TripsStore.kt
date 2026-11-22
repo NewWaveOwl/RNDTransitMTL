@@ -104,8 +104,8 @@ class TripsStore private constructor(
      * the transition from active to completed.
      */
     val progress: Float
-        get() = elapsedMillis.toFloat() /
-                TRIP_SIMULATION_DURATION_MILLIS.toFloat()
+        get() = state.value.activeTrip?.routeProgress ?: (elapsedMillis.toFloat() /
+                TRIP_SIMULATION_DURATION_MILLIS.toFloat())
 
     val completedTrips: List<Trip>
         get() = mutableState.value.completedTrips
@@ -154,8 +154,8 @@ class TripsStore private constructor(
         val active = current.activeTrip
 
         if (active != null && active.trip.id == tripId) {
-            return active.elapsedMillis.toFloat() /
-                    TRIP_SIMULATION_DURATION_MILLIS.toFloat()
+            return active.routeProgress ?: (active.elapsedMillis.toFloat() /
+                    TRIP_SIMULATION_DURATION_MILLIS.toFloat())
         }
 
         return if (current.completedTrips.any { it.id == tripId }) {
@@ -254,14 +254,31 @@ class TripsStore private constructor(
             return commitCompletion(current, active)
         }
 
-        if (boundedElapsed != active.elapsedMillis) {
+        if (boundedElapsed != active.elapsedMillis || active.routeProgress != null) {
             mutableState.value = current.copy(
                 activeTrip = active.copy(
-                    elapsedMillis = boundedElapsed
+                    elapsedMillis = boundedElapsed,
+                    routeProgress = null,
                 )
             )
         }
 
+        return TripActionResult.Applied
+    }
+
+    /**
+     * Saves an actual GPS distance fraction without advancing the debug clock.
+     * Only the location coordinator supplies fresh, accurate, on-route readings.
+     * @param tripId Accepted active-trip identity.
+     * @param progress Distance fraction in 0..1; reaching 1 completes the trip once.
+     */
+    fun updateRouteProgress(tripId: TripId, progress: Float): TripActionResult {
+        if (!progress.isFinite() || progress !in 0f..1f) return TripActionResult.InvalidInput("Invalid route progress.")
+        val current = mutableState.value
+        if (current.completedTrips.any { it.id == tripId }) return TripActionResult.AlreadyCompleted
+        val active = current.activeTrip?.takeIf { it.trip.id == tripId } ?: return TripActionResult.MissingTrip(tripId)
+        if (progress == 1f) return commitCompletion(current, active)
+        mutableState.value = current.copy(activeTrip = active.copy(routeProgress = progress))
         return TripActionResult.Applied
     }
 

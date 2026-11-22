@@ -21,6 +21,8 @@ import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
 import com.example.rnd_transit_mtl.View.current_trip.ActiveMapContent
+import com.example.rnd_transit_mtl.View.current_trip.TripLocationState
+import com.example.rnd_transit_mtl.state.debug.LocalDebugModeState
 import com.example.rnd_transit_mtl.ViewModels.main.MainPlannerState
 import com.example.rnd_transit_mtl.ViewModels.main.MainPlannerViewModel
 import com.example.rnd_transit_mtl.data.generation.MockTripGenerator
@@ -76,6 +78,7 @@ internal fun TransitOpeningScreen(
     sampleOutcome: Trip33Sample = Trip33Sample.Normal
 ) {
     val tripsStore = LocalTripsStore.current
+    val simulationEnabled = LocalDebugModeState.current?.simulationEnabled == true
     val liveMap = LocalTransitMap.current != null
     val location = LocalPlannerLocation.current
     val backendGenerator = LocalBackendTripGenerator.current
@@ -697,14 +700,18 @@ internal fun TransitOpeningScreen(
         ActiveMapContent(
             trip = activeState.trip,
             progress = (
-                activeState.elapsedMillis.toFloat() /
-                    TRIP_SIMULATION_DURATION_MILLIS
+                activeState.routeProgress ?: (activeState.elapsedMillis.toFloat() /
+                    TRIP_SIMULATION_DURATION_MILLIS)
             ).coerceIn(0f, 1f),
             actionsEnabled = isDestinationActive && !processingAction,
             mainOverview = true,
             onResume = { performPrimaryAction() },
             onFinish = {},
             onConfirmCancel = { _ -> },
+            simulationEnabled = simulationEnabled,
+            userPosition = if (simulationEnabled) null else location?.fix?.point,
+            onRequestLocation = { location?.request() },
+            locationState = if (simulationEnabled) TripLocationState.Sample else if (location?.fix != null) TripLocationState.Live else TripLocationState.NotTracking,
             modifier = modifier
         )
         return

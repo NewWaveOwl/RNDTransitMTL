@@ -50,11 +50,14 @@ import com.example.rnd_transit_mtl.navigation.Router
 import com.example.rnd_transit_mtl.navigation.TripNavigation
 import com.example.rnd_transit_mtl.navigation.backStackConfig
 import com.example.rnd_transit_mtl.state.trip.LocalTripsStore
+import com.example.rnd_transit_mtl.state.debug.DebugModeState
+import com.example.rnd_transit_mtl.state.debug.LocalDebugModeState
 import com.example.rnd_transit_mtl.state.trip.SessionTripsStores
 import com.example.rnd_transit_mtl.state.user.LocalNicknameSession
 import com.example.rnd_transit_mtl.state.user.appNicknameSession
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.LocalSharedTransitMapHost
 import com.example.rnd_transit_mtl.ui.theme.RNDTransitTheme
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.debug.DebugModeDialog
 import kotlinx.coroutines.CancellationException
 import com.example.rnd_transit_mtl.data.accounts.AccountRepository
 import com.example.rnd_transit_mtl.data.accounts.LocalAccountRepository
@@ -90,6 +93,7 @@ internal fun App(
     tripRepository: ((UserId) -> TripRepository)? = null,
 ) {
     val backendGenerator = rememberBackendTripGenerator(generationEndpoint)
+    val debugMode = rememberSaveable(saver = DebugModeState.Saver) { DebugModeState() }
 
     var transportData by remember {
         mutableStateOf<TransportData?>(null)
@@ -234,6 +238,7 @@ internal fun App(
             }
 
             CompositionLocalProvider(
+                LocalDebugModeState provides debugMode,
                 LocalBackendTripGenerator provides backendGenerator,
                 LocalNavigator provides navigator,
                 LocalTripsStore provides tripsStore,
@@ -271,7 +276,7 @@ internal fun App(
                                     AuthViewModel(authRepository)
                                 }
 
-                                MainLayout {
+                                MainLayout(showTopBar = false) {
                                     AuthScreen(
                                         authViewModel,
                                         onContinueAsGuest = {
@@ -331,6 +336,7 @@ internal fun App(
                         }
                     }
                 }
+                DebugModeDialog(debugMode)
             }
         }
     }

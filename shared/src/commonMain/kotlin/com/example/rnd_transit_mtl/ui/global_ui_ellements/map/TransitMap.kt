@@ -11,6 +11,8 @@ import com.example.rnd_transit_mtl.model.trip.Trip
 internal data class TransitMapData(
     val trip: Trip? = null,
     val progress: Float? = null,
+    val userPosition: GeoPoint? = null,
+    val simulatePosition: Boolean = true,
     val recenterRequest: Int = 0,
     val interactive: Boolean = true,
     val topInset: Dp = 0.dp,

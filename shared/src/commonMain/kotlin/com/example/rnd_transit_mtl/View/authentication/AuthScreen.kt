@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import org.jetbrains.compose.resources.painterResource
 import rnd_transit_mtl.shared.generated.resources.Res
 import rnd_transit_mtl.shared.generated.resources.rnd_logo_on_blue
@@ -43,6 +44,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.rnd_transit_mtl.ViewModels.authentication.AuthViewModel
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.debug.rememberDebugLogoClick
 
 @Composable
 internal fun AuthScreen(
@@ -84,7 +86,8 @@ internal fun AuthScreen(
             color = TransitComplementary, style = MaterialTheme.typography.bodyMedium)
         if (!registering) {
             Spacer(Modifier.height(8.dp))
-            Box(Modifier.size(64.dp).clip(RoundedCornerShape(16.dp)).background(TransitMain),
+            Box(Modifier.size(64.dp).clip(RoundedCornerShape(16.dp)).background(TransitMain)
+                .clickable(onClick = rememberDebugLogoClick()),
                 contentAlignment = Alignment.Center) {
                 Image(painterResource(Res.drawable.rnd_logo_on_blue),
                     contentDescription = "RND Transit logo", modifier = Modifier.size(56.dp))

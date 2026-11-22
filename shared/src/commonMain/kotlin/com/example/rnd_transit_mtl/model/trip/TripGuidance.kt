@@ -1,5 +1,6 @@
 package com.example.rnd_transit_mtl.model.trip
 
+import com.example.rnd_transit_mtl.model.geo.GeoPoint
 import kotlin.math.roundToInt
 
 /** Instructions for the same geometry-based playback position used by the trip map. */
@@ -86,6 +87,25 @@ fun Trip.guidanceAt(progress: Float): TripGuidance {
 }
 
 private val leftTurns = setOf("LEFT", "HARD_LEFT", "SLIGHTLY_LEFT")
+
+/**
+ * Compact street hint; detailed section/next guidance remains available on expansion.
+ * @param progress Distance fraction matched to the current position.
+ * @param userPosition Measured GPS point, or null for explicit debug playback.
+ */
+fun Trip.compactGuidanceAt(progress: Float, userPosition: GeoPoint? = null): String {
+    val fraction = if (progress.isFinite()) progress.coerceIn(0f, 1f) else 0f
+    val distanceFromStart = userPosition?.distanceMetersTo(origin.point)
+        ?: (legs.sumOf { leg -> leg.geometry.zipWithNext().sumOf { (a, b) -> a.distanceMetersTo(b) } } * fraction)
+    if (fraction <= 0.03f) {
+        if (distanceFromStart > 30.0) return "Go to ${origin.label}"
+        val street = legs.first().navigation?.steps?.firstOrNull { !it.bogusName && !it.streetName.isNullOrBlank() }?.streetName
+        return street?.let { "Start on $it" } ?: "Start towards ${destination.label}"
+    }
+    val action = guidanceAt(fraction).currentAction
+    val streetIndex = action.indexOf(" on ")
+    return if (action.startsWith("Continue with ") && streetIndex >= 0) "Continue" + action.substring(streetIndex) else action
+}
 
 /** Destination signage saved on a transit leg. */
 private fun LegNavigation?.towards(): String =

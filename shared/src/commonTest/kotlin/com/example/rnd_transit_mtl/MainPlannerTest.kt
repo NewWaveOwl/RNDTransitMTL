@@ -85,7 +85,7 @@ class MainPlannerTest {
             Json.encodeToString(planner.uiState.value)
         ))
         assertEquals(planner.uiState.value, restored.uiState.value)
-        assertEquals(35, restored.uiState.value.minutes)
+        assertEquals(37, restored.uiState.value.minutes)
         assertEquals(100f, restored.uiState.value.intensity)
     }
 

@@ -190,14 +190,15 @@ private fun AndroidTransitMap(
     }
     val path = remember(legs) { legs.flatMap { it.geometry.zipWithNext() } }
     val distances = remember(path) { path.map { (from, to) -> from.distanceMetersTo(to) } }
-    val marker = data.progress?.let { positionAlongRoute(path, distances, it) }
-    val travelled = remember(path, distances, marker, data.progress) {
+    val routeMarker = data.progress?.let { positionAlongRoute(path, distances, it) }
+    val marker = data.userPosition ?: routeMarker.takeIf { data.simulatePosition }
+    val travelled = remember(path, distances, routeMarker, data.progress) {
         val progress = data.progress?.coerceIn(0f, 1f) ?: 0f
         var remaining = distances.sum() * progress
         path.zip(distances).mapNotNull { (segment, distance) ->
             if (remaining <= 0 || distance <= 0) return@mapNotNull null
             remaining -= distance
-            listOf(segment.first, if (remaining >= 0) segment.second else marker ?: segment.second)
+            listOf(segment.first, if (remaining >= 0) segment.second else routeMarker ?: segment.second)
         }
     }
 
@@ -285,15 +286,37 @@ private fun AndroidTransitMap(
             snapshotFlow { map.isCameraMoving && map.cameraMoveReason == CameraMoveReason.Gesture }
                 .collect { moving -> if (moving) onManualCameraMove() }
         }
-        LaunchedEffect(map, data.followPosition, marker, data.recenterRequest, data.topInset, data.bottomInset) {
-            if (data.followPosition && marker != null) {
-                val viewport = map.awaitViewport()
-                map.setCameraPosition(
-                    map.cameraPosition.copy(
-                        center = marker.position(),
-                        padding = data.visibleMapPadding(viewport.size.height)
-                    )
+        var handledRecenterRequest by remember(map, trip?.id) { mutableIntStateOf(0) }
+        var recenterAnimating by remember(map, trip?.id) { mutableStateOf(false) }
+        val latestMarker by rememberUpdatedState(marker)
+        // A moving GPS marker must not cancel and restart an explicit recenter animation.
+        LaunchedEffect(map, trip?.id, data.recenterRequest, marker != null) {
+            val request = data.recenterRequest
+            if (request <= 0 || request == handledRecenterRequest || marker == null) return@LaunchedEffect
+            snapshotFlow { latestData.cameraInsetsReady }.first { it }
+            val viewport = map.awaitViewport()
+            val target = latestMarker ?: return@LaunchedEffect
+            handledRecenterRequest = request
+            recenterAnimating = true
+            try {
+                map.animateCamera(
+                    CameraUpdate(
+                        center = target.position(),
+                        zoom = maxOf(16.0, map.cameraPosition.zoom),
+                        padding = latestData.visibleMapPadding(viewport.size.height),
+                    ),
+                    CameraAnimation.Ease.Standard,
                 )
+            } finally {
+                recenterAnimating = false
+            }
+        }
+        // Overlay resizing only reveals/hides the map. Keep the last camera padding
+        // until the user explicitly recenters, including on subsequent GPS updates.
+        LaunchedEffect(map, trip?.id, data.followPosition, marker, recenterAnimating, handledRecenterRequest) {
+            if (data.followPosition && marker != null && !recenterAnimating &&
+                data.recenterRequest == handledRecenterRequest) {
+                map.setCameraPosition(map.cameraPosition.copy(center = marker.position()))
             }
         }
 
@@ -414,10 +437,11 @@ private fun AndroidTransitMap(
                 overlay = {
                     val selectedOrigin = data.pin.takeIf { data.pickerOpen || data.centerOnPin }
                     if (fix != null && fix.point != selectedOrigin) UserPointer(fix.point)
+                    data.userPosition?.let { UserPointer(it, -map.cameraPosition.bearing.toFloat()) }
                     selectedOrigin?.let { OriginMarker(it) }
                     if (trip != null && map.style.loadState == StyleLoadState.Ready) {
                         DestinationMarker(trip.destination.point)
-                        if (marker != null) {
+                        if (marker != null && data.userPosition == null && data.progress != null) {
                             val ahead = positionAlongRoute(path, distances, (data.progress + 0.001f).coerceAtMost(1f))
                             val to = ahead ?: marker
                             val from = if (to == marker) {

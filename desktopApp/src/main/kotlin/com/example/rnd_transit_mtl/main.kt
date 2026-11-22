@@ -10,7 +10,7 @@ import androidx.compose.ui.res.painterResource
 fun main() = application {
     Window(
         onCloseRequest = ::exitApplication,
-        title = "RND_Transit_MTL",
+        title = "RNDTransit",
         icon = painterResource("app_icon.png"),
     ) {
         App()

@@ -11,11 +11,11 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.Orientation
@@ -31,6 +31,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -44,10 +49,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.model.trip.guidanceAt
+import com.example.rnd_transit_mtl.model.trip.compactGuidanceAt
+import com.example.rnd_transit_mtl.model.geo.GeoPoint
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.MockTripMap
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.toSampleMapLegs
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.transitions.tripPanelEntrance
@@ -64,6 +72,9 @@ import rnd_transit_mtl.shared.generated.resources.rnd_warning
 private const val ActiveMapPanelMaximumHeightFraction = 0.56f
 private val ActiveMapHorizontalPadding = 24.dp
 private val ActiveMapPanelPadding = 16.dp
+private val ActiveMapPanelTopPadding = 4.dp
+private val ActiveMapPanelBottomPadding = 12.dp
+private val ActiveMapPanelHeaderSpacing = 4.dp
 private val ActiveMapActionSpacing = 12.dp
 private val ActiveMapDialogMaximumWidth = 620.dp
 private val ActiveMapProgressHeight = 64.dp
@@ -76,6 +87,12 @@ private val ActiveMapInstructionIconSize = 32.dp
 private val ActiveMapWarningIconSize = 26.dp
 private val ActiveMapWarningMinimumHeight = 88.dp
 private val ActiveMapLegIndicatorSize = 12.dp
+private val ActiveMapPanelHandleHeight = 24.dp
+private val ActiveMapPanelMinimumHeight = 76.dp
+
+// Animation settings — details grow down from the compact hint and retract upwards.
+private const val ACTIVE_TRIP_DIRECTIONS_ANIMATION_DURATION_MILLIS = 280
+private const val ACTIVE_TRIP_DIRECTIONS_FADE_DURATION_MILLIS = 160
 
 /**
  * Optional presentation override for provider or preview instructions.
@@ -92,11 +109,17 @@ data class ActiveMapInstruction(
     val nextAction: String? = null
 )
 
-/** Explicit location availability; sample progress is not a GPS reading. */
+/** Explicit location availability; NotTracking is a paused route, not a GPS error. */
 enum class TripLocationState {
     Sample,
     Stale,
-    Missing
+    Missing,
+    NotTracking,
+    Live,
+    Estimated,
+    EstimatedStale,
+    Waiting,
+    PermissionDenied
 }
 
 /** Shared active-trip/overview map with explicit completion and confirmed cancellation.
@@ -114,6 +137,9 @@ enum class TripLocationState {
  * @param onShowInformation Opens the existing information dialog.
  * @param locationState Explicit sample, stale, or missing location state.
  * @param sampleStateLabel Optional fixture label, never inferred from provider errors.
+ * @param simulationEnabled Whether to label playback and offer the simulated finish action.
+ * @param userPosition Measured location or an explicitly labelled estimate along the route.
+ * @param onRequestLocation Requests a fresh reading or permission for recentering.
  */
 @Composable
 fun ActiveMapContent(
@@ -130,7 +156,10 @@ fun ActiveMapContent(
     onResume: () -> Unit = {},
     onShowInformation: () -> Unit = {},
     locationState: TripLocationState = TripLocationState.Sample,
-    sampleStateLabel: String? = null
+    sampleStateLabel: String? = null,
+    simulationEnabled: Boolean = true,
+    userPosition: GeoPoint? = null,
+    onRequestLocation: () -> Unit = {},
 ) {
     val fraction = if (progress.isFinite()) {
         progress.coerceIn(0f, 1f)
@@ -138,7 +167,14 @@ fun ActiveMapContent(
         0f
     }
     val completed = fraction >= 1f
+    val positionAvailable = if (simulationEnabled) locationState == TripLocationState.Sample || locationState == TripLocationState.Stale
+        else userPosition != null && locationState in setOf(TripLocationState.Live, TripLocationState.Estimated, TripLocationState.EstimatedStale, TripLocationState.Stale)
     val reference = trip.id.value.takeLast(3)
+    val positionLabel = sampleStateLabel ?: when {
+        !simulationEnabled && (locationState == TripLocationState.Estimated || locationState == TripLocationState.EstimatedStale) -> "Estimated position"
+        !simulationEnabled && locationState == TripLocationState.Stale && userPosition != null -> "Position paused"
+        else -> null
+    }
 
     var followPosition by rememberSaveable(trip.id) {
         mutableStateOf(false)
@@ -147,8 +183,9 @@ fun ActiveMapContent(
         mutableStateOf(fraction)
     }
 
-    LaunchedEffect(fraction, locationState) {
-        if (locationState == TripLocationState.Sample) {
+    LaunchedEffect(fraction, locationState, simulationEnabled) {
+        if (locationState == TripLocationState.Sample || locationState == TripLocationState.Live || locationState == TripLocationState.Estimated || locationState == TripLocationState.EstimatedStale ||
+            (!simulationEnabled && locationState == TripLocationState.Stale)) {
             retainedMapProgress = fraction
         }
     }
@@ -160,13 +197,22 @@ fun ActiveMapContent(
         showLeftTurnIcon = guidance.nextIsLeftTurn,
         nextAction = guidance.nextAction
     )
+    var directionsExpanded by rememberSaveable(trip.id.value) { mutableStateOf(false) }
+    val compactInstruction = instruction?.detail ?: when {
+        !simulationEnabled && userPosition == null -> when (locationState) {
+            TripLocationState.PermissionDenied -> "Allow location to see directions"
+            TripLocationState.NotTracking -> "Trip route"
+            else -> "Finding your location"
+        }
+        else -> trip.compactGuidanceAt(retainedMapProgress, userPosition)
+    }
 
     var confirmingFinish by rememberSaveable(trip.id) {
         mutableStateOf(false)
     }
 
-    LaunchedEffect(completed) {
-        if (completed) confirmingFinish = false
+    LaunchedEffect(completed, simulationEnabled) {
+        if (completed || !simulationEnabled) confirmingFinish = false
     }
 
     var confirmingCancel by rememberSaveable(trip.id) {
@@ -183,18 +229,51 @@ fun ActiveMapContent(
     var headerHeight by remember { mutableIntStateOf(0) }
     var panelHeight by remember { mutableIntStateOf(0) }
     var recenterRequest by remember(trip.id) { mutableIntStateOf(0) }
-    var panelCollapsed by rememberSaveable(trip.id.value) { mutableStateOf(false) }
-    var panelDrag by remember(trip.id) { mutableFloatStateOf(0f) }
-    val collapseThreshold = with(density) { 24.dp.toPx() }
+    // A continuous saved fraction: release leaves the panel exactly where it was dragged.
+    var panelExpansion by rememberSaveable(trip.id.value) { mutableFloatStateOf(1f) }
+    val panelScroll = rememberScrollState()
 
     BoxWithConstraints(modifier.fillMaxSize()) {
         val panelMaxHeight = maxHeight * ActiveMapPanelMaximumHeightFraction
+        val panelMinHeight = ActiveMapPanelMinimumHeight.coerceAtMost(panelMaxHeight)
+        val panelRangePx = with(density) { (panelMaxHeight - panelMinHeight).toPx() }
+        val panelVisibleHeight = panelMinHeight + (panelMaxHeight - panelMinHeight) * panelExpansion
         val mapInteractive = actionsEnabled && !confirmingCancel && !confirmingFinish
+        val resizePanel: (Float) -> Float = { delta ->
+            if (mapInteractive && panelRangePx > 0f) {
+                val previous = panelExpansion
+                panelExpansion = (previous - delta / panelRangePx).coerceIn(0f, 1f)
+                (previous - panelExpansion) * panelRangePx
+            } else 0f
+        }
+        val latestResizePanel by rememberUpdatedState(resizePanel)
+        val latestDragEnabled by rememberUpdatedState(mapInteractive)
+        val latestPanelExpansion by rememberUpdatedState(panelExpansion)
+        val panelNestedScroll = remember(panelScroll) {
+            object : NestedScrollConnection {
+                override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                    if (!latestDragEnabled || source != NestedScrollSource.UserInput) return Offset.Zero
+                    return if (available.y < 0f || !panelScroll.canScrollBackward) {
+                        Offset(0f, latestResizePanel(available.y))
+                    } else Offset.Zero
+                }
+
+                override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset =
+                    if (latestDragEnabled && source == NestedScrollSource.UserInput) {
+                        Offset(0f, latestResizePanel(available.y))
+                    } else Offset.Zero
+
+                override suspend fun onPreFling(available: Velocity): Velocity =
+                    if (latestDragEnabled && latestPanelExpansion < 1f) Velocity(0f, available.y) else Velocity.Zero
+            }
+        }
         if (liveMap) {
             TransitMap(
                 data = TransitMapData(
                     trip = trip,
-                    progress = retainedMapProgress.takeIf { locationState != TripLocationState.Missing },
+                    progress = retainedMapProgress.takeIf { positionAvailable },
+                    userPosition = userPosition.takeIf { !simulationEnabled && positionAvailable },
+                    simulatePosition = simulationEnabled,
                     recenterRequest = recenterRequest,
                     followPosition = followPosition,
                     onManualCameraMove = { followPosition = false },
@@ -206,26 +285,30 @@ fun ActiveMapContent(
                 ),
                 modifier = Modifier.fillMaxSize()
             ) {}
+        } else {
+            // Keep the bundled map's viewport fixed just like Android's shared map.
+            // The panel and directions are overlays, never map-size constraints.
+            MockTripMap(
+                start = trip.origin.toSampleMapPoint(),
+                destination = trip.destination.toSampleMapPoint(),
+                legs = trip.toSampleMapLegs(),
+                progress = retainedMapProgress,
+                interactive = mapInteractive,
+                matchPlannerBackground = true,
+                followPosition = followPosition,
+                onManualCameraMove = { followPosition = false },
+                showControls = false,
+                showPosition = positionAvailable,
+                userPosition = userPosition?.toSampleMapPoint("Your location").takeIf { !simulationEnabled && positionAvailable },
+                recenterRequest = recenterRequest,
+                topInset = with(density) { headerHeight.toDp() },
+                bottomInset = with(density) { panelHeight.toDp() },
+                modifier = Modifier.fillMaxSize()
+            )
         }
 
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxWidth().weight(1f)) {
-                if (!liveMap) {
-                    MockTripMap(
-                        start = trip.origin.toSampleMapPoint(),
-                        destination = trip.destination.toSampleMapPoint(),
-                        legs = trip.toSampleMapLegs(),
-                        progress = retainedMapProgress,
-                        interactive = mapInteractive,
-                        matchPlannerBackground = true,
-                        followPosition = followPosition,
-                        onManualCameraMove = { followPosition = false },
-                        showControls = false,
-                        showPosition = locationState != TripLocationState.Missing,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-
                 Column(
                     Modifier.align(Alignment.TopCenter).fillMaxWidth()
                         .onSizeChanged { headerHeight = it.height }
@@ -240,9 +323,10 @@ fun ActiveMapContent(
                                 .clickable(
                                     enabled = actionsEnabled,
                                     role = Role.Button,
-                                    onClickLabel = "Open current section information",
-                                    onClick = onShowInformation
+                                    onClickLabel = if (directionsExpanded) "Collapse directions" else "Expand directions",
+                                    onClick = { directionsExpanded = !directionsExpanded }
                                 )
+                                .semantics { stateDescription = if (directionsExpanded) "Expanded" else "Collapsed" }
                                 .padding(horizontal = ActiveMapHorizontalPadding, vertical = ActiveMapPanelPadding),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
@@ -251,36 +335,40 @@ fun ActiveMapContent(
                                     .background(tripLegColor(guidance.legIndex), RoundedCornerShape(50))
                                     .border(1.dp, TransitWhite, RoundedCornerShape(50))
                             )
-                            if (currentInstruction.showLeftTurnIcon) {
-                                Image(
-                                    painterResource(Res.drawable.rnd_turn_left),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(ActiveMapInstructionIconSize)
-                                )
-                            }
-
                             Column(
                                 Modifier.weight(1f),
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 Text(
-                                    currentInstruction.title,
+                                    compactInstruction,
                                     color = TransitWhite,
                                     fontSize = 19.sp,
                                     fontWeight = FontWeight.Bold
                                 )
-                                Text(
-                                    "Now: ${currentInstruction.detail}",
-                                    color = TransitWhite,
-                                    fontSize = 13.sp
-                                )
-                                currentInstruction.nextAction?.let { next ->
-                                    Text(
-                                        "Next: $next",
-                                        color = TransitWhite,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
+                                AnimatedVisibility(
+                                    visible = directionsExpanded,
+                                    enter = expandVertically(
+                                        tween(ACTIVE_TRIP_DIRECTIONS_ANIMATION_DURATION_MILLIS, easing = FastOutSlowInEasing),
+                                        expandFrom = Alignment.Top,
+                                    ) + fadeIn(tween(ACTIVE_TRIP_DIRECTIONS_FADE_DURATION_MILLIS)),
+                                    exit = shrinkVertically(
+                                        tween(ACTIVE_TRIP_DIRECTIONS_ANIMATION_DURATION_MILLIS, easing = FastOutSlowInEasing),
+                                        shrinkTowards = Alignment.Top,
+                                    ) + fadeOut(tween(ACTIVE_TRIP_DIRECTIONS_FADE_DURATION_MILLIS)),
+                                ) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            if (currentInstruction.showLeftTurnIcon) {
+                                                Image(painterResource(Res.drawable.rnd_turn_left), contentDescription = null,
+                                                    modifier = Modifier.size(ActiveMapInstructionIconSize))
+                                            }
+                                            Text(currentInstruction.title, color = TransitWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                        Text("Now: ${currentInstruction.detail}", color = TransitWhite, fontSize = 13.sp)
+                                        currentInstruction.nextAction?.let { next ->
+                                            Text("Next: $next", color = TransitWhite, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -292,8 +380,8 @@ fun ActiveMapContent(
                         shape = RoundedCornerShape(16.dp)
                     ) {
                         Text(
-                            "Sample trip · #$reference" +
-                                sampleStateLabel?.let { " · $it" }.orEmpty(),
+                            (if (simulationEnabled) "Sample trip · #$reference" else "Trip · #$reference") +
+                                positionLabel?.let { " · $it" }.orEmpty(),
                             color = TransitMain,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
@@ -306,10 +394,11 @@ fun ActiveMapContent(
 
                     if (!mainOverview) {
                         when (locationState) {
-                            TripLocationState.Stale -> TripWarning(
-                                title = "Location not updating",
+                            TripLocationState.Stale, TripLocationState.EstimatedStale -> TripWarning(
+                                title = "Location is not updating",
                                 detail = staleMessage
-                                    ?: "No recent reading. Route remains available."
+                                    ?: if (locationState == TripLocationState.EstimatedStale) "No reliable GPS reading for over 30 seconds. Position is estimated along your saved route."
+                                    else "No reliable GPS reading for over 30 seconds. Route remains available."
                             )
 
                             TripLocationState.Missing -> TripWarning(
@@ -317,11 +406,14 @@ fun ActiveMapContent(
                                 detail = "Your saved route remains available."
                             )
 
-                            TripLocationState.Sample -> {
+                            TripLocationState.Sample, TripLocationState.Live, TripLocationState.Estimated -> {
                                 if (staleMessage != null) {
-                                    TripWarning("Location not updating", staleMessage)
+                                    TripWarning(if (locationState == TripLocationState.Sample) "Location not updating" else "Check your route", staleMessage)
                                 }
                             }
+
+                            TripLocationState.PermissionDenied -> TripWarning("Location permission needed", "Tap recenter to allow location access.")
+                            TripLocationState.NotTracking, TripLocationState.Waiting -> Unit
                         }
                     }
                 }
@@ -335,11 +427,12 @@ fun ActiveMapContent(
                         .size(ActiveMapRecenterSize)
                         .clickable(
                             enabled = actionsEnabled && !confirmingCancel && !confirmingFinish &&
-                                locationState != TripLocationState.Missing,
+                                (positionAvailable || !simulationEnabled),
                             role = Role.Button
                         ) {
                             followPosition = true
                             recenterRequest++
+                            if (!simulationEnabled) onRequestLocation()
                         }
                 )
 
@@ -361,131 +454,94 @@ fun ActiveMapContent(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = panelMaxHeight)
+                    .height(panelVisibleHeight)
+                    .clipToBounds()
                     .onSizeChanged { panelHeight = it.height }
                     .tripPanelEntrance(liveMap)
                     .background(TransitComplementary)
-                    .padding(ActiveMapPanelPadding),
-                verticalArrangement = Arrangement.spacedBy(ActiveMapActionSpacing)
+                    .nestedScroll(panelNestedScroll)
+                    .draggable(
+                        state = rememberDraggableState { latestResizePanel(it) },
+                        orientation = Orientation.Vertical,
+                        enabled = mapInteractive,
+                    )
+                    .semantics {
+                        contentDescription = "Trip progress panel"
+                        stateDescription = "${(panelExpansion * 100).roundToInt()} percent open"
+                    }
+                    .padding(start = ActiveMapPanelPadding, end = ActiveMapPanelPadding,
+                        top = ActiveMapPanelTopPadding, bottom = ActiveMapPanelBottomPadding),
+                verticalArrangement = Arrangement.spacedBy(ActiveMapPanelHeaderSpacing)
             ) {
                 Box(
-                    Modifier.fillMaxWidth().height(32.dp)
-                        .semantics {
-                            contentDescription = "Trip panel"
-                            stateDescription = if (panelCollapsed) "Collapsed" else "Expanded"
-                        }
-                        .draggable(
-                            state = rememberDraggableState { panelDrag += it },
-                            orientation = Orientation.Vertical,
-                            enabled = actionsEnabled,
-                            onDragStarted = { panelDrag = 0f },
-                            onDragStopped = { velocity ->
-                                if (panelDrag > collapseThreshold || velocity > 600f) panelCollapsed = true
-                                else if (panelDrag < -collapseThreshold || velocity < -600f) panelCollapsed = false
-                            }
-                        )
-                        .clickable(
-                            enabled = actionsEnabled,
-                            role = Role.Button,
-                            onClickLabel = if (panelCollapsed) "Expand trip panel" else "Collapse trip panel"
-                        ) { panelCollapsed = !panelCollapsed },
-                    contentAlignment = Alignment.Center
+                    Modifier.fillMaxWidth().height(ActiveMapPanelHandleHeight)
+                        .semantics { contentDescription = "Trip panel handle" },
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Box(Modifier.width(48.dp).height(4.dp)
-                        .background(TransitWhite, RoundedCornerShape(2.dp)))
+                    Box(Modifier.width(48.dp).height(4.dp).background(TransitWhite, RoundedCornerShape(2.dp)))
                 }
-                AnimatedContent(
-                    targetState = panelCollapsed,
-                    transitionSpec = {
-                        (fadeIn(tween(180, delayMillis = 100)) togetherWith fadeOut(tween(100)))
-                            .using(SizeTransform { _, _ ->
-                                tween(durationMillis = 360, easing = FastOutSlowInEasing)
-                            })
-                    },
-                    label = "Trip panel slide"
-                ) { collapsed ->
-                    if (collapsed) {
+                Column(
+                    Modifier.weight(1f).verticalScroll(panelScroll, enabled = mapInteractive),
+                    verticalArrangement = Arrangement.spacedBy(ActiveMapActionSpacing),
+                ) {
+                    if (mainOverview) {
                         Text(
-                            "${ceil(trip.plannedMinutes * (1f - fraction)).toInt()} min remaining " +
-                                "(${(trip.distanceKm * (1f - fraction) * 10).roundToInt() / 10.0} km)",
+                            "Your adventure is still running",
                             color = TransitWhite,
-                            fontSize = 18.sp,
+                            fontSize = 24.sp,
                             fontWeight = FontWeight.Bold
                         )
+                    }
+
+                    Text("Current trip · #$reference", color = TransitWhite, fontSize = 14.sp)
+                    if (locationState == TripLocationState.NotTracking) {
+                        Text("Trip progress paused", color = TransitWhite, fontSize = 14.sp)
+                    }
+                    if (locationState == TripLocationState.Waiting) {
+                        Text("Finding your location", color = TransitWhite, fontSize = 14.sp)
+                    }
+                    EstimatedTripProgress(trip, fraction)
+
+                    if (operationMessage != null) {
+                        Text(
+                            operationMessage,
+                            color = TransitWhite,
+                            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+                        )
+                    }
+
+                    if (mainOverview) {
+                        TripActionButton(
+                            label = "Resume current trip",
+                            enabled = actionsEnabled,
+                            onClick = onResume
+                        )
+                        Text(
+                            "Finish or cancel this trip before generating another.",
+                            color = TransitWhite,
+                            fontSize = 12.sp
+                        )
                     } else {
-                        Column(
-                            Modifier.heightIn(max = (panelMaxHeight - 76.dp).coerceAtLeast(0.dp))
-                                .verticalScroll(rememberScrollState()),
-                            verticalArrangement = Arrangement.spacedBy(ActiveMapActionSpacing)
-                        ) {
-                            if (mainOverview) {
-                                Text(
-                                    "Your adventure is still running",
-                                    color = TransitWhite,
-                                    fontSize = 24.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-
-                            Text(
-                                "Current trip · #$reference",
-                                color = TransitWhite,
-                                fontSize = 14.sp
+                        Row(horizontalArrangement = Arrangement.spacedBy(ActiveMapActionSpacing)) {
+                            if (completed || simulationEnabled) TripActionButton(
+                                label = if (completed) "Review trip" else "Finish trip",
+                                enabled = actionsEnabled,
+                                onClick = {
+                                    if (completed) onFinish()
+                                    else { confirmingCancel = false; confirmingFinish = true }
+                                },
+                                modifier = Modifier.weight(1f)
                             )
-
-                            EstimatedTripProgress(trip, fraction)
-
-                            if (operationMessage != null) {
-                                Text(
-                                    operationMessage,
-                                    color = TransitWhite,
-                                    modifier = Modifier.semantics {
-                                        liveRegion = LiveRegionMode.Polite
-                                    }
-                                )
-                            }
-
-                            if (mainOverview) {
-                                TripActionButton(
-                                    label = "Resume current trip",
-                                    enabled = actionsEnabled,
-                                    onClick = onResume
-                                )
-                                Text(
-                                    "Finish or cancel this trip before generating another.",
-                                    color = TransitWhite,
-                                    fontSize = 12.sp
-                                )
-                            } else {
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    TripActionButton(
-                                        label = if (completed) "Review trip" else "Finish trip",
-                                        enabled = actionsEnabled,
-                                        onClick = {
-                                            if (completed) onFinish()
-                                            else { confirmingCancel = false; confirmingFinish = true }
-                                        },
-                                        modifier = Modifier.weight(1f)
-                                    )
-
-                                    TripActionButton(
-                                        label = "Cancel",
-                                        secondary = true,
-                                        enabled = actionsEnabled && !completed,
-                                        onClick = { confirmingFinish = false; confirmingCancel = true },
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                }
-
-                                TextButton(
-                                    onClick = onShowInformation,
-                                    enabled = actionsEnabled
-                                ) {
-                                    Text("Trip information", color = TransitWhite)
-                                }
-                            }
+                            TripActionButton(
+                                label = "Cancel",
+                                secondary = true,
+                                enabled = actionsEnabled && !completed,
+                                onClick = { confirmingFinish = false; confirmingCancel = true },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        TextButton(onClick = onShowInformation, enabled = actionsEnabled) {
+                            Text("Trip information", color = TransitWhite)
                         }
                     }
                 }
@@ -553,7 +609,7 @@ fun ActiveMapContent(
         }
     }
 
-    if (confirmingFinish && !completed) {
+    if (confirmingFinish && !completed && simulationEnabled) {
         Dialog(
             onDismissRequest = { confirmingFinish = false },
             properties = DialogProperties(usePlatformDefaultWidth = false)

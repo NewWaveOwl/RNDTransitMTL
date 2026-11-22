@@ -46,9 +46,14 @@ internal class ActiveTripSimulation(
             ?.takeIf { it.trip.id == tripId }
             ?: return null
 
+        // Explicitly switching from GPS to debug playback resumes at the saved route position.
+        val initialElapsed = maxOf(active.elapsedMillis, active.routeProgress
+            ?.let { (it * TRIP_SIMULATION_DURATION_MILLIS).toLong() } ?: 0L)
+        if (active.routeProgress != null) tripsStore.updateElapsed(tripId, initialElapsed)
+
         return Session(
             startedAt = timeSource.markNow(),
-            initialElapsedMillis = active.elapsedMillis
+            initialElapsedMillis = initialElapsed
         ).also {
             currentSession = it
         }
