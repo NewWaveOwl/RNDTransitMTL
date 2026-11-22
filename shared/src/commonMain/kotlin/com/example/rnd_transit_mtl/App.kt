@@ -8,6 +8,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -39,6 +40,8 @@ import com.example.rnd_transit_mtl.data.trips.SupabaseTripRepository
 import com.example.rnd_transit_mtl.data.trips.TripRepository
 import com.example.rnd_transit_mtl.data.trips.tryCloudAction
 import com.example.rnd_transit_mtl.layout.MainLayout
+import com.example.rnd_transit_mtl.launcher.ExternalUriHandler
+import com.example.rnd_transit_mtl.launcher.RouterDeepLinkResolver
 import com.example.rnd_transit_mtl.model.ids.UserId
 import com.example.rnd_transit_mtl.model.transport.TransportRoute
 import com.example.rnd_transit_mtl.model.transport.TransportType
@@ -286,6 +289,17 @@ internal fun App(
                         }
                     }
                 } else {
+                    val deepLinkResolver = remember { RouterDeepLinkResolver() }
+                    DisposableEffect(backStack, deepLinkResolver) {
+                        ExternalUriHandler.listener = { uri ->
+                            deepLinkResolver.resolve(uri)?.let { destinationStack ->
+                                backStack.clear()
+                                backStack.addAll(destinationStack)
+                            }
+                        }
+                        onDispose { ExternalUriHandler.listener = null }
+                    }
+
                     MainLayout {
                         Box(Modifier.fillMaxSize()) {
                             val pending =
