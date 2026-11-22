@@ -43,6 +43,40 @@ class BackendTripGeneratorTest {
     }.toString()
 
     @Test
+    fun fixedDestinationIsSentAndValidatedWithoutChangingTheInputOrigin() = runTest {
+        val fixed = input.copy(destinationPlace = destination, compareModes = true)
+        var failure: Exception? = null
+        val result = BackendTripGenerator(post = { body, _ ->
+            val request = Json.decodeFromString<BackendGenerationRequest>(body)
+            assertEquals(origin, request.origin)
+            assertEquals(destination, request.destination)
+            assertTrue(request.compareModes)
+            response()
+        }, reportFailure = { failure = it }).generate(fixed, modes, emptySet())
+        val trip = assertIs<TripGenerationResult.Success>(result, failure?.stackTraceToString()).trip
+        assertEquals(origin, trip.origin)
+        assertEquals(destination, trip.destination)
+        assertTrue(trip.legs.any { it.isRouted })
+
+        val wrongDestination = Place("Changed target", GeoPoint(45.52, -73.6))
+        val wrong = JsonObject(Json.parseToJsonElement(response()).jsonObject +
+            ("destination" to Json.encodeToJsonElement(wrongDestination))).toString()
+        assertIs<TripGenerationResult.RoutingUnavailable>(BackendTripGenerator(post = { _, _ -> wrong })
+            .generate(fixed, modes, emptySet()))
+    }
+
+    @Test
+    fun returnRoutingFailureAndCancellationNeverProduceATrip() = runTest {
+        val fixed = input.copy(destinationPlace = destination)
+        assertIs<TripGenerationResult.NoRoute>(BackendTripGenerator(post = { _, _ -> """{"status":"no_trip"}""" })
+            .generate(fixed, modes, emptySet()))
+        assertFailsWith<CancellationException> {
+            BackendTripGenerator(post = { _, _ -> throw CancellationException("cancel return") })
+                .generate(fixed, modes, emptySet())
+        }
+    }
+
+    @Test
     fun repeatingRestoredBusOnlyTripsKeepsWalkingAsAccessRatherThanAnAlternative() = runTest {
         val bus = TransportId("bus")
         val walk = TransportId("walk")

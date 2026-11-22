@@ -31,7 +31,9 @@ internal data class BackendGenerationRequest(
     val selectedRouteIds: List<String>,
     val excludedDestinations: List<GeoPoint>,
     val walkingPreference: String = "Amble",
-    val bikeSpeedKmh: Int = 18
+    val bikeSpeedKmh: Int = 18,
+    val destination: Place? = null,
+    val compareModes: Boolean = false
 )
 
 @Serializable
@@ -80,6 +82,10 @@ internal class BackendTripGenerator(
                 input.plannedMinutes, input.attractionIntensity)
             require(input.selectedTransportIds.isNotEmpty()) { "Choose at least one transport type." }
             require(input.selectedTransportIds.distinct().size == input.selectedTransportIds.size)
+            require(input.destinationPlace == null || input.destinationPlace.point != origin.point) {
+                "You are already at the starting point."
+            }
+            require(!input.compareModes || input.destinationPlace != null)
             require(input.bikeSpeedKmh in 8..32) { "Choose a bike speed from 8 to 32 km/h." }
             require(input.walkingPreference in listOf("Amble", "Walk", "Dash")) { "Choose Amble, Walk or Dash." }
             require(input.selectedTransportIds.all { id -> OtpMode.entries.any { it.id == id } }) {
@@ -102,7 +108,8 @@ internal class BackendTripGenerator(
             val request = BackendGenerationRequest(
                 origin, input.plannedMinutes, input.selectedTransportIds.map { it.value },
                 input.selectedZonesByTransport.entries.associate { (mode, zones) -> mode.value to zones.map { it.value } },
-                input.selectedRouteIds.map { it.value }, excludedDestinations.takeLast(10), input.walkingPreference, input.bikeSpeedKmh
+                input.selectedRouteIds.map { it.value }, excludedDestinations.takeLast(10), input.walkingPreference, input.bikeSpeedKmh,
+                input.destinationPlace, input.compareModes
             )
             val payload = json.encodeToString(request)
             stage = "http"
@@ -156,6 +163,9 @@ internal class BackendTripGenerator(
     ): TripGenerationResult {
         require(response.origin == origin) { "The backend changed the confirmed origin." }
         val destination = requireNotNull(response.destination)
+        require(input.destinationPlace == null || destination == input.destinationPlace) {
+            "The backend changed the saved return destination."
+        }
         val elapsed = requireNotNull(response.elapsedSeconds)
         require(elapsed in 1..input.plannedMinutes * 60L)
         require(response.orientationBufferSeconds in 0..elapsed)
@@ -169,7 +179,7 @@ internal class BackendTripGenerator(
         val route = decoder.decodeResponse(requireNotNull(response.otp), request)
         if (route !is RoutingResult.Success) return TripGenerationResult.RoutingUnavailable("The trip planner returned an invalid route.")
         require(route.durationSeconds <= elapsed)
-        if(input.selectedTransportIds.map { it.value }.toSet()==setOf("walk","bike")) {
+        if(!input.compareModes && input.selectedTransportIds.map { it.value }.toSet()==setOf("walk","bike")) {
             val walking=route.legs.filter { it.transportId.value=="walk" }
             val cycling=route.legs.filter { it.transportId.value=="bike" }
             require(walking.sumOf { it.distanceMeters }>0 && walking.sumOf { it.durationSeconds }>0 &&

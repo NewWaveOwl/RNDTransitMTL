@@ -51,7 +51,8 @@ internal val modeNames=mapOf("walk" to "WALK", "bike" to "BICYCLE", "bus" to "BU
 internal val walkingSpeeds=mapOf("Amble" to 3.0,"Walk" to 4.8,"Dash" to 6.8)
 internal fun orientationSeconds(meters: Double)=ceil(meters*60/1000).toLong()
 internal data class Request(val origin: JsonObject, val minutes: Int, val modes: List<String>, val pace: String,
-    val zones: Map<String,List<String>>, val lines: List<String>, val excluded: List<Point>, val bikeSpeedKmh: Int = 18) {
+    val zones: Map<String,List<String>>, val lines: List<String>, val excluded: List<Point>, val bikeSpeedKmh: Int = 18,
+    val destination: JsonObject? = null, val compareModes: Boolean = false) {
     val start get()=point(origin["point"])
     val speed get()=walkingSpeeds.getValue(pace)/3.6
     val bikeOnly get()=modes==listOf("bike")
@@ -87,7 +88,27 @@ internal fun parseRequest(v: JsonElement): Request {
         checkInput(ref.field("type").text() in listOf("Node","Way","Relation") && id!=null && id>0 && id<=9_007_199_254_740_991.0 && id%1==0.0,"Invalid origin reference.")
     }
     val clean=JsonObject(origin.filterKeys { it in listOf("label","point","osmReference") })
-    return Request(clean,minutes.toInt(),modes,pace,zones,lines,excluded,bikeSpeed.toInt())
+    val destination = v.field("destination")?.takeUnless { it == JsonNull }?.let { raw ->
+        checkInput(raw is JsonObject, "Choose a valid destination.")
+        val target = point(raw.field("point"))
+        checkInput(inServiceArea(target), "Destination is outside the supported area.")
+        checkInput(target != point(clean["point"]), "Start and destination must be different.")
+        checkInput(raw.field("label").text()?.let { it.isNotBlank() && it.length <= 160 } == true,
+            "Choose a named destination.")
+        raw.field("osmReference")?.takeUnless { it == JsonNull }?.let { ref ->
+            val id = ref.field("id").number()
+            checkInput(ref.field("type").text() in listOf("Node", "Way", "Relation") &&
+                id != null && id > 0 && id <= 9_007_199_254_740_991.0 && id % 1 == 0.0,
+                "Invalid destination reference.")
+        }
+        JsonObject(raw.jsonObject.filterKeys { it in listOf("label", "point", "osmReference") })
+    }
+    val compareModes = v.field("compareModes")?.let {
+        checkInput(it is JsonPrimitive && !it.isString && it.booleanOrNull != null, "Invalid return transport option.")
+        it.jsonPrimitive.boolean
+    } ?: false
+    checkInput(!compareModes || destination != null, "Transport comparison requires a destination.")
+    return Request(clean,minutes.toInt(),modes,pace,zones,lines,excluded,bikeSpeed.toInt(),destination,compareModes)
 }
 /** Uniform-area arbitrary coordinates, independent of stops or a POI catalogue. */
 internal fun candidates(input: Request, random: Random=Random.Default, check: ()->Unit = {}): List<Point> {

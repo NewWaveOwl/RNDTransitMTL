@@ -48,7 +48,11 @@ data class TripGenerationInput(
     val ownerId: UserId? = null,
     val originPlace: Place? = null,
     val walkingPreference: String = "Amble",
-    val bikeSpeedKmh: Int = 18
+    val bikeSpeedKmh: Int = 18,
+    /** Fixed geographic target for a return request; null keeps random adventure generation. */
+    val destinationPlace: Place? = null,
+    /** Compare available modes by arrival time for a fixed-target request. */
+    val compareModes: Boolean = false
 )
 
 /**

@@ -183,6 +183,8 @@ internal class Generator(private val routes: List<JsonElement>, private val zone
     private val diagnostic: (String)->Unit = { println("RndTransitGeneration $it") },
     private val preparationDispatcher: CoroutineDispatcher = Dispatchers.Default) {
     suspend fun generate(input: Request, requestId: String = "internal"): JsonObject {
+        if (input.destination != null) return routeToDestination(input, routes, zones, route, now(),
+            timeoutMillis ?: 30_000)
         val timer=TimeSource.Monotonic.markNow()
         fun log(event: String) = diagnostic("request=$requestId elapsedMs=${timer.elapsedNow().inWholeMilliseconds} $event")
         log("search=start modes=${input.modes.joinToString()} minutes=${input.minutes}")
