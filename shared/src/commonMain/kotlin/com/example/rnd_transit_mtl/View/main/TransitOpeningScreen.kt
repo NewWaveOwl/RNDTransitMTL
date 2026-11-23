@@ -53,7 +53,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
-import com.example.rnd_transit_mtl.data.location.awaitFreshFix
+import com.example.rnd_transit_mtl.data.location.awaitPlanningLocation
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
@@ -381,19 +381,26 @@ internal fun TransitOpeningScreen(
                 }
 
                 val routingOrigin = if (liveMap && !planner.originIsManual) {
-                    val fresh = location?.awaitFreshFix()
-                    if (fresh == null || !location.containsPoint(fresh.point)) {
-                        fail(Trip33Failure.PermissionDenied, "Current location unavailable. Try again or choose a starting point.")
+                    val update = location?.awaitPlanningLocation()
+                    if (update !is LocationUpdate.Fix) {
+                        fail(if (update == LocationUpdate.PermissionDenied) Trip33Failure.PermissionDenied
+                            else Trip33Failure.LocationUnavailable)
                         return@launch
                     }
-                    Place("Current location", fresh.point).also { plannerViewModel.setDefaultOrigin(it) }
+                    if (!location.containsPoint(update.point)) {
+                        fail(Trip33Failure.LocationUnavailable, "Outside the supported area. Choose a starting point.")
+                        return@launch
+                    }
+                    Place("Current location", update.point).also { plannerViewModel.setDefaultOrigin(it) }
                 } else planner.originPlace
                 val origin = planner.origin
                 if ((if (liveMap) routingOrigin == null else origin == null) ||
                     (sampleOutcome == Trip33Sample.PermissionDenied &&
                         !planner.originIsManual)
                 ) {
-                    fail(Trip33Failure.PermissionDenied)
+                    fail(if (sampleOutcome == Trip33Sample.PermissionDenied || planner.locationAccessOff ||
+                        location?.currentUpdate == LocationUpdate.PermissionDenied) Trip33Failure.PermissionDenied
+                        else Trip33Failure.LocationUnavailable)
                     return@launch
                 }
 
@@ -624,9 +631,13 @@ internal fun TransitOpeningScreen(
                 closeProposalFlow()
             },
             onUnavailableAction = {
-                failureMessage =
-                    "Address search and live location are not connected " +
+                if (liveMap) {
+                    closeProposalFlow()
+                    performPrimaryAction()
+                } else {
+                    failureMessage = "Address search and live location are not connected " +
                         "in this sample. Choose a point on the map."
+                }
             },
             onCancelPicking = {
                 pickingOrigin = false
@@ -754,7 +765,7 @@ internal fun TransitOpeningScreen(
         OriginSelectionContent(
             origin = if (originMode == "pick") draftOrigin else planner.origin,
             minutes = boundedMinutes,
-            locationAccessOff = if (liveMap) location?.fix == null else planner.locationAccessOff,
+            locationAccessOff = if (liveMap) location?.currentUpdate == LocationUpdate.PermissionDenied else planner.locationAccessOff,
             picking = originMode == "pick",
             draftLabel = liveDraft?.let { "Pinned location" },
             enabled = canChangeInputs(),

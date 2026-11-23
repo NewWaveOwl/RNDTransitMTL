@@ -179,6 +179,74 @@ class Trip33FlowTest {
     }
 
     @Test
+    fun switchingToRoundTripKeepsARecentGpsOriginWithoutAnotherRefresh() = runBlocking(Dispatchers.Main) {
+        val recent = LocationUpdate.Fix(GeoPoint(45.51, -73.59), 5.0,
+            timestampEpochMillis = kotlin.time.Clock.System.now().toEpochMilliseconds())
+        var refreshes = 0
+        val location = object : PlannerLocation {
+            override val fix = recent
+            override val automaticOriginUpdates = kotlinx.coroutines.flow.MutableStateFlow<LocationUpdate>(recent)
+            override val containsPoint: (GeoPoint) -> Boolean = { true }
+            override fun request(onResult: ((LocationUpdate.Fix?) -> Unit)?) {
+                refreshes++
+                onResult?.invoke(null)
+            }
+        }
+        val requests = mutableListOf<BackendGenerationRequest>()
+        val backend = BackendTripGenerator(post = { body, _ ->
+            requests += Json.decodeFromString<BackendGenerationRequest>(body)
+            """{"status":"no_trip"}"""
+        })
+        Host(Trip33Sample.Normal, liveMap = true, backend = backend, providedLocation = location).use { host ->
+            host.render()
+            host.planner.setRoundTrip(true)
+            host.render()
+            host.click("GO")
+            host.await("No trip fits these choices")
+            assertTrue(requests.single().roundTrip)
+            assertEquals(recent.point, requests.single().origin.point)
+            assertEquals(0, refreshes)
+            assertFalse(host.has("Location access is off"))
+        }
+    }
+
+    @Test
+    fun roundTripGpsOutageShowsTheCorrectWarningAndRetryRequestsLocationAgain() = runBlocking(Dispatchers.Main) {
+        var available = false
+        var refreshes = 0
+        val fresh = LocationUpdate.Fix(GeoPoint(45.51, -73.59), 5.0)
+        val location = object : PlannerLocation {
+            override val fix: LocationUpdate.Fix? = null
+            override val containsPoint: (GeoPoint) -> Boolean = { true }
+            override fun request(onResult: ((LocationUpdate.Fix?) -> Unit)?) {
+                refreshes++
+                onResult?.invoke(if (available) fresh else null)
+            }
+        }
+        val requests = mutableListOf<BackendGenerationRequest>()
+        val backend = BackendTripGenerator(post = { body, _ ->
+            requests += Json.decodeFromString<BackendGenerationRequest>(body)
+            """{"status":"no_trip"}"""
+        })
+        Host(Trip33Sample.Normal, liveMap = true, backend = backend, providedLocation = location).use { host ->
+            host.render()
+            host.planner.setDefaultOrigin(Place("Current location", fresh.point))
+            host.planner.setRoundTrip(true)
+            host.render()
+            host.click("GO")
+            host.await("Current location unavailable")
+            assertFalse(host.has("Location access is off"))
+            assertTrue(requests.isEmpty())
+            available = true
+            host.click("Try current location again")
+            host.await("No trip fits these choices")
+            assertEquals(2, refreshes)
+            assertTrue(requests.single().roundTrip)
+            assertEquals(fresh.point, requests.single().origin.point)
+        }
+    }
+
+    @Test
     fun goGeneratesTwoBackendProposalsFromTheSamePinAndStartsTheAcceptedRoute() = runBlocking(Dispatchers.Main) {
         val origin = Place("Confirmed origin", GeoPoint(45.5, -73.6))
         val requests = mutableListOf<BackendGenerationRequest>()

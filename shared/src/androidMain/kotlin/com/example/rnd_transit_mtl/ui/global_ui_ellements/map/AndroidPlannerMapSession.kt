@@ -78,6 +78,12 @@ internal class AndroidPlannerMapSession(private val context: Context) : PlannerL
     var permitted by mutableStateOf(false)
     var permissionChecked by mutableStateOf(false)
     var latestLocationUpdate by mutableStateOf<LocationUpdate?>(null)
+    override val currentUpdate: LocationUpdate?
+        get() = when {
+            permissionChecked && !permitted -> LocationUpdate.PermissionDenied
+            accuracyMonitor.state.locationEnabled == false -> LocationUpdate.Unavailable
+            else -> latestLocationUpdate
+        }
     override val automaticOriginUpdates = snapshotFlow {
         when {
             !permissionChecked -> null
@@ -111,9 +117,10 @@ internal class AndroidPlannerMapSession(private val context: Context) : PlannerL
                 result.trustedFix?.let { movementHeading.receive(it) }
                 if ((update.timestampEpochMillis ?: 0L) >= requestedAtMillis) complete(result.trustedFix)
             }
-        } else {
+        } else if (update == LocationUpdate.PermissionDenied) {
             complete(null)
         }
+        // A temporary provider outage must not cancel a pending refresh before GPS recovers.
         // Fresh but suspicious readings still count as provider activity, never as progress.
         latestLocationUpdate = update
     }
