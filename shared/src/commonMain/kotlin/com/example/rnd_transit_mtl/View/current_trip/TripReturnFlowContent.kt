@@ -68,7 +68,7 @@ internal fun TripReturnFlowContent(
         TripCompletionContent(outbound, onReview, onSkip, onPlanAnother, page, enabled, errorMessage,
             syncPending, celebrate = !state.hasRequested, returnControls = {
                 Text("Return to starting point · Trip #${outbound.id.value.takeLast(3)}", color = TransitWhite, fontSize = 14.sp)
-                ReturnOptionControl(outbound, state.option, enabled, onFind)
+                ReturnOptionControl(enabled, onFind)
             })
         return
     }
@@ -142,34 +142,27 @@ internal fun TripReturnFlowContent(
     }
 }
 
-/** Figma's split primary action and accessible two-choice menu. */
+/** Figma's split button exposes both return actions directly. */
 @Composable
-private fun ReturnOptionControl(outbound: Trip, option: ReturnTransportOption, enabled: Boolean,
+private fun ReturnOptionControl(enabled: Boolean,
     onFind: (ReturnTransportOption) -> Unit) {
-    var expanded by rememberSaveable(outbound.id.value) { mutableStateOf(false) }
-    Box {
-        Row(Modifier.fillMaxWidth().heightIn(min = ReturnOptionHeight)
-            .clip(RoundedCornerShape(ReturnOptionCornerRadius)).background(TransitMain)) {
-            Box(Modifier.weight(1f).heightIn(min = ReturnOptionHeight)
-                .clickable(enabled, role = Role.Button) { onFind(option) }, contentAlignment = Alignment.Center) {
-                Text(if (option == ReturnTransportOption.Fastest) "Fastest way back" else "Same transport",
-                    color = TransitWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            }
-            Box(Modifier.size(ReturnOptionHeight).clickable(enabled, role = Role.Button,
-                onClickLabel = "More return options") { expanded = true }.semantics { contentDescription = "More return options" },
-                contentAlignment = Alignment.Center) {
-                Image(painterResource(Res.drawable.rnd_expand_more), null, Modifier.size(24.dp))
-            }
+    Row(Modifier.fillMaxWidth().heightIn(min = ReturnOptionHeight)
+        .clip(RoundedCornerShape(ReturnOptionCornerRadius)).background(TransitMain),
+        verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.weight(1.5f).heightIn(min = ReturnOptionHeight)
+            .clickable(enabled, role = Role.Button) { onFind(ReturnTransportOption.Fastest) }
+            .padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
+            Text("Return trip / Fastest trip", color = TransitWhite,
+                fontWeight = FontWeight.Bold, fontSize = 14.sp)
         }
-        DropdownMenu(expanded, { expanded = false }, containerColor = TransitWhite, shape = RoundedCornerShape(12.dp)) {
-            DropdownMenuItem(text = { Column {
-                Text("Fastest way back", color = TransitComplementary, fontWeight = FontWeight.Bold)
-                Text("Compare all available transport modes", color = TransitComplementary, fontSize = 12.sp)
-            } }, onClick = { expanded = false; onFind(ReturnTransportOption.Fastest) }, enabled = enabled)
-            DropdownMenuItem(text = { Column {
-                Text("Same transport", color = TransitComplementary, fontWeight = FontWeight.Bold)
-                Text("Keep your outbound selection", color = TransitComplementary, fontSize = 12.sp)
-            } }, onClick = { expanded = false; onFind(ReturnTransportOption.SameTransport) }, enabled = enabled)
+        androidx.compose.foundation.Canvas(Modifier.width(24.dp).height(ReturnOptionHeight)) {
+            drawLine(TransitWhite, androidx.compose.ui.geometry.Offset(size.width, 0f),
+                androidx.compose.ui.geometry.Offset(0f, size.height), strokeWidth = 6.dp.toPx())
+        }
+        Box(Modifier.weight(1f).heightIn(min = ReturnOptionHeight)
+            .clickable(enabled, role = Role.Button) { onFind(ReturnTransportOption.SameTransport) }
+            .padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
+            Text("Same transport", color = TransitWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
         }
     }
 }

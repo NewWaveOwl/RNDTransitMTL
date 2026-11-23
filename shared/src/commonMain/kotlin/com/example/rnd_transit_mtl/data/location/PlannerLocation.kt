@@ -21,3 +21,11 @@ internal interface PlannerLocation {
 }
 
 internal val LocalPlannerLocation = staticCompositionLocalOf<PlannerLocation?> { null }
+
+/** Explicit requests wait for a provider measurement; cancellation ignores late callbacks. */
+internal suspend fun PlannerLocation.awaitFreshFix(): LocationUpdate.Fix? =
+    kotlinx.coroutines.withTimeoutOrNull(16_000) {
+        kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
+            request { fix -> if (continuation.isActive) continuation.resumeWith(Result.success(fix)) }
+        }
+    }

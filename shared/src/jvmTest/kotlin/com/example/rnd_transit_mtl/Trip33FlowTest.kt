@@ -57,7 +57,8 @@ class Trip33FlowTest {
     private class Host(
         initialOutcome: Trip33Sample,
         liveMap: Boolean = false,
-        backend: BackendTripGenerator? = null
+        backend: BackendTripGenerator? = null,
+        providedLocation: PlannerLocation? = null
     ) : AutoCloseable {
         var outcome by mutableStateOf(initialOutcome)
         var mapData = TransitMapData()
@@ -93,7 +94,7 @@ class Trip33FlowTest {
                 LocalNavigator provides navigator,
                 LocalTripNavigation provides navigation,
                 LocalBackendTripGenerator provides backend,
-                LocalPlannerLocation provides location.takeIf { liveMap },
+                LocalPlannerLocation provides (providedLocation ?: location).takeIf { liveMap },
                 LocalTransitMap provides if (liveMap) ({ data, _ -> SideEffect { mapData = data } }) else null
             ) {
                 RNDTransitTheme {
@@ -144,6 +145,36 @@ class Trip33FlowTest {
         override fun close() {
             scene.close()
             models.viewModelStore.clear()
+        }
+    }
+
+    @Test
+    fun goWaitsForFreshPositionAndRoutesFromItInsteadOfTheEarlierAutomaticOrigin() = runBlocking(Dispatchers.Main) {
+        val old = LocationUpdate.Fix(GeoPoint(45.5, -73.6), 5.0)
+        val fresh = LocationUpdate.Fix(GeoPoint(45.51, -73.59), 5.0)
+        val updates = kotlinx.coroutines.flow.MutableStateFlow<LocationUpdate>(old)
+        var requested: ((LocationUpdate.Fix?) -> Unit)? = null
+        val location = object : PlannerLocation {
+            override val fix = old
+            override val automaticOriginUpdates = updates
+            override val containsPoint: (GeoPoint) -> Boolean = { true }
+            override fun request(onResult: ((LocationUpdate.Fix?) -> Unit)?) { requested = onResult }
+        }
+        val requests = mutableListOf<BackendGenerationRequest>()
+        val backend = BackendTripGenerator(post = { body, _ ->
+            requests += Json.decodeFromString<BackendGenerationRequest>(body)
+            """{"status":"no_trip"}"""
+        })
+        Host(Trip33Sample.Normal, liveMap = true, backend = backend, providedLocation = location).use { host ->
+            host.render()
+            assertEquals(old.point, host.planner.uiState.value.originPlace?.point)
+            host.click("GO")
+            host.render()
+            assertTrue(requests.isEmpty(), "GO must wait for a fresh measurement")
+            assertNotNull(requested).invoke(fresh)
+            host.await("No trip fits these choices")
+            assertEquals(fresh.point, requests.single().origin.point)
+            assertFalse(host.planner.uiState.value.originIsManual)
         }
     }
 

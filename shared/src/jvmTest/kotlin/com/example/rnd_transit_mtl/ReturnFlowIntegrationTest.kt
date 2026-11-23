@@ -35,7 +35,7 @@ import kotlin.test.*
 @OptIn(ExperimentalComposeUiApi::class)
 class ReturnFlowIntegrationTest {
     private class BackInput : NavigationEventInput() { fun back() = dispatchOnBackCompleted() }
-    private class Host(private val failFirst: Boolean = false) : AutoCloseable {
+    private class Host(private val failFirst: Boolean = false, width: Int = 412) : AutoCloseable {
         val store = TripsStore { 200_000L }.also {
             it.start(guidanceTestTrip()); it.updateElapsed(guidanceTestTrip().id, TRIP_SIMULATION_DURATION_MILLIS)
         }
@@ -56,7 +56,7 @@ class ReturnFlowIntegrationTest {
             if (failFirst && requests.size == 1) """{"status":"no_trip"}"""
             else response(request)
         }, idFactory = { "return-${requests.size}" }, now = { 200_000L })
-        private val scene = ImageComposeScene(412, 716) {
+        private val scene = ImageComposeScene(width, 716) {
             val dispatcher = rememberNavigationEventDispatcherOwner(parent = null)
             DisposableEffect(dispatcher) {
                 dispatcher.navigationEventDispatcher.addInput(backInput)
@@ -133,10 +133,24 @@ class ReturnFlowIntegrationTest {
         override fun close() { scene.close(); models.viewModelStore.clear() }
     }
 
+    @Test fun splitActionsRemainVisibleOnNarrowScreens() = runBlocking(Dispatchers.Main) {
+        Host(width = 320).use { host ->
+            host.render()
+            assertTrue(host.has("Return trip / Fastest trip"))
+            assertTrue(host.has("Same transport"))
+            host.scrollPanelToBottom()
+            host.snapshot("Return-split-button-320.png")
+            host.click("Same transport")
+            assertFalse(host.requests.single().compareModes)
+            assertTrue(host.has("Back with the same transport"))
+        }
+    }
+
     @Test fun acceptsARealReturnAndReviewsTheOriginalTripAfterGettingBack() = runBlocking(Dispatchers.Main) {
         Host().use { host ->
             host.render()
-            host.click("Fastest way back")
+            host.snapshot("Return-split-button.png")
+            host.click("Return trip / Fastest trip")
             assertTrue(host.has("Start return trip"))
             assertEquals(host.original, host.store.findCompleted(host.original.id))
             assertEquals(host.original.id, host.store.pendingReviewTripId)
@@ -164,7 +178,7 @@ class ReturnFlowIntegrationTest {
         Host(failFirst = true).use { host ->
             host.render()
             val before = host.store.toSavedStateJson()
-            host.click("Fastest way back")
+            host.click("Return trip / Fastest trip")
             assertTrue(host.has("No return route found"))
             assertEquals(before, host.store.toSavedStateJson())
             host.snapshot("Return-route-unavailable.png")
@@ -173,7 +187,6 @@ class ReturnFlowIntegrationTest {
             host.back()
             assertTrue(host.has("Adventure complete!"))
             assertEquals(before, host.store.toSavedStateJson())
-            host.click("More return options")
             host.click("Same transport")
             assertFalse(host.requests.last().compareModes)
             assertEquals(listOf("walk", "bus"), host.requests.last().modes)

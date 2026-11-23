@@ -52,7 +52,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.collect
+import com.example.rnd_transit_mtl.data.location.awaitFreshFix
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
@@ -287,7 +288,7 @@ internal fun TransitOpeningScreen(
 
     var defaultOriginStatus by remember { mutableStateOf<String?>(null) }
     val needsDefaultOrigin = isDestinationActive && canChangeInputs() &&
-        originMode == "planner" && planner.originPlace == null && !planner.originIsManual
+        originMode == "planner" && !planner.originIsManual
     LaunchedEffect(location, needsDefaultOrigin) {
         defaultOriginStatus = null
         if (!needsDefaultOrigin || location == null) return@LaunchedEffect
@@ -299,17 +300,17 @@ internal fun TransitOpeningScreen(
             }
         }
         try {
-            val fix = updates.first { update ->
+            updates.collect { update ->
                 val usable = update is LocationUpdate.Fix && location.containsPoint(update.point)
                 defaultOriginStatus = when (update) {
                     LocationUpdate.PermissionDenied -> "Location permission is off. Choose a starting point."
                     LocationUpdate.Unavailable -> "Location unavailable. Choose a starting point."
                     is LocationUpdate.Fix -> if (usable) null else "Outside the supported area. Choose a starting point."
                 }
-                usable
-            } as LocationUpdate.Fix
-            if (canChangeInputs() && originMode == "planner") {
-                plannerViewModel.setDefaultOrigin(Place("Current location", fix.point))
+                if (usable && canChangeInputs() && originMode == "planner") {
+                    timeout.cancel()
+                    plannerViewModel.setDefaultOrigin(Place("Current location", update.point))
+                }
             }
         } finally {
             timeout.cancel()
@@ -379,8 +380,16 @@ internal fun TransitOpeningScreen(
                     return@launch
                 }
 
+                val routingOrigin = if (liveMap && !planner.originIsManual) {
+                    val fresh = location?.awaitFreshFix()
+                    if (fresh == null || !location.containsPoint(fresh.point)) {
+                        fail(Trip33Failure.PermissionDenied, "Current location unavailable. Try again or choose a starting point.")
+                        return@launch
+                    }
+                    Place("Current location", fresh.point).also { plannerViewModel.setDefaultOrigin(it) }
+                } else planner.originPlace
                 val origin = planner.origin
-                if ((if (liveMap) planner.originPlace == null else origin == null) ||
+                if ((if (liveMap) routingOrigin == null else origin == null) ||
                     (sampleOutcome == Trip33Sample.PermissionDenied &&
                         !planner.originIsManual)
                 ) {
@@ -424,7 +433,7 @@ internal fun TransitOpeningScreen(
                     selectedZoneIds = zones.values.flatten().distinct().sortedBy { it.value },
                     selectedZonesByTransport = zones,
                     origin = origin?.copy(),
-                    originPlace = planner.originPlace,
+                    originPlace = routingOrigin,
                     walkingPreference = planner.walkingPreference,
                     bikeSpeedKmh = planner.bikeSpeedKmh,
                     roundTrip = planner.roundTrip
@@ -782,7 +791,7 @@ internal fun TransitOpeningScreen(
                     location.request { fix ->
                         if (originMode == "options" && canChangeInputs()) {
                             if (fix != null && location.containsPoint(fix.point)) {
-                                plannerViewModel.setOrigin(Place("Current location", fix.point))
+                                plannerViewModel.useCurrentOrigin(Place("Current location", fix.point))
                                 proposalJson = null
                                 clearValidation()
                                 originMode = "planner"

@@ -48,6 +48,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.UiComposable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalInspectionMode
@@ -440,8 +441,8 @@ private fun AndroidTransitMap(
                 } else MapInteractions.None,
                 overlay = {
                     val selectedOrigin = data.pin.takeIf { data.pickerOpen || data.centerOnPin }
-                    if (browsingPosition != null && browsingPosition != selectedOrigin) UserPointer(browsingPosition)
-                    data.userPosition?.let { UserPointer(it, -map.cameraPosition.bearing.toFloat()) }
+                    if (browsingPosition != null && browsingPosition != selectedOrigin) UserPointer(browsingPosition, session.movementHeading.degrees - map.cameraPosition.bearing.toFloat())
+                    data.userPosition?.let { UserPointer(it, session.movementHeading.degrees - map.cameraPosition.bearing.toFloat()) }
                     selectedOrigin?.let { OriginMarker(it) }
                     if (trip != null && map.style.loadState == StyleLoadState.Ready) {
                         DestinationMarker(trip.destination.point)
@@ -573,7 +574,7 @@ private fun TransitMapData.visibleMapPadding(height: Dp): DpPadding {
 @Composable
 private fun MapOverlayScope.UserPointer(point: GeoPoint, rotation: Float = 0f) {
     val pointer = painterResource(Res.drawable.map_user_pointer_marker)
-    Canvas(Modifier.placedAt(point.position()).size(36.dp)) {
+    Canvas(Modifier.placedAt(point.position()).zIndex(1f).size(36.dp)) {
         drawDirectedTripPointer(pointer, center, size.width, rotation)
     }
 }

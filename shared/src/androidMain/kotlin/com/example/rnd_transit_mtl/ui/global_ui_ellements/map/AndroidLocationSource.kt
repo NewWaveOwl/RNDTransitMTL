@@ -7,6 +7,8 @@ import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.os.Build
+import android.os.CancellationSignal
 import android.os.Bundle
 import android.os.Looper
 import android.os.SystemClock
@@ -50,6 +52,7 @@ internal class AndroidLocationSource(private val context: Context) : LocationSou
         }
         val manager = context.getSystemService(LocationManager::class.java)
         val registered = mutableListOf<String>()
+        val currentRequests = mutableListOf<CancellationSignal>()
         val recovery = LocationRecoveryPolicy(SystemClock.elapsedRealtime())
         fun reportIfUnavailable() {
             if (registered.none(manager::isProviderEnabled)) trySend(LocationUpdate.Unavailable)
@@ -79,7 +82,14 @@ internal class AndroidLocationSource(private val context: Context) : LocationSou
             for (provider in listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)) {
                 runCatching {
                     // A stationary device still needs fresh fixes, rather than appearing to lose GPS.
-                    manager.requestLocationUpdates(provider, 2_000L, 0f, listener, Looper.getMainLooper())
+                    manager.requestLocationUpdates(provider, 1_000L, 0f, listener, Looper.getMainLooper())
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && manager.isProviderEnabled(provider)) {
+                        val cancellation = CancellationSignal()
+                        currentRequests.add(cancellation)
+                        manager.getCurrentLocation(provider, cancellation, context.mainExecutor) { location ->
+                            if (location != null) listener.onLocationChanged(location)
+                        }
+                    }
                     registered.add(provider)
                 }
             }
@@ -96,6 +106,8 @@ internal class AndroidLocationSource(private val context: Context) : LocationSou
                 }
                 if (recovery.retryIfStalled(SystemClock.elapsedRealtime())) {
                     // Replace the stalled registrations in this same shared source.
+                    currentRequests.forEach { it.cancel() }
+                    currentRequests.clear()
                     manager.removeUpdates(listener)
                     registered.clear()
                     registerProviders()
@@ -104,6 +116,7 @@ internal class AndroidLocationSource(private val context: Context) : LocationSou
         }
         awaitClose {
             watchdog.cancel()
+            currentRequests.forEach { it.cancel() }
             manager.removeUpdates(listener)
         }
     }

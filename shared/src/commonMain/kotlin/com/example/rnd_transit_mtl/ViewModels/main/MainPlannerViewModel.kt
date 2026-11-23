@@ -116,12 +116,16 @@ class MainPlannerViewModel(
         }
     }
 
-    /** Installs the first usable fix while the planner still has no chosen origin. */
+    /** Keeps the automatic origin current without replacing a manually chosen point. */
     fun setDefaultOrigin(place: Place) {
         mutableUiState.update { state ->
-            if (state.originPlace != null || state.originIsManual) state
+            if (state.originIsManual) state
             else state.copy(origin = null, originPlace = place)
         }
+    }
+
+    fun useCurrentOrigin(place: Place) {
+        mutableUiState.update { it.copy(origin = null, originPlace = place, originIsManual = false) }
     }
 
     fun setOrigin(place: Place) {

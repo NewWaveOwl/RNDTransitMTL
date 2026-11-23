@@ -28,7 +28,7 @@ import kotlinx.coroutines.test.runTest
 /** Checks draft restoration and zone requests without geographic-routing assumptions. */
 class MainPlannerTest {
     @Test
-    fun deviceOriginKeepsTheFirstFixAndNeverReplacesAManualPin() {
+    fun deviceOriginFollowsLatestFixAndNeverReplacesAManualPin() {
         val planner = MainPlannerViewModel(MainPlannerState(origin = null))
         val firstFix = Place("Current location", GeoPoint(45.5019, -73.5673))
         val laterFix = Place("Current location", GeoPoint(45.51, -73.57))
@@ -36,7 +36,7 @@ class MainPlannerTest {
 
         planner.setDefaultOrigin(firstFix)
         planner.setDefaultOrigin(laterFix)
-        assertEquals(firstFix, planner.uiState.value.originPlace)
+        assertEquals(laterFix, planner.uiState.value.originPlace)
         assertFalse(planner.uiState.value.originIsManual)
 
         planner.setOrigin(manualPin)

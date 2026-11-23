@@ -96,6 +96,9 @@ internal class AndroidPlannerMapSession(private val context: Context) : PlannerL
     var locationAttempt by mutableIntStateOf(0)
         private set
 
+    private var requestedAtMillis = 0L
+    val movementHeading = com.example.rnd_transit_mtl.data.location.MovementHeading()
+
     fun receive(update: LocationUpdate) {
         if (update is LocationUpdate.Fix) {
             val result = jumpFilter.evaluate(update, System.currentTimeMillis()) ?: return
@@ -104,7 +107,10 @@ internal class AndroidPlannerMapSession(private val context: Context) : PlannerL
             uncertaintyMeters = fix?.let { retained ->
                 maxOf(update.accuracyMeters, retained.accuracyMeters) + retained.point.distanceMetersTo(update.point)
             }
-            if (result.accepted) complete(result.trustedFix)
+            if (result.accepted) {
+                result.trustedFix?.let { movementHeading.receive(it) }
+                if ((update.timestampEpochMillis ?: 0L) >= requestedAtMillis) complete(result.trustedFix)
+            }
         } else {
             complete(null)
         }
@@ -114,13 +120,13 @@ internal class AndroidPlannerMapSession(private val context: Context) : PlannerL
 
     override fun request(onResult: ((LocationUpdate.Fix?) -> Unit)?) {
         autoCenterPending = false
+        requestedAtMillis = System.currentTimeMillis()
         pendingResult = onResult ?: { result ->
             if (result != null && containsPoint(result.point)) recenter++
         }
         permitted = hasPermission()
         if (permitted) {
-            val currentFix = fix
-            if (currentFix != null) complete(currentFix) else locationAttempt++
+            locationAttempt++
         } else {
             askPermission()
         }
