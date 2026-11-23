@@ -19,7 +19,6 @@
             android:value="${generationEndpoint}" />
 
         <activity
-            android:launchMode="singleTask"
             android:exported="true"
             android:name=".MainActivity"
             android:theme="@style/Theme.RNDTransit.Startup">
