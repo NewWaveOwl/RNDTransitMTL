@@ -1,5 +1,7 @@
 # AI log index
 
+- TravelTracker shared integration (ML_4 workspace): [decisions and source prompts](../milestones/4/AI/TravelTracker-Addresses-AI-Decision-Log.md), [techniques](../milestones/4/AI/TravelTracker-Addresses-AI-Technique-Log.md)
+
 - [Milestone 1 / Sprint 1 usage](../milestones/1/AI/Sprint1-AI-Usage.md)
 - [Milestone 1 ideation discussions](../milestones/1/AI/AI-Ideation-Discussion-Logs.md)
 - Milestone 2 integration: [decisions](../milestones/2/AI/Milestone2-As3-Merge-AI-Decision-Log.md), [techniques](../milestones/2/AI/Milestone2-As3-Merge-AI-Technique-Log.md)

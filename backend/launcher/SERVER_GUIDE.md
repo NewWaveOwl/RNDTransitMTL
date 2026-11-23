@@ -176,6 +176,153 @@ graph. Missing credentials, runtimes, data and occupied ports produce setup erro
 For exo bus graphs, the included Prepare-ExoBusGraph.ps1 is the supported rebuild
 helper; it can also run on the server PC using the packaged runtime.
 
+## TravelTracker control window and addresses
+
+Click **TravelTracker window** in the existing RNDTransit Server application.
+This opens a second control window connected to the **same** controller, Ktor,
+OTP, bridge and tunnel. It does not start a second OTP process or load a second
+graph. Closing the TravelTracker window hides it; services keep running. Its
+**Stop shared server** and **Restart shared server** actions affect both apps and
+ask for confirmation. Exit from the main application also affects both apps.
+
+The window shows the shared service state, copyable API base URL and aggregate
+address/routing counters. Counters are read only from the local Ktor endpoint
+while the window is visible. Refreshing them does not send a Nominatim or OTP
+request. A ready backend does not prove that a particular address, journey,
+transit service date or external provider is available.
+
+Stop the server, then open **TravelTracker settings** in that window. If
+TravelTracker uses a different Supabase Auth project from RNDTransit, enter its
+**project origin** and **publishable key**. Leave both fields blank only when the
+two apps deliberately use the same project. Never enter a secret/service-role
+key. Existing RNDTransit credentials and tunnel settings are retained.
+
+The corresponding optional settings in `%LOCALAPPDATA%\RNDTransitServer\server.properties` are:
+
+```properties
+travelTrackerSupabaseUrl=https://YOUR-TRAVELTRACKER-PROJECT.supabase.co
+travelTrackerSupabaseKey=sb_publishable_YOUR-PUBLIC-KEY
+nominatimUrl=https://nominatim.openstreetmap.org
+nominatimUserAgent=TravelTracker/1.0 (+https://github.com/NewWaveOwl/TravelTracker)
+```
+
+Address lookup uses **Public Nominatim**, without installing Photon, Pelias,
+OpenSearch or a local address database. Its [usage policy](https://operations.osmfoundation.org/policies/nominatim/)
+requires a maximum of one request per second across all app users, application
+identification, OpenStreetMap attribution and appropriate caching. Autocomplete
+while typing is forbidden. Use explicit Search/Enter or user marker placement;
+never submit personal or confidential information. The backend queues address
+requests independently of routing, and the address field remains usable if the
+provider is unavailable. `nominatimUrl` lets the operator switch to a compatible
+Nominatim service without rebuilding TravelTracker; HTTPS is required remotely,
+with HTTP allowed only for a local loopback instance.
+
+### Where the Dev Tunnel address goes in TravelTracker
+
+Use the **existing** Microsoft tunnel ID in the main application's **Tunnel
+settings**. After startup, copy the **Public HTTPS** base URL from either window,
+for example `https://YOUR-ID-18088.use.devtunnels.ms`. Do not append
+`/v1/trips/generate`, and do not use the inspection URL, OTP port or bridge port.
+Both apps share the same public API port; no second tunnel is needed.
+
+On the computer running the TravelTracker Blazor frontend, set its
+`Services:Routing` setting. For a PowerShell launch:
+
+```powershell
+$env:Services__Routing = 'https://YOUR-ID-18088.use.devtunnels.ms'
+# Run the normal TravelTracker launcher from the TravelTracker repository.
+dotnet run --file scripts/StartSupabaseDev.cs
+```
+
+For a persistent local setting, run from the TravelTracker repository:
+
+```powershell
+dotnet user-secrets set 'Services:Routing' 'https://YOUR-ID-18088.use.devtunnels.ms' --project src/TravelTracker.Frontend
+```
+
+TravelTracker's server sends its signed-in user's token to the configured shared
+backend. Set `travelTrackerSupabaseUrl` and `travelTrackerSupabaseKey` on the
+Windows server to the project that issued that token. This configuration does
+not replace TravelTracker's six service URLs or change its database ownership.
+
+### Update an existing Windows server safely
+
+For this update, the dependency versions, bundled Java, OTP and bridge are
+unchanged. A smaller **JAR-only update ZIP** can update an already installed
+portable server without repackaging the OTP runtimes:
+
+~~~powershell
+# Development PC, from the RNDTransitMTL repository:
+.\backend\scripts\Package-TravelTrackerUpdate.ps1
+~~~
+
+This runs the backend/launcher tests and creates
+**backend/launcher/build/updates/TIMESTAMP/RNDTransitServer-TravelTracker-Update.zip**.
+Use **-SkipBuild** only after verifying the current installDist outputs yourself.
+The ZIP contains the launcher/backend JARs, SHA-256 manifest, apply/rollback
+script and this guide. It contains no graph, credentials, runtime or EXE.
+
+On the server PC, **stop services and exit the application, including the tray
+instance**, then extract that ZIP into a separate folder. From that folder:
+
+~~~powershell
+.\Apply-TravelTrackerUpdate.ps1 -ServerDirectory 'D:\Server\RNDTransitServer' -UpdateDirectory '.' -CheckOnly
+.\Apply-TravelTrackerUpdate.ps1 -ServerDirectory 'D:\Server\RNDTransitServer' -UpdateDirectory '.'
+~~~
+
+Replace the example with the folder containing your existing EXE. Check mode
+validates the payload checksums, existing JAR names and stopped state without
+writing files. Apply creates a new sibling backup of every replaced JAR, then
+replaces only those JARs. Exact dependency filename compatibility is required;
+otherwise use the complete portable-package alternative below. It never deletes
+directories, replaces the EXE/runtimes or touches imported data or LOCALAPPDATA.
+
+Reopen your existing EXE after success. For rollback, stop/exit again and use
+the exact backup path printed by the updater:
+
+~~~powershell
+.\Apply-TravelTrackerUpdate.ps1 -ServerDirectory 'D:\Server\RNDTransitServer' -RollbackDirectory 'D:\Server\RNDTransitServer-traveltracker-backup-TIMESTAMP'
+~~~
+
+If an older updater reports that `LiteralPath` is an empty string when started
+with `powershell -File`, supply `-UpdateDirectory` explicitly with the extracted
+update folder. This is a Windows PowerShell 5.1 parameter-default bug in the initial
+helper: it fails before backups or target writes. The corrected helper initializes
+the omitted default in its script body. Regression checks launch a fresh Windows
+PowerShell process to verify default-folder CheckOnly, apply and rollback.
+
+The developer's isolated updater checks are
+**.\backend\scripts\Test-TravelTrackerUpdate.ps1**: dry-check, scoped replacement,
+backup/rollback, corrupt payload, duplicate paths, path traversal and dependency
+mismatch. They use disposable fixture files under ignored launcher/build;
+they do not update a real server.
+
+**Complete portable-package alternative:**
+
+1. Build a new portable package on the development PC from the updated source,
+   using **Build the package on the development PC** below. Copy the full ZIP to
+   the server PC. The EXE alone does not contain the updated backend or libraries.
+2. In the running server, stop the shared services and exit the application,
+   including any tray instance. Both apps temporarily lose routing/address access.
+3. Back up `%LOCALAPPDATA%\RNDTransitServer\server.properties`. Keep its imported
+   `dataDirectory`, graph, feed credentials, caches and Microsoft CLI sign-in.
+   These are separate from the portable app and must not be deleted or replaced
+   by files from a package.
+4. Extract the **entire new ZIP into a new folder**. Keep the old portable folder
+   as a rollback copy. Do not overwrite an application that is still running.
+5. Start the new `RNDTransitServer.exe` as the same Windows user. It reads the
+   existing local settings and imported data. Do not repeat Setup / import or
+   rebuild the graph solely for this update. The packaged OTP version must still
+   match that graph.
+6. Open **TravelTracker window → TravelTracker settings**, configure its public
+   Auth identifiers if needed, then **Start shared server**. Confirm Bridge, OTP,
+   Ktor and the existing tunnel become ready. Set the displayed base URL in
+   TravelTracker as described above, then verify one address lookup and route
+   preview from TravelTracker.
+7. If the new application fails, stop/exit it before restarting the previous
+   portable EXE. Both versions must never supervise the same imported services
+   concurrently. The update makes no database or graph migration.
+
 ## Microsoft Dev Tunnels (Azure)
 
 This shares the server running on your PC; it does not deploy OTP/Ktor to an Azure

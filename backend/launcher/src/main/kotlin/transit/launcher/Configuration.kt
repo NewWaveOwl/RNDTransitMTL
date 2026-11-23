@@ -21,9 +21,14 @@ data class ServerConfig(
     val supabaseKey: String = "",
     val devtunnel: String = "",
     val devTunnelId: String = "rndtransit",
+    val travelTrackerSupabaseUrl: String = "",
+    val travelTrackerSupabaseKey: String = "",
+    val nominatimUrl: String = defaultNominatimUrl,
+    val nominatimUserAgent: String = defaultNominatimUserAgent,
 ) {
     /** Validates before any service is launched, including loopback tunnel authentication. */
     fun validate() {
+        validateTravelTrackerSettings()
         val ports = listOf(apiPort, otpPort, bridgePort) + if (tunnelMode in listOf("quick", "named")) listOf(metricsPort()) else emptyList()
         require(ports.all { it in 1024..65535 } && ports.distinct().size == ports.size) {
             "API, OTP, bridge and tunnel metrics ports must be different, between 1024 and 65535."
@@ -68,7 +73,9 @@ class ConfigStore(val home: Path) {
         return ServerConfig(Path.of(value("dataDirectory", home.resolve("data").toString())).toAbsolutePath(),
             number("apiPort", 18088), number("otpPort", 18085), number("bridgePort", 18086), number("otpMemoryMb", 4096),
             value("tunnelMode", "off"), value("cloudflared"), value("tunnelTokenFile"), value("publicAddress"),
-            value("supabaseUrl"), value("supabaseKey"), value("devtunnel"), value("devTunnelId", "rndtransit"))
+            value("supabaseUrl"), value("supabaseKey"), value("devtunnel"), value("devTunnelId", "rndtransit"),
+            value("travelTrackerSupabaseUrl"), value("travelTrackerSupabaseKey"),
+            value("nominatimUrl", defaultNominatimUrl), value("nominatimUserAgent", defaultNominatimUserAgent))
     }
 
     /** @param config Settings to replace atomically on the next Start/Restart. */
@@ -82,6 +89,9 @@ class ConfigStore(val home: Path) {
             setProperty("tunnelTokenFile", config.tunnelTokenFile); setProperty("publicAddress", config.publicAddress)
             setProperty("supabaseUrl", config.supabaseUrl); setProperty("supabaseKey", config.supabaseKey)
             setProperty("devtunnel", config.devtunnel); setProperty("devTunnelId", config.devTunnelId)
+            setProperty("travelTrackerSupabaseUrl", config.travelTrackerSupabaseUrl)
+            setProperty("travelTrackerSupabaseKey", config.travelTrackerSupabaseKey)
+            setProperty("nominatimUrl", config.nominatimUrl); setProperty("nominatimUserAgent", config.nominatimUserAgent)
         }
         val temporary = file.resolveSibling("server.properties.tmp")
         Files.newBufferedWriter(temporary).use { values.store(it, "RNDTransit Server. Restart after edits. See SERVER_GUIDE.md for tunnel setup.") }

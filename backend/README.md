@@ -1,5 +1,11 @@
 # Trip generation backend
 
+The API also serves TravelTracker address lookup and chosen-endpoint route previews.
+The Windows launcher's **TravelTracker** button opens a separate control window
+over the same services and tunnel. Public Nominatim supplies addresses; no local
+geocoder/database is installed. See [the shared contract](TravelTracker.md) and
+[Windows configuration/update instructions](launcher/SERVER_GUIDE.md).
+
 Kotlin/JVM 21 + Ktor 3.4.3. The Android app calls this service; OTP and the
 STM/exo bridge stay private.
 

@@ -63,6 +63,8 @@ class ServerWindow(private val store: ConfigStore, bundle: Path) : JFrame("RNDTr
     private val logs = JTextArea()
     private val controller: ServerController
     private val realtimePanel: RealtimeFeedsPanel
+    private var travelTrackerWindow: TravelTrackerWindow? = null
+    private var latestState = ServerState()
     private var tray: TrayIcon? = null
 
     init {
@@ -110,6 +112,7 @@ class ServerWindow(private val store: ConfigStore, bundle: Path) : JFrame("RNDTr
             add(button("Stop server") { controller.stop() })
             add(button("Restart / retry") { controller.restart() })
             add(button("Setup / import") { importData() })
+            add(button("TravelTracker window") { openTravelTracker() })
         })
         actions.add(JPanel(FlowLayout(FlowLayout.LEFT, 8, 0)).apply {
             add(button("Configuration") { openFile(store.file) })
@@ -128,6 +131,7 @@ class ServerWindow(private val store: ConfigStore, bundle: Path) : JFrame("RNDTr
 
     /** @param state Immutable service state published by the controller. */
     private fun render(state: ServerState) {
+        latestState = state
         statusLabels.forEach { (name, label) ->
             val status = state.services.getValue(name)
             label.text = status
@@ -137,6 +141,15 @@ class ServerWindow(private val store: ConfigStore, bundle: Path) : JFrame("RNDTr
         if (state.localAddress.isNotBlank()) local.text = state.localAddress
         public.text = state.publicAddress.ifBlank { "Public access is off / not connected" }
         realtimePanel.render(state.realtimeFeeds)
+        travelTrackerWindow?.render(state)
+    }
+
+    /** Opens an observer of the existing process owner, never another server instance. */
+    private fun openTravelTracker() {
+        val window = travelTrackerWindow ?: TravelTrackerWindow(this, store, controller).also { travelTrackerWindow = it }
+        window.render(latestState)
+        window.isVisible = true
+        window.toFront()
     }
 
     private fun editFeedCredentials() {
@@ -183,7 +196,7 @@ class ServerWindow(private val store: ConfigStore, bundle: Path) : JFrame("RNDTr
     private fun closeRequested() {
         if (!controller.active()) { controller.exit { exitProcess(0) }; return }
         val options = arrayOf("Stop services and exit", "Keep running in tray", "Cancel")
-        when (JOptionPane.showOptionDialog(this, "Your phone needs these services to plan trips. What should happen?", "Close server window",
+        when (JOptionPane.showOptionDialog(this, "RNDTransit and TravelTracker use these shared services. What should happen?", "Close server window",
             JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, options[2])) {
             0 -> controller.exit { exitProcess(0) }
             1 -> hideToTray()

@@ -231,7 +231,7 @@ class ServerController(
                 "OTP_CATALOGUE_URL" to "http://127.0.0.1:${settings.otpPort}/otp/gtfs/v1",
                 "FARE_ZONES_FILE" to store.home.resolve("cache/fare-zones-2026.geojson").toString(),
                 "SUPABASE_URL" to settings.supabaseUrl, "SUPABASE_PUBLISHABLE_KEY" to settings.supabaseKey,
-                "PUBLIC_API" to "${settings.tunnelMode != "off"}")
+                "PUBLIC_API" to "${settings.tunnelMode != "off"}") + settings.travelTrackerEnvironment()
             processes.start("Ktor", ktorCommand, store.home, environment)
             await("Ktor", 90) { readiness.check("http://127.0.0.1:${settings.apiPort}/health", valid = { Json.parseToJsonElement(it).jsonObject["status"]?.jsonPrimitive?.content == "ready" }) }
             service("Ktor", "Ready")
@@ -280,7 +280,7 @@ class ServerController(
     })
 
     private fun configureRedaction(settings: ServerConfig) {
-        val secrets = mutableListOf(settings.supabaseKey)
+        val secrets = mutableListOf(settings.supabaseKey, settings.travelTrackerSupabaseKey)
         for (name in listOf("stm-upstream.json", "exo-realtime.local.json", busCredentialsName)) {
             val file = settings.dataDirectory.resolve(name)
             if (Files.isRegularFile(file)) {

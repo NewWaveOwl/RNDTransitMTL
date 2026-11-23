@@ -27,8 +27,8 @@ import java.util.logging.Level
 import java.util.logging.Logger
 
 private const val fareSource="https://donnees.artm.quebec/catalogue/dataset/9b19ddd0-f10d-45b9-9cee-8896bacc012d/resource/88c53302-58f7-4d35-9231-dc3d48dce008/download/zone_tarifaire_2026.geojson"
-internal class Upstream : AutoCloseable {
-    private val client=HttpClient(OkHttp) { install(HttpTimeout) { requestTimeoutMillis=30_000; socketTimeoutMillis=30_000; connectTimeoutMillis=5_000 }; followRedirects=true }
+internal class Upstream(allowRedirects: Boolean = true) : AutoCloseable {
+    private val client=HttpClient(OkHttp) { install(HttpTimeout) { requestTimeoutMillis=30_000; socketTimeoutMillis=30_000; connectTimeoutMillis=5_000 }; followRedirects=allowRedirects }
     suspend fun request(url: String, body: JsonObject?=null, headers: Map<String,String> = emptyMap()): HttpResponse {
         require(URI(url).scheme in listOf("http","https")) { "Endpoint must use HTTP(S)." }
         return client.request(url) { method=if(body==null) HttpMethod.Get else HttpMethod.Post
@@ -186,7 +186,7 @@ fun main() {
         val generator=Generator(routes,zones,{ body -> upstream.json(endpoint,body) })
         val api=Api(generator, authorize = { token ->
             if(!authenticated) "local-guest" else if(token?.startsWith("Bearer ")!=true) null else {
-                val response=withTimeout(5000) { upstream.request(URI(supabase).resolve("/auth/v1/user").toString(),headers=mapOf("Authorization" to token,"apikey" to key!!)) }
+                val response=withTimeout(5000) { upstream.request(URI(supabase).resolve("/auth/v1/user").toString(),headers=mapOf("Authorization" to token,"apikey" to key)) }
                 if(response.status.value in listOf(401,403)) null else {
                     if(!response.status.isSuccess()) throw ProviderError("Authentication service unavailable.",httpStatus=response.status.value)
                     // This ID comes from the authenticated /user response, never unverified JWT claims.
@@ -196,7 +196,20 @@ fun main() {
                 }
             }
         })
-        println("Trip generation ready at http://$host:$port (Kotlin/Ktor; random geographic destinations).")
-        embeddedServer(CIO,port=port,host=host) { generationRoutes(api) }.start(wait=true)
+        Upstream(allowRedirects = false).use { travelUpstream ->
+            NominatimHttp(env("NOMINATIM_URL", "https://nominatim.openstreetmap.org"),
+                env("NOMINATIM_USER_AGENT", "TravelTracker/1.0 (+https://github.com/NewWaveOwl/TravelTracker)")).use { addressHttp ->
+                val addressService = NominatimAddresses(addressHttp::fetch)
+                val (trackerProject, trackerKey) = travelTrackerProject(System.getenv("TRAVELTRACKER_SUPABASE_URL"),
+                    System.getenv("TRAVELTRACKER_SUPABASE_KEY"), supabase, key)
+                val trackerApi = TravelTrackerApi(addressService, TravelTrackerPlanner { body -> upstream.json(endpoint, body) },
+                    travelTrackerSession(trackerProject, trackerKey, travelUpstream))
+                println("Shared routing and TravelTracker address service ready at http://$host:$port.")
+                embeddedServer(CIO,port=port,host=host) {
+                    generationRoutes(api)
+                    travelTrackerRoutes(trackerApi)
+                }.start(wait=true)
+            }
+        }
     }
 }

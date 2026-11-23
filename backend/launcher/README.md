@@ -19,6 +19,11 @@ separate from realtime freshness.
 
 Start with [SERVER_GUIDE.md](SERVER_GUIDE.md) for second-PC setup, imports, ports,
 authentication, tunnel settings, Android endpoint configuration and packaging.
+The main window's **TravelTracker window** opens a second view of the same
+controller and shared services. Its address/routing counters are aggregate-only;
+closing that window hides it. See [TravelTracker setup and portable server updates](SERVER_GUIDE.md#traveltracker-control-window-and-addresses)
+for Public Nominatim settings, optional separate TravelTracker Auth configuration,
+where to put the Dev Tunnel base URL and preserving the existing imported stack.
 Run `gradlew -p backend :launcher:test :launcher:installDist` to build independently
 of Android. The main class is `transit.launcher.LauncherKt`. Development runs may
 set `-Drnd.server.home=<state-directory>` and `-Drnd.server.bundle=<app-image>`;
