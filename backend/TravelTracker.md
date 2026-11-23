@@ -141,3 +141,30 @@ modify the actual Windows server or test live authenticated tunnel requests.
 Apply to the stopped existing portable app using the
 [update/rollback commands](launcher/SERVER_GUIDE.md), with an explicit
 `-UpdateDirectory` pointing to the extracted files.
+
+## Verified regional map package
+
+The wider Montreal-to-Trois-Rivieres map is supplied separately:
+`backend/launcher/build/updates/TravelTracker-RegionalMap-20261123/TravelTracker-Montreal-TroisRivieres-Map.zip`.
+Size: 276,912,512 bytes. SHA-256:
+`49240965425E623F4C231C824566023BA5D7E5AEE512CE3C4A080E5646E2E9C5`.
+Its 355,888,004-byte graph has SHA-256
+`7C6D4D4B9CE65C50E1005DF545CB4129D753614B19AEE2455A62A002B156AF19`.
+All 34 payload files were verified; the archive includes the exact regional OSM
+source, ODbL attribution/terms, extraction recipe, build manifest and route proof.
+
+Private OTP checks generated a real outbound car route of 137,371.89 metres /
+5,462 seconds and a return route of 136,972.46 metres / 5,413 seconds. All five
+mode samples and 12 total candidates passed production-adapter replay. Actual
+car geometry passed frontend validation through simulated HTTP and an isolated
+test session. The latest verifier gate passed 143 backend and 60 launcher tests,
+with no failures, errors, skips or compiler warnings. The runtime ZIP remains
+the separately validated `7ca9005` build; the six new numeric-evidence tests and
+verifier correction in `7ca4693` do not change its runtime JARs.
+
+Read [the map provenance, verification and installation limits](CarTransitPreviews.md#verified-montreal-to-trois-rivieres-regional-map)
+and the archive's `README.md` before importing. It retains the original STM and
+EXO_TRAINS schedules; verify their hashes against the server and rebuild first
+if additional feeds are installed. Use a new staging copy and a new empty import
+destination while stopped, preserving the old data folder for rollback. The
+actual target server and authenticated tunnel were not updated or tested.

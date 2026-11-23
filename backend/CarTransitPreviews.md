@@ -69,7 +69,7 @@ Raw request/response and private OTP logs are retained in the ignored
 deterministic regression cases cover both out-of-bounds endpoints, disconnected
 car routing, unknown-error preservation and the authenticated HTTP 200/503
 distinction. Existing cancellation and request-capacity behavior is unchanged.
-The final `gradlew.bat -p backend test installDist :launcher:installDist --console=plain`
+The runtime update's `gradlew.bat -p backend test installDist :launcher:installDist --console=plain`
 gate passed all 137 backend and 60 launcher tests, with zero
 failures, errors or skips and no compiler warnings. The five additions raise the
 backend baseline from 132; four failed against the old mapper before the fix.
@@ -78,6 +78,68 @@ The global loaded service-date union is reported with inclusive calendar dates
 and raw exclusive timestamp bounds. It is **not** used as a blanket road validity
 period or a per-feed/weekday guarantee. Unavailable dates are classified from the
 actual router response, preserving legitimate cross-midnight journeys.
+
+## Verified Montreal to Trois-Rivieres regional map
+
+A wider map is now prepared separately from the runtime update:
+`backend/launcher/build/updates/TravelTracker-RegionalMap-20261123/TravelTracker-Montreal-TroisRivieres-Map.zip`.
+It is 276,912,512 bytes, SHA-256
+`49240965425E623F4C231C824566023BA5D7E5AEE512CE3C4A080E5646E2E9C5`.
+All 34 payload files were verified against the extracted archive's manifest;
+archive paths use forward slashes. This data package extends the verified street
+corridor while the separate `TravelTracker-Coverage-20261123` JAR update fixes
+misreported coverage errors.
+
+The new graph is 355,888,004 bytes, SHA-256
+`7C6D4D4B9CE65C50E1005DF545CB4129D753614B19AEE2455A62A002B156AF19`.
+It was built in 214 seconds with OTP 2.10.0 from the retained STM and EXO_TRAINS
+schedule archives, whose hashes match the original inputs, and a new street
+extract. It contains no additional transit feeds.
+
+The OSM input comes from Geofabrik's Quebec extract dated 2026-11-22, SHA-256
+`DFC965D376B2CB55EF64E656E2FFAB3C8AA5915F06BB334F1A9D8D1951D5EE98`.
+Osmium 1.19.1 selected west -74.6, south 45.0, east -72.05, north 46.7 using
+the smart strategy with restriction/multipolygon relations and restriction/street
+tags. Complete-way references were checked with zero missing way nodes. The exact
+regional input is bundled as `region.osm.pbf`: 156,408,049 bytes, SHA-256
+`80D8C65E84618ACB7A5A4BF73937405507C4AC0AEC18032FA83420051E293818`.
+The archive includes source/download records, the extraction recipe, build
+manifest and OpenStreetMap attribution/ODbL terms. The selection box describes
+the input region; it does not guarantee every location has a connected road.
+
+Private OTP processes using the new graph verified both intercity directions:
+
+| CAR journey | Distance (metres) | Estimated duration (seconds) |
+| --- | ---: | ---: |
+| Montreal to Trois-Rivieres | 137,371.89 | 5,462 |
+| Trois-Rivieres to Montreal | 136,972.46 | 5,413 |
+
+The outbound capture also passed the existing local WALK, BICYCLE, BUS and RAIL
+samples: five modes, 11 candidates. Production-adapter replay passed those 11
+and the return car candidate using verifier commit
+`7ca4693d3475cda887876ce0d023f323232d4e02`. That test-tool follow-up compares
+finite JSON numbers by value, so equivalent coordinate spellings do not cause
+false replay failures; altered endpoints, numeric strings and missing values
+remain rejected. The latest gate passed 143 backend and 60 launcher tests, with
+zero failures, errors, skips or compiler warnings. Runtime source and the JAR
+update remain at `7ca9005`; the verifier change requires no runtime ZIP rebuild.
+
+The actual outbound/return car geometry also passed the production frontend's
+HTTP contract and endpoint validation through simulated HTTP and an isolated
+test session: 9,131 characters/3,181 points outbound and 9,371/3,286 return.
+This verifies real provider geometry acceptance, not a real account, browser
+interaction or authenticated tunnel journey. Retained raw evidence and manifests
+are under `backend/build/routing-evidence/Montreal-TroisRivieres-20261123/` and
+inside the map archive. Both owned OTP processes were stopped automatically.
+
+To install, follow the archive's `README.md` while the server is stopped. Verify
+the graph and current STM/EXO schedule hashes before copying the current prepared
+data folder into a new staging folder and replacing the graph there. Keep private
+feed settings in that staging copy, then use Setup/import with a new empty
+destination. A server with additional exo bus feeds needs a graph rebuilt with
+those feeds before import. Preserve the previous data folder for rollback.
+The target server was not updated and its real user/tunnel journey remains
+unverified; no live realtime feeds were tested.
 
 ## Candidate and leg details
 
