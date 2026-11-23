@@ -32,15 +32,47 @@ Known empty-routing responses have a public reason:
 
 | Reason | Meaning |
 | --- | --- |
+| outside_coverage | OTP returned OUTSIDE_BOUNDS for an endpoint outside its loaded street graph. |
 | outside_service_period | The router reported the requested service period unavailable. |
 | location_not_found | The router could not match a selected location. |
 | no_stops_in_range | No suitable transit stops were in the allowed access range. |
-| no_route | No candidate matched the requested endpoints, mode and time. |
+| no_route | No candidate matched the requested endpoints, mode and time, including NO_DIRECT_MODE_CONNECTION for disconnected street routing. |
 
 Success has reason null. Unexpected GraphQL/routing errors, malformed geometry,
 impossible stops/times, timeouts and provider outages remain sanitized HTTP 503.
 Invalid caller fields remain HTTP 400. Caller cancellation propagates. These
 outcomes do not write or replace a saved trip.
+
+### Montreal to Trois-Rivieres coverage correction
+
+On 2026-11-23, an isolated copy of the existing Montreal graph returned
+`OUTSIDE_BOUNDS` for the destination of a CAR request from 45.5088,-73.5686 to
+46.3432,-72.5477 in 195 ms. The adapter had omitted this normal OTP 2.10 routing
+code from its no-route allowlist and incorrectly turned it into HTTP 503.
+It now returns HTTP 200 with `status: no_route`, `reason: outside_coverage` and
+an empty itinerary list. The live routing-error enum also confirmed
+`NO_DIRECT_MODE_CONNECTION`, which now remains a normal no-route result. Unknown
+errors and real provider failures still return 503; no timeout was increased.
+
+The correction makes the cause visible; it cannot add missing roads. To generate
+this journey, the server needs a graph built from OSM data covering Montreal,
+Trois-Rivieres and the connecting roads. Use a wider regional extract with
+[Prepare-TravelTrackerOtp.ps1](scripts/Prepare-TravelTrackerOtp.ps1) in a new
+directory, retaining the existing STM/EXO GTFS feeds. Validate the resulting graph
+with a CAR case for the actual endpoints, then follow the stopped-server
+backup/import procedure in [SERVER_GUIDE.md](launcher/SERVER_GUIDE.md). Replacing
+application JARs alone preserves the old graph and cannot extend its coverage.
+
+The original graph and remote server were not changed for this reproduction.
+Raw request/response and private OTP logs are retained in the ignored
+`backend/build/routing-evidence/long-car-20261123/` directory. Five added
+deterministic regression cases cover both out-of-bounds endpoints, disconnected
+car routing, unknown-error preservation and the authenticated HTTP 200/503
+distinction. Existing cancellation and request-capacity behavior is unchanged.
+The final `gradlew.bat -p backend test installDist :launcher:installDist --console=plain`
+gate passed all 137 backend and 60 launcher tests, with zero
+failures, errors or skips and no compiler warnings. The five additions raise the
+backend baseline from 132; four failed against the old mapper before the fix.
 
 The global loaded service-date union is reported with inclusive calendar dates
 and raw exclusive timestamp bounds. It is **not** used as a blanket road validity

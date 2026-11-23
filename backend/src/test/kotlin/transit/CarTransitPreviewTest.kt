@@ -183,6 +183,44 @@ class CarTransitPreviewTest {
         assertEquals("no_route", result["status"].text())
     }
 
+    @Test fun carDestinationOutsideTheLoadedStreetGraphIsCoverageRatherThanAnOutage() = runBlocking {
+        val longRequest = JsonObject(request() + ("destination" to obj("lat" to 46.3432, "lon" to -72.5477)))
+        val planner = TravelTrackerPlanner(capabilities()) { query ->
+            assertEquals(46.3432, query["variables"].field("destinationLat").number()!!, 0.0)
+            // Exact routing error observed from the Montreal graph for Montreal to Trois-Rivieres.
+            obj("data" to obj("planConnection" to obj("routingErrors" to listOf(
+                obj("code" to "OUTSIDE_BOUNDS", "inputField" to "TO")), "edges" to emptyList<Any>())))
+        }
+        val result = planner.plan(longRequest)
+        assertEquals("no_route", result["status"].text())
+        assertEquals("outside_coverage", result["reason"].text())
+        assertTrue(result["itineraries"].items().isEmpty())
+        assertEquals("America/Toronto", result["timeZone"].text())
+        assertEquals("2026-11-23T10:00-05:00", result["requestedDepartureTime"].text())
+    }
+
+    @Test fun originOutsideTheStreetGraphIsAlsoReportedAsCoverage() = runBlocking {
+        val raw = obj("data" to obj("planConnection" to obj("routingErrors" to listOf(
+            obj("code" to "OUTSIDE_BOUNDS", "inputField" to "FROM")), "edges" to emptyList<Any>())))
+        val result = TravelTrackerPlanner { raw }.plan(request())
+        assertEquals("no_route", result["status"].text())
+        assertEquals("outside_coverage", result["reason"].text())
+        assertTrue(result["itineraries"].items().isEmpty())
+    }
+
+    @Test fun disconnectedCarRoadsAreNoRouteRatherThanAProviderOutage() = runBlocking {
+        val result = TravelTrackerPlanner { noRoute("NO_DIRECT_MODE_CONNECTION") }.plan(request())
+        assertEquals("no_route", result["status"].text())
+        assertEquals("no_route", result["reason"].text())
+        assertTrue(result["itineraries"].items().isEmpty())
+    }
+
+    @Test fun outsideCoverageDoesNotHideAnAdditionalUnknownProviderError() = runBlocking {
+        val raw = obj("data" to obj("planConnection" to obj("routingErrors" to listOf(
+            obj("code" to "OUTSIDE_BOUNDS"), obj("code" to "INTERNAL_FAILURE")), "edges" to emptyList<Any>())))
+        rejectsProvider(raw, "car")
+    }
+
     @Test fun unknownRoutingErrorCannotBecomeAMisleadingNoRouteSuccess() = runBlocking {
         rejectsProvider(noRoute("INTERNAL_FAILURE"))
     }

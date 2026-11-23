@@ -22,7 +22,8 @@ internal class TravelTrackerPlanner(
     val requests = AtomicLong()
     private val supported = mapOf("pedestrian" to "WALK", "bike" to "BICYCLE", "car" to "CAR", "bus" to "BUS", "train" to "RAIL")
     private val noRouteCodes = setOf("NO_STOPS_IN_RANGE", "NO_TRANSIT_CONNECTION", "NO_TRANSIT_CONNECTION_IN_SEARCH_WINDOW",
-        "OUTSIDE_SERVICE_PERIOD", "LOCATION_NOT_FOUND", "WALKING_BETTER_THAN_TRANSIT", "NO_ROUTES_FOUND")
+        "OUTSIDE_SERVICE_PERIOD", "LOCATION_NOT_FOUND", "WALKING_BETTER_THAN_TRANSIT", "NO_ROUTES_FOUND",
+        "OUTSIDE_BOUNDS", "NO_DIRECT_MODE_CONNECTION")
 
     /** @return Authenticated, live router metadata, independent of address lookup and saved trips. */
     suspend fun capabilities(): JsonObject = capabilitySource?.read() ?: throw ProviderError("Router capability metadata is unavailable.")
@@ -184,6 +185,7 @@ internal class TravelTrackerPlanner(
                 "timingBasis" to if (!transit) "estimated" else if (realTime) "realtime" else "scheduled", "legs" to legs)
         }
         val reason = if (itineraries.isNotEmpty()) null else when {
+            "OUTSIDE_BOUNDS" in codes -> "outside_coverage"
             "OUTSIDE_SERVICE_PERIOD" in codes -> "outside_service_period"
             "LOCATION_NOT_FOUND" in codes -> "location_not_found"
             "NO_STOPS_IN_RANGE" in codes -> "no_stops_in_range"

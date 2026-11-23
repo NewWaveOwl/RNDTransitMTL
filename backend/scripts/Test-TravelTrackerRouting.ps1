@@ -131,7 +131,7 @@ try {
         if ($null -eq $connection -or $null -eq $connection.edges -or $null -eq $connection.routingErrors) {
             throw 'OTP omitted route candidates or routing errors; this is not verified routing evidence.'
         }
-        $knownNoRoute = @('NO_STOPS_IN_RANGE', 'NO_TRANSIT_CONNECTION', 'NO_TRANSIT_CONNECTION_IN_SEARCH_WINDOW', 'OUTSIDE_SERVICE_PERIOD', 'LOCATION_NOT_FOUND', 'WALKING_BETTER_THAN_TRANSIT', 'NO_ROUTES_FOUND')
+        $knownNoRoute = @('NO_STOPS_IN_RANGE', 'NO_TRANSIT_CONNECTION', 'NO_TRANSIT_CONNECTION_IN_SEARCH_WINDOW', 'OUTSIDE_SERVICE_PERIOD', 'LOCATION_NOT_FOUND', 'WALKING_BETTER_THAN_TRANSIT', 'NO_ROUTES_FOUND', 'OUTSIDE_BOUNDS', 'NO_DIRECT_MODE_CONNECTION')
         if (@($connection.routingErrors | Where-Object { $_.code -notin $knownNoRoute }).Count) {
             throw 'OTP returned an unknown routing error; do not interpret provider failure as no route.'
         }

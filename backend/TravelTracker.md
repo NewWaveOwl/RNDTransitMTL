@@ -39,6 +39,12 @@ encoded-polyline `geometry`, optional `routeName`, `realtime`. Timing basis is
 `estimated` for street routes, `scheduled` for timetable-only transit and `realtime`
 when actual estimated leg timestamps are present. No live road traffic is claimed.
 Imported graph permissions and schedule dates determine available routes.
+An endpoint outside the loaded street graph returns HTTP 200 with
+`status: no_route` and `reason: outside_coverage`; it is not a service outage.
+Disconnected direct-mode streets likewise return `no_route`. A wider OSM graph
+is required to extend car routing beyond the imported Montreal area; changing
+request timeouts or updating application JARs does not add missing roads. See
+[the reproduced Montreal to Trois-Rivieres case](CarTransitPreviews.md#montreal-to-trois-rivieres-coverage-correction).
 
 Invalid input is 400; rejected Auth is 401; provider errors/timeouts/capacity are
 503. Known backoff includes `Retry-After` and `retryAfterSeconds`. Responses use
