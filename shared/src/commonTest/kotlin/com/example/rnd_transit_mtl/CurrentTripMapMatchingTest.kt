@@ -20,7 +20,7 @@ class CurrentTripMapMatchingTest {
     }
 
     @Test
-    fun weakGpsSnapsToTheCurrentLegWhileKeepingRawGpsAndConfirmedProgressSeparate() {
+    fun weakGpsRetainsTheSharedTrustedPointAndRawDiagnosticsWithoutChangingProgress() {
         var now = 50_000L
         val trip = walkingTrip(listOf(GeoPoint(45.5, -73.6), GeoPoint(45.505, -73.6)))
         val store = TripsStore { now }.also { it.start(trip) }
@@ -35,8 +35,9 @@ class CurrentTripMapMatchingTest {
         assertEquals(TripLocationAvailability.LowAccuracy, model.state.value.availability)
         val displayed = assertNotNull(model.state.value.displayedPosition)
         assertEquals(-73.6, displayed.longitude, 0.000001)
-        assertEquals(45.5003, displayed.latitude, 0.000001)
-        assertTrue(assertNotNull(model.state.value.displayedProgress) > confirmed)
+        assertEquals(45.5002, displayed.latitude, 0.000001)
+        assertEquals(confirmed, model.state.value.displayedProgress)
+        assertNull(model.state.value.matchedPosition)
         assertTrue(assertNotNull(model.state.value.uncertaintyRadiusMeters) >= coarse.accuracyMeters + coarse.point.distanceMetersTo(displayed) - 0.01)
         assertEquals(confirmed, store.progress)
         val weakRadius = assertNotNull(model.state.value.uncertaintyRadiusMeters)
@@ -65,8 +66,8 @@ class CurrentTripMapMatchingTest {
         model.receive(LocationUpdate.Fix(GeoPoint(45.5001, -73.6), 5.0, now))
         now += 6_000
         model.receive(LocationUpdate.Fix(GeoPoint(45.50015, -73.59975), 80.0, now))
-        assertEquals(-73.6, assertNotNull(model.state.value.matchedPosition).longitude, 0.000001)
-        assertTrue(assertNotNull(model.state.value.matchedProgress) < 0.15f)
+        assertEquals(GeoPoint(45.5001, -73.6), model.state.value.displayedPosition)
+        assertNull(model.state.value.matchedPosition)
         val geometry = TripRouteGeometry(trip)
         assertNull(geometry.matchOnLeg(GeoPoint(45.5002, -73.59985), 0, 0.5f, 0.5f, 500.0, 100.0),
             "Equally plausible distant branches must not be forced onto the route")
@@ -82,7 +83,7 @@ class CurrentTripMapMatchingTest {
         val confirmed = store.progress
         now += 3_000
         model.receive(LocationUpdate.Fix(GeoPoint(45.5011, -73.5999), 80.0, now))
-        val matched = assertNotNull(model.state.value.matchedProgress)
+        val matched = assertNotNull(model.state.value.displayedProgress)
         assertTrue(matched < 1f / 3f, "Only reliable GPS may confirm entering the bus leg")
         assertEquals(confirmed, store.progress)
         now += 3_000
@@ -99,7 +100,7 @@ class CurrentTripMapMatchingTest {
         walkModel.receive(LocationUpdate.Fix(GeoPoint(45.5009, -73.6), 5.0, now))
         now += 3_000
         walkModel.receive(LocationUpdate.Fix(walk.destination.point, 80.0, now))
-        assertTrue(assertNotNull(walkModel.state.value.matchedProgress) < 1f)
+        assertTrue(assertNotNull(walkModel.state.value.displayedProgress) < 1f)
         assertTrue(walkStore.completedTrips.isEmpty())
         now++
         walkModel.receive(LocationUpdate.Fix(walk.destination.point, 5.0, now))

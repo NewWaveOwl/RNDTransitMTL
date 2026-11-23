@@ -42,7 +42,12 @@ internal class LocationJumpFilter {
     private var lastResult: Result? = null
     private val confirmation = LocationCandidateConfirmation()
 
-    data class Result(val reading: LocationUpdate.Fix, val accepted: Boolean, val relocated: Boolean = false)
+    data class Result(
+        val reading: LocationUpdate.Fix,
+        val accepted: Boolean,
+        val relocated: Boolean = false,
+        val trustedFix: LocationUpdate.Fix? = null,
+    )
 
     fun useMaximumSpeed(owner: Any, metersPerSecond: Double) {
         speedOwner = owner
@@ -81,7 +86,7 @@ internal class LocationJumpFilter {
                 anchorTime = time
             }
         }
-        return Result(fix, accepted, relocated).also { lastResult = it }
+        return Result(fix, accepted, relocated, acceptedFix).also { lastResult = it }
     }
 
     companion object {

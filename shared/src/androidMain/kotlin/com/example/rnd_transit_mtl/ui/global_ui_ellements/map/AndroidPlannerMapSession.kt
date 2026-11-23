@@ -100,11 +100,11 @@ internal class AndroidPlannerMapSession(private val context: Context) : PlannerL
         if (update is LocationUpdate.Fix) {
             val result = jumpFilter.evaluate(update, System.currentTimeMillis()) ?: return
             accuracyMonitor.receive(update)
-            if (result.accepted) fix = update
+            fix = result.trustedFix
             uncertaintyMeters = fix?.let { retained ->
                 maxOf(update.accuracyMeters, retained.accuracyMeters) + retained.point.distanceMetersTo(update.point)
             }
-            if (result.accepted) complete(update)
+            if (result.accepted) complete(result.trustedFix)
         } else {
             complete(null)
         }

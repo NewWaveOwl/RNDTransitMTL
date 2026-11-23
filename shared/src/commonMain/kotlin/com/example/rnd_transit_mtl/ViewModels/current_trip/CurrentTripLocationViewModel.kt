@@ -3,7 +3,6 @@ package com.example.rnd_transit_mtl.ViewModels.current_trip
 import androidx.lifecycle.ViewModel
 import com.example.rnd_transit_mtl.data.location.LocationUpdate
 import com.example.rnd_transit_mtl.data.location.LocationJumpFilter
-import com.example.rnd_transit_mtl.data.location.LocationCandidateConfirmation
 import com.example.rnd_transit_mtl.data.location.LOCATION_FIX_MAX_AGE_MILLIS
 import com.example.rnd_transit_mtl.data.location.LOCATION_UPDATE_TIMEOUT_MILLIS
 import com.example.rnd_transit_mtl.model.geo.GeoPoint
@@ -73,15 +72,9 @@ internal class CurrentTripLocationViewModel(
     private var motionLegIndex: Int? = null
     private var velocityMetersPerSecond = 0.0
     private var anchorProgress: Float? = null
-    private var matchReferenceProgress: Float? = null
-    private var matchReferenceAt: Long? = null
-    private var matchingVelocity = 0.0
-    private var lastReliableOnRoute: Boolean? = null
     private var lastProgressAt: Long? = null
     private data class ProgressRecovery(val point: GeoPoint, val progress: Float, val time: Long)
     private var progressRecovery: ProgressRecovery? = null
-    private val unmatchedConfirmation = LocationCandidateConfirmation()
-    private var unmatchedPositionConfirmed = false
     private val restoredProgress = tripsStore.state.value.activeTrip
         ?.takeIf { it.trip.id == trip.id }?.routeProgress
     private var previousProgress = restoredProgress ?: 0f
@@ -120,7 +113,6 @@ internal class CurrentTripLocationViewModel(
             is LocationUpdate.Fix -> receiveFix(update)
             LocationUpdate.PermissionDenied -> {
                 clearMotion()
-                matchingVelocity = 0.0
                 mutableState.value = withUncertainty(mutableState.value.copy(availability = TripLocationAvailability.PermissionDenied))
             }
             // Provider outages use the same grace period, retaining the last good position.
@@ -140,43 +132,21 @@ internal class CurrentTripLocationViewModel(
         lastReadingAt = measuredAt
         val decision = jumpFilter.evaluate(fix, now) ?: return
         if (!decision.accepted) {
-            holdPosition(fix)
+            holdPosition(fix, decision.trustedFix?.point)
             return
         }
         if (decision.relocated) clearMotion()
         if (fix.accuracyMeters > TripLocationMaximumAccuracyMeters) {
-            // A fresh coarse reading means location is updating, but cannot confirm route progress.
-            val matched = matchWeakReading(fix, measuredAt)
-            if (matched == null && mutableState.value.displayedPosition?.distanceMetersTo(fix.point)?.let { it > 10.0 } == true &&
-                lastReliableOnRoute != false && !unmatchedPositionConfirmed && !decision.relocated &&
-                !unmatchedConfirmation.add(fix, measuredAt, maximumSpeed(routeGeometry.legIndexAt(previousProgress)))) {
-                holdPosition(fix)
-                return
-            }
-            unmatchedPositionConfirmed = matched == null
-            if (matched != null) unmatchedConfirmation.clear()
-            clearMotion()
-            mutableState.value = withUncertainty(CurrentTripLocationState(
-                fix, TripLocationAvailability.LowAccuracy,
-                matchedPosition = matched?.let { routeGeometry.pointAt(it.progress) },
-                matchedProgress = matched?.progress,
-            ))
-            if (matched != null) {
-                matchReferenceProgress = matched.progress
-                matchReferenceAt = measuredAt
-            }
+            // Both maps use the shared trusted measurement; weak GPS never pulls the marker onto a route.
+            holdPosition(fix, decision.trustedFix?.point)
             return
         }
         lastFixAt = measuredAt
-        unmatchedConfirmation.clear()
-        unmatchedPositionConfirmed = false
         val matched = trip.routePosition(fix.point, previousProgress)
         val onRoute = matched != null && matched.distanceFromRouteMeters <= TripRouteToleranceMeters
-        lastReliableOnRoute = onRoute
         mutableState.value = withUncertainty(CurrentTripLocationState(fix, TripLocationAvailability.Available, !onRoute))
         if (!onRoute) {
             clearMotion()
-            matchingVelocity = 0.0
             if (decision.relocated) hasObservedRoute = false
             return
         }
@@ -203,9 +173,6 @@ internal class CurrentTripLocationViewModel(
         }
         progressRecovery = null
         recordMotion(fix, matched.progress, measuredAt)
-        matchingVelocity = velocityMetersPerSecond
-        matchReferenceProgress = matched.progress
-        matchReferenceAt = measuredAt
         var progress = matched.progress
         val atDestination = fix.point.distanceMetersTo(trip.destination.point) <= TripArrivalToleranceMeters
         if (progress >= 0.98f && atDestination && hasObservedRoute) progress = 1f
@@ -217,16 +184,16 @@ internal class CurrentTripLocationViewModel(
         tripsStore.updateRouteProgress(trip.id, progress)
     }
 
-    private fun holdPosition(fix: LocationUpdate.Fix) {
+    private fun holdPosition(fix: LocationUpdate.Fix, trustedPosition: GeoPoint? = null) {
         val current = mutableState.value
         clearMotion()
-        matchingVelocity = 0.0
         mutableState.value = withUncertainty(CurrentTripLocationState(
             fix = fix,
-            availability = TripLocationAvailability.LastKnown,
+            availability = if (fix.accuracyMeters > TripLocationMaximumAccuracyMeters)
+                TripLocationAvailability.LowAccuracy else TripLocationAvailability.LastKnown,
             offRoute = current.offRoute,
-            retainedPosition = current.displayedPosition ?: jumpFilter.acceptedFix?.point,
-            retainedProgress = current.displayedProgress ?: previousProgress,
+            retainedPosition = trustedPosition ?: jumpFilter.acceptedFix?.point ?: current.displayedPosition,
+            retainedProgress = previousProgress,
         ))
     }
 
@@ -246,18 +213,6 @@ internal class CurrentTripLocationViewModel(
         val nextLeg = (legIndex + 1).takeIf { it < trip.legs.size && remaining <= 30.0 }
         return maxOf(maximumSpeed(legIndex), nextLeg?.let(::maximumSpeed) ?: 0.0)
     }
-
-    private fun matchWeakReading(fix: LocationUpdate.Fix, measuredAt: Long) =
-        if (lastReliableOnRoute == false || fix.accuracyMeters > 250.0) null else {
-            val legIndex = routeGeometry.legIndexAt(previousProgress)
-            val reference = matchReferenceProgress ?: previousProgress
-            val seconds = matchReferenceAt?.let { ((measuredAt - it).coerceAtLeast(0L) / 1_000.0).coerceAtMost(30.0) } ?: 0.0
-            val velocity = matchingVelocity.takeIf { lastFixAt?.let { measuredAt - it <= 30_000 } == true } ?: 0.0
-            val expected = if (routeLength > 0.0) reference + (velocity * seconds / routeLength).toFloat() else reference
-            routeGeometry.matchOnLeg(fix.point, legIndex, reference, expected,
-                maximumTravelMeters = 30.0 + maximumSpeed(legIndex) * seconds,
-                maximumDistanceMeters = minOf(fix.accuracyMeters, 100.0))
-        }
 
     private fun withUncertainty(state: CurrentTripLocationState): CurrentTripLocationState {
         val fix = state.fix ?: return state
@@ -350,10 +305,6 @@ internal class CurrentTripLocationViewModel(
         }))
         trackingStartedAt = null
         clearMotion()
-        matchingVelocity = 0.0
-        matchReferenceProgress = null
-        matchReferenceAt = null
-        unmatchedConfirmation.clear()
         jumpFilter.releaseMaximumSpeed(this)
     }
 

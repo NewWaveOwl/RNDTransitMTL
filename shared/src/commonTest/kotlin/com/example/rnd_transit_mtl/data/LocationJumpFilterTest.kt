@@ -93,6 +93,8 @@ class LocationJumpFilterTest {
         filter.evaluate(start, 50_000)
         assertTrue(assertNotNull(filter.evaluate(fix(20.0, 52_000, 80.0), 52_000)).accepted)
         assertEquals(start, filter.acceptedFix)
+        assertEquals(start, assertNotNull(filter.evaluate(fix(20.0, 52_000, 80.0), 52_000)).trustedFix,
+            "Map consumers must receive the retained anchor rather than the weaker raw point")
         assertFalse(assertNotNull(filter.evaluate(fix(100.0, 54_000, 80.0), 54_000)).accepted)
     }
 }

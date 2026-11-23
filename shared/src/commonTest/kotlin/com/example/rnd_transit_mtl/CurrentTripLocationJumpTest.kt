@@ -112,7 +112,7 @@ class CurrentTripLocationJumpTest {
             model.receive(LocationUpdate.Fix(GeoPoint(latitude, -73.6), 200.0, now))
             model.refreshFreshness()
             assertEquals(trip.origin.point, model.state.value.displayedPosition)
-            assertEquals(TripLocationAvailability.LastKnown, model.state.value.availability)
+            assertEquals(TripLocationAvailability.LowAccuracy, model.state.value.availability)
             assertEquals(0f, store.progress)
         }
         now += 30_001
@@ -140,7 +140,7 @@ class CurrentTripLocationJumpTest {
     }
 
     @Test
-    fun rejectedWeakRouteMatchesHoldTheVisiblePointUntilConsistentReadingsConfirmIt() {
+    fun repeatedWeakReadingsCannotReplaceTheTrustedPointOrChangeProgress() {
         var now = 50_000L
         val trip = guidanceTestTrip()
         val store = TripsStore { now }.also { it.start(trip) }
@@ -152,7 +152,7 @@ class CurrentTripLocationJumpTest {
         repeat(3) { index ->
             now += 2_000
             model.receive(LocationUpdate.Fix(outside, 150.0, now))
-            assertEquals(if (index < 2) trip.origin.point else outside, model.state.value.displayedPosition)
+            assertEquals(trip.origin.point, model.state.value.displayedPosition)
         }
         assertEquals(0f, store.progress)
         assertTrue(store.completedTrips.isEmpty())

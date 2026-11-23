@@ -22,7 +22,9 @@ seconds without a fresh location reading.
 **Dismiss** suppresses all accuracy notices for 10 minutes, including across app
 restarts. Settings remains available during that interval. Simulation and inactive
 map controls do not display the notice. The known user marker, yellow uncertainty
-circle, route matching and jump protection continue as before.
+circle and jump protection retain a shared trusted measurement. Raw readings remain
+available for accuracy/freshness diagnostics. Weak readings enlarge uncertainty
+without replacing a reliable marker or snapping it onto the saved route.
 
 The help dialog offers system settings, clearer-signal guidance and optional
 **Direction looks wrong?** compass guidance. Figure-eight calibration helps heading;
