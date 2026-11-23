@@ -63,6 +63,19 @@ class RoundTripRoutingTest {
         assertNotEquals(decodePolyline(shape("otp")).reversed(), decodePolyline(shape("returnOtp")))
     }
 
+    @Test fun outboundCanUseMoreThanHalfOfTheCombinedBudget() = runBlocking {
+        val queries = mutableListOf<JsonObject>()
+        val result = Generator(emptyList(), zones(), { query ->
+            queries += query
+            response(query, if (query.field("variables").field("originLat").number() == home.latitude) 1140 else 480)
+        }, { now }, sample = { listOf(away) }, maxAttempts = 1).generate(input)
+        assertEquals("success", result["status"].text())
+        assertEquals(2, queries.size)
+        assertEquals(1704.0, result["elapsedSeconds"].number()!!, 0.0)
+        assertEquals(now.plusSeconds(1182).toString(), queries.last().field("variables").field("departure").text())
+        assertNotNull(result["otp"])
+        assertNotNull(result["returnOtp"])
+    }
     @Test fun unavailableOrOverBudgetInboundNeverProducesAOneWaySuccess() = runBlocking {
         for (overBudget in listOf(false, true)) {
             val result = Generator(emptyList(), zones(), { query ->

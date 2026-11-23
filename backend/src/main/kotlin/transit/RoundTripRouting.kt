@@ -26,7 +26,7 @@ internal suspend fun generateRoundTrip(
             val outward = Generator(routes, zones, route, { departure }, sample,
                 (remaining / 2).coerceAtLeast(1), maxAttempts.coerceAtMost(24),
                 preparationDispatcher = dispatcher).generate(input.copy(roundTrip = false,
-                    minutes = (input.minutes / 2).coerceAtLeast(1), excluded = excluded.toList()))
+                    minutes = input.minutes, excluded = excluded.toList()))
             if (outward["status"].text() != "success") return@withTimeoutOrNull outward
             val turnaround = requireNotNull(outward["destination"] as? JsonObject)
             excluded += point(turnaround["point"])
