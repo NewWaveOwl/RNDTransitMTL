@@ -7,13 +7,20 @@ import java.time.OffsetDateTime
 import java.util.concurrent.atomic.AtomicLong
 
 /** Plans between chosen endpoints through OTP, independently of random destination generation.
+ * @param capabilitySource Live router metadata; absent in isolated route-only fixtures.
  * @param fetch Shared bridge/OTP transport; provider results remain behind this public contract.
  */
-internal class TravelTrackerPlanner(private val fetch: suspend (JsonObject) -> JsonObject) {
+internal class TravelTrackerPlanner(
+    private val capabilitySource: OtpCapabilities? = null,
+    private val fetch: suspend (JsonObject) -> JsonObject,
+) {
     val requests = AtomicLong()
     private val supported = mapOf("pedestrian" to "WALK", "bike" to "BICYCLE", "car" to "CAR", "bus" to "BUS", "train" to "RAIL")
     private val noRouteCodes = setOf("NO_STOPS_IN_RANGE", "NO_TRANSIT_CONNECTION", "NO_TRANSIT_CONNECTION_IN_SEARCH_WINDOW",
         "OUTSIDE_SERVICE_PERIOD", "LOCATION_NOT_FOUND", "WALKING_BETTER_THAN_TRANSIT", "NO_ROUTES_FOUND")
+
+    /** @return Authenticated, live router metadata, independent of address lookup and saved trips. */
+    suspend fun capabilities(): JsonObject = capabilitySource?.read() ?: throw ProviderError("Router capability metadata is unavailable.")
 
     /**
      * Validates a selected mode, offset-aware departure and two real points before contacting OTP.

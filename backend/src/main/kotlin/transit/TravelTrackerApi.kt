@@ -62,6 +62,9 @@ internal class TravelTrackerApi(
         addresses.reverse(lat?.toDoubleOrNull() ?: throw InputError("Invalid latitude."), lon?.toDoubleOrNull() ?: throw InputError("Invalid longitude."))
     }
 
+    /** @param token Verified through the configured TravelTracker project. @return Live router capabilities, without saving or geocoding. */
+    suspend fun capabilities(token: String?) = authorized(token) { 200 to planner.capabilities() }
+
     /** @param token Bearer header. @param contentType Expected JSON. @param read Bounded caller body. @return Preview candidates only. */
     suspend fun plan(token: String?, contentType: String?, read: suspend () -> String) = authorized(token) {
         checkInput(contentType?.substringBefore(';')?.trim() == "application/json", "Send application/json.")
@@ -98,6 +101,11 @@ internal fun Application.travelTrackerRoutes(api: TravelTrackerApi) {
         }
         route("/v1/routes") {
             install(HttpRequestLifecycle) { cancelCallOnClose = true }
+            get("/capabilities") {
+                if (call.request.queryParameters.names().isNotEmpty())
+                    call.travelTrackerResponse(400 to obj("status" to "invalid_input", "message" to "Capability lookup takes no query parameters."))
+                else call.travelTrackerResponse(api.capabilities(call.request.headers[HttpHeaders.Authorization]))
+            }
             post("/plan") {
                 call.travelTrackerResponse(api.plan(call.request.headers[HttpHeaders.Authorization], call.request.headers[HttpHeaders.ContentType]) {
                     val output = ByteArrayOutputStream()

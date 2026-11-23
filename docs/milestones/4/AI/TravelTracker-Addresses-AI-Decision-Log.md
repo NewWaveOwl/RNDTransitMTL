@@ -131,6 +131,29 @@ saved in a named Git stash before updating the checkout to current source.
 
 **Technique record:** [A1 in the technique log](TravelTracker-Addresses-AI-Technique-Log.md#a1--provider-selection-and-shared-integration).
 
+### Full prompt 6
+
+```text
+we don have a sepparaet interface for the Taravel tracker part of the server it is the same?
+```
+
+### Full prompt 7
+
+```text
+where should i pu tunnel?
+```
+
+### Full prompt 8
+
+```text
+lets run full aapp privde commads to do it in the chat
+```
+
+**AI output summary for prompts6-8:** Explained the shared EXE with a separate
+TravelTracker window, existing Microsoft Dev Tunnel settings, the frontend's
+`Services:Routing` base URL, and full-stack launch commands. Supplying commands is
+not evidence that the user successfully started or updated either application.
+
 ## A2 - Auth diagnosis and six routing/address issues
 
 **Date:** 2026-11-22. **Contributor:** NewWaveOwl requesting account.
@@ -164,6 +187,15 @@ auth/HTTP checks passed; full suite evidence will be recorded after delivery.
 and update artifact will be recorded after they are observed. Human review,
 student time/code estimates and learning reflections [Student reflection needed].
 **Technique record:** A2 in the companion technique log.
+
+**#106 evidence:** Real isolated OTP 2.10.0/Java25 queries returned actual WALK,
+BICYCLE, CAR, BUS and RAIL itineraries, with scheduled transit access/egress walks.
+The new reproduction script passed both explicit-existing and owned-isolated
+PowerShell entry points; the owned run stopped its own process. Graph/JAR hashes
+are tied to the isolated process; neighboring source inputs are marked as available
+references, not proven original graph-build inputs. A fresh full graph build was
+not rerun. Capability source tests and the full Kotlin gate passed 88 backend and
+60 launcher tests without compiler warnings. See `backend/RoutingVerification.md`.
 
 ## Reflection
 

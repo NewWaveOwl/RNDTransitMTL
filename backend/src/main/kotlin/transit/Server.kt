@@ -202,7 +202,10 @@ fun main() {
                 val addressService = NominatimAddresses(addressHttp::fetch)
                 val (trackerProject, trackerKey) = travelTrackerProject(System.getenv("TRAVELTRACKER_SUPABASE_URL"),
                     System.getenv("TRAVELTRACKER_SUPABASE_KEY"), supabase, key)
-                val trackerApi = TravelTrackerApi(addressService, TravelTrackerPlanner { body -> upstream.json(endpoint, body) },
+                val capabilities = OtpCapabilities(
+                    fetch = { body -> upstream.json(catalogue, body) },
+                    serverInfo = { body -> upstream.json(URI(catalogue).resolve("/otp/transmodel/v3").toString(), body) })
+                val trackerApi = TravelTrackerApi(addressService, TravelTrackerPlanner(capabilities) { body -> upstream.json(endpoint, body) },
                     travelTrackerSession(trackerProject, trackerKey, travelUpstream))
                 println("Shared routing and TravelTracker address service ready at http://$host:$port.")
                 embeddedServer(CIO,port=port,host=host) {
