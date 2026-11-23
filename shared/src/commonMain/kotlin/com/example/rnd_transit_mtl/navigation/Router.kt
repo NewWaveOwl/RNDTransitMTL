@@ -106,6 +106,12 @@ data object HistoryScreenKey : ScreenKey() {
     override val screenTitle = "history"
 }
 
+@Serializable
+@SerialName("com.example.rnd_transit_mtl.HistoryConfirmationScreenKey")
+data object HistoryConfirmationScreenKey : ScreenKey() {
+    override val screenTitle = "history"
+}
+
 /**
  * Demonstrates passing the generated item to the second content screen.
  *
@@ -178,6 +184,7 @@ val backStackConfig = SavedStateConfiguration {
             subclass(AboutScreenKey::class, AboutScreenKey.serializer())
             subclass(SettingsScreenKey::class, SettingsScreenKey.serializer())
             subclass(HistoryScreenKey::class, HistoryScreenKey.serializer())
+            subclass(HistoryConfirmationScreenKey::class, HistoryConfirmationScreenKey.serializer())
             subclass(
                 CurrentTripScreenKey::class,
                 CurrentTripScreenKey.serializer()
@@ -314,23 +321,11 @@ private fun DestinationDisplay(
             }
 
             entry<HistoryScreenKey> {
-                HistoryScreen(
-                    isDestinationActive =
-                        navigator.current == HistoryScreenKey,
-                    onOpenDetails = { tripId ->
-                        if (navigator.current == HistoryScreenKey) {
-                            navigation.openDetails(tripId)
-                        }
-                    },
-                    onReview = { tripId ->
-                        if (navigator.current == HistoryScreenKey) {
-                            navigation.openReview(
-                                tripId = tripId,
-                                origin = ReviewOrigin.History
-                            )
-                        }
-                    }
-                )
+                HistoryDestination(HistoryScreenKey, navigation)
+            }
+
+            entry<HistoryConfirmationScreenKey> {
+                HistoryDestination(HistoryConfirmationScreenKey, navigation, sendResult = true)
             }
 
             entry<TripDetailsScreenKey> { key ->
@@ -477,6 +472,27 @@ private fun DestinationDisplay(
                     slideOutHorizontally(targetOffsetX = { it })
             }
         }
+    )
+}
+
+@Composable
+private fun HistoryDestination(
+    key: ScreenKey,
+    navigation: TripNavigation,
+    sendResult: Boolean = false,
+) {
+    val navigator = LocalNavigator.current
+    HistoryScreen(
+        isDestinationActive = navigator.current == key,
+        onOpenDetails = { tripId ->
+            if (navigator.current == key) navigation.openDetails(tripId)
+        },
+        onReview = { tripId ->
+            if (navigator.current == key) {
+                navigation.openReview(tripId = tripId, origin = ReviewOrigin.History)
+            }
+        },
+        sendResult = sendResult,
     )
 }
 

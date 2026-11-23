@@ -5,7 +5,9 @@ import com.example.rnd_transit_mtl.model.ids.TripId
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import com.example.rnd_transit_mtl.layout.PageTitle
+import com.example.rnd_transit_mtl.rememberResultResponder
 import com.example.rnd_transit_mtl.navigation.HistoryScreenKey
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -41,7 +43,8 @@ fun HistoryScreen(
     onOpenDetails: ((TripId) -> Unit)? = null,
     onReview: ((TripId) -> Unit)? = null,
     isDestinationActive: Boolean = true,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    sendResult: Boolean = false,
 ) {
     val tripsStore = LocalTripsStore.current
     val cloud = LocalCloudTrips.current
@@ -216,6 +219,15 @@ fun HistoryScreen(
 
     Column(modifier.fillMaxSize()) {
         PageTitle(title = HistoryScreenKey.screenTitle, layoutScale = 1f, highlighted = false)
+        if (sendResult) {
+            val sendResultAndClose = rememberResultResponder()
+            Button(
+                onClick = { sendResultAndClose("History has ${historyRecords.size} trips.") },
+                enabled = !loading
+            ) {
+                Text("Send History & Return")
+            }
+        }
         if (loadFailed) {
             TextButton(onClick = { retry++ }, enabled = isDestinationActive && !loading) {
                 Text("Could not load cloud history. Retry")

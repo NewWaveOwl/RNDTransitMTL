@@ -75,6 +75,7 @@ internal fun SharedTopBarContent(
 ) {
     val historySelected =
         currentKey == HistoryScreenKey ||
+            currentKey == HistoryConfirmationScreenKey ||
             currentKey is TripDetailsScreenKey ||
             (
                 currentKey is TripReviewScreenKey &&
@@ -159,7 +160,8 @@ internal fun SharedTopBarContent(
         }
 
         if (currentKey != MainScreenKey && currentKey !is CurrentTripScreenKey &&
-            currentKey != HistoryScreenKey && currentKey != SettingsScreenKey &&
+            currentKey != HistoryScreenKey && currentKey != HistoryConfirmationScreenKey &&
+            currentKey != SettingsScreenKey &&
             currentKey != ProfileScreenKey
         ) {
             PageTitle(
