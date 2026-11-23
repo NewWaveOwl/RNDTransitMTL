@@ -26,6 +26,20 @@ circle and jump protection retain a shared trusted measurement. Raw readings rem
 available for accuracy/freshness diagnostics. Weak readings enlarge uncertainty
 without replacing a reliable marker or snapping it onto the saved route.
 
+Stationary readings within their measurement noise retain the shared point and
+do not record travel. Reported stationary speed also prevents distant readings
+of the same quality from becoming relocation evidence. Walking and transit
+movement can release that hold. Without speed evidence, the planner uses a
+walking movement allowance instead of assuming bus speed.
+
+Coarse readings cannot confirm a relocation away from a reliable point. Precise
+corrections can replace an earlier coarse fix, and interleaved poorer provider
+readings do not reset that confirmation. Recovery changes the visible location;
+progress resumes only after plausible movement. The Android source rejects
+measurements with missing/invalid accuracy rather than treating them as perfect.
+The active-trip map also retains that shared point during GPS gaps. Temporary
+route estimates remain separate and cannot move the device marker or finish a trip.
+
 The help dialog offers system settings, clearer-signal guidance and optional
 **Direction looks wrong?** compass guidance. Figure-eight calibration helps heading;
 the app does not claim to calibrate GPS or apply a manual coordinate offset.

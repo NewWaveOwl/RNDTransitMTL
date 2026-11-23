@@ -70,7 +70,7 @@ class LocationJumpFilterTest {
         val bus = LocationJumpFilter()
         val walk = walkingFilter()
         for (filter in listOf(bus, walk)) filter.evaluate(fix(0.0, 50_000), 50_000)
-        val moving = fix(80.0, 52_000)
+        val moving = fix(80.0, 52_000).copy(speedMetersPerSecond = 35.0)
         assertTrue(assertNotNull(bus.evaluate(moving, 52_000)).accepted)
         assertFalse(assertNotNull(walk.evaluate(moving, 52_000)).accepted)
     }
@@ -91,10 +91,87 @@ class LocationJumpFilterTest {
         val filter = walkingFilter()
         val start = fix(0.0, 50_000)
         filter.evaluate(start, 50_000)
-        assertTrue(assertNotNull(filter.evaluate(fix(20.0, 52_000, 80.0), 52_000)).accepted)
+        assertFalse(assertNotNull(filter.evaluate(fix(20.0, 52_000, 80.0), 52_000)).accepted)
         assertEquals(start, filter.acceptedFix)
         assertEquals(start, assertNotNull(filter.evaluate(fix(20.0, 52_000, 80.0), 52_000)).trustedFix,
             "Map consumers must receive the retained anchor rather than the weaker raw point")
         assertFalse(assertNotNull(filter.evaluate(fix(100.0, 54_000, 80.0), 54_000)).accepted)
+    }
+
+    @Test fun stationaryZeroSpeedAndAlternatingProvidersCannotMoveTheMarker() {
+        val filter = LocationJumpFilter()
+        val start = fix(0.0, 50_000).copy(speedMetersPerSecond = 0.0)
+        filter.evaluate(start, 50_000)
+        repeat(40) { index ->
+            val time = 52_000L + index * 2_000
+            val reading = fix(if (index % 2 == 0) 80.0 else -6.0, time).copy(speedMetersPerSecond = 0.0)
+            assertFalse(assertNotNull(filter.evaluate(reading, time)).relocated)
+            assertEquals(start.point, filter.acceptedFix?.point)
+        }
+    }
+
+    @Test fun weakClustersCannotRelocateAReliablePoint() {
+        val filter = walkingFilter()
+        val start = fix(0.0, 50_000)
+        filter.evaluate(start, 50_000)
+        repeat(20) { index ->
+            val time = 52_000L + index * 2_000
+            assertFalse(assertNotNull(filter.evaluate(fix(1_000.0, time, 150.0), time)).accepted)
+            assertEquals(start, filter.acceptedFix)
+        }
+    }
+
+    @Test fun preciseRecoverySurvivesInterleavedCoarseProviderReadings() {
+        val filter = walkingFilter()
+        filter.evaluate(fix(0.0, 50_000, 200.0), 50_000)
+        repeat(3) { index ->
+            val time = 52_000L + index * 4_000
+            val precise = assertNotNull(filter.evaluate(fix(1_000.0, time), time))
+            assertEquals(index == 2, precise.accepted)
+            if (index < 2) filter.evaluate(fix(0.0, time + 2_000, 200.0), time + 2_000)
+        }
+        assertEquals(fix(1_000.0, 60_000), filter.acceptedFix)
+    }
+
+    @Test fun noiseIsHeldButSlowWalkingAndMeasuredBusMovementAreNotFrozen() {
+        val filter = LocationJumpFilter()
+        filter.evaluate(fix(0.0, 50_000), 50_000)
+        assertTrue(assertNotNull(filter.evaluate(fix(2.0, 52_000), 52_000)).stationary)
+        assertEquals(fix(0.0, 50_000).point, filter.acceptedFix?.point)
+        assertTrue(assertNotNull(filter.evaluate(fix(12.0, 54_000), 54_000)).accepted)
+        val moving = fix(92.0, 56_000).copy(speedMetersPerSecond = 35.0)
+        assertTrue(assertNotNull(filter.evaluate(moving, 56_000)).accepted)
+        assertEquals(moving, filter.acceptedFix)
+    }
+
+    @Test fun plannerWithoutMovementEvidenceRejectsAnIsolatedEightyMetreJump() {
+        val filter = LocationJumpFilter()
+        filter.evaluate(fix(0.0, 50_000), 50_000)
+        assertFalse(assertNotNull(filter.evaluate(fix(80.0, 52_000), 52_000)).accepted)
+        assertTrue(assertNotNull(filter.evaluate(fix(0.0, 54_000), 54_000)).stationary)
+    }
+
+    @Test fun unspeededJitterAndLessPreciseNetworkClustersRetainTheFreshGpsPoint() {
+        val filter = LocationJumpFilter()
+        val start = fix(0.0, 50_000)
+        filter.evaluate(start, 50_000)
+        repeat(8) { index ->
+            val time = 52_000L + index * 2_000
+            filter.evaluate(fix(if (index % 2 == 0) 8.0 else -8.0, time), time)
+            assertEquals(start.point, filter.acceptedFix?.point)
+        }
+        repeat(5) { index ->
+            val time = 68_000L + index * 2_000
+            assertFalse(assertNotNull(filter.evaluate(fix(80.0, time, 20.0), time)).accepted)
+            assertEquals(start.point, filter.acceptedFix?.point)
+        }
+    }
+
+    @Test fun betterAccuracyCanCorrectACoarseStationaryFixWithoutWaitingForMovement() {
+        val filter = LocationJumpFilter()
+        filter.evaluate(fix(0.0, 50_000, 200.0).copy(speedMetersPerSecond = 0.0), 50_000)
+        val precise = fix(100.0, 52_000).copy(speedMetersPerSecond = 0.0)
+        assertTrue(assertNotNull(filter.evaluate(precise, 52_000)).relocated)
+        assertEquals(precise, filter.acceptedFix)
     }
 }

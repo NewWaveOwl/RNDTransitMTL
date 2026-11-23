@@ -536,23 +536,22 @@ fun CurrentTripScreen(
                 if (latestDestinationActive) navigation.requestTripInformation()
             },
             simulationEnabled = simulationEnabled,
-            userPosition = if (simulationEnabled) null else locationState.displayedPosition,
+            userPosition = if (simulationEnabled) null else location?.fix?.point ?: locationState.trustedPosition,
             userUncertaintyMeters = if (simulationEnabled) null else locationState.uncertaintyRadiusMeters,
             onRequestLocation = { location?.request() },
             locationState = if (simulationEnabled) TripLocationState.Sample else when (locationState.availability) {
                 TripLocationAvailability.Available -> TripLocationState.Live
                 TripLocationAvailability.LastKnown -> TripLocationState.LastKnown
                 TripLocationAvailability.LowAccuracy -> if (locationState.matchedPosition != null) TripLocationState.MatchedLowAccuracy else TripLocationState.LowAccuracy
-                TripLocationAvailability.Estimated -> TripLocationState.Estimated
-                TripLocationAvailability.Stale -> if (locationState.estimatedPosition != null || locationState.matchedPosition != null) TripLocationState.EstimatedStale else TripLocationState.Stale
+                TripLocationAvailability.Estimated -> TripLocationState.LastKnown
+                TripLocationAvailability.Stale -> TripLocationState.Stale
                 TripLocationAvailability.PermissionDenied -> TripLocationState.PermissionDenied
                 TripLocationAvailability.Waiting -> TripLocationState.Waiting
                 TripLocationAvailability.Unsupported -> TripLocationState.NotTracking
             },
             staleMessage = if (simulationEnabled) null else when {
                 locationState.availability == TripLocationAvailability.Stale ->
-                    if (locationState.estimatedPosition != null || locationState.matchedPosition != null) "No fresh location reading for over 30 seconds. Position is estimated along your saved route."
-                    else "No fresh location reading for over 30 seconds. Your last position is kept on the map."
+                    "No fresh location reading for over 30 seconds. Your last position is kept on the map."
                 locationState.offRoute -> "You are away from the planned route. Your position remains visible."
                 else -> null
             },

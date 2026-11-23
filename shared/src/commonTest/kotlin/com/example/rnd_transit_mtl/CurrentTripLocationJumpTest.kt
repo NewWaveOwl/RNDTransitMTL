@@ -15,7 +15,7 @@ class CurrentTripLocationJumpTest {
         val trip = guidanceTestTrip()
         val store = TripsStore { now }.also { it.start(trip) }
         val model = CurrentTripLocationViewModel(trip, store) { now }
-        model.receive(LocationUpdate.Fix(trip.origin.point, 5.0, now, 0.0))
+        model.receive(LocationUpdate.Fix(trip.origin.point, 5.0, now))
         repeat(70) {
             now += 2_000
             model.receive(LocationUpdate.Fix(trip.destination.point, 5.0, now, 0.0))
@@ -29,6 +29,45 @@ class CurrentTripLocationJumpTest {
         now += 30_000
         model.receive(LocationUpdate.Fix(trip.destination.point, 5.0, now, 1.4))
         assertEquals(trip.id, store.completedTrips.single().id)
+    }
+
+    @Test fun stationaryJitterKeepsAFreshTrustedPointWithoutPredictionOrProgress() {
+        var now = 50_000L
+        val trip = guidanceTestTrip()
+        val store = TripsStore { now }.also { it.start(trip) }
+        val filter = LocationJumpFilter()
+        val model = CurrentTripLocationViewModel(trip, store, jumpFilter = filter) { now }
+        model.receive(LocationUpdate.Fix(trip.origin.point, 5.0, now, 0.0))
+        repeat(20) { index ->
+            now += 2_000
+            val jitter = GeoPoint(trip.origin.point.latitude + (if (index % 2 == 0) 2.0 else -2.0) / 111_195.0,
+                trip.origin.point.longitude)
+            model.receive(LocationUpdate.Fix(jitter, 5.0, now, 0.0))
+            model.refreshFreshness()
+            assertEquals(trip.origin.point, model.state.value.displayedPosition)
+            assertEquals(filter.acceptedFix?.point, model.state.value.displayedPosition)
+            assertEquals(TripLocationAvailability.Available, model.state.value.availability)
+            assertNull(model.state.value.estimatedPosition)
+            assertEquals(0f, store.progress)
+            assertTrue(store.completedTrips.isEmpty())
+        }
+    }
+
+    @Test fun routeGapEstimatesCannotReplaceTheTrustedDevicePoint() {
+        var now = 50_000L
+        val trip = guidanceTestTrip()
+        val store = TripsStore { now }.also { it.start(trip) }
+        val model = CurrentTripLocationViewModel(trip, store) { now }
+        model.receive(LocationUpdate.Fix(trip.origin.point, 3.0, now, 1.4))
+        now += 8_000
+        val measured = GeoPoint(45.5001, -73.6)
+        model.receive(LocationUpdate.Fix(measured, 3.0, now, 1.4))
+        val confirmed = store.progress
+        now += 10_000
+        model.refreshFreshness()
+        assertNotNull(model.state.value.estimatedPosition)
+        assertEquals(measured, model.state.value.trustedPosition)
+        assertEquals(confirmed, store.progress)
     }
 
     @Test
@@ -91,7 +130,7 @@ class CurrentTripLocationJumpTest {
         assertEquals(progress, store.progress)
         assertTrue(store.completedTrips.isEmpty())
         now += 2_000
-        val recovered = LocationUpdate.Fix(GeoPoint(45.50005, -73.6), 5.0, now)
+        val recovered = LocationUpdate.Fix(GeoPoint(45.50005, -73.6), 5.0, now, 1.4)
         shared.evaluate(recovered, now)
         model.receive(recovered)
         assertEquals(recovered.point, model.state.value.displayedPosition)

@@ -7,6 +7,12 @@ internal class LocationCandidateConfirmation {
 
     fun clear() = samples.clear()
 
+    fun prefersTo(fix: LocationUpdate.Fix, time: Long): Boolean {
+        val first = samples.firstOrNull() ?: return false
+        if (time - first.time > 15_000L) { clear(); return false }
+        return first.fix.accuracyMeters * 2 < fix.accuracyMeters
+    }
+
     fun add(fix: LocationUpdate.Fix, time: Long, maximumSpeed: Double): Boolean {
         if (fix.accuracyMeters > 250.0) {
             clear()
@@ -47,6 +53,7 @@ internal class LocationJumpFilter {
         val accepted: Boolean,
         val relocated: Boolean = false,
         val trustedFix: LocationUpdate.Fix? = null,
+        val stationary: Boolean = false,
     )
 
     fun useMaximumSpeed(owner: Any, metersPerSecond: Double) {
@@ -73,10 +80,46 @@ internal class LocationJumpFilter {
         // The session and trip observe the same reading; do not count it twice toward confirmation.
         if (fix.timestampEpochMillis != null && time == lastReadingTime && lastResult?.reading == fix) return lastResult
         if (lastReadingTime?.let { time <= it } == true) return null
+        val previousReadingAt = lastReadingTime
         lastReadingTime = time
         val anchor = acceptedFix
-        val plausible = anchor == null || plausibleMovement(anchor, anchorTime ?: time, fix, time, maximumSpeedMetersPerSecond)
-        val relocated = !plausible && confirmation.add(fix, time, maximumSpeedMetersPerSecond)
+        fun result(accepted: Boolean, relocated: Boolean = false, stationary: Boolean = false): Result =
+            Result(fix, accepted, relocated, acceptedFix, stationary).also { lastResult = it }
+        if (anchor != null) {
+            // Poorer provider activity is diagnostic input, not evidence against a better candidate.
+            val freshReliableAnchor = anchor.accuracyMeters <= 50.0 &&
+                time - (anchorTime ?: time) <= LOCATION_UPDATE_TIMEOUT_MILLIS
+            if ((anchor.accuracyMeters <= 50.0 && fix.accuracyMeters > 50.0) ||
+                (freshReliableAnchor && fix.accuracyMeters > maxOf(15.0, anchor.accuracyMeters * 2)) ||
+                confirmation.prefersTo(fix, time)) return result(false)
+            val improved = fix.accuracyMeters <= 50.0 && fix.accuracyMeters * 2 < anchor.accuracyMeters
+            val displacement = anchor.point.distanceMetersTo(fix.point)
+            val noise = maxOf(3.0, minOf(15.0, anchor.accuracyMeters + fix.accuracyMeters))
+            val slow = fix.speedMetersPerSecond?.let { it < 0.3 } != false
+            if (previousReadingAt != null && !improved && slow && displacement <= noise) {
+                // Fresh supporting measurements may retain a point; they must not create travel.
+                acceptedFix = anchor.copy(timestampEpochMillis = fix.timestampEpochMillis,
+                    speedMetersPerSecond = fix.speedMetersPerSecond ?: anchor.speedMetersPerSecond)
+                anchorTime = time
+                confirmation.clear()
+                return result(true, stationary = true)
+            }
+            if (previousReadingAt != null && !improved && fix.speedMetersPerSecond?.let { it < 0.3 } == true &&
+                anchor.speedMetersPerSecond?.let { it < 0.3 } == true) return result(false)
+            // A precise correction inside an earlier coarse uncertainty circle can recover immediately.
+            if (improved && displacement <= anchor.accuracyMeters + fix.accuracyMeters) {
+                val relocated = displacement > maxOf(3.0, fix.accuracyMeters)
+                acceptedFix = fix
+                anchorTime = time
+                confirmation.clear()
+                return result(true, relocated)
+            }
+        }
+        // A planner without measured movement must not assume that every device is travelling at bus speed.
+        val speed = if (speedOwner == null && fix.speedMetersPerSecond?.let { it >= 0.3 } != true)
+            minOf(maximumSpeedMetersPerSecond, 3.5) else maximumSpeedMetersPerSecond
+        val plausible = anchor == null || plausibleMovement(anchor, anchorTime ?: time, fix, time, speed)
+        val relocated = !plausible && fix.accuracyMeters <= 50.0 && confirmation.add(fix, time, speed)
         val accepted = plausible || relocated
         if (accepted) {
             confirmation.clear()
@@ -86,7 +129,7 @@ internal class LocationJumpFilter {
                 anchorTime = time
             }
         }
-        return Result(fix, accepted, relocated, acceptedFix).also { lastResult = it }
+        return result(accepted, relocated)
     }
 
     companion object {

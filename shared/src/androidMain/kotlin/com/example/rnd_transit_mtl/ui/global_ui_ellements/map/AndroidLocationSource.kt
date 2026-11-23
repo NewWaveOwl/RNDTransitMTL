@@ -63,9 +63,11 @@ internal class AndroidLocationSource(private val context: Context) : LocationSou
                 val ageNanos = SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos
                 if (ageNanos !in 0L..LOCATION_FIX_MAX_AGE_MILLIS * 1_000_000L) return
                 recovery.recordFix(location.elapsedRealtimeNanos / 1_000_000L, SystemClock.elapsedRealtime())
+                // Missing accuracy must not be represented as a perfect zero-metre measurement.
+                if (!location.hasAccuracy() || !location.accuracy.isFinite() || location.accuracy < 0f) return
                 trySend(LocationUpdate.Fix(
                     GeoPoint(location.latitude, location.longitude),
-                    if (location.hasAccuracy()) location.accuracy.toDouble() else 0.0,
+                    location.accuracy.toDouble(),
                     timestampEpochMillis = System.currentTimeMillis() - ageNanos / 1_000_000L,
                     speedMetersPerSecond = location.speed.toDouble()
                         .takeIf { location.hasSpeed() && it.isFinite() && it >= 0.0 },

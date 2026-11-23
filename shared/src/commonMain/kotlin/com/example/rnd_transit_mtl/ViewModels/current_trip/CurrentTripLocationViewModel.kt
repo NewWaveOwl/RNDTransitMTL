@@ -39,6 +39,8 @@ internal data class CurrentTripLocationState(
     val retainedPosition: GeoPoint? = null,
     val retainedProgress: Float? = null,
 ) {
+    /** Maps retain the shared measurement; route estimates are never device coordinates. */
+    val trustedPosition: GeoPoint? get() = retainedPosition ?: fix?.point
     val displayedPosition: GeoPoint? get() = retainedPosition ?: estimatedPosition ?: matchedPosition ?: fix?.point
     val displayedProgress: Float? get() = retainedProgress ?: estimatedProgress ?: matchedProgress
 }
@@ -131,8 +133,12 @@ internal class CurrentTripLocationViewModel(
         lastAcceptedTimestamp = measuredAt
         lastReadingAt = measuredAt
         val decision = jumpFilter.evaluate(fix, now) ?: return
-        if (!decision.accepted) {
+        if (!decision.accepted || decision.stationary) {
             holdPosition(fix, decision.trustedFix?.point)
+            if (decision.stationary && fix.accuracyMeters <= TripLocationMaximumAccuracyMeters) {
+                lastFixAt = measuredAt
+                mutableState.value = mutableState.value.copy(availability = TripLocationAvailability.Available)
+            }
             return
         }
         if (decision.relocated) clearMotion()
