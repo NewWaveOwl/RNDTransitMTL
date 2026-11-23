@@ -3,7 +3,9 @@ package com.example.rnd_transit_mtl
 import android.animation.ValueAnimator
 import android.content.pm.PackageManager
 import android.os.Build
+import android.content.Intent
 import android.os.Bundle
+import com.example.rnd_transit_mtl.ExternalUriHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -31,6 +33,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
+        intent?.data?.toString()?.let { ExternalUriHandler.onNewUri(it) }
+
         val showStartup = savedInstanceState == null &&
             (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || ValueAnimator.areAnimatorsEnabled())
         val generationEndpoint = packageManager.getApplicationInfo(packageName, PackageManager.GET_META_DATA)
@@ -49,6 +53,14 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+
+        // Handle links clicked while app is active
+        intent.data?.toString()?.let { ExternalUriHandler.onNewUri(it) }
     }
 }
 
