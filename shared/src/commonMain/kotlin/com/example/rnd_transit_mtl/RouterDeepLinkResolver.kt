@@ -17,10 +17,16 @@ internal class RouterDeepLinkResolver {
         DeepLinkUri("rndtransit://launch/history/confirm"),
         HistoryConfirmationScreenKey.serializer(),
     )
+    private val webHistoryConfirmationMatcher = UriDeepLinkMatcher(
+        DeepLinkUri("http://localhost:8080/history/confirm"),
+        HistoryConfirmationScreenKey.serializer(),
+    )
 
     fun resolve(uriString: String): List<NavKey>? {
-        val request = DeepLinkRequest(uri = uriString)
+        val normalizedUri = uriString.replace("/#/", "/")
+        val request = DeepLinkRequest(uri = normalizedUri)
         val targetKey = historyConfirmationMatcher.match(request)?.key
+            ?: webHistoryConfirmationMatcher.match(request)?.key
             ?: historyMatcher.match(request)?.key
             ?: return null
         return listOf(MainScreenKey, targetKey)

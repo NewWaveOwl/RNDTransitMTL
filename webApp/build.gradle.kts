@@ -19,6 +19,9 @@ kotlin {
     }
 
     sourceSets {
+        webMain.dependencies {
+            implementation("org.jetbrains.kotlinx:kotlinx-browser:0.5.0")
+        }
         commonMain.dependencies {
             implementation(project(":shared"))
 
