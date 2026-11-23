@@ -1,5 +1,8 @@
 package com.example.rnd_transit_mtl
 
+import androidx.compose.runtime.DisposableEffect
+import com.example.rnd_transit_mtl.ExternalUriHandler
+import com.example.rnd_transit_mtl.RouterDeepLinkResolver
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -286,6 +289,16 @@ internal fun App(
                         }
                     }
                 } else {
+                    val deepLinkResolver = remember { RouterDeepLinkResolver() }
+                    DisposableEffect(backStack, deepLinkResolver) {
+                        ExternalUriHandler.listener = { uri ->
+                            deepLinkResolver.resolve(uri)?.let { destinationStack ->
+                                backStack.clear()
+                                backStack.addAll(destinationStack)
+                            }
+                        }
+                        onDispose { ExternalUriHandler.listener = null }
+                    }
                     MainLayout {
                         Box(Modifier.fillMaxSize()) {
                             val pending =
