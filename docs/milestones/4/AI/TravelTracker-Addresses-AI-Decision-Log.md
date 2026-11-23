@@ -2,13 +2,13 @@
 
 ## Overview and coverage
 
-Records the available conversation and observed work on 2026-11-22. The milestone-4
+Records the available conversation and observed work on 2026-11-22 and 2026-11-23. The milestone-4
 placement is inferred from the requested `WEB_3/ML_4` workspace and linked M4 issues;
 it does not establish completion of a separate RNDTransit course milestone.
 
 | Contributor | Scope | AI use | Entry |
 | --- | --- | --- | --- |
-| NewWaveOwl (requesting account; personal attribution not supplied) | TravelTracker addresses, OTP previews, authentication, six linked features and Windows update | Codex research, implementation, tests and read-only review | A1, A2 |
+| NewWaveOwl (requesting account; personal attribution not supplied) | TravelTracker addresses, OTP previews, authentication, six linked features and Windows update | Codex research, implementation, tests and read-only review | A1, A2, A3 |
 
 ## Session index
 
@@ -16,6 +16,7 @@ it does not establish completion of a separate RNDTransit course milestone.
 | --- | --- | --- | --- |
 | A1 | 2026-11-22 | Codex; [Conversation link needed] | Select address provider and implement shared integration |
 | A2 | 2026-11-22 | Codex; [Conversation link needed] | Diagnose signed-in address rejection; implement and commit six routing/address issues |
+| A3 | 2026-11-23 | Codex; [Conversation link needed] | Diagnose missing tables and live routing Auth setup; verify fixes and prepare requested publication |
 
 ## A1 — Public Nominatim and shared Windows backend
 
@@ -253,6 +254,128 @@ remain unverified. Fixture/browser processes were stopped, and temporary scripts
 logs/screenshots stayed in ignored frontend bin/TestResults directories. The
 primary agent inspected representative screenshots. Human review is still not
 claimed by an AI review or simulated UI check.
+
+## A3 - Runtime failures and publication checks
+
+**Contributor:** NewWaveOwl requesting account; personal attribution [Not documented].
+**Conversation:** [Conversation link needed]. **AI tool:** Codex and the existing
+frontend/backend/review agents. Exact model variants [Not documented].
+
+### Full prompt 1
+
+```text
+fail: TravelTracker.Users.Api[0]
+      Users request failed (PostgresException) on GET api/v1/users/me/picture (trace 0HNQ93SM61D7D:00000004).
+warn: TravelTracker.Frontend.Api.ServiceClient[0]
+      GET service request to /api/v1/users failed as Unavailable (status 503, failure type (null))
+warn: TravelTracker.Frontend.Api.ServiceClient[0]
+      PUT service request to /api/v1/users failed as Unexpected (status 413, failure type (null))
+warn: TravelTracker.Frontend.Api.ServiceClient[0]
+      PUT service request to /api/v1/users failed as Unexpected (status 413, failure type (null))
+warn: TravelTracker.Frontend.Api.ServiceClient[0]
+      PUT service request to /api/v1/users failed as Unexpected (status 413, failure type (null))
+fail: TravelTracker.Users.Api[0]
+      Users request failed (PostgresException) on PUT api/v1/users/me/picture (trace 0HNQ93SM61D7D:00000008).
+warn: TravelTracker.Frontend.Api.ServiceClient[0]
+      PUT service request to /api/v1/users failed as Unavailable (status 503, failure type (null))
+fail: TravelTracker.Users.Api[0]
+      Users request failed (PostgresException) on PUT api/v1/users/me/picture (trace 0HNQ93SM61D7D:00000009).
+warn: TravelTracker.Frontend.Api.ServiceClient[0]
+      PUT service request to /api/v1/users failed as Unavailable (status 503, failure type (null))
+warn: TravelTracker.Frontend.Api.ServiceClient[0]
+      PUT service request to /api/v1/users failed as Unexpected (status 413, failure type (null))
+fail: TravelTracker.Users.Api[0]
+      Users request failed (PostgresException) on PUT api/v1/users/me/picture (trace 0HNQ93SM61D7D:0000000B).
+warn: TravelTracker.Frontend.Api.ServiceClient[0]
+      PUT service request to /api/v1/users failed as Unavailable (status 503, failure type (null))
+fail: TravelTracker.Users.Api[0]
+      Users request failed (PostgresException) on PUT api/v1/users/me/picture (trace 0HNQ93SM61D7D:0000000C).
+warn: TravelTracker.Frontend.Api.ServiceClient[0]
+      PUT service request to /api/v1/users failed as Unavailable (status 503, failure type (null))
+fail: TravelTracker.Users.Api[0]
+      Users request failed (PostgresException) on PUT api/v1/users/me/picture (trace 0HNQ93SM61D7D:0000000D).
+warn: TravelTracker.Frontend.Api.ServiceClient[0]
+      PUT service request to /api/v1/users failed as Unavailable (status 503, failure type (null))
+fail: TravelTracker.Users.Api[0]
+      Users request failed (PostgresException) on GET api/v1/users/me/picture (trace 0HNQ93SM61D7D:0000000E).
+warn: TravelTracker.Frontend.Api.ServiceClient[0]
+      GET service request to /api/v1/users failed as Unavailable (status 503, failure type (null))
+warn: TravelTracker.Frontend.Api.ServiceClient[0]
+      GET service request to /v1/places/reverse failed as Unavailable (status 503, failure type (null))
+warn: TravelTracker.Frontend.Api.ServiceClient[0]
+      GET service request to /v1/places/search failed as Unavailable (status 503, failure type (null))
+warn: TravelTracker.Frontend.Api.ServiceClient[0]
+      GET service request to /v1/routes/capabilities failed as Network (status (null), failure type TaskCanceledException)
+warn: TravelTracker.Frontend.Api.ServiceClient[0]
+      GET service request to /v1/routes/capabilities failed as Network (status (null), failure type TaskCanceledException) when tring to add route to bike
+```
+
+### Full prompt 2
+
+```text
+also cannotsave Action could not be completed
+Your draft is still here. Correct the details or retry.
+
+The requested service is unavailable. Your entries are retained; try again shortly.
+The previous attempt may have saved this. Check your saved list before retrying so you do not create a duplicate. info: TravelTracker.Api.Trips.TripReferenceValidator[0]
+      trip check passed: 1 leg(s) snapshotted and ready to save.
+fail: TravelTracker.Api.Trips.TripSaveService[0]
+      trip write failed (DbUpdateException); this service cannot confirm what the repository kept.
+fail: TripFailures[0]
+      Trip request failed with HTTP 503 (dependency failure); exception type DbUpdateException.
+warn: TravelTracker.Frontend.Api.ServiceClient[0]
+      POST service request to /api/v1/trips failed as Unavailable (status 503, failure type (null))
+warn: TravelTracker.Frontend.Components.Pages.NewTrip[0]
+      Trip request failed as Unavailable (status 503)
+```
+
+### Full follow-up answer
+
+Question: Was the latest RNDTransitServer update ZIP installed on the server PC,
+and is its current Public HTTPS address still the configured tunnel?
+
+```text
+Updated; that tunnel address is current
+```
+
+### Full prompt 3
+
+```text
+After testing taht all featuer that realted to mpleted ises work. create aq PR to main travel and close iisue in pr thatwe complet tin this caht tracker the ahnges to RND trasit bakend keep inthe seprate brunch and push
+```
+
+**AI output summary:** Read-only project database logs identified absent
+`UserPictures` and `TripStops`; their existing EF migrations need applying on the
+local app stack. The operator received the migration command and explicit browser
+draft Save/Restore instructions. The current tunnel's two anonymous health checks
+returned 200; one deliberately invalid synthetic credential carrying the app's
+expected issuer returned `503 authentication_unavailable` in 360 ms. This confirms
+missing/mismatched TravelTracker Auth settings before provider work, not a
+successful authenticated journey. No real account token was used for the probe.
+
+**Implemented result:** The app rejects recognizable oversized image dimensions
+before PUT and shows fixed, bounded/allowlisted routing setup and connection
+guidance. It does not expose arbitrary backend diagnostic text or change the
+eight-second client deadline. Separate frontend commits are `5e0db39` and
+`cd27913`. Recovery and migration-inventory docs explain the operator steps.
+No Kotlin runtime change or replacement update ZIP was needed for these failures.
+
+**Verification:** Release build zero warnings/errors; 1,781 application tests
+passed, including 727 frontend cases, plus 55 Node interaction regressions.
+Fresh Kotlin gate on runtime-equivalent documentation HEAD `5188f7b` passed
+132 backend and 60 launcher cases with zero failures/errors/skips/warnings.
+Offline production-adapter replay passed five modes and all 11 recorded real OTP
+alternatives. AI source review found no remaining blockers. Updated browser and
+publication results belong to the final PR delivery record; this log does not
+invent a merge or human review.
+
+**Student decision:** The user confirmed the deployed update/tunnel and explicitly
+requested testing, a TravelTracker PR with completed issue references, and pushing
+the backend on its separate branch. Execution of database migrations and correction
+of server Auth settings have not been observed. Personal reflection, time estimates
+and final teammate review remain [Student reflection needed].
+
+**Technique record:** A3 in the companion technique log.
 
 ## Reflection
 

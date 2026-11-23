@@ -41,3 +41,22 @@
 | Outcome | Auth fix and six requested features are committed locally, with a narrow-screen CSS follow-up after real pointer clicks exposed an overlay defect. A verified 34-JAR update ZIP records the runtime source commit and checksum. |
 | Iterations / time / code impact | [Not documented]; student estimates required. |
 | Productivity / learning | [Student reflection needed]. |
+
+## A3 - Distinguish schema, validation and remote Auth failures
+
+**Date:** 2026-11-23. **Contributor:** NewWaveOwl requesting account.
+**Conversation:** [Conversation link needed].
+**Full prompts:** A3 in the companion decision log.
+
+| Field | Evidence / student record |
+| --- | --- |
+| Challenge | Similar 503 UI failures came from absent Users/Trips tables and an incompatible routing Auth project, while 413 was a separate image-size rejection. |
+| AI used | Codex primary agent plus existing frontend, backend and read-only review agents. |
+| Observable prompting | User supplied actual logs, added a save failure, confirmed update/tunnel state and requested verified PR/branch publication. |
+| Deliberate techniques | [Student reflection needed]. |
+| Debugging | Read database logs before proposing schema changes; inspect committed migrations; compare anonymous health with one invalid-credential issuer probe; leave real account tokens and providers untouched. |
+| Strategy | Apply existing migrations through the operator launcher; fix frontend feedback and early dimensions rather than increasing deadlines or changing routing algorithms without evidence. |
+| Verification | A3 records 1,781 application/727 frontend tests, 55 Node cases, fresh 132 backend/60 launcher cases and five-mode/11-alternative offline OTP replay. |
+| Outcome | Two focused frontend fixes committed; operator recovery documented; Kotlin runtime unchanged. User requested TravelTracker PR and separate backend branch push. No human review or completed live repair is invented. |
+| Iterations / time / code impact | [Not documented]; student estimates required. |
+| Productivity / learning | [Student reflection needed]. |
