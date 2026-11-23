@@ -1,6 +1,7 @@
 package com.example.rnd_transit_mtl.View.current_trip
 
 import com.example.rnd_transit_mtl.data.trips.LocalCloudTrips
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.location.LocationAccuracyNotice
 
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMap
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMapData
@@ -57,7 +58,9 @@ import com.example.rnd_transit_mtl.model.trip.TripJourneyKind
 import com.example.rnd_transit_mtl.model.trip.guidanceAt
 import com.example.rnd_transit_mtl.model.trip.compactGuidanceAt
 import com.example.rnd_transit_mtl.model.geo.GeoPoint
+import com.example.rnd_transit_mtl.model.geo.uncertaintyRing
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.MockTripMap
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.rememberAnimatedMapPosition
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.toSampleMapLegs
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.transitions.tripPanelEntrance
 import com.example.rnd_transit_mtl.ui.theme.*
@@ -88,8 +91,8 @@ private val ActiveMapInstructionIconSize = 32.dp
 private val ActiveMapWarningIconSize = 26.dp
 private val ActiveMapWarningMinimumHeight = 88.dp
 private val ActiveMapLegIndicatorSize = 12.dp
-private val ActiveMapPanelHandleHeight = 24.dp
-private val ActiveMapPanelMinimumHeight = 76.dp
+private val ActiveMapPanelHandleHeight = 20.dp
+private val ActiveMapPanelMinimumHeight = ActiveMapPanelTopPadding + ActiveMapPanelHandleHeight
 
 // Animation settings — details grow down from the compact hint and retract upwards.
 private const val ACTIVE_TRIP_DIRECTIONS_ANIMATION_DURATION_MILLIS = 280
@@ -118,6 +121,8 @@ enum class TripLocationState {
     NotTracking,
     Live,
     LastKnown,
+    LowAccuracy,
+    MatchedLowAccuracy,
     Estimated,
     EstimatedStale,
     Waiting,
@@ -162,6 +167,7 @@ fun ActiveMapContent(
     simulationEnabled: Boolean = true,
     userPosition: GeoPoint? = null,
     onRequestLocation: () -> Unit = {},
+    userUncertaintyMeters: Double? = null,
 ) {
     val fraction = if (progress.isFinite()) {
         progress.coerceIn(0f, 1f)
@@ -169,11 +175,15 @@ fun ActiveMapContent(
         0f
     }
     val completed = fraction >= 1f
+    val renderedUserPosition = rememberAnimatedMapPosition(userPosition.takeUnless { simulationEnabled })
     val positionAvailable = if (simulationEnabled) locationState == TripLocationState.Sample || locationState == TripLocationState.Stale
-        else userPosition != null && locationState in setOf(TripLocationState.Live, TripLocationState.LastKnown, TripLocationState.Estimated, TripLocationState.EstimatedStale, TripLocationState.Stale)
+        else userPosition != null
     val reference = trip.id.value.takeLast(3)
     val positionLabel = sampleStateLabel ?: when {
         !simulationEnabled && locationState == TripLocationState.LastKnown -> "Last known position"
+        !simulationEnabled && locationState == TripLocationState.LowAccuracy -> "Low GPS accuracy"
+        !simulationEnabled && locationState == TripLocationState.MatchedLowAccuracy -> "Estimated position · Low GPS accuracy"
+        !simulationEnabled && locationState == TripLocationState.PermissionDenied && userPosition != null -> "Last known position"
         !simulationEnabled && (locationState == TripLocationState.Estimated || locationState == TripLocationState.EstimatedStale) -> "Estimated position"
         !simulationEnabled && locationState == TripLocationState.Stale && userPosition != null -> "Position paused"
         else -> null
@@ -187,8 +197,7 @@ fun ActiveMapContent(
     }
 
     LaunchedEffect(fraction, locationState, simulationEnabled) {
-        if (locationState == TripLocationState.Sample || locationState == TripLocationState.Live || locationState == TripLocationState.Estimated || locationState == TripLocationState.EstimatedStale ||
-            (!simulationEnabled && (locationState == TripLocationState.Stale || locationState == TripLocationState.LastKnown))) {
+        if (locationState == TripLocationState.Sample || !simulationEnabled) {
             retainedMapProgress = fraction
         }
     }
@@ -275,7 +284,8 @@ fun ActiveMapContent(
                 data = TransitMapData(
                     trip = trip,
                     progress = retainedMapProgress.takeIf { positionAvailable },
-                    userPosition = userPosition.takeIf { !simulationEnabled && positionAvailable },
+                    userPosition = renderedUserPosition.takeIf { !simulationEnabled && positionAvailable },
+                    userUncertaintyMeters = userUncertaintyMeters.takeIf { !simulationEnabled && positionAvailable },
                     simulatePosition = simulationEnabled,
                     recenterRequest = recenterRequest,
                     followPosition = followPosition,
@@ -302,7 +312,12 @@ fun ActiveMapContent(
                 onManualCameraMove = { followPosition = false },
                 showControls = false,
                 showPosition = positionAvailable,
-                userPosition = userPosition?.toSampleMapPoint("Your location").takeIf { !simulationEnabled && positionAvailable },
+                userPosition = renderedUserPosition?.toSampleMapPoint("Your location").takeIf { !simulationEnabled && positionAvailable },
+                userUncertaintyRing = remember(renderedUserPosition, userUncertaintyMeters, simulationEnabled) {
+                    if (simulationEnabled) emptyList() else renderedUserPosition?.let { point ->
+                        userUncertaintyMeters?.let { point.uncertaintyRing(it).map { it.toSampleMapPoint("Location uncertainty") } }
+                    }.orEmpty()
+                },
                 recenterRequest = recenterRequest,
                 topInset = with(density) { headerHeight.toDp() },
                 bottomInset = with(density) { panelHeight.toDp() },
@@ -395,13 +410,16 @@ fun ActiveMapContent(
                         )
                     }
 
+                    if (!simulationEnabled) LocationAccuracyNotice(
+                        modifier = Modifier.padding(horizontal = 16.dp), enabled = actionsEnabled
+                    )
                     if (!mainOverview) {
                         when (locationState) {
                             TripLocationState.Stale, TripLocationState.EstimatedStale -> TripWarning(
                                 title = "Location is not updating",
                                 detail = staleMessage
-                                    ?: if (locationState == TripLocationState.EstimatedStale) "No reliable GPS reading for over 30 seconds. Position is estimated along your saved route."
-                                    else "No reliable GPS reading for over 30 seconds. Route remains available."
+                                    ?: if (locationState == TripLocationState.EstimatedStale) "No fresh location reading for over 30 seconds. Position is estimated along your saved route."
+                                    else "No fresh location reading for over 30 seconds. Route remains available."
                             )
 
                             TripLocationState.Missing -> TripWarning(
@@ -416,7 +434,8 @@ fun ActiveMapContent(
                             }
 
                             TripLocationState.PermissionDenied -> TripWarning("Location permission needed", "Tap recenter to allow location access.")
-                            TripLocationState.NotTracking, TripLocationState.Waiting, TripLocationState.LastKnown -> Unit
+                            TripLocationState.NotTracking, TripLocationState.Waiting, TripLocationState.LastKnown,
+                            TripLocationState.LowAccuracy, TripLocationState.MatchedLowAccuracy -> Unit
                         }
                     }
                 }
@@ -454,7 +473,7 @@ fun ActiveMapContent(
                 )
             }
 
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(panelVisibleHeight)
@@ -472,84 +491,91 @@ fun ActiveMapContent(
                         contentDescription = "Trip progress panel"
                         stateDescription = "${(panelExpansion * 100).roundToInt()} percent open"
                     }
-                    .padding(start = ActiveMapPanelPadding, end = ActiveMapPanelPadding,
-                        top = ActiveMapPanelTopPadding, bottom = ActiveMapPanelBottomPadding),
-                verticalArrangement = Arrangement.spacedBy(ActiveMapPanelHeaderSpacing)
             ) {
-                Box(
-                    Modifier.fillMaxWidth().height(ActiveMapPanelHandleHeight)
-                        .semantics { contentDescription = "Trip panel handle" },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Box(Modifier.width(48.dp).height(4.dp).background(TransitWhite, RoundedCornerShape(2.dp)))
-                }
+                // Keep the full sheet below the viewport as it is pulled down, leaving only its handle.
                 Column(
-                    Modifier.weight(1f).verticalScroll(panelScroll, enabled = mapInteractive),
-                    verticalArrangement = Arrangement.spacedBy(ActiveMapActionSpacing),
+                    Modifier.fillMaxWidth()
+                        .wrapContentHeight(Alignment.Top, unbounded = true)
+                        .height(panelMaxHeight)
+                        .padding(start = ActiveMapPanelPadding, end = ActiveMapPanelPadding,
+                            top = ActiveMapPanelTopPadding, bottom = ActiveMapPanelBottomPadding),
+                    verticalArrangement = Arrangement.spacedBy(ActiveMapPanelHeaderSpacing)
                 ) {
-                    if (mainOverview) {
-                        Text(
-                            "Your adventure is still running",
-                            color = TransitWhite,
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                    Box(
+                        Modifier.fillMaxWidth().height(ActiveMapPanelHandleHeight)
+                            .semantics { contentDescription = "Trip panel handle" },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Box(Modifier.width(48.dp).height(4.dp).background(TransitWhite, RoundedCornerShape(2.dp)))
                     }
-
-                    if (trip.journey?.kind == TripJourneyKind.Return) {
-                        Text("Returning to your start", color = TransitWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Text("${if (trip.journey?.kind == TripJourneyKind.Return) "Return trip" else "Current trip"} · #$reference",
-                        color = TransitWhite, fontSize = 14.sp)
-                    if (locationState == TripLocationState.NotTracking) {
-                        Text("Trip progress paused", color = TransitWhite, fontSize = 14.sp)
-                    }
-                    if (locationState == TripLocationState.Waiting) {
-                        Text("Finding your location", color = TransitWhite, fontSize = 14.sp)
-                    }
-                    EstimatedTripProgress(trip, fraction)
-
-                    if (operationMessage != null) {
-                        Text(
-                            operationMessage,
-                            color = TransitWhite,
-                            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
-                        )
-                    }
-
-                    if (mainOverview) {
-                        TripActionButton(
-                            label = "Resume current trip",
-                            enabled = actionsEnabled,
-                            onClick = onResume
-                        )
-                        Text(
-                            "Finish or cancel this trip before generating another.",
-                            color = TransitWhite,
-                            fontSize = 12.sp
-                        )
-                    } else {
-                        Row(horizontalArrangement = Arrangement.spacedBy(ActiveMapActionSpacing)) {
-                            if (completed || simulationEnabled || trip.journey?.kind == TripJourneyKind.Return) TripActionButton(
-                                label = if (completed) "Review trip" else if (trip.journey?.kind == TripJourneyKind.Return)
-                                    "I'm back at the start" else "Finish trip",
-                                enabled = actionsEnabled,
-                                onClick = {
-                                    if (completed) onFinish()
-                                    else { confirmingCancel = false; confirmingFinish = true }
-                                },
-                                modifier = Modifier.weight(1f)
-                            )
-                            TripActionButton(
-                                label = "Cancel",
-                                secondary = true,
-                                enabled = actionsEnabled && !completed,
-                                onClick = { confirmingFinish = false; confirmingCancel = true },
-                                modifier = Modifier.weight(1f)
+                    Column(
+                        Modifier.weight(1f).verticalScroll(panelScroll, enabled = mapInteractive),
+                        verticalArrangement = Arrangement.spacedBy(ActiveMapActionSpacing),
+                    ) {
+                        if (mainOverview) {
+                            Text(
+                                "Your adventure is still running",
+                                color = TransitWhite,
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold
                             )
                         }
-                        TextButton(onClick = onShowInformation, enabled = actionsEnabled) {
-                            Text("Trip information", color = TransitWhite)
+
+                        if (trip.journey?.kind == TripJourneyKind.Return) {
+                            Text("Returning to your start", color = TransitWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Text("${if (trip.journey?.kind == TripJourneyKind.Return) "Return trip" else "Current trip"} · #$reference",
+                            color = TransitWhite, fontSize = 14.sp)
+                        if (locationState == TripLocationState.NotTracking) {
+                            Text("Trip progress paused", color = TransitWhite, fontSize = 14.sp)
+                        }
+                        if (locationState == TripLocationState.Waiting) {
+                            Text("Finding your location", color = TransitWhite, fontSize = 14.sp)
+                        }
+                        EstimatedTripProgress(trip, fraction)
+
+                        if (operationMessage != null) {
+                            Text(
+                                operationMessage,
+                                color = TransitWhite,
+                                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+                            )
+                        }
+
+                        if (mainOverview) {
+                            TripActionButton(
+                                label = "Resume current trip",
+                                enabled = actionsEnabled,
+                                onClick = onResume
+                            )
+                            Text(
+                                "Finish or cancel this trip before generating another.",
+                                color = TransitWhite,
+                                fontSize = 12.sp
+                            )
+                        } else {
+                            Row(horizontalArrangement = Arrangement.spacedBy(ActiveMapActionSpacing)) {
+                                if (completed || simulationEnabled || trip.journey?.kind == TripJourneyKind.Return) TripActionButton(
+                                    label = if (completed) "Review trip" else if (trip.journey?.kind == TripJourneyKind.Return)
+                                        "I'm back at the start" else "Finish trip",
+                                    enabled = actionsEnabled,
+                                    onClick = {
+                                        if (completed) onFinish()
+                                        else { confirmingCancel = false; confirmingFinish = true }
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                TripActionButton(
+                                    label = "Cancel",
+                                    secondary = true,
+                                    enabled = actionsEnabled && !completed,
+                                    onClick = { confirmingFinish = false; confirmingCancel = true },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            TextButton(onClick = onShowInformation, enabled = actionsEnabled) {
+                                Text("Trip information", color = TransitWhite)
+                            }
                         }
                     }
                 }

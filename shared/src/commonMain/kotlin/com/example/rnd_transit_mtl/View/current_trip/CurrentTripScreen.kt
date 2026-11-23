@@ -31,6 +31,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.rnd_transit_mtl.ViewModels.current_trip.CurrentTripLocationViewModel
 import com.example.rnd_transit_mtl.ViewModels.current_trip.TripLocationAvailability
 import com.example.rnd_transit_mtl.data.location.LocalPlannerLocation
+import com.example.rnd_transit_mtl.data.location.LocationJumpFilter
 import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.simulation.ActiveTripSimulation
 import com.example.rnd_transit_mtl.state.debug.LocalDebugModeState
@@ -93,7 +94,8 @@ fun CurrentTripScreen(
     val simulationRunningAllowed = simulationEnabled && !debugMode.isModeChooserVisible
     val location = LocalPlannerLocation.current
     val locationModel = viewModel(key = "trip-location:${trip.id.value}") {
-        CurrentTripLocationViewModel(trip, tripsStore, initialFix = location?.fix.takeUnless { simulationEnabled })
+        CurrentTripLocationViewModel(trip, tripsStore, initialFix = location?.fix.takeUnless { simulationEnabled },
+            jumpFilter = location?.jumpFilter ?: LocationJumpFilter())
     }
     val locationState by locationModel.state.collectAsStateWithLifecycle()
     var locationRequested by rememberSaveable(trip.id.value) { mutableStateOf(false) }
@@ -132,7 +134,7 @@ fun CurrentTripScreen(
         else -> 0L
     }
 
-    val progress = if (!simulationEnabled && activeState != null) locationState.estimatedProgress ?: activeState.routeProgress ?: 0f else (
+    val progress = if (!simulationEnabled && activeState != null) locationState.displayedProgress ?: activeState.routeProgress ?: 0f else (
             elapsedMillis.toFloat() /
                     TRIP_SIMULATION_DURATION_MILLIS.toFloat()
             ).coerceIn(0f, 1f)
@@ -172,7 +174,7 @@ fun CurrentTripScreen(
             if (location.fix == null) location.request()
         }
         location.fix?.let(locationModel::receive)
-        val collector = launch { location.automaticOriginUpdates?.collect(locationModel::receive) }
+        val collector = launch { location.trackingUpdates?.collect(locationModel::receive) }
         try {
             while (isActive) {
                 delay(250)
@@ -534,21 +536,23 @@ fun CurrentTripScreen(
                 if (latestDestinationActive) navigation.requestTripInformation()
             },
             simulationEnabled = simulationEnabled,
-            userPosition = if (simulationEnabled) null else locationState.estimatedPosition ?: locationState.fix?.point,
+            userPosition = if (simulationEnabled) null else locationState.displayedPosition,
+            userUncertaintyMeters = if (simulationEnabled) null else locationState.uncertaintyRadiusMeters,
             onRequestLocation = { location?.request() },
             locationState = if (simulationEnabled) TripLocationState.Sample else when (locationState.availability) {
                 TripLocationAvailability.Available -> TripLocationState.Live
                 TripLocationAvailability.LastKnown -> TripLocationState.LastKnown
+                TripLocationAvailability.LowAccuracy -> if (locationState.matchedPosition != null) TripLocationState.MatchedLowAccuracy else TripLocationState.LowAccuracy
                 TripLocationAvailability.Estimated -> TripLocationState.Estimated
-                TripLocationAvailability.Stale -> if (locationState.estimatedPosition != null) TripLocationState.EstimatedStale else TripLocationState.Stale
+                TripLocationAvailability.Stale -> if (locationState.estimatedPosition != null || locationState.matchedPosition != null) TripLocationState.EstimatedStale else TripLocationState.Stale
                 TripLocationAvailability.PermissionDenied -> TripLocationState.PermissionDenied
                 TripLocationAvailability.Waiting -> TripLocationState.Waiting
                 TripLocationAvailability.Unsupported -> TripLocationState.NotTracking
             },
             staleMessage = if (simulationEnabled) null else when {
                 locationState.availability == TripLocationAvailability.Stale ->
-                    if (locationState.estimatedPosition != null) "No reliable GPS reading for over 30 seconds. Position is estimated along your saved route."
-                    else "No reliable GPS reading for over 30 seconds. Your last position is kept on the map."
+                    if (locationState.estimatedPosition != null || locationState.matchedPosition != null) "No fresh location reading for over 30 seconds. Position is estimated along your saved route."
+                    else "No fresh location reading for over 30 seconds. Your last position is kept on the map."
                 locationState.offRoute -> "You are away from the planned route. Your position remains visible."
                 else -> null
             },

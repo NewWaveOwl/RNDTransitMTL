@@ -59,6 +59,10 @@ class CurrentTripLocationViewModelTest {
         val reopened = CurrentTripLocationViewModel(trip, store, initialFix = fix) { now }
         assertEquals(TripLocationAvailability.Stale, reopened.state.value.availability)
         assertEquals(0f, store.progress)
+        repeat(2) {
+            model.receive(LocationUpdate.Fix(GeoPoint(45.5015, -73.6), 5.0, now))
+            now += 2_000
+        }
         val recovered = LocationUpdate.Fix(GeoPoint(45.5015, -73.6), 5.0, now)
         model.receive(recovered)
         assertEquals(recovered, model.state.value.fix)
@@ -67,7 +71,7 @@ class CurrentTripLocationViewModelTest {
     }
 
     @Test
-    fun coarseSharedPositionRemainsVisibleWithoutConfirmingArrivalAndPermissionDenialClearsIt() {
+    fun coarseSharedPositionRemainsVisibleWithoutConfirmingArrivalEvenAfterPermissionDenial() {
         var now = 50_000L
         val trip = guidanceTestTrip()
         val store = TripsStore { now }.also { it.start(trip) }
@@ -75,20 +79,60 @@ class CurrentTripLocationViewModelTest {
         val model = CurrentTripLocationViewModel(trip, store, initialFix = coarse) { now }
         model.receive(coarse)
         assertEquals(coarse, model.state.value.fix)
-        assertEquals(TripLocationAvailability.LastKnown, model.state.value.availability)
+        assertEquals(TripLocationAvailability.LowAccuracy, model.state.value.availability)
         assertEquals(0f, store.progress)
         assertTrue(store.completedTrips.isEmpty())
         now += 30_001
         model.receive(coarse.copy(timestampEpochMillis = now))
+        assertEquals(TripLocationAvailability.LowAccuracy, model.state.value.availability)
+        now += 30_000
+        model.refreshFreshness()
+        assertEquals(TripLocationAvailability.LowAccuracy, model.state.value.availability)
+        now++
+        model.refreshFreshness()
         assertEquals(TripLocationAvailability.Stale, model.state.value.availability)
         assertNull(model.state.value.estimatedPosition)
         model.receive(LocationUpdate.PermissionDenied)
         model.useSharedFix(coarse)
-        assertNull(model.state.value.fix)
+        assertEquals(coarse.point, model.state.value.displayedPosition)
         assertEquals(TripLocationAvailability.PermissionDenied, model.state.value.availability)
         val future = CurrentTripLocationViewModel(trip, store, initialFix = coarse.copy(timestampEpochMillis = now + 1)) { now }
         assertNull(future.state.value.fix)
         assertEquals(TripLocationAvailability.Waiting, future.state.value.availability)
+    }
+
+    @Test
+    fun continuousCoarseUpdatesMoveTheMarkerWithoutWarningOrChangingProgressAndRecoverWithPreciseGps() {
+        var now = 50_000L
+        val trip = guidanceTestTrip()
+        val store = TripsStore { now }.also { it.start(trip) }
+        val model = CurrentTripLocationViewModel(trip, store) { now }
+        model.receive(LocationUpdate.Fix(GeoPoint(45.5015, -73.6), 5.0, now))
+        val progress = store.progress
+        repeat(12) { index ->
+            now += 10_000
+            val point = GeoPoint(if (index % 2 == 0) 45.50155 else 45.50145, -73.5998)
+            val fix = LocationUpdate.Fix(point, 200.0, now)
+            model.receive(fix)
+            model.refreshFreshness()
+            assertEquals(fix, model.state.value.fix)
+            assertEquals(TripLocationAvailability.LowAccuracy, model.state.value.availability)
+            assertEquals(progress, store.progress)
+            assertNull(model.state.value.estimatedPosition)
+            assertTrue(store.completedTrips.isEmpty())
+        }
+        now += 30_001
+        model.refreshFreshness()
+        assertEquals(TripLocationAvailability.Stale, model.state.value.availability)
+        model.receive(LocationUpdate.Fix(GeoPoint(45.5016, -73.5999), 100.0, now))
+        assertEquals(TripLocationAvailability.LowAccuracy, model.state.value.availability)
+        now += 1_000
+        val precise = LocationUpdate.Fix(GeoPoint(45.5018, -73.6), 5.0, now)
+        model.receive(precise)
+        assertEquals(TripLocationAvailability.Available, model.state.value.availability)
+        assertEquals(precise, model.state.value.fix)
+        assertTrue(store.progress > progress)
+        assertTrue(store.completedTrips.isEmpty())
     }
 
     @Test
@@ -100,7 +144,9 @@ class CurrentTripLocationViewModelTest {
         val model = CurrentTripLocationViewModel(trip, store) { now }
         model.receive(LocationUpdate.Fix(trip.origin.point, 5.0, now))
         assertEquals("Start on Rue Sherbrooke", trip.compactGuidanceAt(store.progress, trip.origin.point))
-        now += 2_000
+        now += 30_000
+        model.receive(LocationUpdate.Fix(GeoPoint(45.5008, -73.6), 5.0, now))
+        now += 30_000
         val halfway = GeoPoint(45.5015, -73.6)
         model.receive(LocationUpdate.Fix(halfway, 5.0, now))
         assertEquals(halfway, model.state.value.fix?.point)
@@ -117,12 +163,14 @@ class CurrentTripLocationViewModelTest {
         model.receive(LocationUpdate.Fix(trip.destination.point, 200.0, now))
         assertEquals(savedProgress, store.progress)
         assertTrue(store.completedTrips.isEmpty())
-        now += 1_000
-        model.receive(LocationUpdate.Fix(GeoPoint(45.6, -73.7), 5.0, now))
+        repeat(3) {
+            now += 2_000
+            model.receive(LocationUpdate.Fix(GeoPoint(45.6, -73.7), 5.0, now))
+        }
         assertTrue(model.state.value.offRoute)
         assertEquals(savedProgress, store.progress)
         model.receive(LocationUpdate.PermissionDenied)
-        assertNull(model.state.value.fix)
+        assertEquals(GeoPoint(45.6, -73.7), model.state.value.displayedPosition)
         assertEquals(TripLocationAvailability.PermissionDenied, model.state.value.availability)
         assertTrue(store.completedTrips.isEmpty())
         val restored = assertNotNull(TripsStore.fromSavedStateJson(store.toSavedStateJson(), { now }))
@@ -235,6 +283,8 @@ class CurrentTripLocationViewModelTest {
         model.refreshFreshness()
         assertTrue(assertNotNull(model.state.value.estimatedProgress) < 1f / 3f, "No estimated boarding")
         now += 1_000
+        model.receive(LocationUpdate.Fix(GeoPoint(45.5011, -73.6), 3.0, now, 1.4))
+        now += 8_000
         model.receive(LocationUpdate.Fix(GeoPoint(45.5028, -73.6), 3.0, now, 1.4))
         now += 8_000
         model.receive(LocationUpdate.Fix(GeoPoint(45.5029, -73.6), 3.0, now, 1.4))
@@ -251,7 +301,7 @@ class CurrentTripLocationViewModelTest {
     }
 
     @Test
-    fun unreliableDuplicateAndOldReadingsCannotExtendTheGracePeriod() {
+    fun duplicateAndOldReadingsCannotExtendTheGracePeriod() {
         var now = 1_000L
         val trip = guidanceTestTrip()
         val store = TripsStore { now }.also { it.start(trip) }
@@ -259,7 +309,6 @@ class CurrentTripLocationViewModelTest {
         model.receive(LocationUpdate.Fix(trip.origin.point, 3.0, now))
         val goodFix = model.state.value.fix
         now += 30_001
-        model.receive(LocationUpdate.Fix(trip.destination.point, 200.0, now))
         model.receive(LocationUpdate.Fix(trip.destination.point, 3.0, now - 20_000))
         model.receive(LocationUpdate.Fix(trip.destination.point, 3.0, 1_000L))
         assertEquals(TripLocationAvailability.Stale, model.state.value.availability)
@@ -279,7 +328,10 @@ class CurrentTripLocationViewModelTest {
         now += 10_000
         model.refreshFreshness()
         assertNull(model.state.value.estimatedPosition, "A stopped device must not drift from GPS jitter")
-        model.receive(LocationUpdate.Fix(GeoPoint(45.6, -73.7), 3.0, now))
+        repeat(3) {
+            now += 2_000
+            model.receive(LocationUpdate.Fix(GeoPoint(45.6, -73.7), 3.0, now))
+        }
         now += 10_000
         model.refreshFreshness()
         assertTrue(model.state.value.offRoute)
@@ -288,10 +340,10 @@ class CurrentTripLocationViewModelTest {
         now += 31_000
         model.refreshFreshness()
         assertEquals(TripLocationAvailability.PermissionDenied, model.state.value.availability)
-        assertNull(model.state.value.fix)
+        assertEquals(GeoPoint(45.6, -73.7), model.state.value.displayedPosition)
         model.stop()
         model.refreshFreshness()
-        assertEquals(TripLocationAvailability.Waiting, model.state.value.availability)
+        assertEquals(TripLocationAvailability.PermissionDenied, model.state.value.availability)
         assertNull(model.state.value.estimatedPosition)
     }
 
@@ -345,10 +397,14 @@ class CurrentTripLocationViewModelTest {
             model.receive(LocationUpdate.Fix(trip.destination.point, 5.0, now))
         }
         assertTrue(store.completedTrips.isEmpty())
-        now += 1_000
-        model.receive(LocationUpdate.Fix(trip.origin.point, 5.0, now))
-        now += 1_000
-        model.receive(LocationUpdate.Fix(trip.destination.point, 5.0, now))
+        repeat(3) {
+            now += 2_000
+            model.receive(LocationUpdate.Fix(trip.origin.point, 5.0, now))
+        }
+        for (latitude in listOf(45.5008, 45.5015, 45.5028, 45.503)) {
+            now += 30_000
+            model.receive(LocationUpdate.Fix(GeoPoint(latitude, -73.6), 5.0, now))
+        }
         assertEquals(trip.id, store.completedTrips.single().id)
         assertNull(store.activeTrip)
         model.receive(LocationUpdate.Fix(trip.destination.point, 5.0, now))

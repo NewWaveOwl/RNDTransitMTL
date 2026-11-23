@@ -50,6 +50,7 @@ fun CurrentTripContent(
     simulationEnabled: Boolean = true,
     userPosition: GeoPoint? = null,
     onRequestLocation: () -> Unit = {},
+    userUncertaintyMeters: Double? = null,
 ) {
     val boundedProgress = boundedTripProgress(progress)
     val completed = boundedProgress == 1f
@@ -65,6 +66,7 @@ fun CurrentTripContent(
             staleMessage = staleMessage,
             simulationEnabled = simulationEnabled,
             userPosition = userPosition,
+            userUncertaintyMeters = userUncertaintyMeters,
             onRequestLocation = onRequestLocation,
             onFinish = { if (completed) onRequestReview() else onFinishRequested() },
             onConfirmCancel = onCancel,

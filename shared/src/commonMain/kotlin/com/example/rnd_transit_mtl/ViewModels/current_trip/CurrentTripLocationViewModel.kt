@@ -2,6 +2,10 @@ package com.example.rnd_transit_mtl.ViewModels.current_trip
 
 import androidx.lifecycle.ViewModel
 import com.example.rnd_transit_mtl.data.location.LocationUpdate
+import com.example.rnd_transit_mtl.data.location.LocationJumpFilter
+import com.example.rnd_transit_mtl.data.location.LocationCandidateConfirmation
+import com.example.rnd_transit_mtl.data.location.LOCATION_FIX_MAX_AGE_MILLIS
+import com.example.rnd_transit_mtl.data.location.LOCATION_UPDATE_TIMEOUT_MILLIS
 import com.example.rnd_transit_mtl.model.geo.GeoPoint
 import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.model.trip.TripRouteGeometry
@@ -12,8 +16,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlin.math.abs
 import kotlin.time.Clock
 
-internal const val TRIP_LOCATION_MAX_AGE_MILLIS = 15_000L
-internal const val TRIP_LOCATION_GRACE_MILLIS = 30_000L
+internal const val TRIP_LOCATION_MAX_AGE_MILLIS = LOCATION_FIX_MAX_AGE_MILLIS
+internal const val TRIP_LOCATION_GRACE_MILLIS = LOCATION_UPDATE_TIMEOUT_MILLIS
 private const val PredictionDelayMillis = 4_000L
 private const val MotionWindowMillis = 10_000L
 private const val TripLocationMaximumAccuracyMeters = 50.0
@@ -21,7 +25,7 @@ private const val TripRouteToleranceMeters = 35.0
 private const val TripArrivalToleranceMeters = 20.0
 
 /** Estimates are explicit and never become recorded GPS progress. */
-internal enum class TripLocationAvailability { Waiting, LastKnown, Available, Estimated, Stale, PermissionDenied, Unsupported }
+internal enum class TripLocationAvailability { Waiting, LastKnown, Available, LowAccuracy, Estimated, Stale, PermissionDenied, Unsupported }
 
 /** Keeps the real reading separate from a temporary route estimate. */
 internal data class CurrentTripLocationState(
@@ -30,7 +34,15 @@ internal data class CurrentTripLocationState(
     val offRoute: Boolean = false,
     val estimatedPosition: GeoPoint? = null,
     val estimatedProgress: Float? = null,
-)
+    val matchedPosition: GeoPoint? = null,
+    val matchedProgress: Float? = null,
+    val uncertaintyRadiusMeters: Double? = null,
+    val retainedPosition: GeoPoint? = null,
+    val retainedProgress: Float? = null,
+) {
+    val displayedPosition: GeoPoint? get() = retainedPosition ?: estimatedPosition ?: matchedPosition ?: fix?.point
+    val displayedProgress: Float? get() = retainedProgress ?: estimatedProgress ?: matchedProgress
+}
 
 /**
  * Matches fresh GPS to one accepted trip and keeps its real progress in the shared store.
@@ -44,11 +56,13 @@ internal class CurrentTripLocationViewModel(
     private val trip: Trip,
     private val tripsStore: TripsStore,
     initialFix: LocationUpdate.Fix? = null,
+    private val jumpFilter: LocationJumpFilter = LocationJumpFilter(),
     private val nowEpochMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(CurrentTripLocationState())
     val state = mutableState.asStateFlow()
     private var lastFixAt: Long? = null
+    private var lastReadingAt: Long? = null
     private var lastAcceptedTimestamp: Long? = null
     private var trackingStartedAt: Long? = null
     private data class MotionSample(val time: Long, val distance: Double)
@@ -59,6 +73,13 @@ internal class CurrentTripLocationViewModel(
     private var motionLegIndex: Int? = null
     private var velocityMetersPerSecond = 0.0
     private var anchorProgress: Float? = null
+    private var matchReferenceProgress: Float? = null
+    private var matchReferenceAt: Long? = null
+    private var matchingVelocity = 0.0
+    private var lastReliableOnRoute: Boolean? = null
+    private var lastProgressAt: Long? = null
+    private val unmatchedConfirmation = LocationCandidateConfirmation()
+    private var unmatchedPositionConfirmed = false
     private val restoredProgress = tripsStore.state.value.activeTrip
         ?.takeIf { it.trip.id == trip.id }?.routeProgress
     private var previousProgress = restoredProgress ?: 0f
@@ -76,7 +97,9 @@ internal class CurrentTripLocationViewModel(
         val now = nowEpochMillis()
         val measuredAt = fix.timestampEpochMillis ?: now
         if (measuredAt > now) return
-        startTracking()
+        if (trackingStartedAt == null) trackingStartedAt = now
+        lastReadingAt = measuredAt
+        jumpFilter.seed(fix, now)
         if (fix.accuracyMeters <= TripLocationMaximumAccuracyMeters) lastFixAt = measuredAt
         mutableState.value = CurrentTripLocationState(fix, TripLocationAvailability.LastKnown)
         refreshFreshness()
@@ -85,6 +108,7 @@ internal class CurrentTripLocationViewModel(
     /** Starts the initial-fix grace period when the active screen resumes. */
     fun startTracking() {
         if (trackingStartedAt == null) trackingStartedAt = nowEpochMillis()
+        jumpFilter.useMaximumSpeed(this, trackingMaximumSpeed())
     }
 
     /** @param update Latest provider reading or actual provider failure. */
@@ -94,8 +118,8 @@ internal class CurrentTripLocationViewModel(
             is LocationUpdate.Fix -> receiveFix(update)
             LocationUpdate.PermissionDenied -> {
                 clearMotion()
-                lastFixAt = null
-                mutableState.value = CurrentTripLocationState(availability = TripLocationAvailability.PermissionDenied)
+                matchingVelocity = 0.0
+                mutableState.value = withUncertainty(mutableState.value.copy(availability = TripLocationAvailability.PermissionDenied))
             }
             // Provider outages use the same grace period, retaining the last good position.
             LocationUpdate.Unavailable -> refreshFreshness()
@@ -106,28 +130,127 @@ internal class CurrentTripLocationViewModel(
         val now = nowEpochMillis()
         val measuredAt = fix.timestampEpochMillis ?: now
         if (now - measuredAt !in 0L..TRIP_LOCATION_MAX_AGE_MILLIS ||
-            lastAcceptedTimestamp?.let { measuredAt <= it } == true ||
-            fix.accuracyMeters > TripLocationMaximumAccuracyMeters) {
+            lastAcceptedTimestamp?.let { measuredAt <= it } == true) {
             refreshFreshness()
             return
         }
         lastAcceptedTimestamp = measuredAt
+        lastReadingAt = measuredAt
+        val decision = jumpFilter.evaluate(fix, now) ?: return
+        if (!decision.accepted) {
+            holdPosition(fix)
+            return
+        }
+        if (decision.relocated) clearMotion()
+        if (fix.accuracyMeters > TripLocationMaximumAccuracyMeters) {
+            // A fresh coarse reading means location is updating, but cannot confirm route progress.
+            val matched = matchWeakReading(fix, measuredAt)
+            if (matched == null && mutableState.value.displayedPosition?.distanceMetersTo(fix.point)?.let { it > 10.0 } == true &&
+                lastReliableOnRoute != false && !unmatchedPositionConfirmed && !decision.relocated &&
+                !unmatchedConfirmation.add(fix, measuredAt, maximumSpeed(routeGeometry.legIndexAt(previousProgress)))) {
+                holdPosition(fix)
+                return
+            }
+            unmatchedPositionConfirmed = matched == null
+            if (matched != null) unmatchedConfirmation.clear()
+            clearMotion()
+            mutableState.value = withUncertainty(CurrentTripLocationState(
+                fix, TripLocationAvailability.LowAccuracy,
+                matchedPosition = matched?.let { routeGeometry.pointAt(it.progress) },
+                matchedProgress = matched?.progress,
+            ))
+            if (matched != null) {
+                matchReferenceProgress = matched.progress
+                matchReferenceAt = measuredAt
+            }
+            return
+        }
         lastFixAt = measuredAt
+        unmatchedConfirmation.clear()
+        unmatchedPositionConfirmed = false
         val matched = trip.routePosition(fix.point, previousProgress)
         val onRoute = matched != null && matched.distanceFromRouteMeters <= TripRouteToleranceMeters
-        mutableState.value = CurrentTripLocationState(fix, TripLocationAvailability.Available, !onRoute)
+        lastReliableOnRoute = onRoute
+        mutableState.value = withUncertainty(CurrentTripLocationState(fix, TripLocationAvailability.Available, !onRoute))
         if (!onRoute) {
+            clearMotion()
+            matchingVelocity = 0.0
+            return
+        }
+        val progressAge = lastProgressAt?.let { (measuredAt - it).coerceAtLeast(0L) / 1_000.0 }
+        val travelBudget = 10.0 + minOf(fix.accuracyMeters, 25.0) +
+            trackingMaximumSpeed() * (progressAge ?: 0.0)
+        if (!decision.relocated && progressAge != null && abs(matched.progress - previousProgress) * routeLength > travelBudget) {
+            // Crossing/parallel geometry must not jump confirmed progress to a distant branch.
             clearMotion()
             return
         }
         recordMotion(fix, matched.progress, measuredAt)
+        matchingVelocity = velocityMetersPerSecond
+        matchReferenceProgress = matched.progress
+        matchReferenceAt = measuredAt
         var progress = matched.progress
         val atDestination = fix.point.distanceMetersTo(trip.destination.point) <= TripArrivalToleranceMeters
         if (progress >= 0.98f && atDestination && hasObservedRoute) progress = 1f
         if (progress >= 0.999f && (!hasObservedRoute || !atDestination)) progress = 0.999f
         previousProgress = progress
+        lastProgressAt = measuredAt
+        jumpFilter.useMaximumSpeed(this, trackingMaximumSpeed())
         if (progress < 0.98f) hasObservedRoute = true
         tripsStore.updateRouteProgress(trip.id, progress)
+    }
+
+    private fun holdPosition(fix: LocationUpdate.Fix) {
+        val current = mutableState.value
+        clearMotion()
+        matchingVelocity = 0.0
+        mutableState.value = withUncertainty(CurrentTripLocationState(
+            fix = fix,
+            availability = TripLocationAvailability.LastKnown,
+            offRoute = current.offRoute,
+            retainedPosition = current.displayedPosition ?: jumpFilter.acceptedFix?.point,
+            retainedProgress = current.displayedProgress ?: previousProgress,
+        ))
+    }
+
+    private fun maximumSpeed(legIndex: Int): Double {
+        val leg = trip.legs[legIndex]
+        val label = trip.selectedTransports.firstOrNull { it.id == leg.transportId }?.label.orEmpty().lowercase()
+        return when {
+            "walk" in label || "walk" in leg.transportId.value.lowercase() -> 3.5
+            "bik" in label || "cycl" in label -> 15.0
+            else -> 45.0
+        }
+    }
+
+    private fun trackingMaximumSpeed(): Double {
+        val legIndex = routeGeometry.legIndexAt(previousProgress)
+        val remaining = legLengths.take(legIndex + 1).sum() - previousProgress * routeLength
+        val nextLeg = (legIndex + 1).takeIf { it < trip.legs.size && remaining <= 30.0 }
+        return maxOf(maximumSpeed(legIndex), nextLeg?.let(::maximumSpeed) ?: 0.0)
+    }
+
+    private fun matchWeakReading(fix: LocationUpdate.Fix, measuredAt: Long) =
+        if (lastReliableOnRoute == false || fix.accuracyMeters > 250.0) null else {
+            val legIndex = routeGeometry.legIndexAt(previousProgress)
+            val reference = matchReferenceProgress ?: previousProgress
+            val seconds = matchReferenceAt?.let { ((measuredAt - it).coerceAtLeast(0L) / 1_000.0).coerceAtMost(30.0) } ?: 0.0
+            val velocity = matchingVelocity.takeIf { lastFixAt?.let { measuredAt - it <= 30_000 } == true } ?: 0.0
+            val expected = if (routeLength > 0.0) reference + (velocity * seconds / routeLength).toFloat() else reference
+            routeGeometry.matchOnLeg(fix.point, legIndex, reference, expected,
+                maximumTravelMeters = 30.0 + maximumSpeed(legIndex) * seconds,
+                maximumDistanceMeters = minOf(fix.accuracyMeters, 100.0))
+        }
+
+    private fun withUncertainty(state: CurrentTripLocationState): CurrentTripLocationState {
+        val fix = state.fix ?: return state
+        val position = state.displayedPosition ?: return state
+        val ageSeconds = ((nowEpochMillis() - (lastReadingAt ?: fix.timestampEpochMillis ?: nowEpochMillis())).coerceAtLeast(0L) / 1_000.0 - 4.0).coerceAtLeast(0.0)
+        val retained = state.availability in setOf(TripLocationAvailability.Stale, TripLocationAvailability.LastKnown,
+            TripLocationAvailability.PermissionDenied, TripLocationAvailability.Unsupported)
+        val minimum = if (retained || fix.accuracyMeters > TripLocationMaximumAccuracyMeters) 75.0 else 10.0
+        val growth = (ageSeconds * maximumSpeed(routeGeometry.legIndexAt(previousProgress))).coerceAtMost(2_000.0)
+        return state.copy(uncertaintyRadiusMeters = maxOf(minimum, fix.accuracyMeters + fix.point.distanceMetersTo(position) + growth))
     }
 
     private fun clearMotion() {
@@ -140,19 +263,12 @@ internal class CurrentTripLocationViewModel(
     private fun recordMotion(fix: LocationUpdate.Fix, progress: Float, measuredAt: Long) {
         if (routeLength <= 0.0) return
         val distance = routeLength * progress
-        var end = 0.0
-        val legIndex = legLengths.indices.firstOrNull { end += legLengths[it]; distance < end }
-            ?: trip.legs.lastIndex
+        val legIndex = routeGeometry.legIndexAt(progress)
         if (motionLegIndex != legIndex) clearMotion()
         motionLegIndex = legIndex
         anchorProgress = progress
         val leg = trip.legs[legIndex]
-        val label = trip.selectedTransports.firstOrNull { it.id == leg.transportId }?.label.orEmpty().lowercase()
-        val maximumSpeed = when {
-            "walk" in label || "walk" in leg.transportId.value.lowercase() -> 3.5
-            "bik" in label || "cycl" in label -> 15.0
-            else -> 45.0
-        }
+        val maximumSpeed = maximumSpeed(legIndex)
         val previous = motionSamples.lastOrNull()
         if (previous != null && abs(distance - previous.distance) >
             maximumSpeed * (measuredAt - previous.time) / 1_000.0 + fix.accuracyMeters) motionSamples.clear()
@@ -171,51 +287,62 @@ internal class CurrentTripLocationViewModel(
         } else 0.0
     }
 
-    /** Coasts within the saved leg; after 30 seconds the estimate carries a GPS warning. */
+    /** Accuracy controls progress; only 30 seconds without fresh readings triggers the GPS warning. */
     fun refreshFreshness() {
         val current = mutableState.value
         if (current.availability == TripLocationAvailability.PermissionDenied ||
             current.availability == TripLocationAvailability.Unsupported) return
-        val measuredAt = lastFixAt ?: trackingStartedAt ?: return
-        val age = (nowEpochMillis() - measuredAt).coerceAtLeast(0L)
+        val measuredAt = lastReadingAt ?: trackingStartedAt ?: return
+        val now = nowEpochMillis()
+        val readingAge = (now - measuredAt).coerceAtLeast(0L)
+        val motionAge = lastFixAt?.let { (now - it).coerceAtLeast(0L) } ?: 0L
         val anchor = anchorProgress
         val legIndex = motionLegIndex
         var estimatedProgress: Float? = null
-        if (age > PredictionDelayMillis && anchor != null && legIndex != null && velocityMetersPerSecond != 0.0) {
+        if (motionAge > PredictionDelayMillis && anchor != null && legIndex != null && velocityMetersPerSecond != 0.0) {
             val start = legLengths.take(legIndex).sum()
             val end = start + legLengths[legIndex]
             val anchorDistance = anchor * routeLength
-            val distance = anchorDistance + velocityMetersPerSecond * age / 1_000.0
+            val distance = anchorDistance + velocityMetersPerSecond * motionAge / 1_000.0
             // Do not estimate a transfer, boarding, or arrival without a confirming measurement.
             val bounded = if (velocityMetersPerSecond > 0.0) distance.coerceIn(anchorDistance, maxOf(anchorDistance, end - 0.5))
                 else distance.coerceIn(minOf(anchorDistance, start + 0.5), anchorDistance)
             estimatedProgress = (bounded / routeLength).toFloat().coerceIn(0f, 0.999f)
         }
-        mutableState.value = current.copy(
+        mutableState.value = withUncertainty(current.copy(
             availability = when {
-                age > TRIP_LOCATION_GRACE_MILLIS -> TripLocationAvailability.Stale
+                readingAge > TRIP_LOCATION_GRACE_MILLIS -> TripLocationAvailability.Stale
                 estimatedProgress != null -> TripLocationAvailability.Estimated
                 current.availability == TripLocationAvailability.LastKnown -> TripLocationAvailability.LastKnown
+                current.fix?.let { it.accuracyMeters > TripLocationMaximumAccuracyMeters } == true -> TripLocationAvailability.LowAccuracy
                 current.fix != null -> TripLocationAvailability.Available
                 else -> TripLocationAvailability.Waiting
             },
-            estimatedProgress = estimatedProgress,
-            estimatedPosition = estimatedProgress?.let(routeGeometry::pointAt),
-        )
+            estimatedProgress = estimatedProgress ?: current.estimatedProgress,
+            estimatedPosition = estimatedProgress?.let(routeGeometry::pointAt) ?: current.estimatedPosition,
+        ))
     }
 
-    /** Clears the visible reading when collection stops or debug playback takes over. */
+    /** Stops prediction while retaining the last visible position across screen/lifecycle changes. */
     fun stop() {
-        mutableState.value = CurrentTripLocationState()
-        lastFixAt = null
-        lastAcceptedTimestamp = null
+        val current = mutableState.value
+        mutableState.value = withUncertainty(current.copy(availability = when {
+            current.availability == TripLocationAvailability.PermissionDenied -> TripLocationAvailability.PermissionDenied
+            current.fix != null -> TripLocationAvailability.LastKnown
+            else -> TripLocationAvailability.Waiting
+        }))
         trackingStartedAt = null
         clearMotion()
+        matchingVelocity = 0.0
+        matchReferenceProgress = null
+        matchReferenceAt = null
+        unmatchedConfirmation.clear()
+        jumpFilter.releaseMaximumSpeed(this)
     }
 
     /** This platform has no location adapter; the accepted route stays usable. */
     fun unsupported() {
         stop()
-        mutableState.value = CurrentTripLocationState(availability = TripLocationAvailability.Unsupported)
+        mutableState.value = withUncertainty(mutableState.value.copy(availability = TripLocationAvailability.Unsupported))
     }
 }

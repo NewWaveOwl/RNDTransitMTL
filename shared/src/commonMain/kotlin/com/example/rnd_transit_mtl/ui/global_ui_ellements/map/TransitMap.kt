@@ -12,6 +12,7 @@ internal data class TransitMapData(
     val trip: Trip? = null,
     val progress: Float? = null,
     val userPosition: GeoPoint? = null,
+    val userUncertaintyMeters: Double? = null,
     val simulatePosition: Boolean = true,
     val recenterRequest: Int = 0,
     val interactive: Boolean = true,

@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.rnd_transit_mtl.model.trip.TripPoint
 import com.example.rnd_transit_mtl.ui.theme.TransitMain
+import com.example.rnd_transit_mtl.ui.theme.TransitHighlight
 import com.example.rnd_transit_mtl.ui.theme.tripLegColor
 import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 import org.jetbrains.compose.resources.painterResource
@@ -114,6 +115,7 @@ fun MockTripMap(
     userPosition: TripPoint? = null,
     topInset: Dp = 0.dp,
     bottomInset: Dp = 0.dp,
+    userUncertaintyRing: List<TripPoint> = emptyList(),
 ) {
     val mapPainter = painterResource(Res.drawable.map_sample)
     val startPainter = painterResource(Res.drawable.start_point_marker)
@@ -230,6 +232,7 @@ fun MockTripMap(
                 contentDescription = "Mock transit map. Yellow start triangle, " +
                     "green destination triangle. " +
                     (if (showPosition) "Directed yellow position pointer. " else "Position unavailable. ") +
+                    (if (showPosition && userUncertaintyRing.isNotEmpty()) "Location uncertainty circle. " else "") +
                     (if (legs.all { it.isRouted }) "Solid line follows the planned route. "
                     else "Dashed line is a straight-line preview, not a real route. ") +
                     if (interactive) "Pinch to zoom and drag to move the picture." else ""
@@ -271,6 +274,18 @@ fun MockTripMap(
             )
             translate(mapRect.left, mapRect.top) {
                 with(mapPainter) { draw(size = mapRect.size) }
+            }
+
+            if (showPosition && userUncertaintyRing.isNotEmpty()) {
+                val ring = Path().apply {
+                    userUncertaintyRing.forEachIndexed { index, point ->
+                        val position = point.toMapPosition(mapRect)
+                        if (index == 0) moveTo(position.x, position.y) else lineTo(position.x, position.y)
+                    }
+                    close()
+                }
+                drawPath(ring, TransitHighlight.copy(alpha = 0.2f))
+                drawPath(ring, TransitHighlight.copy(alpha = 0.53f), style = Stroke(1.5.dp.toPx()))
             }
 
             val startPosition = start.toMapPosition(mapRect)

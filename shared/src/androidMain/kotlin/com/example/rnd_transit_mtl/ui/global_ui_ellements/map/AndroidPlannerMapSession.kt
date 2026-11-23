@@ -2,16 +2,22 @@ package com.example.rnd_transit_mtl.ui.global_ui_ellements.map
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LifecycleStartEffect
 import com.example.rnd_transit_mtl.data.location.LocationUpdate
+import com.example.rnd_transit_mtl.data.location.LocationJumpFilter
+import com.example.rnd_transit_mtl.data.location.LocationAccuracyMonitor
 import com.example.rnd_transit_mtl.data.location.PlannerLocation
 import com.example.rnd_transit_mtl.model.geo.GeoBounds
 import com.example.rnd_transit_mtl.model.geo.GeoPoint
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.filterNotNull
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.spatialk.geojson.Position
@@ -40,13 +46,28 @@ internal val MontrealBrowsingBounds = run {
     )
 }
 
-internal class AndroidPlannerMapSession(context: Context) : PlannerLocation {
+internal class AndroidPlannerMapSession(private val context: Context) : PlannerLocation {
     private val preferences = context.getSharedPreferences("planner_map", Context.MODE_PRIVATE)
     var camera: CameraPosition? = restoreCamera()
         private set
     var autoCenterPending = true
     var recenter by mutableIntStateOf(0)
     override var fix by mutableStateOf<LocationUpdate.Fix?>(null)
+    override val jumpFilter = LocationJumpFilter()
+    override val accuracyMonitor = LocationAccuracyMonitor(
+        dismissedAtMillis = preferences.getLong("accuracy_prompt_dismissed_at", -1L).takeIf { it >= 0L },
+        onDismiss = { preferences.edit().putLong("accuracy_prompt_dismissed_at", it).apply() },
+    )
+    override fun openAppLocationSettings(): Boolean = openSettings(
+        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
+    )
+    override fun openDeviceLocationSettings(): Boolean = openSettings(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+    private fun openSettings(intent: Intent): Boolean = runCatching {
+        context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        true
+    }.getOrDefault(false)
+    var uncertaintyMeters by mutableStateOf<Double?>(null)
+        private set
     override val containsPoint: (GeoPoint) -> Boolean = { point ->
         MontrealCenter.distanceMetersTo(point) <= montrealServiceRadiusMeters
     }
@@ -61,11 +82,35 @@ internal class AndroidPlannerMapSession(context: Context) : PlannerLocation {
         when {
             !permissionChecked -> null
             !permitted -> LocationUpdate.PermissionDenied
+            latestLocationUpdate is LocationUpdate.Fix -> fix
+            else -> latestLocationUpdate
+        }
+    }.filterNotNull()
+    override val trackingUpdates = snapshotFlow {
+        when {
+            !permissionChecked -> null
+            !permitted -> LocationUpdate.PermissionDenied
             else -> latestLocationUpdate
         }
     }.filterNotNull()
     var locationAttempt by mutableIntStateOf(0)
         private set
+
+    fun receive(update: LocationUpdate) {
+        if (update is LocationUpdate.Fix) {
+            val result = jumpFilter.evaluate(update, System.currentTimeMillis()) ?: return
+            accuracyMonitor.receive(update)
+            if (result.accepted) fix = update
+            uncertaintyMeters = fix?.let { retained ->
+                maxOf(update.accuracyMeters, retained.accuracyMeters) + retained.point.distanceMetersTo(update.point)
+            }
+            if (result.accepted) complete(update)
+        } else {
+            complete(null)
+        }
+        // Fresh but suspicious readings still count as provider activity, never as progress.
+        latestLocationUpdate = update
+    }
 
     override fun request(onResult: ((LocationUpdate.Fix?) -> Unit)?) {
         autoCenterPending = false
@@ -114,8 +159,13 @@ internal fun rememberAndroidPlannerMapSession(): AndroidPlannerMapSession {
     val context = LocalContext.current.applicationContext
     val session = remember(context) { AndroidPlannerMapSession(context) }
     val source = remember(context) { AndroidLocationSource(context) }
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+    val refreshAccess = {
         session.permitted = source.hasPermission()
+        session.permissionChecked = true
+        session.accuracyMonitor.updateAccess(source.permissionLevel(), source.isLocationEnabled())
+    }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        refreshAccess()
         if (!session.permitted) session.complete(null)
     }
     session.hasPermission = source::hasPermission
@@ -125,24 +175,23 @@ internal fun rememberAndroidPlannerMapSession(): AndroidPlannerMapSession {
 
     var started by remember { mutableStateOf(false) }
     LifecycleStartEffect(session) {
-        session.permitted = source.hasPermission()
-        session.permissionChecked = true
+        refreshAccess()
         started = true
         onStopOrDispose {
             started = false
-            session.fix = null
             session.latestLocationUpdate = null
+            session.accuracyMonitor.pause()
         }
     }
-    LaunchedEffect(session.permitted, started, session.locationAttempt) {
+    LaunchedEffect(started) {
+        if (started) while (isActive) {
+            refreshAccess()
+            delay(1_000)
+        }
+    }
+    LaunchedEffect(session.permitted, session.accuracyMonitor.state.permission, started, session.locationAttempt) {
         if (session.permitted && started) source.updates.collect { update ->
-            when (update) {
-                is LocationUpdate.Fix -> session.fix = update
-                LocationUpdate.PermissionDenied -> session.fix = null
-                LocationUpdate.Unavailable -> Unit // Keep the shared last position across screen changes.
-            }
-            session.latestLocationUpdate = update
-            session.complete(update as? LocationUpdate.Fix)
+            session.receive(update)
         }
     }
     val pending = session.pendingResult
