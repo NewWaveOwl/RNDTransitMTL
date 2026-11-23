@@ -426,7 +426,8 @@ internal fun TransitOpeningScreen(
                     origin = origin?.copy(),
                     originPlace = planner.originPlace,
                     walkingPreference = planner.walkingPreference,
-                    bikeSpeedKmh = planner.bikeSpeedKmh
+                    bikeSpeedKmh = planner.bikeSpeedKmh,
+                    roundTrip = planner.roundTrip
                 )
 
                 // Explicit samples are distinct from validation failures.
@@ -857,6 +858,10 @@ internal fun TransitOpeningScreen(
                 }
             },
             walkingPreference = planner.walkingPreference,
+            roundTrip = planner.roundTrip,
+            onRoundTripChange = {
+                if (canChangeInputs()) { plannerViewModel.setRoundTrip(it); clearValidation() }
+            },
             bikeSpeedKmh = planner.bikeSpeedKmh,
             onBikeSpeedChange = {
                 if (canChangeInputs()) plannerViewModel.setBikeSpeedKmh(it)

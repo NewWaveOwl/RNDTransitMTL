@@ -47,7 +47,9 @@ data class MainPlannerState(
     // Supplied by a future permission adapter, or a labelled preview fixture.
     val locationAccessOff: Boolean = false,
     val originIsManual: Boolean = false,
-    val originPlace: Place? = null
+    val originPlace: Place? = null,
+    /** Both independently routed directions share the selected available time. */
+    val roundTrip: Boolean = false
 ) {
     /** Returns independently saved zones, with legacy shared-zone fallback.
      * @param transportId Transit mode whose zones are requested.
@@ -88,6 +90,9 @@ class MainPlannerViewModel(
     /** Read-only planner state observed by the view. */
     val uiState = mutableUiState.asStateFlow()
 
+    /** Chooses whether a new adventure finishes at its stored original start. */
+    fun setRoundTrip(value: Boolean) { mutableUiState.update { it.copy(roundTrip = value) } }
+
     /** Copies only the preferences actually recorded in a completed trip.
      * @param trip Saved trip; its identity, endpoints, and review are never changed.
      */
@@ -103,6 +108,7 @@ class MainPlannerViewModel(
                     },
                 intensity = trip.attractionIntensity,
                 walkingPreference = trip.walkingPreference ?: it.walkingPreference,
+                roundTrip = trip.journey?.kind == com.example.rnd_transit_mtl.model.trip.TripJourneyKind.RoundTrip,
                 origin = if (liveMap) null else trip.origin.toSampleMapPoint(),
                 originPlace = trip.origin.takeIf { liveMap },
                 originIsManual = true

@@ -22,6 +22,8 @@ import com.example.rnd_transit_mtl.data.routing.RoutingResult
 import com.example.rnd_transit_mtl.data.routing.RoutingService
 import com.example.rnd_transit_mtl.model.trip.Place
 import com.example.rnd_transit_mtl.model.trip.TripRequest
+import com.example.rnd_transit_mtl.model.trip.TripJourney
+import com.example.rnd_transit_mtl.model.trip.TripJourneyKind
 import com.example.rnd_transit_mtl.model.trip.message
 
 /**
@@ -52,7 +54,9 @@ data class TripGenerationInput(
     /** Fixed geographic target for a return request; null keeps random adventure generation. */
     val destinationPlace: Place? = null,
     /** Compare available modes by arrival time for a fixed-target request. */
-    val compareModes: Boolean = false
+    val compareModes: Boolean = false,
+    /** Routes outward and back within the same available-time budget. */
+    val roundTrip: Boolean = false
 )
 
 /**
@@ -228,12 +232,29 @@ class MockTripGenerator(
             return TripGenerationResult.InvalidInput(it.message)
         }
 
-        val legs = when (val routed = routingService.route(request)) {
+        val outwardRequest = if (normalizedInput.roundTrip)
+            request.copy(durationBudgetSeconds = normalizedInput.plannedMinutes * 30L) else request
+        val outwardLegs = when (val routed = routingService.route(outwardRequest)) {
             is RoutingResult.Success -> routed.legs
             RoutingResult.NoRouteFound, is RoutingResult.OutsideServiceArea ->
                 return TripGenerationResult.NoRoute
             is RoutingResult.Unavailable ->
                 return TripGenerationResult.RoutingUnavailable(routed.message)
+        }
+
+        // Ask the sample provider independently in each direction, too; never reverse a saved shape.
+        val legs = if (normalizedInput.roundTrip) {
+            val secondsLeft = normalizedInput.plannedMinutes * 60L - outwardLegs.sumOf { it.durationSeconds }
+            if (secondsLeft <= 0) return TripGenerationResult.NoRoute
+            when (val inbound = routingService.route(request.copy(origin = destinationPlace, destination = origin,
+                durationBudgetSeconds = secondsLeft))) {
+                is RoutingResult.Success -> outwardLegs + inbound.legs
+                RoutingResult.NoRouteFound, is RoutingResult.OutsideServiceArea -> return TripGenerationResult.NoRoute
+                is RoutingResult.Unavailable -> return TripGenerationResult.RoutingUnavailable(inbound.message)
+            }
+        } else outwardLegs
+        if (normalizedInput.roundTrip && legs.sumOf { it.durationSeconds } > normalizedInput.plannedMinutes * 60L) {
+            return TripGenerationResult.NoRoute
         }
 
         val trip = try {
@@ -262,7 +283,7 @@ class MockTripGenerator(
         description = normalizedInput.description,
         imageUrl = normalizedInput.imageUrl,
         origin = origin,
-        destination = destinationPlace,
+        destination = if (normalizedInput.roundTrip) origin else destinationPlace,
         legs = legs,
         plannedMinutes = normalizedInput.plannedMinutes,
         selectedTransports = snapshots.first,
@@ -272,7 +293,8 @@ class MockTripGenerator(
         completedAt = null,
         review = null,
         selectedZoneIds = normalizedInput.selectedZoneIds.toList(),
-        selectedZonesByTransport = normalizedInput.selectedZonesByTransport.mapValues { (_, zones) -> zones.toList() }
+        selectedZonesByTransport = normalizedInput.selectedZonesByTransport.mapValues { (_, zones) -> zones.toList() },
+        journey = if (normalizedInput.roundTrip) TripJourney(TripJourneyKind.RoundTrip, turnaround = destinationPlace) else null
     )
 
     private fun resolveSelections(

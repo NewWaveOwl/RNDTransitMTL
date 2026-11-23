@@ -2,6 +2,7 @@ package com.example.rnd_transit_mtl.View.main
 
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMap
 import com.example.rnd_transit_mtl.data.location.LocalPlannerLocation
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.location.LocationAccuracyNotice
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMapData
 import com.example.rnd_transit_mtl.state.NullableTransportIdSaver
 import com.example.rnd_transit_mtl.model.ids.ZoneId
@@ -57,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import com.example.rnd_transit_mtl.View.main.components.GOBox
 import com.example.rnd_transit_mtl.View.main.components.GoBoxCompactHeight
 import com.example.rnd_transit_mtl.View.main.components.PlannerPreferenceBands
+import com.example.rnd_transit_mtl.View.main.components.PlannerTripTypeBand
 import com.example.rnd_transit_mtl.data.generation.TripGenerationBounds
 import com.example.rnd_transit_mtl.model.transport.TransportType
 import com.example.rnd_transit_mtl.model.trip.Place
@@ -174,7 +176,9 @@ internal fun MainPlannerContent(
     originIsManual: Boolean = true,
     originStatus: String? = null,
     onTapOrigin: (TripPoint) -> Unit = {},
-    onTapLiveOrigin: (GeoPoint) -> Unit = {}
+    onTapLiveOrigin: (GeoPoint) -> Unit = {},
+    roundTrip: Boolean = false,
+    onRoundTripChange: (Boolean) -> Unit = {}
 ) {
     val liveLocation = LocalPlannerLocation.current
     // Expansion is presentation state, separate from transport and zone selections.
@@ -349,6 +353,7 @@ internal fun MainPlannerContent(
                             )
                         }
                     }
+                    LocationAccuracyNotice(Modifier.padding(top = 8.dp), enabled = enabled && showMapControls)
                 }
             }
 
@@ -522,6 +527,7 @@ internal fun MainPlannerContent(
                             }
                         }
                     }
+                    PlannerTripTypeBand(scale, roundTrip, onRoundTripChange, enabled)
                     PlannerPreferenceBands(
                         scale, transportTypes, selectedTransportIds, selectedZonesByTransport,
                         onToggleTransport, onToggleZone, walkingPreference, selectedAttractionIds,
