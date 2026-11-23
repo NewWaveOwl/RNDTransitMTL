@@ -116,20 +116,28 @@ revoked the local session after a failed lookup.
 
 ## Verified M4 update package
 
-The final update is
-`backend/launcher/build/updates/TravelTracker-Routing-M4-20261122/RNDTransitServer-TravelTracker-Update.zip`
-(15,228,905 bytes). It contains 34 application/dependency JARs plus updater,
+The current update is
+`backend/launcher/build/updates/TravelTracker-Coverage-20261123/RNDTransitServer-TravelTracker-Update.zip`
+(15,228,721 bytes). It contains 34 application/dependency JARs plus updater,
 manifest and instructions, built from runtime source commit
-`58d68ff4f66e56479944d8c1acfe073c2d922ab0`.
+`7ca9005005fc74a2cdb9bf4ffedbf135db1171bc`.
 
-SHA-256: `68415AB3152B52D91D36EFFB889D15685DDCEB74B38D7741ED5890127AC9DECF`.
+SHA-256: `21FA1C2FA10D47B195E585D16AC0FFE4B87825C80CF231C24B2A82ABE7E1C998`.
 
-This supersedes the initial Nominatim and PowerShell-fix ZIPs. Both installDist
-builds passed without warnings; 132 backend/60 launcher tests, eight isolated
-updater checks and genuine prior-JAR compatibility CheckOnly passed. Archive
-hashes/sizes, the current query/auth classes and embedded source commit were
-independently verified. `SOURCE-COMMIT.txt` and `package-evidence.json` are beside
-the ZIP. These checks did not modify the actual Windows server or test live
-authenticated tunnel requests. Apply to the stopped existing portable app using
-the [update/rollback commands](launcher/SERVER_GUIDE.md), with an explicit
+This supersedes `TravelTracker-Routing-M4-20261122` (runtime `58d68ff`) and the
+earlier Nominatim/PowerShell-fix ZIPs. It corrects out-of-map and disconnected
+direct-mode responses that previously appeared as HTTP 503. Both installDist
+builds passed without warnings; 137 backend/60 launcher tests, eight isolated
+updater checks and packaged CheckOnly against the genuine prior portable JARs
+passed. All 34 payload JAR hashes/sizes and the current compiled coverage mapping
+were verified from the extracted archive. The source commit is inside the ZIP's
+README and `SOURCE-COMMIT.txt`; `SOURCE-COMMIT.txt` and `package-evidence.json`
+also sit beside the ZIP.
+
+This application update preserves the imported graph. It reports an uncovered
+Montreal-to-Trois-Rivieres destination clearly but does not add its missing roads;
+that journey requires a separately prepared wider graph. These checks did not
+modify the actual Windows server or test live authenticated tunnel requests.
+Apply to the stopped existing portable app using the
+[update/rollback commands](launcher/SERVER_GUIDE.md), with an explicit
 `-UpdateDirectory` pointing to the extracted files.
