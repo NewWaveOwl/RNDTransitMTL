@@ -34,7 +34,9 @@ fun main(args: Array<String>) = runBlocking {
                 "Recorded query does not match the current TravelTracker query; capture new evidence."
             }
             for (key in listOf("originLat", "originLon", "destinationLat", "destinationLon", "departure", "modes", "filters", "walkSpeed")) {
-                check(planned["variables"].field(key) == recorded["variables"].field(key)) { "Recorded chosen route differs at $key." }
+                check(RoutingEvidenceVariables.matches(key, planned["variables"].field(key), recorded["variables"].field(key))) {
+                    "Recorded chosen route differs at $key."
+                }
             }
             // The recorded run explicitly excludes realtime updates; this check proves scheduled normalization, not live predictions.
             check(recorded["variables"].field("excludeRealtime") == JsonPrimitive(true))
