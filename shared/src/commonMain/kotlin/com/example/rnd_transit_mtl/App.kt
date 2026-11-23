@@ -61,6 +61,8 @@ import com.example.rnd_transit_mtl.ui.global_ui_ellements.debug.DebugModeDialog
 import kotlinx.coroutines.CancellationException
 import com.example.rnd_transit_mtl.data.accounts.AccountRepository
 import com.example.rnd_transit_mtl.data.accounts.LocalAccountRepository
+import com.example.rnd_transit_mtl.state.refresh.rememberInactivityRefresh
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.refresh.InactivityRefreshFeedback
 
 private data class TransportData(
     val types: List<TransportType>,
@@ -210,6 +212,20 @@ internal fun App(
                 owner?.let { AccountRepository(UserId(it)) }
             }
 
+            val inactivityRefresh = rememberInactivityRefresh(identity) {
+                val catalogueOk = tryCloudAction {
+                    val refreshed = TransportData(
+                        FakeTransportTypeRepository().getTransportTypes(),
+                        FakeTransportRouteRepository().getTransportRoutes(),
+                    )
+                    transportData = refreshed
+                    loadingError = false
+                }
+                val accountOk = tryCloudAction { accountRepository?.refreshAccount() }
+                val historyOk = tryCloudAction { cloudTrips?.refreshAfterIdle() }
+                check(catalogueOk && accountOk && historyOk) { "App data refresh failed." }
+            }
+
             LaunchedEffect(accountRepository) {
                 try {
                     accountRepository?.ensureAccount()
@@ -244,6 +260,7 @@ internal fun App(
                 LocalAccountSession provides accountSession.value,
                 LocalAccountRepository provides accountRepository,
             ) {
+                Box(Modifier.fillMaxSize()) {
                 val showAccountScreen =
                     accountSession.value !is AccountSession.SignedIn &&
                         !continueAsGuest
@@ -330,6 +347,8 @@ internal fun App(
                             }
                         }
                     }
+                }
+                InactivityRefreshFeedback(inactivityRefresh)
                 }
                 DebugModeDialog(debugMode)
             }

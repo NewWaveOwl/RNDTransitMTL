@@ -19,11 +19,27 @@ internal class CloudTrips(
     private val store: TripsStore,
 ) {
     private val mutex = Mutex()
+    private var cachedHistory: List<Trip>? = null
+    private var cachedRevision = -1
     var revision by mutableStateOf(0)
         private set
 
     suspend fun history(): List<Trip> = mutex.withLock {
-        repository.listHistory()
+        cachedHistory?.takeIf { cachedRevision == revision } ?: loadHistory()
+    }
+
+    /** Shares the refreshed result with History, so its revision effect does not fetch it again. */
+    suspend fun refreshAfterIdle() = mutex.withLock {
+        for (trip in store.pendingFinalTrips()) persistFinalTrip(trip)
+        val records = repository.listHistory()
+        revision++
+        cachedHistory = records
+        cachedRevision = revision
+    }
+
+    private suspend fun loadHistory(): List<Trip> = repository.listHistory().also {
+        cachedHistory = it
+        cachedRevision = revision
     }
 
     suspend fun details(id: TripId): Trip? = mutex.withLock {

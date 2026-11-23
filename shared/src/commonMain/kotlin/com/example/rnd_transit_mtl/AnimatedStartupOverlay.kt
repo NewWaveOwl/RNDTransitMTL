@@ -43,6 +43,7 @@ import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.sin
+import kotlin.math.PI
 
 private const val LogoWidth = 637f
 private const val LogoHoldEnd = 0.14f
@@ -63,7 +64,10 @@ private val compassEasing = CubicBezierEasing(0.35f, 0.15f, 0.5f, 1f)
 private val spreadColor = lerp(TransitComplementary, TransitMain, 0.40f)
 
 @Composable
-fun AnimatedStartupOverlay(readyToReveal: () -> Boolean = { true }) {
+fun AnimatedStartupOverlay(
+    readyToReveal: () -> Boolean = { true },
+    revealTimeoutMillis: Long? = 3_000L,
+) {
     var progress by remember { mutableFloatStateOf(0f) }
     var finished by remember { mutableStateOf(false) }
     val latestReadyToReveal by rememberUpdatedState(readyToReveal)
@@ -88,7 +92,11 @@ fun AnimatedStartupOverlay(readyToReveal: () -> Boolean = { true }) {
             }
         }
         advanceTo(RevealStart)
-        withTimeoutOrNull(3_000) { snapshotFlow { latestReadyToReveal() }.first { it } }
+        if (revealTimeoutMillis == null) {
+            snapshotFlow { latestReadyToReveal() }.first { it }
+        } else {
+            withTimeoutOrNull(revealTimeoutMillis) { snapshotFlow { latestReadyToReveal() }.first { it } }
+        }
         // Begin a fresh frame baseline after waiting for the map.
         advanceTo(1f)
         finished = true
@@ -221,11 +229,11 @@ private class DirectionBadge(
 
 private fun tangentAngle(head: Offset): Float {
     val radians = atan2(head.y, head.x) + acos((WrapRadius / head.getDistance()).coerceAtMost(1f))
-    return (radians * 180.0 / Math.PI).toFloat()
+    return (radians * 180.0 / PI).toFloat()
 }
 
 private fun pointOnRing(angle: Float): Offset {
-    val radians = angle * Math.PI / 180.0
+    val radians = angle * PI / 180.0
     return Offset((cos(radians) * WrapRadius).toFloat(), (sin(radians) * WrapRadius).toFloat())
 }
 
