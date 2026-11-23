@@ -19,3 +19,4 @@ internal object JsonAssetReader {
         .parseToJsonElement(Res.readBytes(assetPath).decodeToString())
         .jsonArray
 }
+

@@ -17,10 +17,16 @@ internal class RouterDeepLinkResolver {
         DeepLinkUri("rndtransit://launch/compass/confirm"),
         CompassConfirmationScreenKey.serializer(),
     )
+    private val webCompassConfirmationMatcher = UriDeepLinkMatcher(
+        DeepLinkUri("http://localhost:8080/compass/confirm"),
+        CompassConfirmationScreenKey.serializer(),
+    )
 
     fun resolve(uriString: String): List<NavKey>? {
-        val request = DeepLinkRequest(uri = uriString)
+        val normalizedUri = uriString.replace("/#/", "/")
+        val request = DeepLinkRequest(uri = normalizedUri)
         val targetKey = compassConfirmationMatcher.match(request)?.key
+            ?: webCompassConfirmationMatcher.match(request)?.key
             ?: compassMatcher.match(request)?.key
             ?: return null
         return listOf(MainScreenKey, targetKey)

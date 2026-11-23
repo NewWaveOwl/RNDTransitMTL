@@ -105,6 +105,9 @@ kotlin {
             implementation("io.ktor:ktor-client-darwin:$ktorVersion")
         }
 
+        webMain.dependencies {
+            implementation("org.jetbrains.kotlinx:kotlinx-browser:0.5.0")
+        }
         jsMain.dependencies {
             implementation(libs.wrappers.browser)
             implementation("io.ktor:ktor-client-js:$ktorVersion")

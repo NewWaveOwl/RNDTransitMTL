@@ -50,6 +50,14 @@ fun CompassScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceEvenly
         ) {
+            if (sendResult) {
+                val sendResultAndClose = rememberResultResponder()
+                Button(onClick = {
+                    sendResultAndClose("Compass screen acknowledged.")
+                }) {
+                    Text("Acknowledge & Return")
+                }
+            }
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.alpha(if (controlsVisible) 1f else 0f)) {
                 Text(if (activeTrip != null) "Find your next direction" else "Follow your curiosity",
                     color = TransitWhite, fontSize = 24.sp, fontWeight = FontWeight.Bold)
@@ -62,15 +70,6 @@ fun CompassScreen(
                     .alpha(if (activeTrip == null && controlsVisible) 0.6f else 1f))
             }
             Text("Hold the screen to reveal controls", color = TransitWhite.copy(alpha = 0.65f), fontSize = 12.sp)
-            if (sendResult) {
-                val sendResultAndClose = rememberResultResponder()
-                Spacer(Modifier.height(12.dp))
-                Button(onClick = {
-                    sendResultAndClose("Compass screen acknowledged.")
-                }) {
-                    Text("Acknowledge & Return")
-                }
-            }
         }
         if (controlsVisible) {
             Column(Modifier.fillMaxWidth().background(TransitMain).padding(20.dp)) {
