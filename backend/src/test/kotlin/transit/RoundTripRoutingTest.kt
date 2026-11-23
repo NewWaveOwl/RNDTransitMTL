@@ -76,6 +76,21 @@ class RoundTripRoutingTest {
         assertNotNull(result["otp"])
         assertNotNull(result["returnOtp"])
     }
+    @Test fun thirtyMinuteWalkingRoundTripLeavesRoomForTheWayHome() = runBlocking {
+        val result = Generator(emptyList(), zones(), { query ->
+            val vars = query.field("variables")
+            val start = Point(vars.field("originLat").number()!!, vars.field("originLon").number()!!)
+            val end = Point(vars.field("destinationLat").number()!!, vars.field("destinationLon").number()!!)
+            // Streets take longer than a straight line; reproduce the actual walking search,
+            // rather than supplying an artificially short turnaround through the test sampler.
+            response(query, kotlin.math.ceil(distance(start, end) * 1.4 / input.speed).toLong())
+        }, { now }, maxAttempts = 24).generate(input)
+        assertEquals("success", result["status"].text())
+        assertTrue(result["elapsedSeconds"].number()!! <= 1800)
+        assertEquals(input.origin, result["destination"])
+        assertNotNull(result["returnOtp"])
+    }
+
     @Test fun unavailableOrOverBudgetInboundNeverProducesAOneWaySuccess() = runBlocking {
         for (overBudget in listOf(false, true)) {
             val result = Generator(emptyList(), zones(), { query ->

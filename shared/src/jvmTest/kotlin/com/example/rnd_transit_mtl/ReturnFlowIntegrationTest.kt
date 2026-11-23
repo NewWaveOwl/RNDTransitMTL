@@ -136,11 +136,11 @@ class ReturnFlowIntegrationTest {
     @Test fun splitActionsRemainVisibleOnNarrowScreens() = runBlocking(Dispatchers.Main) {
         Host(width = 320).use { host ->
             host.render()
-            assertTrue(host.has("Return trip / Fastest trip"))
-            assertTrue(host.has("Same transport"))
+            assertTrue(host.has("Return Fast"))
+            assertTrue(host.has("Same Way"))
             host.scrollPanelToBottom()
             host.snapshot("Return-split-button-320.png")
-            host.click("Same transport")
+            host.click("Same Way")
             assertFalse(host.requests.single().compareModes)
             assertTrue(host.has("Back with the same transport"))
         }
@@ -150,7 +150,7 @@ class ReturnFlowIntegrationTest {
         Host().use { host ->
             host.render()
             host.snapshot("Return-split-button.png")
-            host.click("Return trip / Fastest trip")
+            host.click("Return Fast")
             assertTrue(host.has("Start return trip"))
             assertEquals(host.original, host.store.findCompleted(host.original.id))
             assertEquals(host.original.id, host.store.pendingReviewTripId)
@@ -178,7 +178,7 @@ class ReturnFlowIntegrationTest {
         Host(failFirst = true).use { host ->
             host.render()
             val before = host.store.toSavedStateJson()
-            host.click("Return trip / Fastest trip")
+            host.click("Return Fast")
             assertTrue(host.has("No return route found"))
             assertEquals(before, host.store.toSavedStateJson())
             host.snapshot("Return-route-unavailable.png")
@@ -187,7 +187,7 @@ class ReturnFlowIntegrationTest {
             host.back()
             assertTrue(host.has("Adventure complete!"))
             assertEquals(before, host.store.toSavedStateJson())
-            host.click("Same transport")
+            host.click("Same Way")
             assertFalse(host.requests.last().compareModes)
             assertEquals(listOf("walk", "bus"), host.requests.last().modes)
             assertTrue(host.has("Back with the same transport"))

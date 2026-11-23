@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.rnd_transit_mtl.View.main.TripLabelValueField
@@ -149,11 +150,12 @@ private fun ReturnOptionControl(enabled: Boolean,
     Row(Modifier.fillMaxWidth().heightIn(min = ReturnOptionHeight)
         .clip(RoundedCornerShape(ReturnOptionCornerRadius)).background(TransitMain),
         verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.weight(1.5f).heightIn(min = ReturnOptionHeight)
+        Box(Modifier.weight(1f).heightIn(min = ReturnOptionHeight)
             .clickable(enabled, role = Role.Button) { onFind(ReturnTransportOption.Fastest) }
             .padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
-            Text("Return trip / Fastest trip", color = TransitWhite,
-                fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text("Return Fast", color = TransitWhite,
+                fontWeight = FontWeight.Bold, fontSize = 14.sp,
+                maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
         }
         androidx.compose.foundation.Canvas(Modifier.width(24.dp).height(ReturnOptionHeight)) {
             drawLine(TransitWhite, androidx.compose.ui.geometry.Offset(size.width, 0f),
@@ -162,7 +164,8 @@ private fun ReturnOptionControl(enabled: Boolean,
         Box(Modifier.weight(1f).heightIn(min = ReturnOptionHeight)
             .clickable(enabled, role = Role.Button) { onFind(ReturnTransportOption.SameTransport) }
             .padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
-            Text("Same transport", color = TransitWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text("Same Way", color = TransitWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp,
+                maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
         }
     }
 }

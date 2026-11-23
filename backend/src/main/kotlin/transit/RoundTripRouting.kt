@@ -3,6 +3,7 @@ package transit
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.*
 import java.time.Instant
+import kotlin.math.pow
 import kotlin.time.TimeSource
 
 /**
@@ -21,14 +22,24 @@ internal suspend fun generateRoundTrip(
     val timer = TimeSource.Monotonic.markNow()
     val excluded = input.excluded.toMutableList()
     val result = withTimeoutOrNull(timeoutMillis) {
-        repeat(3) {
+        repeat(3) { attempt ->
             currentCoroutineContext().ensureActive()
             val remaining = timeoutMillis - timer.elapsedNow().inWholeMilliseconds
             if (remaining <= 1) return@withTimeoutOrNull null
-            val outward = Generator(routes, zones, route, { departure }, sample,
+            // Choose nearby turnarounds without capping the accepted outbound duration.
+            // A one-way search otherwise maximizes the outbound leg against the entire budget,
+            // leaving no time to walk home. Shrink the search area if the actual return will not fit.
+            val turnaroundSample = sample ?: { request: Request ->
+                val searchMinutes = (input.minutes * 0.5 * 0.65.pow(attempt)).toInt().coerceAtLeast(1)
+                val search = request.copy(minutes = searchMinutes)
+                destinationCandidates(search, routes, zones, allowedLines(search, routes),
+                    dispatcher = dispatcher)
+            }
+            val outward = Generator(routes, zones, route, { departure }, turnaroundSample,
                 (remaining / 2).coerceAtLeast(1), maxAttempts.coerceAtMost(24),
                 preparationDispatcher = dispatcher).generate(input.copy(roundTrip = false,
                     minutes = input.minutes, excluded = excluded.toList()))
+            if (outward["status"].text() == "no_trip") return@repeat
             if (outward["status"].text() != "success") return@withTimeoutOrNull outward
             val turnaround = requireNotNull(outward["destination"] as? JsonObject)
             excluded += point(turnaround["point"])
