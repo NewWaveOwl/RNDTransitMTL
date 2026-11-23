@@ -46,6 +46,9 @@ internal class TravelTrackerApi(
             currentCoroutineContext().ensureActive()
             503 to obj("status" to "unavailable", "message" to "The service timed out. Keep your manual entry and try again.")
         } catch (cancelled: CancellationException) { throw cancelled }
+        catch (configuration: TravelTrackerAuthConfigurationException) {
+            503 to obj("status" to "authentication_unavailable", "message" to configuration.message)
+        }
         catch (invalid: InputError) { 400 to obj("status" to "invalid_input", "message" to invalid.message) }
         catch (_: Exception) { 503 to obj("status" to "unavailable", "message" to "The service is unavailable. Keep your manual entry and try again.") }
         finally { requestCapacity.release() }

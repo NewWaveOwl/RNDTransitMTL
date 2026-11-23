@@ -131,6 +131,40 @@ saved in a named Git stash before updating the checkout to current source.
 
 **Technique record:** [A1 in the technique log](TravelTracker-Addresses-AI-Technique-Log.md#a1--provider-selection-and-shared-integration).
 
+## A2 - Auth diagnosis and six routing/address issues
+
+**Date:** 2026-11-22. **Contributor:** NewWaveOwl requesting account.
+**AI tool:** Codex with frontend, backend and read-only review agents; exact model
+variants [Not documented]. **Conversation:** [Conversation link needed].
+
+### Full prompt
+
+```text
+when I am loogged in i still get this Sign in to look up addresses. Manual entry remains available. | and lets impmemt this issuues https://github.com/NewWaveOwl/TravelTracker/issues/108, https://github.com/NewWaveOwl/TravelTracker/issues/107, https://github.com/NewWaveOwl/TravelTracker/issues/113 , https://github.com/NewWaveOwl/TravelTracker/issues/120 , https://github.com/NewWaveOwl/TravelTracker/issues/127 , https://github.com/NewWaveOwl/TravelTracker/issues/106 |commit after adding each feature and after provide instruction if backed needs to be updated (server)
+```
+
+**Student decision:** Explicitly authorized the six issues and separate feature
+commits; retained the earlier Public Nominatim choice. Deployment remains a manual
+target-PC operation, not an observed result.
+
+**AI output summary / diagnosis:** A downstream Routing401 revoked the whole app
+session, and the UI conflated wrong/missing routing Auth settings with local
+sign-out. The fix preserves local sessions for optional routing rejection and
+returns a safe configuration failure for missing/mismatched backend projects.
+The unverified JWT issuer can reject only; matched requests still require live
+Supabase user verification. Exact public project-pair setup instructions were
+added. The user's actual server configuration is unavailable, so its precise
+misconfiguration is not claimed as observed.
+
+**Verification so far:** Baseline .NET1,716 passed, zero build warnings/errors;
+backend73 and launcher60 before the auth change. Focused frontend38 and backend8
+auth/HTTP checks passed; full suite evidence will be recorded after delivery.
+
+**Remaining evidence:** Per-feature changes, live local OTP results, final tests
+and update artifact will be recorded after they are observed. Human review,
+student time/code estimates and learning reflections [Student reflection needed].
+**Technique record:** A2 in the companion technique log.
+
 ## Reflection
 
 - Observable AI assistance: source research, provider comparison, source generation,

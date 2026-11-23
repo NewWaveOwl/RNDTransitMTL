@@ -81,3 +81,24 @@ complete portable package replacement, backups and rollback. Updating applicatio
 JARs does not require reimporting private data or rebuilding the OTP graph. Live
 address quality, full graph/mode coverage and real authenticated tunnel journeys
 must be checked on the configured target PC.
+
+### Signed in, but address lookup is refused
+
+TravelTracker and RNDTransit may use different Supabase projects. In the stopped
+server, open **TravelTracker window → TravelTracker settings** and set the
+TravelTracker URL and publishable key to the frontend's exact project pair. On the
+development PC, read only these public launcher fields:
+
+```powershell
+cd 'K:\CLASSES 26 FALL\WEB_3\ML_4\TravelTracker'
+$travelTrackerSettings = Get-Content -Raw .traveltracker-launch.json | ConvertFrom-Json
+$travelTrackerSettings | Select-Object SupabaseUrl, PublishableKey
+```
+
+Do not change RNDTransit's separate project fields. Restart the shared server after
+saving. Missing routing configuration and a mismatched session issuer return safe
+`503 authentication_unavailable`, without sending that bearer to the wrong Auth
+project. Inspecting an unverified issuer can only reject; identity still requires
+Supabase's verified user response. A Routing-only rejection does not sign the user
+out of TravelTracker. Sign out and back in once if a previous app version already
+revoked the local session after a failed lookup.

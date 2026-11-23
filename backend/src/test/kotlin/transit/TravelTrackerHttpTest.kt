@@ -115,7 +115,9 @@ class TravelTrackerHttpTest {
 
     @Test fun unconfiguredAndPrivilegedAuthConfigurationFailClosed() = runBlocking {
         Upstream(false).use { upstream ->
-            assertNull(travelTrackerSession(null, null, upstream)("Bearer unverified"))
+            assertNull(travelTrackerSession(null, null, upstream)(null))
+            try { travelTrackerSession(null, null, upstream)("Bearer unverified"); fail() }
+            catch (_: TravelTrackerAuthConfigurationException) { }
             try { travelTrackerSession("https://example.supabase.co", "sb_secret_private", upstream); fail() } catch (_: IllegalArgumentException) { }
             try { travelTrackerSession("http://example.supabase.co", "sb_publishable_example", upstream); fail() } catch (_: IllegalArgumentException) { }
             val verifier = travelTrackerSession("https://example.supabase.co", "sb_publishable_example", upstream)

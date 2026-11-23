@@ -22,3 +22,22 @@
 | Time | Student-estimated active interaction time [Not documented]. |
 | Outcome | Working-tree implementation and transferable tested update ZIP; source uncommitted and real server untouched. |
 | Productivity / learning | [Student reflection needed]. |
+
+## A2 - Session diagnosis and routing feature delivery
+
+**Date:** 2026-11-22. **Contributor:** NewWaveOwl requesting account.
+**Conversation:** [Conversation link needed].
+**Full prompt:** A2 in the companion decision log.
+
+| Field | Evidence / student record |
+| --- | --- |
+| Challenge | A signed-in traveller receives a false sign-in prompt; implement six linked routing/address issues with separate commits. |
+| AI used | Codex primary agent, frontend/backend layer agents and read-only reviewer. |
+| Observable prompting | User supplied the exact symptom, six issue links, separate-commit and server-update requirements. |
+| Deliberate techniques | [Student reflection needed]. |
+| Debugging | AI traced downstream401 to global session revocation and found missing/project-mismatched backend Auth returns the wrong error class; added focused regressions. |
+| Strategy | Separate foundational integration from auth fix and dependency-ordered feature commits; use existing Montreal OSM/GTFS assets for real OTP checks. |
+| Verification | Exact observed checks and final results belong to the A2 decision record; target-server deployment is unverified. |
+| Outcome | Auth changes under validation; feature delivery in progress. |
+| Iterations / time / code impact | [Not documented]; student estimates required. |
+| Productivity / learning | [Student reflection needed]. |

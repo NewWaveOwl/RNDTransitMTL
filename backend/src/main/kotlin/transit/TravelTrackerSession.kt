@@ -29,7 +29,10 @@ internal fun travelTrackerProject(project: String?, key: String?, fallbackProjec
  */
 internal fun travelTrackerSession(projectUrl: String?, publishableKey: String?, upstream: Upstream): suspend (String?) -> String? {
     require(projectUrl.isNullOrBlank() == publishableKey.isNullOrBlank()) { "TravelTracker authentication needs both project URL and publishable key." }
-    if (projectUrl.isNullOrBlank()) return { null }
+    if (projectUrl.isNullOrBlank()) return { token ->
+        if (token?.startsWith("Bearer ") == true) throw TravelTrackerAuthConfigurationException()
+        null
+    }
     val origin = URI(projectUrl)
     require(origin.scheme == "https" && origin.host != null && origin.userInfo == null && origin.query == null && origin.fragment == null &&
         origin.path.orEmpty() in listOf("", "/")) { "TravelTracker authentication requires an HTTPS project origin." }
@@ -40,6 +43,14 @@ internal fun travelTrackerSession(projectUrl: String?, publishableKey: String?, 
     require(validPublicKey && publishableKey.length <= 8192 && publishableKey.none(Char::isISOControl)) { "Use a publishable authentication key, never a secret or service-role key." }
     return { token ->
         if (token?.startsWith("Bearer ") != true || token.length > 8192) null else {
+            // An unverified issuer can only reject a request; identity still comes from Auth below.
+            val issuer = runCatching {
+                val parts = token.removePrefix("Bearer ").split('.')
+                if (parts.size != 3) null else
+                    json.parseToJsonElement(String(Base64.getUrlDecoder().decode(parts[1]), Charsets.UTF_8)).field("iss").text()
+            }.getOrNull()
+            if (issuer != null && issuer != origin.resolve("/auth/v1").toString())
+                throw TravelTrackerAuthConfigurationException()
             val response = withTimeout(4000) { upstream.request(origin.resolve("/auth/v1/user").toString(),
                 headers = mapOf("Authorization" to token, "apikey" to publishableKey)) }
             when {
