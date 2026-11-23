@@ -1,4 +1,5 @@
 package com.example.rnd_transit_mtl.ui.global_ui_ellements.trip
+import com.example.rnd_transit_mtl.model.trip.explorationWaypoints
 import com.example.rnd_transit_mtl.data.assets.toSampleMapPoint
 import com.example.rnd_transit_mtl.model.ids.TripId
 
@@ -526,6 +527,7 @@ fun TripDetailsV3(
                 MockTripMap(
                     start = trip.origin.toSampleMapPoint(),
                     destination = trip.destination.toSampleMapPoint(),
+                waypoints = trip.explorationWaypoints.map { it.toSampleMapPoint() },
                     legs = trip.toSampleMapLegs(),
                     progress = 1f,
                     interactive = enabled,

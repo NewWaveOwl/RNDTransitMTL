@@ -436,7 +436,9 @@ internal fun TransitOpeningScreen(
                     originPlace = routingOrigin,
                     walkingPreference = planner.walkingPreference,
                     bikeSpeedKmh = planner.bikeSpeedKmh,
-                    roundTrip = planner.roundTrip
+                    roundTrip = planner.roundTrip,
+                    interestZoneCount = com.example.rnd_transit_mtl.data.generation.explorationZoneCount(
+                        planner.selectedAttractionIds.size)
                 )
 
                 // Explicit samples are distinct from validation failures.

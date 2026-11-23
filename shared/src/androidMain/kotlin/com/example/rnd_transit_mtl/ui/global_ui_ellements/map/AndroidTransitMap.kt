@@ -1,5 +1,7 @@
 package com.example.rnd_transit_mtl.ui.global_ui_ellements.map
 
+import com.example.rnd_transit_mtl.model.trip.explorationWaypoints
+
 import android.net.ConnectivityManager
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -445,7 +447,8 @@ private fun AndroidTransitMap(
                     data.userPosition?.let { UserPointer(it, session.movementHeading.degrees - map.cameraPosition.bearing.toFloat()) }
                     selectedOrigin?.let { OriginMarker(it) }
                     if (trip != null && map.style.loadState == StyleLoadState.Ready) {
-                        DestinationMarker(trip.destination.point)
+                        if (trip.explorationWaypoints.isEmpty()) DestinationMarker(trip.destination.point)
+                        else trip.explorationWaypoints.forEach { DestinationMarker(it.point) }
                         if (marker != null && data.userPosition == null && data.progress != null) {
                             val ahead = positionAlongRoute(path, distances, (data.progress + 0.001f).coerceAtMost(1f))
                             val to = ahead ?: marker

@@ -50,7 +50,8 @@ data class TripReviewDto(
 data class TripJourneyDto(
     val kind: String,
     @SerialName("outbound_trip_id") val outboundTripId: String? = null,
-    val turnaround: PlaceDto? = null
+    val turnaround: PlaceDto? = null,
+    val waypoints: List<PlaceDto> = emptyList()
 )
 
 /**
@@ -115,7 +116,7 @@ fun Trip.toDto(): TripDto = TripDto(
     orientationBufferSeconds = orientationBufferSeconds,
     requestedTransportIds = requestedTransportIds?.map { it.value },
     journey = journey?.let { TripJourneyDto(if (it.kind == TripJourneyKind.Return) "return" else "round_trip",
-        it.outboundTripId?.value, it.turnaround?.toDto()) },
+        it.outboundTripId?.value, it.turnaround?.toDto(), it.waypoints.map { place -> place.toDto() }) },
     zonesByTransport = selectedZonesByTransport.entries.associate { (mode, zones) ->
         mode.value to zones.map { it.value }
     }
@@ -162,7 +163,7 @@ fun TripDto.toDomainOrNull(): Trip? = runCatchingInvalid {
             }
             TripJourney(kind, saved.outboundTripId?.let(::TripId), saved.turnaround?.let {
                 requireNotNull(it.toDomainOrNull()) { "Invalid round-trip waypoint." }
-            })
+            }, saved.waypoints.map { requireNotNull(it.toDomainOrNull()) { "Invalid loop waypoint." } })
         },
         selectedZonesByTransport = zonesByTransport.entries.associate { (mode, zones) ->
             TransportId(mode) to zones.map(::ZoneId)

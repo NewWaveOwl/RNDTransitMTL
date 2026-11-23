@@ -52,7 +52,7 @@ internal val walkingSpeeds=mapOf("Amble" to 3.0,"Walk" to 4.8,"Dash" to 6.8)
 internal fun orientationSeconds(meters: Double)=ceil(meters*60/1000).toLong()
 internal data class Request(val origin: JsonObject, val minutes: Int, val modes: List<String>, val pace: String,
     val zones: Map<String,List<String>>, val lines: List<String>, val excluded: List<Point>, val bikeSpeedKmh: Int = 18,
-    val destination: JsonObject? = null, val compareModes: Boolean = false, val roundTrip: Boolean = false) {
+    val destination: JsonObject? = null, val compareModes: Boolean = false, val roundTrip: Boolean = false, val interestZoneCount: Int = 1) {
     val start get()=point(origin["point"])
     val speed get()=walkingSpeeds.getValue(pace)/3.6
     val bikeOnly get()=modes==listOf("bike")
@@ -113,7 +113,13 @@ internal fun parseRequest(v: JsonElement): Request {
         it.jsonPrimitive.boolean
     } ?: false
     checkInput(!roundTrip || destination == null, "A round trip chooses its own turnaround.")
-    return Request(clean,minutes.toInt(),modes,pace,zones,lines,excluded,bikeSpeed.toInt(),destination,compareModes,roundTrip)
+    val count = v.field("interestZoneCount")?.let {
+        val n = it.number()
+        checkInput(n != null && n in 1.0..6.0 && n % 1 == 0.0, "Choose 1-6 interest zones.")
+        n!!.toInt()
+    } ?: 1 // Old clients retain their single-turnaround contract.
+    checkInput(roundTrip || count == 1, "Interest zones require round-trip mode.")
+    return Request(clean,minutes.toInt(),modes,pace,zones,lines,excluded,bikeSpeed.toInt(),destination,compareModes,roundTrip,count)
 }
 /** Uniform-area arbitrary coordinates, independent of stops or a POI catalogue. */
 internal fun candidates(input: Request, random: Random=Random.Default, check: ()->Unit = {}): List<Point> {

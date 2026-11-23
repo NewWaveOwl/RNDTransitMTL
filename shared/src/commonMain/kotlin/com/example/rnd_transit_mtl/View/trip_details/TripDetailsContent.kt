@@ -1,5 +1,6 @@
 package com.example.rnd_transit_mtl.View.trip_details
 
+import com.example.rnd_transit_mtl.model.trip.explorationWaypoints
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -160,6 +161,7 @@ fun TripDetailsContent(
                 MockTripMap(
                     start = trip.origin.toSampleMapPoint(),
                     destination = trip.destination.toSampleMapPoint(),
+                waypoints = trip.explorationWaypoints.map { it.toSampleMapPoint() },
                     legs = trip.toSampleMapLegs(),
                     progress = 1f,
                     modifier = Modifier

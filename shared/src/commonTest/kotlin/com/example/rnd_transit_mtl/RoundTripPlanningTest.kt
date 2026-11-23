@@ -58,6 +58,7 @@ class RoundTripPlanningTest {
         var failure: Exception? = null
         val result = BackendTripGenerator(post = { body, _ ->
             assertTrue(Json.decodeFromString<BackendGenerationRequest>(body).roundTrip)
+            assertEquals(1, Json.parseToJsonElement(body).jsonObject["interestZoneCount"]?.jsonPrimitive?.int)
             Json.encodeToString(response())
         }, reportFailure = { failure = it }).generate(input, types, emptySet())
         val trip = assertIs<TripGenerationResult.Success>(result, failure?.stackTraceToString()).trip
@@ -118,4 +119,49 @@ class RoundTripPlanningTest {
         assertTrue(TripRequest(null, start, away, 5, listOf(walk), durationBudgetSeconds = 301)
             .validate(setOf(walk)).any { it is TripRequestError.InvalidDurationBudget })
     }
+    @Test fun legacySingleTurnaroundCannotSatisfyAMultiStopRequest() = runTest {
+        assertIs<TripGenerationResult.RoutingUnavailable>(BackendTripGenerator(post = { _, _ -> Json.encodeToString(response()) })
+            .generate(input.copy(interestZoneCount = 2), types, emptySet()))
+    }
+
+    @Test fun selectedInterestBoxesDetermineExactCountWithOneAsTheMinimum() {
+        assertEquals(1, explorationZoneCount(0))
+        (1..6).forEach { assertEquals(it, explorationZoneCount(it)) }
+    }
+
+    @Test fun multiStopLoopIsDecodedSavedAndRejectsMissingOrReorderedSegments() = runTest {
+        val second = Place("Exploration zone 2", GeoPoint(45.505, -73.59))
+        val segments = listOf(BackendLoopSegment(start, away, otp(start, away, -73.601)),
+            BackendLoopSegment(away, second, otp(away, second, -73.595)),
+            BackendLoopSegment(second, start, otp(second, start, -73.592)))
+        val loop = BackendGenerationResponse("success", origin = start, destination = start,
+            elapsedSeconds = 1926, travelTimeSeconds = 1800, orientationBufferSeconds = 126,
+            roundTrip = true, turnaround = away, waypoints = listOf(away, second), segments = segments)
+        val loopInput = input.copy(plannedMinutes = 40, interestZoneCount = 2)
+        val generator = BackendTripGenerator(post = { body, _ ->
+            assertEquals(2, Json.decodeFromString<BackendGenerationRequest>(body).interestZoneCount)
+            Json.encodeToString(loop)
+        })
+        val trip = assertIs<TripGenerationResult.Success>(generator.generate(loopInput, types, emptySet())).trip
+        assertEquals(listOf(away, second), trip.explorationWaypoints)
+        assertEquals(start, trip.destination)
+        assertEquals(3, trip.legs.size)
+        assertEquals(trip, trip.toDto().toDomainOrNull())
+        assertEquals(trip, Json.decodeFromString<Trip>(Json.encodeToString(trip)))
+        for (bad in listOf(loop.copy(segments = segments.dropLast(1)),
+            loop.copy(segments = segments.reversed()), loop.copy(waypoints = listOf(away, away)))) {
+            assertIs<TripGenerationResult.RoutingUnavailable>(BackendTripGenerator(post = { _, _ -> Json.encodeToString(bad) })
+                .generate(loopInput, types, emptySet()))
+        }
+    }
+
+    @Test fun offlineSamplesAlsoVisitTheRequestedNumberOfStops() = runTest {
+        val trip = assertIs<TripGenerationResult.Success>(MockTripGenerator().generate(
+            input.copy(plannedMinutes = 5, originPlace = null, interestZoneCount = 3), types, emptyList(), emptySet())).trip
+        assertEquals(3, trip.explorationWaypoints.size)
+        assertEquals(4, trip.legs.size)
+        assertEquals(trip.origin, trip.destination)
+        assertEquals(300L, trip.legs.sumOf { it.durationSeconds })
+    }
+
 }

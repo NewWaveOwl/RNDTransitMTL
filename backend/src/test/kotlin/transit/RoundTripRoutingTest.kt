@@ -97,4 +97,61 @@ class RoundTripRoutingTest {
             "modes" to listOf("walk"), "roundTrip" to "yes"))); fail("Invalid trip type") }
         catch (_: InputError) { }
     }
+    @Test fun loopVisitsEveryRequestedZoneInOrderAndReturnsHome() = runBlocking {
+        for (count in listOf(2, 6)) {
+            val stops = (1..count).map { Point(45.5 + it * 0.001, -73.6 + it * 0.001) }
+            val queries = mutableListOf<JsonObject>()
+            val result = Generator(emptyList(), zones(), { query -> queries += query; response(query, 180) },
+                { now }, sample = { stops }).generate(input.copy(interestZoneCount = count))
+            assertEquals("success", result["status"].text())
+            assertEquals(count + 1, queries.size)
+            assertEquals(stops, result["waypoints"].items().map { point(it.field("point")) })
+            assertEquals(input.origin, result["destination"])
+            val segments = result["segments"].items()
+            assertEquals(input.origin, segments.first().field("origin"))
+            assertEquals(input.origin, segments.last().field("destination"))
+            assertTrue(segments.zipWithNext().all { (a, b) -> a.field("destination") == b.field("origin") })
+            assertEquals((count + 1) * 222.0, result["elapsedSeconds"].number()!!, 0.0)
+            queries.forEachIndexed { index, q ->
+                assertEquals(now.plusSeconds(index * 222L).toString(), q.field("variables").field("departure").text())
+            }
+        }
+    }
+
+    @Test fun incompleteOverBudgetOrDuplicateLoopCannotSucceed() = runBlocking {
+        for (duplicate in listOf(false, true)) {
+            val result = Generator(emptyList(), zones(), { query -> response(query, 800) }, { now },
+                sample = { if (duplicate) listOf(away, away) else listOf(away, Point(45.505, -73.59)) })
+                .generate(input.copy(interestZoneCount = 2))
+            assertEquals("no_trip", result["status"].text())
+            assertNull(result["segments"])
+        }
+    }
+
+    @Test fun validatesInterestZoneCount() {
+        for (count in listOf<Any>(0, 7, 1.5, "2", true)) {
+            try { parseRequest(obj("origin" to input.origin, "plannedMinutes" to 30,
+                "modes" to listOf("walk"), "roundTrip" to true, "interestZoneCount" to count))
+                fail("Invalid count accepted: $count")
+            } catch (_: InputError) { }
+        }
+        assertEquals(1, input.interestZoneCount)
+    }
+
+    @Test fun generatedRandomStopsFormANonCollinearLoopAndCancellationPropagates() = runBlocking {
+        val result = Generator(emptyList(), zones(), { query -> response(query, 180) }, { now })
+            .generate(input.copy(interestZoneCount = 3))
+        assertEquals("success", result["status"].text())
+        val points = result["waypoints"].items().map { point(it.field("point")) }
+        assertEquals(3, points.distinct().size)
+        val a = points[0]; val b = points[1]
+        assertTrue(kotlin.math.abs((a.latitude - home.latitude) * (b.longitude - home.longitude) -
+            (a.longitude - home.longitude) * (b.latitude - home.latitude)) > 1e-10)
+        try {
+            Generator(emptyList(), zones(), { throw CancellationException("cancel multi-stop loop") }, { now })
+                .generate(input.copy(interestZoneCount = 3))
+            fail("Cancellation must propagate")
+        } catch (_: CancellationException) { }
+    }
+
 }

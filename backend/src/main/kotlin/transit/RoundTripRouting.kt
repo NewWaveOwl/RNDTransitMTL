@@ -16,6 +16,8 @@ internal suspend fun generateRoundTrip(
     sample: (suspend (Request) -> List<Point>)?, timeoutMillis: Long,
     maxAttempts: Int, dispatcher: CoroutineDispatcher
 ): JsonObject {
+    if (input.interestZoneCount > 1) return generateExplorationLoop(input, routes, zones, route,
+        departure, sample, timeoutMillis)
     val timer = TimeSource.Monotonic.markNow()
     val excluded = input.excluded.toMutableList()
     val result = withTimeoutOrNull(timeoutMillis) {

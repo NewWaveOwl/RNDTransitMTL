@@ -5,11 +5,21 @@ Implements [#92](https://github.com/NewWaveOwl/RNDTransitMTL/issues/92) and
 [round trip Figma frame](https://www.figma.com/design/EBOrT92jIVwFv0mB8jeeVY/RndTransit_main?node-id=391-4353).
 
 The preferences sheet offers **One way** (the default for existing drafts) and
-**Round trip**. Round-trip generation requests an outbound adventure and a fresh
-route from its turnaround to the exact original start. Both directions, transit
-waiting, and orientation reserves must fit the selected available time. The return
-departs after the outbound arrival and its orientation reserve. A missing inbound
-route never becomes a successful one-way proposal. Accepted geometry is saved once.
+**Round trip**. Regular trips choose a final destination and offer Fastest / Same
+transport return routing after arrival. Round trips instead visit random exploration
+waypoints and finish at their original start. Each selected box under **Make it your
+kind** adds exactly one waypoint; zero selections still requests one. The frontend
+sends `interestZoneCount` (1-6), independently of the intensity slider. These are
+random points for now, not verified attractions.
+
+For multiple waypoints the backend samples points around a polygon with the start
+as one vertex, routes every segment in order, and returns `waypoints` and `segments`
+with their accepted OTP responses. Failed searches retry a smaller loop. All routed
+travel, transit waiting and orientation reserves share the selected time budget.
+The next segment departs after the previous arrival and its orientation reserve.
+Missing or over-budget segments never become partial successes. The app saves the
+complete route and ordered waypoints, and flags each stop in proposals, navigation,
+and reopened trips. Legacy single-turnaround records remain readable.
 
 After one-way arrival, the Figma completion sheet shows distance by transport and
 estimated itinerary statistics. Walking steps assume 0.75 metres per step. Speed
@@ -46,7 +56,8 @@ Backend tests cover fresh fixed-target comparison, asymmetric round trips,
 departure time, total budget, failed inbound routing, and cancellation. Shared
 tests cover endpoint/type validation, immutable outbound records, retry/cancel
 races, independent trip identity, JSON/DTO restoration, legacy draft defaults,
-sample-provider requests in both directions, and the initial GPS fix of a loop.
+sample-provider loops, exact interest-box counts, ordered multi-stop restoration,
+missing/reordered segments, and the initial GPS fix of a loop.
 Compose integration tests exercise return failure/retry, preview/start, explicit
 arrival, original-trip review, selector semantics, and completion sheet controls.
 `supabase/tests/trip_journey_metadata.sql` validates legacy and linked records,

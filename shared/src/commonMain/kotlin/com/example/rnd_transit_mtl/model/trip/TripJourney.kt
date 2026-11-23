@@ -9,15 +9,22 @@ import kotlinx.serialization.Serializable
 data class TripJourney(
     val kind: TripJourneyKind,
     val outboundTripId: TripId? = null,
-    val turnaround: Place? = null
+    val turnaround: Place? = null,
+    val waypoints: List<Place> = emptyList()
 ) {
     init {
+        require(waypoints.isEmpty() || (kind == TripJourneyKind.RoundTrip && waypoints.size in 2..6 &&
+            waypoints.map { it.point }.distinct().size == waypoints.size && turnaround == waypoints.first()))
         require((kind == TripJourneyKind.Return) == (outboundTripId != null))
         require((kind == TripJourneyKind.RoundTrip) == (turnaround != null))
     }
 }
 
-/** Return journeys are separately routed records; round trips contain both routed directions. */
+/** Flags for a loop; old single-turnaround records remain readable. */
+val Trip.explorationWaypoints: List<Place>
+    get() = journey?.let { it.waypoints.ifEmpty { listOfNotNull(it.turnaround) } }.orEmpty()
+
+/** Return journeys are separately routed records; round trips contain a complete loop. */
 @Serializable
 enum class TripJourneyKind {
     @SerialName("return") Return,

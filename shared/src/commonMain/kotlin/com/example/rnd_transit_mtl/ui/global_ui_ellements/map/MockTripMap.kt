@@ -101,6 +101,7 @@ private const val TRIP_MAP_RECENTER_ANIMATION_DURATION_MILLIS = 500
 fun MockTripMap(
     start: TripPoint,
     destination: TripPoint,
+    waypoints: List<TripPoint> = emptyList(),
     progress: Float,
     legs: List<TripMapLeg> = listOf(TripMapLeg(listOf(start, destination), isRouted = false)),
     modifier: Modifier = Modifier,
@@ -312,7 +313,8 @@ fun MockTripMap(
                 }
             }
             drawAnchoredTripEndpoint(startPainter, startPosition, endpointSize)
-            drawAnchoredTripEndpoint(endPainter, endPosition, endpointSize)
+            if (waypoints.isEmpty()) drawAnchoredTripEndpoint(endPainter, endPosition, endpointSize)
+            else waypoints.forEach { drawAnchoredTripEndpoint(endPainter, it.toMapPosition(mapRect), endpointSize) }
             if (showPosition) {
                 val direction = current.direction.takeUnless { it == Offset.Zero }
                     ?: (endPosition - startPosition)

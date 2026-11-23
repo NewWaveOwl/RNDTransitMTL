@@ -1,5 +1,6 @@
 package com.example.rnd_transit_mtl.View.current_trip
 
+import com.example.rnd_transit_mtl.model.trip.explorationWaypoints
 import com.example.rnd_transit_mtl.data.trips.LocalCloudTrips
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.location.LocationAccuracyNotice
 
@@ -304,6 +305,7 @@ fun ActiveMapContent(
             MockTripMap(
                 start = trip.origin.toSampleMapPoint(),
                 destination = trip.destination.toSampleMapPoint(),
+                waypoints = trip.explorationWaypoints.map { it.toSampleMapPoint() },
                 legs = trip.toSampleMapLegs(),
                 progress = retainedMapProgress,
                 interactive = mapInteractive,

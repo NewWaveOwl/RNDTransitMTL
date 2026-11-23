@@ -1,5 +1,6 @@
 package com.example.rnd_transit_mtl.View.current_trip
 
+import com.example.rnd_transit_mtl.model.trip.explorationWaypoints
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -95,6 +96,7 @@ internal fun TripJourneySheet(
             bottomInset = with(density) { (heightPx - top).coerceAtLeast(0f).toDp() })
         TransitMap(mapData, Modifier.fillMaxSize()) {
             MockTripMap(start = trip.origin.toSampleMapPoint(), destination = trip.destination.toSampleMapPoint(),
+                waypoints = trip.explorationWaypoints.map { it.toSampleMapPoint() },
                 progress = if (completed) 1f else 0f, legs = trip.toSampleMapLegs(),
                 modifier = Modifier.fillMaxWidth().height(with(density) { top.toDp() }),
                 interactive = enabled, matchPlannerBackground = true,

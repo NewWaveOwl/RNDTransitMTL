@@ -127,6 +127,11 @@ data class Trip(
         require(journey?.outboundTripId != id) { "A return trip must reference a different outbound trip." }
         if (journey?.kind == TripJourneyKind.RoundTrip) {
             val waypoint = requireNotNull(journey.turnaround)
+            val stopIndices = explorationWaypoints.map { stop ->
+                require(stop.point != origin.point)
+                legs.indexOfFirst { it.end == stop.point }.also { require(it >= 0) }
+            }
+            require(stopIndices.zipWithNext().all { (a, b) -> a < b }) { "Loop waypoints must be visited in order." }
             require(origin.point == destination.point && waypoint.point != origin.point &&
                 legs.any { it.end == waypoint.point }) { "A round trip must visit its waypoint and return to the original start." }
         }
