@@ -78,6 +78,8 @@ internal class CurrentTripLocationViewModel(
     private var matchingVelocity = 0.0
     private var lastReliableOnRoute: Boolean? = null
     private var lastProgressAt: Long? = null
+    private data class ProgressRecovery(val point: GeoPoint, val progress: Float, val time: Long)
+    private var progressRecovery: ProgressRecovery? = null
     private val unmatchedConfirmation = LocationCandidateConfirmation()
     private var unmatchedPositionConfirmed = false
     private val restoredProgress = tripsStore.state.value.activeTrip
@@ -175,16 +177,31 @@ internal class CurrentTripLocationViewModel(
         if (!onRoute) {
             clearMotion()
             matchingVelocity = 0.0
+            if (decision.relocated) hasObservedRoute = false
             return
         }
-        val progressAge = lastProgressAt?.let { (measuredAt - it).coerceAtLeast(0L) / 1_000.0 }
+        if (decision.relocated) {
+            // Recover the visible position, never skipped travel or an arrival.
+            progressRecovery = ProgressRecovery(fix.point, matched.progress, measuredAt)
+            hasObservedRoute = false
+            clearMotion()
+            return
+        }
+        val recovery = progressRecovery
+        if (recovery != null && (fix.point.distanceMetersTo(recovery.point) <= maxOf(5.0, fix.accuracyMeters) ||
+                fix.speedMetersPerSecond?.let { it < 0.3 } == true)) return
+        val referenceProgress = recovery?.progress ?: previousProgress
+        val progressAge = (recovery?.time ?: lastProgressAt)?.let {
+            (measuredAt - it).coerceIn(0L, 30_000L) / 1_000.0
+        }
         val travelBudget = 10.0 + minOf(fix.accuracyMeters, 25.0) +
             trackingMaximumSpeed() * (progressAge ?: 0.0)
-        if (!decision.relocated && progressAge != null && abs(matched.progress - previousProgress) * routeLength > travelBudget) {
+        if (progressAge != null && abs(matched.progress - referenceProgress) * routeLength > travelBudget) {
             // Crossing/parallel geometry must not jump confirmed progress to a distant branch.
             clearMotion()
             return
         }
+        progressRecovery = null
         recordMotion(fix, matched.progress, measuredAt)
         matchingVelocity = velocityMetersPerSecond
         matchReferenceProgress = matched.progress

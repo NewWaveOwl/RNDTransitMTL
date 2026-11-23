@@ -10,6 +10,28 @@ import kotlin.test.*
 
 class CurrentTripLocationJumpTest {
     @Test
+    fun relocationAtDestinationCannotInventTravelOrCompleteWhileStationary() {
+        var now = 50_000L
+        val trip = guidanceTestTrip()
+        val store = TripsStore { now }.also { it.start(trip) }
+        val model = CurrentTripLocationViewModel(trip, store) { now }
+        model.receive(LocationUpdate.Fix(trip.origin.point, 5.0, now, 0.0))
+        repeat(70) {
+            now += 2_000
+            model.receive(LocationUpdate.Fix(trip.destination.point, 5.0, now, 0.0))
+            assertEquals(0f, store.progress)
+            assertTrue(store.completedTrips.isEmpty())
+        }
+        // Fresh, plausible movement away from the recovered point can resume progress.
+        now += 30_000
+        model.receive(LocationUpdate.Fix(GeoPoint(45.5028, -73.6), 5.0, now, 1.4))
+        assertTrue(store.progress in 0.9f..0.98f)
+        now += 30_000
+        model.receive(LocationUpdate.Fix(trip.destination.point, 5.0, now, 1.4))
+        assertEquals(trip.id, store.completedTrips.single().id)
+    }
+
+    @Test
     fun approachingATransferAllowsTheNextLegSpeedWithoutFreezingTheFirstBusFix() {
         var now = 50_000L
         val trip = guidanceTestTrip()

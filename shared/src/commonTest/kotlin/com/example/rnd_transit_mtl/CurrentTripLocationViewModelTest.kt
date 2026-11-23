@@ -67,7 +67,11 @@ class CurrentTripLocationViewModelTest {
         model.receive(recovered)
         assertEquals(recovered, model.state.value.fix)
         assertEquals(TripLocationAvailability.Available, model.state.value.availability)
-        assertEquals(0.5f, store.progress, 0.001f)
+        assertEquals(recovered.point, model.state.value.displayedPosition)
+        assertEquals(0f, store.progress, "Relocation restores the marker without inventing skipped travel")
+        now += 10_000
+        model.receive(LocationUpdate.Fix(GeoPoint(45.5016, -73.6), 5.0, now, 1.2))
+        assertEquals(0.5333f, store.progress, 0.001f)
     }
 
     @Test
