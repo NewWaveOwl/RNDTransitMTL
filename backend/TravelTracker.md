@@ -82,6 +82,9 @@ JARs does not require reimporting private data or rebuilding the OTP graph. Live
 address quality, full graph/mode coverage and real authenticated tunnel journeys
 must be checked on the configured target PC.
 
+See [live OTP capabilities and reproducible mode verification](RoutingVerification.md)
+and [the chosen walking/cycling preview and optional trip time-zone contract](WalkingCyclingPreviews.md).
+
 ### Signed in, but address lookup is refused
 
 TravelTracker and RNDTransit may use different Supabase projects. In the stopped

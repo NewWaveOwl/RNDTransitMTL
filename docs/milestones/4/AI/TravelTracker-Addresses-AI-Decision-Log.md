@@ -197,6 +197,15 @@ references, not proven original graph-build inputs. A fresh full graph build was
 not rerun. Capability source tests and the full Kotlin gate passed 88 backend and
 60 launcher tests without compiler warnings. See `backend/RoutingVerification.md`.
 
+**#107 evidence:** The chosen-route adapter now validates optional IANA zones and
+explicit offsets, geometry order/counts and connected duration spans. Existing
+omitted/null-zone requests remain compatible. The full gate passed 111 backend
+and 60 launcher tests without warnings; 23 new adapter/HTTP cases include
+cancellation, timeout recovery, malformed-provider data and unequal realtime
+delays. Tagged OTP model source establishes actual-time duration semantics; this
+is not a claim of live prediction verification. Read-only AI review found no
+remaining issues. Human acceptance review remains [Student reflection needed].
+
 ## Reflection
 
 - Observable AI assistance: source research, provider comparison, source generation,
