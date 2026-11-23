@@ -9,7 +9,8 @@ param(
     [ValidateRange(1024,65535)][int]$Port = 21885,
     [ValidateRange(1024,32768)][int]$MemoryMb = 1536,
     [string]$DepartureTime = '2026-11-23T08:00:00-05:00',
-    [string]$CasesFile
+    [string]$CasesFile,
+    [string]$QueryFile
 )
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
@@ -90,7 +91,8 @@ try {
     $info = $infoText | ConvertFrom-Json
     if ($info.errors -or $info.data.serverInfo.version -ne '2.10.0') { throw 'Live router is not the verified OTP 2.10.0.' }
     # ReadAllText returns an ordinary string; Get-Content -Raw extended properties cause deep PS5 JSON recursion.
-    $query = [IO.File]::ReadAllText((Join-Path $repo 'backend\src\main\resources\plan.graphql'))
+    if (!$QueryFile) { $QueryFile = Join-Path $repo 'backend\src\main\resources\traveltracker-plan.graphql' }
+    $query = [IO.File]::ReadAllText((Resolve-Path -LiteralPath $QueryFile).Path)
     $cases = @(
         @{ mode = 'WALK'; origin = @{ lat = 45.5088; lon = -73.5686 }; destination = @{ lat = 45.5312; lon = -73.6150 } },
         @{ mode = 'BICYCLE'; origin = @{ lat = 45.5088; lon = -73.5686 }; destination = @{ lat = 45.5312; lon = -73.6150 } },

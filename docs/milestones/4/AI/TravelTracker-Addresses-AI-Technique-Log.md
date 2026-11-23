@@ -38,6 +38,6 @@
 | Debugging | AI traced downstream401 to global session revocation and found missing/project-mismatched backend Auth returns the wrong error class; added focused regressions. |
 | Strategy | Separate foundational integration from auth fix and dependency-ordered feature commits; use existing Montreal OSM/GTFS assets for real OTP checks. |
 | Verification | Exact observed checks and final results belong to the A2 decision record; target-server deployment is unverified. |
-| Outcome | Auth changes under validation; feature delivery in progress. |
+| Outcome | Auth fix and six requested feature implementations are covered by local commits and deterministic/real-data checks. Frontend ordinary suite: 1,756 passed; backend: 132 passed; launcher: 60 passed. Responsive browser QA and final package evidence follow separately; remote deployment is unverified. |
 | Iterations / time / code impact | [Not documented]; student estimates required. |
 | Productivity / learning | [Student reflection needed]. |

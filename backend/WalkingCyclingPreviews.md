@@ -54,9 +54,10 @@ do not replace manual planning data.
 ## Realtime timing compatibility
 
 The strict duration check uses estimated timestamps only when the provider marks
-a transit vehicle leg realtime and supplies both estimated endpoints. Otherwise
-scheduled timestamps are retained. Street legs remain estimated, without a live
-road-traffic claim.
+a transit vehicle leg realtime and supplies both estimated endpoints. A
+realtime-marked vehicle leg missing either estimated endpoint is unavailable;
+it is not silently relabeled scheduled. Legs without that realtime flag retain
+scheduled timestamps. Street legs remain estimated, without a live road-traffic claim.
 
 This is verified against OTP **v2.10.0** source: GraphQL LegImpl.duration delegates
 to Leg.duration, which spans its actual start/end times. ScheduledTransitLeg's

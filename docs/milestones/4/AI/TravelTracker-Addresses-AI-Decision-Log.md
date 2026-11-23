@@ -206,6 +206,26 @@ delays. Tagged OTP model source establishes actual-time duration semantics; this
 is not a claim of live prediction verification. Read-only AI review found no
 remaining issues. Human acceptance review remains [Student reflection needed].
 
+**#108 evidence:** Dedicated TravelTracker query returns car/bus/rail coverage and
+no-route reasons, boarding/alighting positions and stop IDs, intermediate stops,
+transfers/interline counts, original scheduled and effective times, initial wait
+and elapsed totals. Android's query remains unchanged. The full Kotlin gate passed
+132 backend and 60 launcher tests without failures/skips/compiler warnings. The
+new TT query succeeded against the isolated real graph for all five modes. Opt-in
+offline replay normalized all 11 recorded alternatives through production code;
+bus alternatives contain 15–17 intermediate stops. The samples had no transfers;
+fixtures cover transfer/interline and unequal-delay behavior. Live predictions,
+authenticated tunnel requests and actual target-PC deployment remain unverified.
+
+**Frontend evidence (#113/#120/#127):** Local commits add keyboard candidate
+search/cancel, address/map forms with gray coordinate readouts, and explicit
+route selection/confirmation with exact seconds, Windows/IANA compatibility,
+Undo and session-local geometry. The .NET Release build had zero warnings/errors;
+1,756 ordinary application tests passed, including 702 frontend tests. Source
+review findings about optional Routing401, wrong catalogue ID, endpoint geometry
+and parent rendering were fixed and covered. Isolated responsive-browser QA and
+the final Windows package are in progress; no human acceptance result is invented.
+
 ## Reflection
 
 - Observable AI assistance: source research, provider comparison, source generation,

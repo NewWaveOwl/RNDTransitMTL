@@ -15,3 +15,15 @@ dependencies {
     testImplementation(libs.kotlinx.coroutinesTest)
 }
 tasks.test { useJUnit() }
+
+val routingEvidenceDirectory = providers.gradleProperty("routingEvidenceDirectory")
+tasks.register<JavaExec>("verifyRoutingEvidence") {
+    group = "verification"
+    description = "Replay explicitly selected real OTP evidence through the TravelTracker preview adapter without network access."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("transit.RoutingEvidenceCheckKt")
+    doFirst {
+        args(routingEvidenceDirectory.orNull ?: error("Set -ProutingEvidenceDirectory to an explicit Test-TravelTrackerRouting.ps1 evidence directory."))
+    }
+}

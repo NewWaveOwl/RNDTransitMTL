@@ -2,6 +2,8 @@ package transit
 
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.*
 import java.time.Duration
 import java.time.OffsetDateTime
@@ -55,18 +57,30 @@ internal class TravelTrackerPlanner(
             }
         }
         val departure = requestedDeparture.toInstant()
+        var coverage: JsonElement = JsonNull
         fun result(fields: JsonObject) = JsonObject(fields + mapOf("timeZone" to value(timeZone?.id),
-            "requestedDepartureTime" to value(requestedDeparture.toString())))
+            "requestedDepartureTime" to value(requestedDeparture.toString()), "coverage" to coverage,
+            "attribution" to value("© OpenStreetMap contributors; transit schedules belong to the listed feed publishers.")))
         val code = body["mode"].text() ?: throw InputError("Choose a transport mode.")
-        if (code !in supported) return result(obj("status" to "unsupported", "itineraries" to emptyList<Any>(), "message" to "This routing mode is not supported."))
+        if (code !in supported) return result(obj("status" to "unsupported", "reason" to "unsupported_mode", "itineraries" to emptyList<Any>(), "message" to "This routing mode is not supported."))
         checkInput(distance(from, to) >= 1, "Choose different departure and destination points.")
         val transit = code in listOf("bus", "train")
+        val metadata = try { withTimeoutOrNull(1500) { capabilitySource?.read() } }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { null }
+        coverage = metadata?.get("coverage") ?: JsonNull
+        if (metadata?.get("modes").items().any { it.field("code").text() == code && it.field("status").text() == "unsupported" }) {
+            val reason = if (transit) "mode_not_in_dataset" else "unsupported_mode"
+            return result(obj("status" to "unsupported", "reason" to reason, "itineraries" to emptyList<Any>(),
+                "message" to if (transit) "The loaded transit data does not contain this transport mode. Keep your manual plan."
+                    else "The configured router does not support this mode. Keep your manual plan."))
+        }
         val modes = if (transit) obj("direct" to emptyList<String>(), "directOnly" to false, "transitOnly" to true,
             "transit" to obj("access" to listOf("WALK"), "egress" to listOf("WALK"), "transfer" to listOf("WALK"),
                 "transit" to listOf(obj("mode" to supported.getValue(code)))))
         else obj("direct" to listOf(supported.getValue(code)), "directOnly" to true, "transitOnly" to false)
         requests.incrementAndGet()
-        val response = fetch(obj("query" to planQuery, "variables" to obj(
+        val response = fetch(obj("query" to routeQuery, "variables" to obj(
             "originLat" to from.latitude, "originLon" to from.longitude, "destinationLat" to to.latitude, "destinationLon" to to.longitude,
             "departure" to departure.toString(), "modes" to modes, "filters" to null, "excludeRealtime" to !transit, "walkSpeed" to 1.3333333333),
             "extensions" to obj("realtimeFeedsFromItinerary" to true, "realtimeFeeds" to when (code) {
@@ -92,6 +106,7 @@ internal class TravelTrackerPlanner(
             var hasSelectedMode = false
             var totalDistance = 0.0
             var geometryCharacters = 0
+            var intermediateStopCount = 0
             val legs = rawLegs.map { leg ->
                 context.ensureActive()
                 val mode = leg.field("mode").text() ?: throw ProviderError("Invalid leg mode.")
@@ -100,10 +115,13 @@ internal class TravelTrackerPlanner(
                 val meters = leg.field("distance").number()?.takeIf { it.isFinite() && it >= 0 } ?: throw ProviderError("Invalid leg distance.")
                 val seconds = leg.field("duration").number()?.takeIf { it.isFinite() && it >= 0 } ?: throw ProviderError("Invalid leg duration.")
                 if (!transit && (meters <= 0 || seconds <= 0)) throw ProviderError("Invalid direct route estimate.")
-                val realtime = transit && mode != "WALK" && leg.field("realTime") == JsonPrimitive(true) &&
-                    leg.field("start").field("estimated").field("time").text() != null &&
-                    leg.field("end").field("estimated").field("time").text() != null
+                val realtime = transit && mode != "WALK" && leg.field("realTime") == JsonPrimitive(true)
+                if (realtime && (leg.field("start").field("estimated").field("time").text() == null ||
+                    leg.field("end").field("estimated").field("time").text() == null)) throw ProviderError("Incomplete realtime route timing.")
                 realTime = realTime || realtime
+                val scheduledStart = leg.field("start").field("scheduledTime").text() ?: throw ProviderError("Missing scheduled departure.")
+                val scheduledEnd = leg.field("end").field("scheduledTime").text() ?: throw ProviderError("Missing scheduled arrival.")
+                if (parseTimestamp(scheduledEnd) < parseTimestamp(scheduledStart)) throw ProviderError("Scheduled route timing is not connected.")
                 fun timestamp(key: String): String {
                     val time = leg.field(key)
                     return (if (realtime) time.field("estimated").field("time").text() else null)
@@ -129,17 +147,80 @@ internal class TravelTrackerPlanner(
                 previous = points.last()
                 totalDistance += meters
                 if (!totalDistance.isFinite()) throw ProviderError("Invalid route distance.")
+                val intermediateStops = when (val reported = leg.field("intermediateStops")) {
+                    null, JsonNull -> null
+                    is JsonArray -> {
+                        if (reported.size > 1000) throw ProviderError("Too many intermediate stops in one leg.")
+                        intermediateStopCount += reported.size
+                        if (intermediateStopCount > 2000) throw ProviderError("Too many route stops.")
+                        reported.map { stop(it) }
+                    }
+                    else -> throw ProviderError("Invalid intermediate route stops.")
+                }
                 obj("mode" to mode, "durationSeconds" to seconds, "distanceMeters" to meters, "departureTime" to starts, "arrivalTime" to ends,
                     "geometry" to geometry, "routeName" to (leg.field("route").field("shortName").text() ?: leg.field("route").field("longName").text()),
-                    "realtime" to realtime)
+                    "routeId" to leg.field("route").field("gtfsId").text(), "headsign" to leg.field("headsign").text(),
+                    "realtime" to realtime, "timingBasis" to if (mode == "WALK" || !transit) "estimated" else if (realtime) "realtime" else "scheduled",
+                    "scheduledDepartureTime" to scheduledStart, "scheduledArrivalTime" to scheduledEnd,
+                    "from" to stop(leg.field("from"), points.first()), "to" to stop(leg.field("to"), points.last()),
+                    "intermediateStops" to intermediateStops)
             }
             if (!hasSelectedMode || distance(previous, to) > 250) throw ProviderError("Route does not reach the selected destination.")
             val span = Duration.between(itineraryStart, previousArrival).let { it.seconds.toDouble() + it.nano / 1_000_000_000.0 }
             if (abs(span - duration) > 1.0) throw ProviderError("Itinerary duration does not match its timestamps.")
+            val transitLegs = if (transit) rawLegs.filter { it.field("mode").text() != "WALK" } else emptyList()
+            val transferCount = when (val reported = node["numberOfTransfers"]) {
+                null, JsonNull -> (transitLegs.withIndex().count { (index, leg) ->
+                    index == 0 || leg.field("interlineWithPreviousLeg") != JsonPrimitive(true)
+                } - 1).coerceAtLeast(0)
+                else -> reported.number()?.takeIf { it.isFinite() && it % 1.0 == 0.0 && it >= 0 &&
+                    it <= (transitLegs.size - 1).coerceAtLeast(0) }?.toInt() ?: throw ProviderError("Invalid route transfer count.")
+            }
+            val elapsed = Duration.between(departure, previousArrival).let { it.seconds.toDouble() + it.nano / 1_000_000_000.0 }
             obj("id" to "route-${index + 1}", "durationSeconds" to duration, "distanceMeters" to totalDistance,
+                "departureTime" to legs.first()["departureTime"], "arrivalTime" to legs.last()["arrivalTime"],
+                "transferCount" to transferCount, "initialWaitSeconds" to (elapsed - span).coerceAtLeast(0.0),
+                "elapsedFromRequestedDepartureSeconds" to elapsed,
                 "timingBasis" to if (!transit) "estimated" else if (realTime) "realtime" else "scheduled", "legs" to legs)
         }
-        return result(obj("status" to if (itineraries.isEmpty()) "no_route" else "success", "itineraries" to itineraries,
+        val reason = if (itineraries.isNotEmpty()) null else when {
+            "OUTSIDE_SERVICE_PERIOD" in codes -> "outside_service_period"
+            "LOCATION_NOT_FOUND" in codes -> "location_not_found"
+            "NO_STOPS_IN_RANGE" in codes -> "no_stops_in_range"
+            else -> "no_route"
+        }
+        return result(obj("status" to if (itineraries.isEmpty()) "no_route" else "success", "reason" to reason, "itineraries" to itineraries,
             "message" to if (itineraries.isEmpty()) "No route is available for these endpoints, mode and service date. Keep your manually entered times." else null))
+    }
+
+    /** @param value Provider ISO timestamp. @return Valid instant without exposing malformed provider text. */
+    private fun parseTimestamp(value: String) = try { OffsetDateTime.parse(value).toInstant() }
+        catch (_: Exception) { throw ProviderError("Invalid route timing.") }
+
+    /**
+     * Preserves a real provider place, or its already verified geometry endpoint when old responses omit coordinates.
+     * @param reported Provider stop/place fields.
+     * @param anchor Verified geometry endpoint; intermediate stops require their own provider coordinates.
+     * @return Public location metadata without changing a user-selected point.
+     */
+    private fun stop(reported: JsonElement?, anchor: Point? = null): JsonObject {
+        val latField = reported.field("lat")
+        val lonField = reported.field("lon")
+        val point = if ((latField == null || latField == JsonNull) && (lonField == null || lonField == JsonNull)) {
+            anchor ?: throw ProviderError("Missing route stop coordinates.")
+        } else {
+            val lat = latField.number()?.takeIf { it.isFinite() && it in -90.0..90.0 }
+                ?: throw ProviderError("Invalid route stop coordinates.")
+            val lon = lonField.number()?.takeIf { it.isFinite() && it in -180.0..180.0 }
+                ?: throw ProviderError("Invalid route stop coordinates.")
+            Point(lat, lon)
+        }
+        if (anchor != null && distance(anchor, point) > 250) throw ProviderError("Route stop does not match its geometry.")
+        return obj("name" to reported.field("name").text()?.takeIf { it.isNotBlank() }, "lat" to point.latitude,
+            "lon" to point.longitude, "stopId" to (reported.field("stop").field("gtfsId").text() ?: reported.field("gtfsId").text()))
+    }
+
+    companion object {
+        private val routeQuery = checkNotNull(TravelTrackerPlanner::class.java.getResource("/traveltracker-plan.graphql")).readText()
     }
 }

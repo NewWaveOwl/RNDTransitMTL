@@ -84,6 +84,8 @@ must be checked on the configured target PC.
 
 See [live OTP capabilities and reproducible mode verification](RoutingVerification.md)
 and [the chosen walking/cycling preview and optional trip time-zone contract](WalkingCyclingPreviews.md).
+The [car/transit preview contract](CarTransitPreviews.md) documents explicit
+coverage reasons, boarding/alighting stops, transfers and initial waiting.
 
 ### Signed in, but address lookup is refused
 
