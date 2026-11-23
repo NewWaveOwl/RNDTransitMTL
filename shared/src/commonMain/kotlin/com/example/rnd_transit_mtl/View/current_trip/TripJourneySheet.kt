@@ -97,7 +97,7 @@ internal fun TripJourneySheet(
             MockTripMap(start = trip.origin.toSampleMapPoint(), destination = trip.destination.toSampleMapPoint(),
                 progress = if (completed) 1f else 0f, legs = trip.toSampleMapLegs(),
                 modifier = Modifier.fillMaxWidth().height(with(density) { top.toDp() }),
-                interactive = enabled, matchPlannerBackground = false,
+                interactive = enabled, matchPlannerBackground = true,
                 showControls = false, showPosition = false)
         }
         overlay()

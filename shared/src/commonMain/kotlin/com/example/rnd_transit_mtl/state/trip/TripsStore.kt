@@ -178,14 +178,32 @@ class TripsStore private constructor(
      *
      * Another start cannot replace the existing active trip.
      */
-    fun start(trip: Trip): TripActionResult {
+    fun start(trip: Trip): TripActionResult = startTrip(trip, null)
+
+    /** Starts a separately routed return without changing its completed outbound record.
+     * The pending outbound review is deferred atomically only after the return is validated.
+     * @param trip Fresh generated route with a return relationship and the exact stored origin as its target.
+     * @param outboundTripId Completed trip whose original start is being revisited.
+     */
+    fun startReturn(trip: Trip, outboundTripId: TripId): TripActionResult = startTrip(trip, outboundTripId)
+
+    private fun startTrip(trip: Trip, outboundTripId: TripId?): TripActionResult {
         val current = mutableState.value
+
+        if (outboundTripId != null) {
+            val outbound = current.completedTrips.firstOrNull { it.id == outboundTripId }
+                ?: return TripActionResult.MissingTrip(outboundTripId)
+            if (trip.journey?.kind != com.example.rnd_transit_mtl.model.trip.TripJourneyKind.Return ||
+                trip.journey.outboundTripId != outboundTripId || trip.destination != outbound.origin) {
+                return TripActionResult.InvalidInput("Return destination must be the saved original start.")
+            }
+        }
 
         current.activeTrip?.let {
             return TripActionResult.ActiveTripExists(it.trip.id)
         }
 
-        if (current.pendingReviewTripId != null) {
+        if (current.pendingReviewTripId != null && current.pendingReviewTripId != outboundTripId) {
             return TripActionResult.InvalidInput(
                 "Handle the pending trip review before starting another trip."
             )
@@ -212,7 +230,8 @@ class TripsStore private constructor(
         }
 
         mutableState.value = current.copy(
-            activeTrip = ActiveTripState(ownedTrip, elapsedMillis = 0L)
+            activeTrip = ActiveTripState(ownedTrip, elapsedMillis = 0L),
+            pendingReviewTripId = if (outboundTripId != null) null else current.pendingReviewTripId
         )
         return TripActionResult.Applied
     }

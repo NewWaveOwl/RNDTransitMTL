@@ -103,7 +103,9 @@ data class Trip(
     /** Orientation reserve already included in routedDurationSeconds. */
     val orientationBufferSeconds: Long = 0,
     /** Allowed planner alternatives, separate from walking access and other used leg modes. Null on legacy trips. */
-    val requestedTransportIds: List<TransportId>? = null
+    val requestedTransportIds: List<TransportId>? = null,
+    /** Optional return relationship or round-trip waypoint; absent on legacy one-way records. */
+    val journey: TripJourney? = null
 ) {
     init {
         require(routedDurationSeconds == null || routedDurationSeconds > 0)
@@ -119,8 +121,14 @@ data class Trip(
             attractionIntensity = attractionIntensity
         )
 
-        require(origin.point != destination.point) {
+        require(origin.point != destination.point || journey?.kind == TripJourneyKind.RoundTrip) {
             "Start and destination must be different."
+        }
+        require(journey?.outboundTripId != id) { "A return trip must reference a different outbound trip." }
+        if (journey?.kind == TripJourneyKind.RoundTrip) {
+            val waypoint = requireNotNull(journey.turnaround)
+            require(origin.point == destination.point && waypoint.point != origin.point &&
+                legs.any { it.end == waypoint.point }) { "A round trip must visit its waypoint and return to the original start." }
         }
         require(legs.isNotEmpty()) { "A trip needs at least one leg." }
         require(legs.first().start == origin.point && legs.last().end == destination.point) {

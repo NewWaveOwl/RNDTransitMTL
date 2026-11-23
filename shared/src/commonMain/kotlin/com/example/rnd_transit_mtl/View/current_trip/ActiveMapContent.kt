@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.rnd_transit_mtl.model.trip.Trip
+import com.example.rnd_transit_mtl.model.trip.TripJourneyKind
 import com.example.rnd_transit_mtl.model.trip.guidanceAt
 import com.example.rnd_transit_mtl.model.trip.compactGuidanceAt
 import com.example.rnd_transit_mtl.model.geo.GeoPoint
@@ -214,7 +215,7 @@ fun ActiveMapContent(
     }
 
     LaunchedEffect(completed, simulationEnabled) {
-        if (completed || !simulationEnabled) confirmingFinish = false
+        if (completed || !simulationEnabled && trip.journey?.kind != TripJourneyKind.Return) confirmingFinish = false
     }
 
     var confirmingCancel by rememberSaveable(trip.id) {
@@ -495,7 +496,11 @@ fun ActiveMapContent(
                         )
                     }
 
-                    Text("Current trip · #$reference", color = TransitWhite, fontSize = 14.sp)
+                    if (trip.journey?.kind == TripJourneyKind.Return) {
+                        Text("Returning to your start", color = TransitWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Text("${if (trip.journey?.kind == TripJourneyKind.Return) "Return trip" else "Current trip"} · #$reference",
+                        color = TransitWhite, fontSize = 14.sp)
                     if (locationState == TripLocationState.NotTracking) {
                         Text("Trip progress paused", color = TransitWhite, fontSize = 14.sp)
                     }
@@ -525,8 +530,9 @@ fun ActiveMapContent(
                         )
                     } else {
                         Row(horizontalArrangement = Arrangement.spacedBy(ActiveMapActionSpacing)) {
-                            if (completed || simulationEnabled) TripActionButton(
-                                label = if (completed) "Review trip" else "Finish trip",
+                            if (completed || simulationEnabled || trip.journey?.kind == TripJourneyKind.Return) TripActionButton(
+                                label = if (completed) "Review trip" else if (trip.journey?.kind == TripJourneyKind.Return)
+                                    "I'm back at the start" else "Finish trip",
                                 enabled = actionsEnabled,
                                 onClick = {
                                     if (completed) onFinish()
@@ -611,7 +617,7 @@ fun ActiveMapContent(
         }
     }
 
-    if (confirmingFinish && !completed && simulationEnabled) {
+    if (confirmingFinish && !completed && (simulationEnabled || trip.journey?.kind == TripJourneyKind.Return)) {
         Dialog(
             onDismissRequest = { confirmingFinish = false },
             properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -626,17 +632,18 @@ fun ActiveMapContent(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    "Finish this adventure?",
+                    if (trip.journey?.kind == TripJourneyKind.Return) "Back at your starting point?" else "Finish this adventure?",
                     color = TransitComplementary,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    "This marks the sample trip as completed.",
+                    if (trip.journey?.kind == TripJourneyKind.Return) "Confirm that you have arrived. Your outbound and return trips remain saved."
+                    else "This marks the sample trip as completed.",
                     color = TransitComplementary
                 )
                 TripActionButton(
-                    "Yes, finish trip",
+                    if (trip.journey?.kind == TripJourneyKind.Return) "Yes, I'm back" else "Yes, finish trip",
                     onClick = {
                         confirmingFinish = false
                         onFinish()

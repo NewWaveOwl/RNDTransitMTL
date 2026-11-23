@@ -47,7 +47,9 @@ internal class SupabaseTripRepository(
         val fields = writeJson.encodeToJsonElement(ownedTrip.toDto()).jsonObject
 
         // The DTO includes an embedded review for reads. Reviews are a separate table.
-        val payload = JsonObject(fields - "review")
+        val payload = JsonObject((fields - "review").filterNot { (name, value) ->
+            name == "journey" && value == JsonNull
+        })
         client.from("trips").upsert(payload) {
             onConflict = "id"
             ignoreDuplicates = true

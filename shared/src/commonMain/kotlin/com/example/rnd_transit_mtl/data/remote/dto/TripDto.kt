@@ -9,6 +9,8 @@ import com.example.rnd_transit_mtl.model.review.TripReview
 import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.model.trip.TripRouteSnapshot
 import com.example.rnd_transit_mtl.model.trip.TripTransportSnapshot
+import com.example.rnd_transit_mtl.model.trip.TripJourney
+import com.example.rnd_transit_mtl.model.trip.TripJourneyKind
 import kotlin.time.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -43,12 +45,18 @@ data class TripReviewDto(
     @SerialName("image_url") val imageUrl: String = ""
 )
 
+/** Optional relationship or turnaround stored alongside the immutable route. */
+@Serializable
+data class TripJourneyDto(
+    val kind: String,
+    @SerialName("outbound_trip_id") val outboundTripId: String? = null,
+    val turnaround: PlaceDto? = null
+)
+
 /**
  * Backend form of a Trip, one row of a trips table.
- *
- * Timestamps are ISO-8601 UTC text, which is how Postgres timestamptz
- * columns arrive through Supabase. Places, legs and snapshots are nested
- * JSON (jsonb columns). distanceKm is not stored because Trip derives it from legs.
+ * Timestamps are ISO-8601 UTC text. Places, legs and snapshots are nested JSON;
+ * distanceKm is derived from legs rather than stored separately.
  */
 @Serializable
 data class TripDto(
@@ -75,7 +83,8 @@ data class TripDto(
     @SerialName("waiting_time_seconds") val waitingTimeSeconds: Long? = null,
     @SerialName("walking_preference") val walkingPreference: String? = null,
     @SerialName("orientation_buffer_seconds") val orientationBufferSeconds: Long = 0,
-    @SerialName("requested_transport_ids") val requestedTransportIds: List<String>? = null
+    @SerialName("requested_transport_ids") val requestedTransportIds: List<String>? = null,
+    val journey: TripJourneyDto? = null
 )
 
 /** Converts a trip into its backend form. */
@@ -105,6 +114,8 @@ fun Trip.toDto(): TripDto = TripDto(
     walkingPreference = walkingPreference,
     orientationBufferSeconds = orientationBufferSeconds,
     requestedTransportIds = requestedTransportIds?.map { it.value },
+    journey = journey?.let { TripJourneyDto(if (it.kind == TripJourneyKind.Return) "return" else "round_trip",
+        it.outboundTripId?.value, it.turnaround?.toDto()) },
     zonesByTransport = selectedZonesByTransport.entries.associate { (mode, zones) ->
         mode.value to zones.map { it.value }
     }
@@ -143,6 +154,16 @@ fun TripDto.toDomainOrNull(): Trip? = runCatchingInvalid {
         walkingPreference = walkingPreference,
         orientationBufferSeconds = orientationBufferSeconds,
         requestedTransportIds = requestedTransportIds?.map(::TransportId),
+        journey = journey?.let { saved ->
+            val kind = when (saved.kind) {
+                "return" -> TripJourneyKind.Return
+                "round_trip" -> TripJourneyKind.RoundTrip
+                else -> throw IllegalArgumentException("Unknown journey kind.")
+            }
+            TripJourney(kind, saved.outboundTripId?.let(::TripId), saved.turnaround?.let {
+                requireNotNull(it.toDomainOrNull()) { "Invalid round-trip waypoint." }
+            })
+        },
         selectedZonesByTransport = zonesByTransport.entries.associate { (mode, zones) ->
             TransportId(mode) to zones.map(::ZoneId)
         }

@@ -45,6 +45,15 @@ import kotlinx.coroutines.launch
 import com.example.rnd_transit_mtl.navigation.LocalTripNavigation
 import com.example.rnd_transit_mtl.navigation.HistoryScreenKey
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.trip.CompleteV3
+import com.example.rnd_transit_mtl.ViewModels.current_trip.ReturnTripViewModel
+import com.example.rnd_transit_mtl.ViewModels.current_trip.ReturnTransportCatalogue
+import com.example.rnd_transit_mtl.ViewModels.current_trip.ReturnPhase
+import com.example.rnd_transit_mtl.data.generation.LocalBackendTripGenerator
+import com.example.rnd_transit_mtl.data.generation.TripGenerationResult
+import com.example.rnd_transit_mtl.model.trip.TripJourneyKind
+import androidx.navigationevent.NavigationEventInfo
+import androidx.navigationevent.compose.NavigationBackHandler
+import androidx.navigationevent.compose.rememberNavigationEventState
 
 /**
  * Coordinates one active trip, with playback only after an explicit debug choice.
@@ -96,6 +105,20 @@ fun CurrentTripScreen(
 
     val completedTrip = currentState.completedTrips
         .firstOrNull { it.id == trip.id }
+
+    val backend = LocalBackendTripGenerator.current
+    val returnModel = viewModel(key = "trip-return:${trip.id.value}") {
+        ReturnTripViewModel(tripsStore, trip.id, generate = { input, existingIds ->
+            backend?.generate(input, ReturnTransportCatalogue, existingIds)
+                ?: TripGenerationResult.RoutingUnavailable("The return planner is not configured. Your completed trip is saved.")
+        })
+    }
+    val returnState by returnModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(isDestinationActive) { if (!isDestinationActive) returnModel.cancelReturn() }
+    val returnBackState = rememberNavigationEventState(currentInfo = NavigationEventInfo.None)
+    NavigationBackHandler(returnBackState,
+        isBackEnabled = isDestinationActive && completedTrip != null && returnState.phase != ReturnPhase.Arrival,
+        onBackCompleted = { returnModel.cancelReturn() })
 
     val storedTrip = activeState?.trip ?: completedTrip
 
@@ -332,11 +355,38 @@ fun CurrentTripScreen(
     }
 
     if (completedTrip != null) {
-        CompleteV3(completedTrip, onReview = { requestReview() },
-            onSkipToHistory = { skipCompletion(true) }, onPlanAnother = { skipCompletion(false) },
-            enabled = isDestinationActive && isAppResumed,
-            errorMessage = operationMessage, modifier = modifier,
-            syncPending = trip.id in currentState.pendingFinalTripIds)
+        if (completedTrip.journey != null) {
+            BackAtStartContent(completedTrip, onReview = {
+                if (isDestinationActive && isAppResumed) {
+                    val originalId = completedTrip.journey.outboundTripId
+                    if (originalId == null) requestReview()
+                    else if (tripsStore.skipReview(completedTrip.id) == TripActionResult.Applied &&
+                        navigation.openCompletedTrip(originalId) && navigation.openInitialReview(originalId)) {
+                        operationMessage = null
+                    } else operationMessage = "Your trips are saved. Please try opening the review again."
+                }
+            }, onSkip = { skipCompletion(false) }, enabled = isDestinationActive && isAppResumed,
+                modifier = modifier, errorMessage = operationMessage)
+        } else TripReturnFlowContent(completedTrip, returnState, isDestinationActive && isAppResumed,
+            onFind = { option ->
+                if (isDestinationActive && isAppResumed) {
+                    operationMessage = null
+                    val fix = if (simulationEnabled) null else location?.fix?.takeIf { location.containsPoint(it.point) }
+                    returnModel.findReturn(option, fix)
+                }
+            }, onCancel = { returnModel.cancelReturn(); operationMessage = null }, onStart = {
+                if (isDestinationActive && isAppResumed) {
+                    when (val result = returnModel.startReturn()) {
+                        TripActionResult.Applied -> if (!navigation.resumeActiveTrip()) {
+                            operationMessage = "Your return is ready. Tap Start return trip to reopen it."
+                        }
+                        is TripActionResult.InvalidInput -> operationMessage = result.message
+                        else -> operationMessage = "The return could not be started. Your completed trip is saved."
+                    }
+                }
+            }, onReview = { requestReview() }, onSkip = { skipCompletion(true) },
+            onPlanAnother = { skipCompletion(false) }, modifier = modifier,
+            syncPending = trip.id in currentState.pendingFinalTripIds, errorMessage = operationMessage)
     } else if (storedTrip == null) {
         Column(
             modifier = modifier
@@ -430,14 +480,16 @@ fun CurrentTripScreen(
                 }
             },
             onFinishRequested = {
-                if (latestSimulationRunningAllowed && latestDestinationActive &&
+                if ((latestSimulationRunningAllowed || trip.journey?.kind == TripJourneyKind.Return) && latestDestinationActive &&
                     lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
                 ) {
                     simulation.pause()
 
                     // Explicitly finish the demo simulation and save its completed trip.
                     when (
-                        tripsStore.updateElapsed(
+                        if (!simulationEnabled && trip.journey?.kind == TripJourneyKind.Return) {
+                            tripsStore.updateRouteProgress(trip.id, 1f)
+                        } else tripsStore.updateElapsed(
                             trip.id,
                             TRIP_SIMULATION_DURATION_MILLIS
                         )
