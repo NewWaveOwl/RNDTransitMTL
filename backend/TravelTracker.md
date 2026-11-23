@@ -107,3 +107,23 @@ project. Inspecting an unverified issuer can only reject; identity still require
 Supabase's verified user response. A Routing-only rejection does not sign the user
 out of TravelTracker. Sign out and back in once if a previous app version already
 revoked the local session after a failed lookup.
+
+## Verified M4 update package
+
+The final update is
+`backend/launcher/build/updates/TravelTracker-Routing-M4-20261122/RNDTransitServer-TravelTracker-Update.zip`
+(15,228,905 bytes). It contains 34 application/dependency JARs plus updater,
+manifest and instructions, built from runtime source commit
+`58d68ff4f66e56479944d8c1acfe073c2d922ab0`.
+
+SHA-256: `68415AB3152B52D91D36EFFB889D15685DDCEB74B38D7741ED5890127AC9DECF`.
+
+This supersedes the initial Nominatim and PowerShell-fix ZIPs. Both installDist
+builds passed without warnings; 132 backend/60 launcher tests, eight isolated
+updater checks and genuine prior-JAR compatibility CheckOnly passed. Archive
+hashes/sizes, the current query/auth classes and embedded source commit were
+independently verified. `SOURCE-COMMIT.txt` and `package-evidence.json` are beside
+the ZIP. These checks did not modify the actual Windows server or test live
+authenticated tunnel requests. Apply to the stopped existing portable app using
+the [update/rollback commands](launcher/SERVER_GUIDE.md), with an explicit
+`-UpdateDirectory` pointing to the extracted files.

@@ -8,13 +8,14 @@ it does not establish completion of a separate RNDTransit course milestone.
 
 | Contributor | Scope | AI use | Entry |
 | --- | --- | --- | --- |
-| NewWaveOwl (requesting account; personal attribution not supplied) | TravelTracker addresses, OTP previews, Windows controls/update | Codex research, implementation, tests and read-only review | A1 |
+| NewWaveOwl (requesting account; personal attribution not supplied) | TravelTracker addresses, OTP previews, authentication, six linked features and Windows update | Codex research, implementation, tests and read-only review | A1, A2 |
 
 ## Session index
 
 | Entry | Date | Tool / source | Purpose |
 | --- | --- | --- | --- |
 | A1 | 2026-11-22 | Codex; [Conversation link needed] | Select address provider and implement shared integration |
+| A2 | 2026-11-22 | Codex; [Conversation link needed] | Diagnose signed-in address rejection; implement and commit six routing/address issues |
 
 ## A1 — Public Nominatim and shared Windows backend
 
@@ -223,8 +224,35 @@ route selection/confirmation with exact seconds, Windows/IANA compatibility,
 Undo and session-local geometry. The .NET Release build had zero warnings/errors;
 1,756 ordinary application tests passed, including 702 frontend tests. Source
 review findings about optional Routing401, wrong catalogue ID, endpoint geometry
-and parent rendering were fixed and covered. Isolated responsive-browser QA and
-the final Windows package are in progress; no human acceptance result is invented.
+and parent rendering were fixed and covered. Browser and package results are
+recorded below; no human acceptance result is invented.
+
+**Final server package:** Runtime source commit
+`58d68ff4f66e56479944d8c1acfe073c2d922ab0`; ZIP in
+`backend/launcher/build/updates/TravelTracker-Routing-M4-20261122/`.
+Size 15,228,905 bytes; SHA-256
+`68415AB3152B52D91D36EFFB889D15685DDCEB74B38D7741ED5890127AC9DECF`.
+The archive contains 34 JARs and four updater/manifest/instruction files. All JAR
+hashes/sizes were checked; source commit is embedded in README and recorded in
+sidecars. The packaged current query/auth classes were inspected. Both installDist
+builds passed without warnings, eight isolated updater checks passed, and
+CheckOnly with genuine previous portable JARs copied to a private fixture left
+that fixture unchanged. No real target-PC update or source push was performed.
+
+**Responsive-browser evidence:** An isolated actual-component fixture passed 31
+normal-click/keyboard checks at 1440×1000 desktop and 390×844 touch/reduced-motion
+phone emulation, with zero application page errors. It used simulated Auth,
+address, catalogue and router responses; it did not validate a live user or
+provider. Normal public basemap tiles loaded. Search/spinner/focus/cancel,
+marker Apply/Undo and route Cancel/Confirm/Save retained exact scheduled seconds.
+The phone check exposed a genuine absolute toolbar/status overlay blocking
+Transport and address input. A narrow-screen-only CSS fix put controls in normal
+flow; the same real-click regression passed. Frontend remained 702 passed, zero
+build warnings/errors. Physical-device and authenticated target-server checks
+remain unverified. Fixture/browser processes were stopped, and temporary scripts,
+logs/screenshots stayed in ignored frontend bin/TestResults directories. The
+primary agent inspected representative screenshots. Human review is still not
+claimed by an AI review or simulated UI check.
 
 ## Reflection
 
