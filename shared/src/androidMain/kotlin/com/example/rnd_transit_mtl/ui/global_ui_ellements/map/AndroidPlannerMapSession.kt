@@ -14,6 +14,7 @@ import com.example.rnd_transit_mtl.data.location.LocationUpdate
 import com.example.rnd_transit_mtl.data.location.LocationJumpFilter
 import com.example.rnd_transit_mtl.data.location.LocationAccuracyMonitor
 import com.example.rnd_transit_mtl.data.location.PlannerLocation
+import com.example.rnd_transit_mtl.data.location.LocationRequestQueue
 import com.example.rnd_transit_mtl.model.geo.GeoBounds
 import com.example.rnd_transit_mtl.model.geo.GeoPoint
 import kotlinx.coroutines.delay
@@ -72,7 +73,9 @@ internal class AndroidPlannerMapSession(private val context: Context) : PlannerL
         MontrealCenter.distanceMetersTo(point) <= montrealServiceRadiusMeters
     }
 
-    var pendingResult: ((LocationUpdate.Fix?) -> Unit)? by mutableStateOf(null)
+    private val requests = LocationRequestQueue()
+    var pendingRequestCount by mutableIntStateOf(0)
+        private set
     lateinit var askPermission: () -> Unit
     lateinit var hasPermission: () -> Boolean
     var permitted by mutableStateOf(false)
@@ -102,7 +105,6 @@ internal class AndroidPlannerMapSession(private val context: Context) : PlannerL
     var locationAttempt by mutableIntStateOf(0)
         private set
 
-    private var requestedAtMillis = 0L
     val movementHeading = com.example.rnd_transit_mtl.data.location.MovementHeading()
 
     fun receive(update: LocationUpdate) {
@@ -115,10 +117,11 @@ internal class AndroidPlannerMapSession(private val context: Context) : PlannerL
             }
             if (result.accepted) {
                 result.trustedFix?.let { movementHeading.receive(it) }
-                if ((update.timestampEpochMillis ?: 0L) >= requestedAtMillis) complete(result.trustedFix)
+                result.trustedFix?.let { requests.receive(it, System.currentTimeMillis()) }
+                pendingRequestCount = requests.size
             }
         } else if (update == LocationUpdate.PermissionDenied) {
-            complete(null)
+            denyPendingRequests()
         }
         // A temporary provider outage must not cancel a pending refresh before GPS recovers.
         // Fresh but suspicious readings still count as provider activity, never as progress.
@@ -127,10 +130,10 @@ internal class AndroidPlannerMapSession(private val context: Context) : PlannerL
 
     override fun request(onResult: ((LocationUpdate.Fix?) -> Unit)?) {
         autoCenterPending = false
-        requestedAtMillis = System.currentTimeMillis()
-        pendingResult = onResult ?: { result ->
+        requests.add(System.currentTimeMillis(), onResult ?: { result ->
             if (result != null && containsPoint(result.point)) recenter++
-        }
+        })
+        pendingRequestCount = requests.size
         permitted = hasPermission()
         if (permitted) {
             locationAttempt++
@@ -139,10 +142,14 @@ internal class AndroidPlannerMapSession(private val context: Context) : PlannerL
         }
     }
 
-    fun complete(result: LocationUpdate.Fix?) {
-        val callback = pendingResult
-        pendingResult = null
-        callback?.invoke(result)
+    fun denyPendingRequests() {
+        requests.denyAccess()
+        pendingRequestCount = requests.size
+    }
+
+    fun expireRequests() {
+        requests.expire(System.currentTimeMillis())
+        pendingRequestCount = requests.size
     }
 
     fun saveCamera(position: CameraPosition) {
@@ -179,7 +186,7 @@ internal fun rememberAndroidPlannerMapSession(): AndroidPlannerMapSession {
     }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         refreshAccess()
-        if (!session.permitted) session.complete(null)
+        if (!session.permitted) session.denyPendingRequests()
     }
     session.hasPermission = source::hasPermission
     session.askPermission = {
@@ -202,16 +209,18 @@ internal fun rememberAndroidPlannerMapSession(): AndroidPlannerMapSession {
             delay(1_000)
         }
     }
-    LaunchedEffect(session.permitted, session.accuracyMonitor.state.permission, started, session.locationAttempt) {
+    LaunchedEffect(session.permitted, session.accuracyMonitor.state.permission, started) {
         if (session.permitted && started) source.updates.collect { update ->
             session.receive(update)
         }
     }
-    val pending = session.pendingResult
-    LaunchedEffect(pending, session.permitted, started) {
-        if (pending != null && session.permitted && started) {
-            delay(15_000)
-            session.complete(null)
+    LaunchedEffect(session.locationAttempt) {
+        if (session.locationAttempt > 0) source.refresh()
+    }
+    LaunchedEffect(session.pendingRequestCount > 0) {
+        while (session.pendingRequestCount > 0) {
+            delay(250)
+            session.expireRequests()
         }
     }
     return session

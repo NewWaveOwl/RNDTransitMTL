@@ -57,10 +57,10 @@ class LiveLocationRegressionTest {
         val location = PendingLocation(recent)
         assertEquals(recent, location.awaitPlanningLocation { 100_000L })
         assertNull(location.callback, "A recent measurement needs no second provider request")
-        val result = async { location.awaitPlanningLocation { 105_000L } }
+        val result = async { location.awaitPlanningLocation { 115_000L } }
         runCurrent()
         assertFalse(result.isCompleted, "An older map position must not become the planning origin")
-        val fresh = recent.copy(timestampEpochMillis = 105_001L)
+        val fresh = recent.copy(timestampEpochMillis = 115_001L)
         assertNotNull(location.callback).invoke(fresh)
         assertEquals(fresh, result.await())
     }
@@ -95,4 +95,51 @@ class LiveLocationRegressionTest {
         assertNotNull(location.callback).invoke(fix(45.51, -73.51))
         assertTrue(result.isCancelled)
     }
+    @Test fun repeatedPlanningAcceptsRecentMeasurementsBeforeTheTapWithoutRefreshingGps() = runTest {
+        val measured = fix(45.5, -73.5).copy(timestampEpochMillis = 100_000L)
+        val location = PendingLocation(measured)
+        for (now in listOf(100_001L, 106_000L, 112_000L, 115_000L)) {
+            assertEquals(measured, location.awaitPlanningLocation { now })
+            assertNull(location.callback)
+        }
+    }
+
+    @Test fun concurrentRecenterCannotReplaceAPlanningLocationRequest() {
+        val queue = LocationRequestQueue()
+        val results = mutableListOf<Pair<String, LocationUpdate.Fix?>>()
+        queue.add(100_000L) { results += "plan" to it }
+        queue.add(100_500L) { results += "recenter" to it }
+        // Android may return a valid recent measurement taken before either button was tapped.
+        val measured = fix(45.5, -73.5).copy(timestampEpochMillis = 99_000L)
+        queue.receive(measured, 101_000L)
+        assertEquals<List<Pair<String, LocationUpdate.Fix?>>>(listOf("plan" to measured, "recenter" to measured), results)
+        assertEquals(0, queue.size)
+    }
+
+    @Test fun repeatedLocationRequestsKeepTheirOwnDeadlinesAndRejectOldOrFutureMeasurements() {
+        val queue = LocationRequestQueue()
+        val results = mutableListOf<Pair<String, LocationUpdate.Fix?>>()
+        queue.add(100_000L) { results += "first" to it }
+        queue.add(110_000L) { results += "second" to it }
+        queue.receive(fix(45.5, -73.5).copy(timestampEpochMillis = 80_000L), 112_000L)
+        queue.receive(fix(45.5, -73.5).copy(timestampEpochMillis = 113_000L), 112_000L)
+        assertTrue(results.isEmpty())
+        queue.expire(115_000L)
+        assertEquals<List<Pair<String, LocationUpdate.Fix?>>>(listOf("first" to null), results)
+        val measured = fix(45.51, -73.51).copy(timestampEpochMillis = 116_000L)
+        queue.receive(measured, 116_000L)
+        assertEquals(listOf("first" to null, "second" to measured), results)
+        assertEquals(0, queue.size)
+    }
+
+    @Test fun deniedPermissionCompletesAllLocationRequestsOnce() {
+        val queue = LocationRequestQueue()
+        val results = mutableListOf<LocationUpdate.Fix?>()
+        repeat(2) { queue.add(100_000L) { results += it } }
+        queue.denyAccess()
+        queue.expire(120_000L)
+        assertEquals<List<LocationUpdate.Fix?>>(listOf(null, null), results)
+        assertEquals(0, queue.size)
+    }
+
 }

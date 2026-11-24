@@ -181,7 +181,7 @@ class Trip33FlowTest {
     @Test
     fun switchingToRoundTripKeepsARecentGpsOriginWithoutAnotherRefresh() = runBlocking(Dispatchers.Main) {
         val recent = LocationUpdate.Fix(GeoPoint(45.51, -73.59), 5.0,
-            timestampEpochMillis = kotlin.time.Clock.System.now().toEpochMilliseconds())
+            timestampEpochMillis = kotlin.time.Clock.System.now().toEpochMilliseconds() - 8_000L)
         var refreshes = 0
         val location = object : PlannerLocation {
             override val fix = recent

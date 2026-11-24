@@ -39,7 +39,7 @@ internal suspend fun PlannerLocation.awaitPlanningLocation(
     val current = currentUpdate
     val recent = fix
     if (current is LocationUpdate.Fix && recent?.timestampEpochMillis?.let {
-            nowEpochMillis() - it in 0L..5_000L
+            nowEpochMillis() - it in 0L..LOCATION_FIX_MAX_AGE_MILLIS
         } == true) return recent
     // Requesting also allows the platform to ask for permission when necessary.
     return awaitFreshFix() ?: if (currentUpdate == LocationUpdate.PermissionDenied) {

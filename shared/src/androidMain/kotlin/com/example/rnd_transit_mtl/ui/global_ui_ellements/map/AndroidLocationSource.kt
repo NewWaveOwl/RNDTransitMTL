@@ -20,11 +20,18 @@ import com.example.rnd_transit_mtl.data.location.LOCATION_FIX_MAX_AGE_MILLIS
 import com.example.rnd_transit_mtl.model.geo.GeoPoint
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 internal class AndroidLocationSource(private val context: Context) : LocationSource {
+    private val refreshes = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    fun refresh() { refreshes.tryEmit(Unit) }
+    private fun providers(manager: LocationManager) =
+        listOf("fused", LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
+            .filter { it in manager.allProviders }
+
     fun permissionLevel(): LocationPermissionLevel = when {
         context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ->
             LocationPermissionLevel.Precise
@@ -35,7 +42,7 @@ internal class AndroidLocationSource(private val context: Context) : LocationSou
 
     fun isLocationEnabled(): Boolean {
         val manager = context.getSystemService(LocationManager::class.java)
-        return listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
+        return providers(manager)
             .any { provider -> runCatching { manager.isProviderEnabled(provider) }.getOrDefault(false) }
     }
 
@@ -77,25 +84,34 @@ internal class AndroidLocationSource(private val context: Context) : LocationSou
                 ))
             }
         }
+        fun requestCurrentReadings() {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+            for (provider in registered.toList()) runCatching {
+                if (manager.isProviderEnabled(provider)) {
+                    val cancellation = CancellationSignal()
+                    currentRequests.add(cancellation)
+                    manager.getCurrentLocation(provider, cancellation, context.mainExecutor) { location ->
+                        currentRequests.remove(cancellation)
+                        if (location != null) listener.onLocationChanged(location)
+                    }
+                }
+            }
+        }
         fun registerProviders() {
             // Android keeps these listeners registered when location services are toggled.
-            for (provider in listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)) {
+            for (provider in providers(manager)) {
                 runCatching {
                     // A stationary device still needs fresh fixes, rather than appearing to lose GPS.
                     manager.requestLocationUpdates(provider, 1_000L, 0f, listener, Looper.getMainLooper())
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && manager.isProviderEnabled(provider)) {
-                        val cancellation = CancellationSignal()
-                        currentRequests.add(cancellation)
-                        manager.getCurrentLocation(provider, cancellation, context.mainExecutor) { location ->
-                            if (location != null) listener.onLocationChanged(location)
-                        }
-                    }
                     registered.add(provider)
                 }
             }
             reportIfUnavailable()
+            requestCurrentReadings()
         }
         registerProviders()
+        // GO/recenter request a measurement without tearing down continuous GPS subscriptions.
+        val refreshJob = launch { refreshes.collect { requestCurrentReadings() } }
         val watchdog = launch {
             while (isActive) {
                 delay(1_000)
@@ -106,7 +122,7 @@ internal class AndroidLocationSource(private val context: Context) : LocationSou
                 }
                 if (recovery.retryIfStalled(SystemClock.elapsedRealtime())) {
                     // Replace the stalled registrations in this same shared source.
-                    currentRequests.forEach { it.cancel() }
+                    currentRequests.toList().forEach { it.cancel() }
                     currentRequests.clear()
                     manager.removeUpdates(listener)
                     registered.clear()
@@ -116,7 +132,8 @@ internal class AndroidLocationSource(private val context: Context) : LocationSou
         }
         awaitClose {
             watchdog.cancel()
-            currentRequests.forEach { it.cancel() }
+            refreshJob.cancel()
+            currentRequests.toList().forEach { it.cancel() }
             manager.removeUpdates(listener)
         }
     }
