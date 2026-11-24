@@ -124,8 +124,6 @@ enum class TripLocationState {
     LastKnown,
     LowAccuracy,
     MatchedLowAccuracy,
-    Estimated,
-    EstimatedStale,
     Waiting,
     PermissionDenied
 }
@@ -185,7 +183,6 @@ fun ActiveMapContent(
         !simulationEnabled && locationState == TripLocationState.LowAccuracy -> "Low GPS accuracy"
         !simulationEnabled && locationState == TripLocationState.MatchedLowAccuracy -> "Estimated position · Low GPS accuracy"
         !simulationEnabled && locationState == TripLocationState.PermissionDenied && userPosition != null -> "Last known position"
-        !simulationEnabled && (locationState == TripLocationState.Estimated || locationState == TripLocationState.EstimatedStale) -> "Estimated position"
         !simulationEnabled && locationState == TripLocationState.Stale && userPosition != null -> "Position paused"
         else -> null
     }
@@ -417,11 +414,9 @@ fun ActiveMapContent(
                     )
                     if (!mainOverview) {
                         when (locationState) {
-                            TripLocationState.Stale, TripLocationState.EstimatedStale -> TripWarning(
+                            TripLocationState.Stale -> TripWarning(
                                 title = "Location is not updating",
-                                detail = staleMessage
-                                    ?: if (locationState == TripLocationState.EstimatedStale) "No fresh location reading for over 30 seconds. Position is estimated along your saved route."
-                                    else "No fresh location reading for over 30 seconds. Route remains available."
+                                detail = staleMessage ?: "No fresh location reading for over 30 seconds. Route remains available."
                             )
 
                             TripLocationState.Missing -> TripWarning(
@@ -429,7 +424,7 @@ fun ActiveMapContent(
                                 detail = "Your saved route remains available."
                             )
 
-                            TripLocationState.Sample, TripLocationState.Live, TripLocationState.Estimated -> {
+                            TripLocationState.Sample, TripLocationState.Live -> {
                                 if (staleMessage != null) {
                                     TripWarning(if (locationState == TripLocationState.Sample) "Location not updating" else "Check your route", staleMessage)
                                 }

@@ -93,21 +93,8 @@ class ActiveMapContentTest {
             location = TripLocationState.Waiting
             render()
             assertContains(mapDescription(), "Directed yellow position pointer")
-            location = TripLocationState.Estimated
-            render("Active-trip-estimated-position.png")
-            assertTrue(texts().any { "Estimated position" in it })
-            assertFalse(texts().any { "not updating" in it || "Location unavailable" in it })
-            val recenter = nodes().first {
-                it.config.getOrNull(SemanticsProperties.ContentDescription)?.contains("Recenter on current position") == true
-            }
-            assertFalse(recenter.config.contains(SemanticsProperties.Disabled))
-            location = TripLocationState.EstimatedStale
-            progress = 0.21f
-            render("Active-trip-estimated-location-warning.png")
-            assertContains(texts(), "Location is not updating")
-            assertTrue(texts().any { "Estimated position" in it })
-            assertTrue(texts().any { "30 seconds" in it })
             location = TripLocationState.Stale
+            progress = 0.21f
             render("Active-trip-location-paused.png")
             assertContains(texts(), "Location is not updating")
             assertTrue(texts().any { "Position paused" in it })
