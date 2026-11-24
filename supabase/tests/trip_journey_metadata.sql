@@ -46,7 +46,7 @@ do $$ begin
     exception when insufficient_privilege then null; end;
 end $$;
 
-update public.trips set journey = '{"kind":"round_trip","turnaround":{"label":"Waypoint","point":{"latitude":45.51,"longitude":-73.6}}}'
+update public.trips set journey = '{"kind":"round_trip","turnaround":{"label":"Waypoint","latitude":45.51,"longitude":-73.6}}'
     where id = current_setting('rnd.journey_return')::uuid;
 do $$ begin
     if not exists(select 1 from public.trips where id = current_setting('rnd.journey_return')::uuid

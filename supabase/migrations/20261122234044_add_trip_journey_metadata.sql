@@ -12,7 +12,8 @@ alter table public.trips add column journey jsonb
                     and length(journey ->> 'outbound_trip_id') > 0
                     and journey ->> 'outbound_trip_id' <> id::text
                 when 'round_trip' then jsonb_typeof(journey -> 'turnaround') = 'object'
-                    and jsonb_typeof(journey -> 'turnaround' -> 'point') = 'object'
+                    and jsonb_typeof(journey -> 'turnaround' -> 'latitude') = 'number'
+                    and jsonb_typeof(journey -> 'turnaround' -> 'longitude') = 'number'
                 else false
             end, false)
     );
