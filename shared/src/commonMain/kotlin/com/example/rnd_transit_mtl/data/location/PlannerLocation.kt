@@ -26,10 +26,8 @@ internal val LocalPlannerLocation = staticCompositionLocalOf<PlannerLocation?> {
 
 /** Explicit requests wait for a provider measurement; cancellation ignores late callbacks. */
 internal suspend fun PlannerLocation.awaitFreshFix(): LocationUpdate.Fix? =
-    kotlinx.coroutines.withTimeoutOrNull(16_000) {
-        kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
-            request { fix -> if (continuation.isActive) continuation.resumeWith(Result.success(fix)) }
-        }
+    kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
+        request { fix -> if (continuation.isActive) continuation.resumeWith(Result.success(fix)) }
     }
 
 /** Reuse only a recent measured position; old map positions still require a new fix. */

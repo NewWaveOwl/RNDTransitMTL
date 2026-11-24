@@ -3,6 +3,7 @@ package com.example.rnd_transit_mtl
 import com.example.rnd_transit_mtl.data.location.*
 import com.example.rnd_transit_mtl.model.geo.GeoPoint
 import kotlinx.coroutines.async
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -139,6 +140,81 @@ class LiveLocationRegressionTest {
         queue.denyAccess()
         queue.expire(120_000L)
         assertEquals<List<LocationUpdate.Fix?>>(listOf(null, null), results)
+        assertEquals(0, queue.size)
+    }
+
+    @Test fun locationDeadlineStartsAfterPermissionDialogOpenLongerThanFifteenSeconds() = runTest {
+        var now = 100_000L
+        var permitted = false
+        val queue = LocationRequestQueue(collectingInitially = false)
+        val location = object : PlannerLocation {
+            override val fix: LocationUpdate.Fix? = null
+            override val currentUpdate: LocationUpdate?
+                get() = if (permitted) null else LocationUpdate.PermissionDenied
+            override val containsPoint: (GeoPoint) -> Boolean = { true }
+            override fun request(onResult: ((LocationUpdate.Fix?) -> Unit)?) {
+                queue.add(now) { onResult?.invoke(it) }
+            }
+        }
+
+        val tripRequest = async { location.awaitPlanningLocation { now } }
+        runCurrent()
+        assertEquals(1, queue.size)
+        assertEquals(0, queue.activeSize)
+
+        // User spends 20 seconds reading the Android permission prompt before granting access.
+        now = 120_000L
+        advanceTimeBy(20_000L)
+        queue.expire(now)
+        runCurrent()
+        assertFalse(tripRequest.isCompleted, "Permission prompt time must not consume the GPS deadline")
+
+        permitted = true
+        assertTrue(queue.setCollecting(true, now))
+        assertEquals(1, queue.activeSize)
+        // Restarting collection (e.g., approximate -> precise) must not extend an active deadline.
+        assertFalse(queue.setCollecting(true, 130_000L))
+
+        now = 134_999L
+        advanceTimeBy(14_999L)
+        queue.expire(now)
+        runCurrent()
+        assertFalse(tripRequest.isCompleted)
+
+        val measured = fix(45.51, -73.59).copy(timestampEpochMillis = 134_500L)
+        queue.receive(measured, now)
+        assertEquals(measured, tripRequest.await())
+        assertEquals(0, queue.size)
+        assertEquals(0, queue.activeSize)
+    }
+
+    @Test fun locationRequestExpiresFifteenSecondsAfterPermissionGrantWhenGpsStaysUnavailable() = runTest {
+        var now = 100_000L
+        var permitted = false
+        val queue = LocationRequestQueue(collectingInitially = false)
+        val location = object : PlannerLocation {
+            override val fix: LocationUpdate.Fix? = null
+            override val currentUpdate: LocationUpdate?
+                get() = if (permitted) null else LocationUpdate.PermissionDenied
+            override val containsPoint: (GeoPoint) -> Boolean = { true }
+            override fun request(onResult: ((LocationUpdate.Fix?) -> Unit)?) {
+                queue.add(now) { onResult?.invoke(it) }
+            }
+        }
+
+        val tripRequest = async { location.awaitPlanningLocation { now } }
+        runCurrent()
+
+        now = 125_000L
+        advanceTimeBy(25_000L)
+        queue.expire(now)
+        permitted = true
+        assertTrue(queue.setCollecting(true, now))
+
+        now = 140_000L
+        advanceTimeBy(15_000L)
+        queue.expire(now)
+        assertEquals(LocationUpdate.Unavailable, tripRequest.await())
         assertEquals(0, queue.size)
     }
 

@@ -73,7 +73,8 @@ internal class AndroidPlannerMapSession(private val context: Context) : PlannerL
         MontrealCenter.distanceMetersTo(point) <= montrealServiceRadiusMeters
     }
 
-    private val requests = LocationRequestQueue()
+    private val requests = LocationRequestQueue(collectingInitially = false)
+    private var collectionActive = false
     var pendingRequestCount by mutableIntStateOf(0)
         private set
     lateinit var askPermission: () -> Unit
@@ -118,7 +119,7 @@ internal class AndroidPlannerMapSession(private val context: Context) : PlannerL
             if (result.accepted) {
                 result.trustedFix?.let { movementHeading.receive(it) }
                 result.trustedFix?.let { requests.receive(it, System.currentTimeMillis()) }
-                pendingRequestCount = requests.size
+                pendingRequestCount = requests.activeSize
             }
         } else if (update == LocationUpdate.PermissionDenied) {
             denyPendingRequests()
@@ -130,26 +131,37 @@ internal class AndroidPlannerMapSession(private val context: Context) : PlannerL
 
     override fun request(onResult: ((LocationUpdate.Fix?) -> Unit)?) {
         autoCenterPending = false
+        permitted = hasPermission()
+        if (!permitted && collectionActive) {
+            setCollectionActive(false)
+        }
         requests.add(System.currentTimeMillis(), onResult ?: { result ->
             if (result != null && containsPoint(result.point)) recenter++
         })
-        pendingRequestCount = requests.size
-        permitted = hasPermission()
+        pendingRequestCount = requests.activeSize
         if (permitted) {
-            locationAttempt++
+            if (collectionActive) locationAttempt++
         } else {
             askPermission()
         }
     }
 
+    fun setCollectionActive(active: Boolean, now: Long = System.currentTimeMillis()) {
+        collectionActive = active
+        if (requests.setCollecting(active, now)) {
+            locationAttempt++
+        }
+        pendingRequestCount = requests.activeSize
+    }
+
     fun denyPendingRequests() {
         requests.denyAccess()
-        pendingRequestCount = requests.size
+        pendingRequestCount = requests.activeSize
     }
 
     fun expireRequests() {
         requests.expire(System.currentTimeMillis())
-        pendingRequestCount = requests.size
+        pendingRequestCount = requests.activeSize
     }
 
     fun saveCamera(position: CameraPosition) {
@@ -209,9 +221,21 @@ internal fun rememberAndroidPlannerMapSession(): AndroidPlannerMapSession {
             delay(1_000)
         }
     }
+    DisposableEffect(session) {
+        onDispose { session.denyPendingRequests() }
+    }
     LaunchedEffect(session.permitted, session.accuracyMonitor.state.permission, started) {
-        if (session.permitted && started) source.updates.collect { update ->
-            session.receive(update)
+        if (session.permitted && started) {
+            session.setCollectionActive(true)
+            try {
+                source.updates.collect { update ->
+                    session.receive(update)
+                }
+            } finally {
+                session.setCollectionActive(false)
+            }
+        } else {
+            session.setCollectionActive(false)
         }
     }
     LaunchedEffect(session.locationAttempt) {
