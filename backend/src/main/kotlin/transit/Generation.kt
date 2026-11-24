@@ -117,7 +117,7 @@ internal fun elapsed(itinerary: JsonElement,start: Instant): Long? {
 /** Stops are linked network anchors; direct-mode alternatives retain geographic sampling. */
 internal suspend fun destinationCandidates(input: Request, routes: List<JsonElement>, zones: FareZones, allowed: Set<String>?,
     checkpoint: suspend ()->Unit = { yield() }, zoneCheck: ((Point,List<String>)->Boolean)? = null,
-    dispatcher: CoroutineDispatcher = Dispatchers.Default): List<Point> = withContext(dispatcher) {
+    dispatcher: CoroutineDispatcher = Dispatchers.Default, random: kotlin.random.Random = kotlin.random.Random.Default): List<Point> = withContext(dispatcher) {
     val context=currentCoroutineContext()
     val transitSelected=input.modes.any { it !in listOf("walk","bike") }
     val seen=mutableSetOf<Pair<String,Point>>()
@@ -147,13 +147,13 @@ internal suspend fun destinationCandidates(input: Request, routes: List<JsonElem
     checkpoint(); context.ensureActive()
     val speed=if(transitSelected) 8.0 else input.directSpeed
     val target=input.minutes*60.0/(1/speed+0.06)
-    val ranked=stops.shuffled().mapIndexed { index,point ->
+    val ranked=stops.shuffled(random).mapIndexed { index,point ->
         if(index%128==0) context.ensureActive()
         point to abs(distance(origin,point)-target)
     }
     val anchors=ranked.sortedBy { it.second }.take(96).map { it.first }
     checkpoint(); context.ensureActive()
-    val geographic=candidates(input,check={ context.ensureActive() })
+    val geographic=candidates(input,random,check={ context.ensureActive() })
     if(anchors.isEmpty()) geographic else if(input.modes.any { it in listOf("walk","bike") })
         buildList { for(i in 0 until 64) { anchors.getOrNull(i)?.let(::add); geographic.getOrNull(i)?.let(::add) } } else anchors
 }
@@ -184,7 +184,7 @@ internal class Generator(private val routes: List<JsonElement>, private val zone
     private val preparationDispatcher: CoroutineDispatcher = Dispatchers.Default) {
     suspend fun generate(input: Request, requestId: String = "internal"): JsonObject {
         if (input.roundTrip) return generateRoundTrip(input, routes, zones, route, now(), sample,
-            timeoutMillis ?: searchBudgetSeconds(input.minutes) * 1000, maxAttempts, preparationDispatcher)
+            timeoutMillis ?: searchBudgetSeconds(input.minutes) * 1000, maxAttempts, preparationDispatcher, requestId, diagnostic)
         if (input.destination != null) return routeToDestination(input, routes, zones, route, now(),
             timeoutMillis ?: 30_000)
         val timer=TimeSource.Monotonic.markNow()

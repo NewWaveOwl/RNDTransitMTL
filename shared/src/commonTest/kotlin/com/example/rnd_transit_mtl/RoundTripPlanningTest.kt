@@ -164,4 +164,35 @@ class RoundTripPlanningTest {
         assertEquals(300L, trip.legs.sumOf { it.durationSeconds })
     }
 
+    @Test fun invisibleReturnPointPreservesRouteAndDoesNotBecomeAnExplorationFlag() = runTest {
+        val second = Place("Exploration zone 2", GeoPoint(45.505, -73.59))
+        val hidden = Place("Return routing point", GeoPoint(45.502, -73.598))
+        for (count in listOf(1, 2)) {
+            val last = if (count == 1) away else second
+            fun node(body: JsonObject) = body["data"]!!.jsonObject["planConnection"]!!.jsonObject["edges"]!!
+                .jsonArray.single().jsonObject["node"]!!.jsonObject
+            val a = node(otp(last, hidden, -73.597))
+            val b = node(otp(hidden, start, -73.599))
+            val combined = buildJsonObject { put("data", buildJsonObject { put("planConnection", buildJsonObject {
+                put("edges", buildJsonArray { add(buildJsonObject { put("node", JsonObject(b + mapOf(
+                    "duration" to JsonPrimitive(1200), "waitingTime" to JsonPrimitive(0),
+                    "legs" to JsonArray(a["legs"]!!.jsonArray + b["legs"]!!.jsonArray)))) }) })
+            }) }) }
+            val body = if (count == 1) response().copy(returnOtp = combined,
+                elapsedSeconds = 1926, travelTimeSeconds = 1800, orientationBufferSeconds = 126)
+            else response().copy(otp = null, returnOtp = null, waypoints = listOf(away, second),
+                elapsedSeconds = 2568, travelTimeSeconds = 2400, orientationBufferSeconds = 168,
+                segments = listOf(BackendLoopSegment(start, away, otp(start, away, -73.601)),
+                    BackendLoopSegment(away, second, otp(away, second, -73.595)),
+                    BackendLoopSegment(second, start, combined)))
+            val trip = assertIs<TripGenerationResult.Success>(BackendTripGenerator(post = { _, _ -> Json.encodeToString(body) })
+                .generate(input.copy(plannedMinutes = 50, interestZoneCount = count), types, emptySet())).trip
+            assertEquals(if (count == 1) listOf(away) else listOf(away, second), trip.explorationWaypoints)
+            assertEquals(count + 2, trip.legs.size)
+            assertEquals(start.point, trip.legs.last().geometry.last())
+            assertTrue(trip.legs.any { hidden.point in it.geometry })
+            assertEquals(trip, trip.toDto().toDomainOrNull())
+        }
+    }
+
 }

@@ -3,66 +3,37 @@ package transit
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.*
 import java.time.Instant
-import kotlin.math.pow
-import kotlin.time.TimeSource
 
-/**
- * Plans an adventure and a fresh route back, sharing one time budget and deadline.
- * Each direction retains its accepted OTP response, including asymmetric streets and transit times.
- * A failed inbound route never becomes a successful one-way proposal.
- */
+/** Both directions share the full trip budget and one search deadline. */
 internal suspend fun generateRoundTrip(
     input: Request, routes: List<JsonElement>, zones: FareZones,
     route: suspend (JsonObject) -> JsonObject, departure: Instant,
     sample: (suspend (Request) -> List<Point>)?, timeoutMillis: Long,
-    maxAttempts: Int, dispatcher: CoroutineDispatcher
+    maxAttempts: Int, dispatcher: CoroutineDispatcher,
+    requestId: String, diagnostic: (String) -> Unit
 ): JsonObject {
-    if (input.interestZoneCount > 1) return generateExplorationLoop(input, routes, zones, route,
-        departure, sample, timeoutMillis)
-    val timer = TimeSource.Monotonic.markNow()
-    val excluded = input.excluded.toMutableList()
-    val result = withTimeoutOrNull(timeoutMillis) {
-        repeat(3) { attempt ->
-            currentCoroutineContext().ensureActive()
-            val remaining = timeoutMillis - timer.elapsedNow().inWholeMilliseconds
-            if (remaining <= 1) return@withTimeoutOrNull null
-            // Choose nearby turnarounds without capping the accepted outbound duration.
-            // A one-way search otherwise maximizes the outbound leg against the entire budget,
-            // leaving no time to walk home. Shrink the search area if the actual return will not fit.
-            val turnaroundSample = sample ?: { request: Request ->
-                val searchMinutes = (input.minutes * 0.5 * 0.65.pow(attempt)).toInt().coerceAtLeast(1)
-                val search = request.copy(minutes = searchMinutes)
-                destinationCandidates(search, routes, zones, allowedLines(search, routes),
-                    dispatcher = dispatcher)
-            }
-            val outward = Generator(routes, zones, route, { departure }, turnaroundSample,
-                (remaining / 2).coerceAtLeast(1), maxAttempts.coerceAtMost(24),
-                preparationDispatcher = dispatcher).generate(input.copy(roundTrip = false,
-                    minutes = input.minutes, excluded = excluded.toList()))
-            if (outward["status"].text() == "no_trip") return@repeat
-            if (outward["status"].text() != "success") return@withTimeoutOrNull outward
-            val turnaround = requireNotNull(outward["destination"] as? JsonObject)
-            excluded += point(turnaround["point"])
-            val outwardSeconds = requireNotNull(outward["elapsedSeconds"].number()).toLong()
-            val secondsLeft = input.minutes * 60L - outwardSeconds
-            if (secondsLeft <= 0) return@repeat
-            val inbound = routeToDestination(input.copy(origin = turnaround, destination = input.origin,
-                roundTrip = false, excluded = emptyList(), minutes = ((secondsLeft + 59) / 60).toInt()),
-                routes, zones, route, departure.plusSeconds(outwardSeconds),
-                (timeoutMillis - timer.elapsedNow().inWholeMilliseconds).coerceAtLeast(1))
-            if (inbound["status"].text() != "success") return@repeat
-            val total = outwardSeconds + requireNotNull(inbound["elapsedSeconds"].number()).toLong()
-            if (total > input.minutes * 60L) return@repeat
-            val buffer = requireNotNull(outward["orientationBufferSeconds"].number()).toLong() +
-                requireNotNull(inbound["orientationBufferSeconds"].number()).toLong()
-            return@withTimeoutOrNull obj("status" to "success", "origin" to input.origin,
-                "destination" to input.origin, "roundTrip" to true, "turnaround" to turnaround,
-                "elapsedSeconds" to total, "travelTimeSeconds" to total - buffer,
-                "orientationBufferSeconds" to buffer, "departure" to departure.toString(),
-                "otp" to outward["otp"], "returnOtp" to inbound["otp"])
+    val search = LoopSearch(input, routes, zones, route, departure, timeoutMillis, requestId, diagnostic)
+    if (input.interestZoneCount > 1) return generateExplorationLoop(input, departure, sample, search)
+    return search.run {
+        val turnaroundSample = sample ?: { request: Request ->
+            val nearby = request.copy(minutes = (input.minutes * 0.5 * scale()).toInt().coerceAtLeast(1))
+            destinationCandidates(nearby, routes, zones, allowedLines(nearby, routes),
+                dispatcher = dispatcher, random = random)
         }
-        obj("status" to "no_trip", "message" to "No round trip fits this time and transport selection. Try more time or different modes.")
+        val outward = Generator(routes, zones, route, { departure }, turnaroundSample,
+            (remaining() / 3).coerceIn(1, 4_000), maxAttempts.coerceAtMost(24),
+            diagnostic = {}, preparationDispatcher = dispatcher).generate(input.copy(roundTrip = false))
+        if (outward["status"].text() != "success") return@run
+        val turnaround = requireNotNull(outward["destination"] as? JsonObject)
+        val elapsed = outward["elapsedSeconds"].number()!!.toLong()
+        returnHome(turnaround, elapsed, listOf(outward)) { inbound ->
+            val total = elapsed + inbound["elapsedSeconds"].number()!!.toLong()
+            val buffer = outward["orientationBufferSeconds"].number()!!.toLong() +
+                inbound["orientationBufferSeconds"].number()!!.toLong()
+            obj("status" to "success", "origin" to input.origin, "destination" to input.origin,
+                "roundTrip" to true, "turnaround" to turnaround, "elapsedSeconds" to total,
+                "travelTimeSeconds" to total - buffer, "orientationBufferSeconds" to buffer,
+                "departure" to departure.toString(), "otp" to outward["otp"], "returnOtp" to inbound["otp"])
+        }
     }
-    currentCoroutineContext().ensureActive()
-    return result ?: obj("status" to "timeout", "message" to "Round-trip search timed out. Retry or allow more time.")
 }

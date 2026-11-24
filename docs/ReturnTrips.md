@@ -14,12 +14,38 @@ random points for now, not verified attractions.
 
 For multiple waypoints the backend samples points around a polygon with the start
 as one vertex, routes every segment in order, and returns `waypoints` and `segments`
-with their accepted OTP responses. Failed searches retry a smaller loop. All routed
+with their accepted OTP responses. Round-trip searches use the existing generation
+deadline (`20 + floor(selectedMinutes / 60)` seconds), rather than a fixed three
+candidates. Bearings change and the radius cycles through progressively smaller
+sizes while time remains. A single-turnaround outbound candidate may still use
+more than half the trip budget, provided its return fits the combined budget.
+
+Each candidate first routes home directly and retains that complete loop as a
+fallback. It then tries an invisible return routing point beside the midpoint of
+the last-stop-to-home line: a perpendicular offset of 18%, then 9%, of that line's
+length, on both sides in seeded random order. Coordinates are projected into local
+metres. Every detour section is routed and charged against the combined budget,
+including waiting and orientation reserves; each routing operation is capped at
+four seconds within the remaining search deadline. The invisible point adds no
+exploration flag: its provider legs are merged into the final return segment.
+
+Candidates are ranked by `0.65 * elapsed/budget + 0.35 * (1 - returnOverlap)`.
+Overlap is the length-weighted share of return samples within 30 metres of outbound
+geometry (samples at approximately 25-metre spacing). This encourages a useful
+journey with less retracing; street connectivity may still require a direct return.
+A later timeout, failed route, or provider failure cannot discard an accepted loop.
+External cancellation still cancels the whole search. All routed
 travel, transit waiting and orientation reserves share the selected time budget.
 The next segment departs after the previous arrival and its orientation reserve.
 Missing or over-budget segments never become partial successes. The app saves the
 complete route and ordered waypoints, and flags each stop in proposals, navigation,
 and reopened trips. Legacy single-turnaround records remain readable.
+
+The backend accepts an optional signed 32-bit integer `generationSeed`. Otherwise
+it creates a fresh seed per request. The seed controls candidate coordinates,
+stop-anchor shuffling, and detour side order, and is returned with `attempts` and
+logged with the request ID. Replaying a seed reproduces random choices, not live
+transit data or the number of candidates evaluated before a wall-clock deadline.
 
 After one-way arrival, the Figma completion sheet shows distance by transport and
 estimated itinerary statistics. Walking steps assume 0.75 metres per step. Speed

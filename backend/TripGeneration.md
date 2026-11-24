@@ -22,7 +22,11 @@ gets 20 seconds, 60 gets 21, 120 gets 22, and 360 gets 26. This search deadline 
 separate from the hard maximum trip duration. The search retains its best valid
 result and returns it at the deadline or exhaustion; reaching 95% of the selected
 duration permits an early exit. Equal-duration ties retain the first accepted option.
-A maximum of 128 routing attempts bounds work even if OTP responds immediately.
+One-way searches have a maximum of 128 routing attempts. Round-trip searches keep
+trying candidate loops until the same deadline, retain valid fallbacks, and prefer
+less retracing via invisible return waypoints; see [ReturnTrips](../docs/ReturnTrips.md).
+An optional integer `generationSeed` reproduces random candidate choices and is
+returned/logged for diagnostics.
 
 For transit, candidates favour stops served by allowed routes in selected zones.
 The startup catalogue requests stop coordinates; older schemas can fall back to the
