@@ -39,7 +39,14 @@ internal suspend fun generateExplorationLoop(
     returnHome(start, elapsed, outward) { inbound ->
         val total = elapsed + inbound["elapsedSeconds"].number()!!.toLong()
         val reserve = buffer + inbound["orientationBufferSeconds"].number()!!.toLong()
-        obj("status" to "success", "origin" to input.origin, "destination" to input.origin,
+        // Existing clients decode one-stop loops through otp/returnOtp. Keep that wire
+        // format while routing all counts with the same algorithm.
+        if (count == 1) obj("status" to "success", "origin" to input.origin, "destination" to input.origin,
+            "roundTrip" to true, "turnaround" to stops.first(),
+            "otp" to outward.single()["otp"], "returnOtp" to inbound["otp"],
+            "elapsedSeconds" to total, "travelTimeSeconds" to total - reserve,
+            "orientationBufferSeconds" to reserve, "departure" to departure.toString())
+        else obj("status" to "success", "origin" to input.origin, "destination" to input.origin,
             "roundTrip" to true, "turnaround" to stops.first(), "waypoints" to stops,
             "segments" to segments + obj("origin" to start, "destination" to input.origin, "otp" to inbound["otp"]),
             "elapsedSeconds" to total, "travelTimeSeconds" to total - reserve,

@@ -287,4 +287,25 @@ class RoundTripRoutingTest {
         assertNotNull(result["returnOtp"])
     }
 
+    @Test fun singlePointKeepsTheShortOutboundThatLeavesTimeForTheReturn() = runBlocking {
+        val result = loopGenerator(emptyList(), zones(), { query ->
+            val target = pointFrom(query, "destination")
+            if (target == home) response(query, 480)
+            else if (target == away) {
+                // OTP offers two paths to the same point. The one-way optimizer used to
+                // choose 24 minutes, discarding the five-minute path that closes the loop.
+                val short = response(query, 300)
+                val long = response(query, 1440)
+                obj("data" to obj("planConnection" to obj("routingErrors" to emptyList<Any>(),
+                    "edges" to short.field("data").field("planConnection").field("edges").items() +
+                        long.field("data").field("planConnection").field("edges").items())))
+            } else emptyPlanningResponse()
+        }, { now }, sample = { listOf(away) }).generate(input)
+        assertEquals("success", result["status"].text())
+        assertEquals(864.0, result["elapsedSeconds"].number()!!, 0.0)
+        assertNotNull(result["otp"])
+        assertNotNull(result["returnOtp"])
+        assertNull("Keep the legacy single-point response contract", result["segments"])
+    }
+
 }

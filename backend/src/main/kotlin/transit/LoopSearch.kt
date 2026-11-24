@@ -25,7 +25,7 @@ internal class LoopSearch(
     fun legTimeout() = remaining().coerceAtMost(4_000)
 
     suspend fun run(candidate: suspend LoopSearch.() -> Unit): JsonObject {
-        diagnostic("request=$requestId search=loop-start seed=$seed budgetMs=$timeoutMillis")
+        diagnostic("request=$requestId search=loop-start seed=$seed budgetMs=$timeoutMillis stops=${input.interestZoneCount} modes=${input.modes.joinToString()} minutes=${input.minutes}")
         withTimeoutOrNull(timeoutMillis) {
             while (isActive) {
                 attempts++

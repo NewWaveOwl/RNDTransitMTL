@@ -382,6 +382,7 @@ internal fun TransitOpeningScreen(
 
                 val routingOrigin = if (liveMap && !planner.originIsManual) {
                     val update = location?.awaitPlanningLocation()
+                    println("RndTransitGeneration stage=location result=${update?.let { it::class.simpleName }} roundTrip=${planner.roundTrip} interestZones=${com.example.rnd_transit_mtl.data.generation.explorationZoneCount(planner.selectedAttractionIds.size)}")
                     if (update !is LocationUpdate.Fix) {
                         fail(if (update == LocationUpdate.PermissionDenied) Trip33Failure.PermissionDenied
                             else Trip33Failure.LocationUnavailable)

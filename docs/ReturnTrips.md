@@ -12,9 +12,13 @@ kind** adds exactly one waypoint; zero selections still requests one. The fronte
 sends `interestZoneCount` (1-6), independently of the intensity slider. These are
 random points for now, not verified attractions.
 
-For multiple waypoints the backend samples points around a polygon with the start
-as one vertex, routes every segment in order, and returns `waypoints` and `segments`
-with their accepted OTP responses. Round-trip searches use the existing generation
+For every waypoint count the backend samples points around a polygon with the start
+as one vertex and routes each leg directly, choosing the shortest accepted itinerary
+for that leg before checking the complete loop. With one waypoint this is an
+out-and-back candidate, with the same invisible return detour logic as larger loops.
+One-way longest-outbound optimization is never used inside a loop. Multiple-waypoint
+responses include `waypoints` and `segments`; single-waypoint responses retain
+`turnaround`, `otp` and `returnOtp` for existing clients. Round-trip searches use the existing generation
 deadline (`20 + floor(selectedMinutes / 60)` seconds), rather than a fixed three
 candidates. Bearings change and the radius cycles through progressively smaller
 sizes while time remains. A single-turnaround outbound candidate may still use
@@ -43,7 +47,7 @@ and reopened trips. Legacy single-turnaround records remain readable.
 
 The backend accepts an optional signed 32-bit integer `generationSeed`. Otherwise
 it creates a fresh seed per request. The seed controls candidate coordinates,
-stop-anchor shuffling, and detour side order, and is returned with `attempts` and
+and detour side order, and is returned with `attempts` and
 logged with the request ID. Replaying a seed reproduces random choices, not live
 transit data or the number of candidates evaluated before a wall-clock deadline.
 
@@ -128,8 +132,9 @@ Before replacing the stopped server's JAR, back it up and verify checksums.
 After restart check both `/health` and `/health/traveltracker`.
 
 The restored deployment JAR SHA-256 is
-`AE3503A817B31A4C9D8608B8D57129F56C6C06BC7E28CFDAC92F444BD4D96545`.
-The old JAR is retained as `backend.jar.before-journey-restore-20261124`.
+`D87984A2BD6669B5FC0980A8E28D035765F5E4745AD503114BB3AC280CA387E7`.
+The pre-unification JAR is retained as `backend.jar.before-single-point-loop-20261124`;
+the older incompatible runtime remains in `backend.jar.before-journey-restore-20261124`.
 
 Separately, Android's location filter could indefinitely reject a new stationary
 location after an outage because both readings reported zero speed. Once the
@@ -144,3 +149,18 @@ For physical-device Android Studio runs, set `generationEndpoint` in the root
 builds retain the emulator-only `10.0.2.2` default. The updated working folder has
 the public server endpoint configured locally; this machine-specific setting is
 not committed. Sync Gradle before running from Android Studio.
+
+## Single-point follow-up
+
+A regression fixture gives OTP two outbound itineraries to the same point: five
+minutes and 24 minutes, with an eight-minute return. The old single-point branch
+selected the longest outbound itinerary, then reported no loop. The shared direct
+leg planner accepts the five-minute alternative and closes the loop. The test was
+confirmed to fail before the change and pass after it. The earlier asymmetric
+19-minute-out/eight-minute-back regression still passes: half-budget allocation is
+not used as an acceptance limit.
+
+Server loop-start diagnostics include stop count, modes and selected minutes.
+Android logs the location-stage outcome and interest count separately, without
+coordinates. A missing current location happens before any loop search; a routing
+failure must not be interpreted as permission denial or lack of GPS.

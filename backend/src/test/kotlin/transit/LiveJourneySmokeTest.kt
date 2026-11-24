@@ -33,10 +33,10 @@ class LiveJourneySmokeTest {
                 assertEquals(result.toString(), "success", result["status"].text())
                 assertEquals(home, result["destination"])
             }
-            for (count in listOf(1, 3)) {
+            for ((count, seed) in listOf(1 to 24001, 1 to -628953240, 3 to 24001)) {
                 val input = parseRequest(obj("origin" to home, "plannedMinutes" to 30,
                     "modes" to listOf("walk"), "roundTrip" to true, "interestZoneCount" to count,
-                    "generationSeed" to 24001))
+                    "generationSeed" to seed))
                 val result = generator.generate(input)
                 assertEquals(result.toString(), "success", result["status"].text())
                 assertEquals(home, result["destination"])

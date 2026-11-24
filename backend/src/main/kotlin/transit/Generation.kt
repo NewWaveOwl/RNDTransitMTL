@@ -184,7 +184,7 @@ internal class Generator(private val routes: List<JsonElement>, private val zone
     private val preparationDispatcher: CoroutineDispatcher = Dispatchers.Default) {
     suspend fun generate(input: Request, requestId: String = "internal"): JsonObject {
         if (input.roundTrip) return generateRoundTrip(input, routes, zones, route, now(), sample,
-            timeoutMillis ?: searchBudgetSeconds(input.minutes) * 1000, maxAttempts, preparationDispatcher, requestId, diagnostic)
+            timeoutMillis ?: searchBudgetSeconds(input.minutes) * 1000, requestId, diagnostic)
         if (input.destination != null) return routeToDestination(input, routes, zones, route, now(),
             timeoutMillis ?: 30_000)
         val timer=TimeSource.Monotonic.markNow()
