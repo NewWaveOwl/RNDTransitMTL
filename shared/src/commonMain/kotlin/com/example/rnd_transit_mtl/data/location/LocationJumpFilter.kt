@@ -104,7 +104,9 @@ internal class LocationJumpFilter {
                 confirmation.clear()
                 return result(true, stationary = true)
             }
-            if (previousReadingAt != null && !improved && fix.speedMetersPerSecond?.let { it < 0.3 } == true &&
+            // Zero speed describes this measurement, not movement since an old anchor.
+            // After an outage, allow consistent fixes to confirm the new stationary position.
+            if (freshReliableAnchor && previousReadingAt != null && !improved && fix.speedMetersPerSecond?.let { it < 0.3 } == true &&
                 anchor.speedMetersPerSecond?.let { it < 0.3 } == true) return result(false)
             // A precise correction inside an earlier coarse uncertainty circle can recover immediately.
             if (improved && displacement <= anchor.accuracyMeters + fix.accuracyMeters) {

@@ -88,3 +88,59 @@ Compose integration tests exercise return failure/retry, preview/start, explicit
 arrival, original-trip review, selector semantics, and completion sheet controls.
 `supabase/tests/trip_journey_metadata.sql` validates legacy and linked records,
 constraint failures, ownership isolation, and rollback using a local PostgreSQL runtime.
+
+## Shared-server regression, 2026-11-23
+
+The app checkout at `3a5ec92` already sent `destination`, `compareModes`, and
+`roundTrip` correctly. The deployed TravelTracker runtime at
+`7ca9005005fc74a2cdb9bf4ffedbf135db1171bc` used an older generation model that
+ignored these fields. Logs showed 360-minute random searches for return requests.
+The app correctly rejected the unrelated destination or one-way response.
+Reinstalling Android alone cannot repair this server regression.
+
+The restored backend combines the shared runtime's Server.kt and TravelTracker
+services with this branch's complete generation sources. Do not replace it with
+either branch's standalone JAR: one loses TravelTracker endpoints, the other loses
+return and loop generation. Both sources are in NewWaveOwl/RNDTransitMTL.
+
+To reproduce the combined build in PowerShell, set `$sharedRepo` to a checkout
+containing the pinned runtime commit, `$appRepo` to this branch, and `$stage` to
+a new, nonexistent build directory:
+
+```powershell
+git -C $sharedRepo worktree add --detach $stage 7ca9005005fc74a2cdb9bf4ffedbf135db1171bc
+Copy-Item -LiteralPath (Join-Path $appRepo 'local.properties') -Destination $stage
+Get-ChildItem (Join-Path $appRepo 'backend/src/main/kotlin/transit') -File |
+    Where-Object Name -ne 'Server.kt' |
+    ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $stage 'backend/src/main/kotlin/transit') }
+Get-ChildItem (Join-Path $appRepo 'backend/src/test/kotlin/transit') -File |
+    ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $stage 'backend/src/test/kotlin/transit') }
+& (Join-Path $stage 'gradlew.bat') -p $stage :backend:test :backend:installDist --console=plain
+```
+
+`LiveJourneySmokeTest` is opt-in. For a live provider check, forward local port
+18089 to the server's OTP bridge port 18086, set
+`RND_LIVE_OTP_URL=http://127.0.0.1:18089/otp/gtfs/v1`, and run `:backend:test`.
+This checks walking returns, fastest bus/metro/walking/cycling comparison, and repeated
+30-minute loops with one and three interest stops using fixed public fixture
+coordinates. It does not require or print user credentials or GPS positions.
+Before replacing the stopped server's JAR, back it up and verify checksums.
+After restart check both `/health` and `/health/traveltracker`.
+
+The restored deployment JAR SHA-256 is
+`AE3503A817B31A4C9D8608B8D57129F56C6C06BC7E28CFDAC92F444BD4D96545`.
+The old JAR is retained as `backend.jar.before-journey-restore-20261124`.
+
+Separately, Android's location filter could indefinitely reject a new stationary
+location after an outage because both readings reported zero speed. Once the
+anchor is older than 30 seconds, three consistent precise measurements over at
+least four seconds can now confirm relocation. Fresh-anchor jitter protection,
+stale/future rejection, and single-outlier rejection remain covered by tests.
+This client recovery fix requires an updated Android installation.
+
+For physical-device Android Studio runs, set `generationEndpoint` in the root
+`local.properties` (beside `sdk.dir`). Android now reads this local value; a Gradle
+`-PgenerationEndpoint=...` override takes precedence. With no configuration, debug
+builds retain the emulator-only `10.0.2.2` default. The updated working folder has
+the public server endpoint configured locally; this machine-specific setting is
+not committed. Sync Gradle before running from Android Studio.

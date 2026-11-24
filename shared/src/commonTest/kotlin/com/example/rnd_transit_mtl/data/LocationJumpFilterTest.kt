@@ -174,4 +174,23 @@ class LocationJumpFilterTest {
         assertTrue(assertNotNull(filter.evaluate(precise, 52_000)).relocated)
         assertEquals(precise, filter.acceptedFix)
     }
+    @Test fun stationaryFixesAfterAnOutageRecoverPlanningWithoutAcceptingASingleJump() {
+        val filter = walkingFilter()
+        val queue = com.example.rnd_transit_mtl.data.location.LocationRequestQueue()
+        val old = fix(0.0, 50_000).copy(speedMetersPerSecond = 0.0)
+        filter.evaluate(old, 50_000)
+        var resolved: LocationUpdate.Fix? = null
+        queue.add(100_000) { resolved = it }
+        repeat(3) { index ->
+            val time = 100_000L + index * 2_000
+            val reading = fix(1_000.0 + index, time).copy(speedMetersPerSecond = 0.0)
+            val result = assertNotNull(filter.evaluate(reading, time))
+            assertEquals(index == 2, result.accepted)
+            if (result.accepted) queue.receive(assertNotNull(result.trustedFix), time)
+            if (index < 2) assertNull(resolved)
+        }
+        assertEquals(fix(1_002.0, 104_000).point, assertNotNull(resolved).point)
+        assertEquals(0, queue.size)
+    }
+
 }

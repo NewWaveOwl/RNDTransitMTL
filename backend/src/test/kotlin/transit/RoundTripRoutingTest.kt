@@ -274,4 +274,17 @@ class RoundTripRoutingTest {
         assertTrue(right.longitude < home.longitude)
     }
 
+    @Test fun apiPreservesRoundTripModeAndClosesTheLoop() = runBlocking {
+        val generator = loopGenerator(emptyList(), zones(), { query -> response(query, 300) },
+            { now }, sample = { listOf(away) })
+        val body = obj("origin" to input.origin, "plannedMinutes" to 30,
+            "modes" to listOf("walk"), "roundTrip" to true, "interestZoneCount" to 1)
+        val (status, result) = Api(generator).handle("application/json", null) { body.toString() }
+        assertEquals(200, status)
+        assertEquals("success", result["status"].text())
+        assertEquals(JsonPrimitive(true), result["roundTrip"])
+        assertEquals(input.origin, result["destination"])
+        assertNotNull(result["returnOtp"])
+    }
+
 }

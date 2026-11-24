@@ -75,4 +75,16 @@ class ReturnRoutingTest {
             fail("Cancellation must propagate")
         } catch (_: CancellationException) { }
     }
+    @Test fun apiPreservesTheFixedReturnDestinationInsteadOfSearchingRandomly() = runBlocking {
+        val generator = Generator(emptyList(), zones(), {
+            response(900, Point(45.505, -73.601))
+        }, { now }, sample = { error("A return request must never sample random destinations") })
+        val body = obj("origin" to request().origin, "destination" to request().destination,
+            "plannedMinutes" to 360, "modes" to listOf("walk"), "compareModes" to true)
+        val (status, result) = Api(generator).handle("application/json", null) { body.toString() }
+        assertEquals(200, status)
+        assertEquals("success", result["status"].text())
+        assertEquals(request().destination, result["destination"])
+    }
+
 }

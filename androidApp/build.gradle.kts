@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.androidApplication)
@@ -23,6 +24,13 @@ dependencies {
     debugImplementation(libs.kotlinx.coroutinesCore)
 }
 
+// Keep machine-specific server configuration beside sdk.dir for Android Studio Run.
+val localConfiguration = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.isFile }?.inputStream()?.use { load(it) }
+}
+val configuredGenerationEndpoint = providers.gradleProperty("generationEndpoint").orNull
+    ?: localConfiguration.getProperty("generationEndpoint")
+
 android {
     namespace = "com.example.rnd_transit_mtl"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
@@ -33,7 +41,7 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
         versionName = "1.0"
-        manifestPlaceholders["generationEndpoint"] = providers.gradleProperty("generationEndpoint").orElse("").get()
+        manifestPlaceholders["generationEndpoint"] = configuredGenerationEndpoint.orEmpty()
     }
     packaging {
         resources {
@@ -42,8 +50,7 @@ android {
     }
     buildTypes {
         debug {
-            manifestPlaceholders["generationEndpoint"] = providers.gradleProperty("generationEndpoint")
-                .orElse("http://10.0.2.2:18088/v1/trips/generate").get()
+            manifestPlaceholders["generationEndpoint"] = (configuredGenerationEndpoint ?: "http://10.0.2.2:18088/v1/trips/generate")
         }
         release {
             isMinifyEnabled = false

@@ -195,4 +195,15 @@ class RoundTripPlanningTest {
         }
     }
 
+    @Test fun outdatedServerThatIgnoresJourneyFieldsReportsAServerUpdateInsteadOfRetrying() = runTest {
+        for (request in listOf(input, input.copy(roundTrip = false, destinationPlace = away))) {
+            val ignoredJourney = BackendGenerationResponse("success", origin = start,
+                destination = Place("Random unrelated destination", GeoPoint(45.51, -73.6)),
+                elapsedSeconds = 600)
+            val result = assertIs<TripGenerationResult.RoutingUnavailable>(BackendTripGenerator(
+                post = { _, _ -> Json.encodeToString(ignoredJourney) }).generate(request, types, emptySet()))
+            assertTrue(result.message.contains("Update the routing server"), result.message)
+        }
+    }
+
 }

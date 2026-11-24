@@ -57,6 +57,8 @@ internal data class BackendGenerationResponse(
     val segments: List<BackendLoopSegment> = emptyList()
 )
 
+private class JourneyContractMismatch : IllegalStateException()
+
 @Serializable
 internal data class BackendLoopSegment(val origin: Place, val destination: Place, val otp: JsonObject)
 
@@ -148,6 +150,7 @@ internal class BackendTripGenerator(
             log("failed stage=$stage ${generationFailureTrace(error)}")
             reportFailure(error)
             val message = when {
+                error is JourneyContractMismatch -> "The server returned a different journey. Update the routing server to support return and round trips."
                 error is HttpRequestTimeoutException || error is SocketTimeoutException || error is ConnectTimeoutException -> "Trip planner request timed out. Check your connection and retry."
                 error is GenerationHttpFailure -> when(error.status) {
                     401, 403 -> "Sign in again to generate a trip."
@@ -176,11 +179,9 @@ internal class BackendTripGenerator(
     ): TripGenerationResult {
         require(response.origin == origin) { "The backend changed the confirmed origin." }
         val destination = requireNotNull(response.destination)
-        require(response.roundTrip == input.roundTrip) { "The planner returned a different trip type." }
+        if (response.roundTrip != input.roundTrip) throw JourneyContractMismatch()
         if (input.roundTrip) require(destination == origin && response.turnaround?.point != origin.point)
-        require(input.destinationPlace == null || destination == input.destinationPlace) {
-            "The backend changed the saved return destination."
-        }
+        if (input.destinationPlace != null && destination != input.destinationPlace) throw JourneyContractMismatch()
         val elapsed = requireNotNull(response.elapsedSeconds)
         require(elapsed in 1..input.plannedMinutes * 60L)
         require(response.orientationBufferSeconds in 0..elapsed)
