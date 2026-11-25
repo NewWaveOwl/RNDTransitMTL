@@ -3,8 +3,10 @@
 See the [decision log](ML4-AI-Decision-Log.md) for the session index, full
 available prompts, student decisions, commit evidence, and source limitations.
 Related iterations are grouped by significant challenge: M4-A1 covers review
-recovery, M4-A2 covers GO/origin interactions, and M4-A3 covers the Figma
-arrival/return/round-trip flow. Personal judgments remain with the student.
+recovery, M4-A2 covers GO/origin interactions, M4-A3 covers the Figma
+arrival/return/round-trip flow, and M4-A4 covers the issue #97 maintainability
+cleanup, composable splitting, and documentation refresh. Personal judgments
+remain with the student.
 
 ## M4-A1 - Completed and cancelled trip persistence with review recovery
 
@@ -90,3 +92,32 @@ ML4 placement and source-coverage limits are qualified there.
 | Time | Student-estimated active interaction/debugging time [Not documented]. Local build durations and commit times are not estimates of total work. |
 | Outcome | Current source has confetti/statistics, the Fastest/Same transport split button, review below it, return preview/start, failure/retry/cancel, and a small back-at-start Review/Skip sheet; Skip goes to the planner. A planned loop routes both directions freshly within its total time budget. Separate commits preserved unrelated work. Nothing had been pushed at the implementation/logging handoff; prompt 5 later authorizes publishing the current branch and its committed history, with the operation's outcome reported in chat. Backend/app rollout and the database migration remain deployment steps. |
 | Productivity / learning reflection | [Student reflection needed]: usefulness of Figma grounding, trust in route comparisons, independent evaluation of the UI, time saved or wasted, and learning about cancellation, routing budgets, or durable journey metadata. |
+
+## M4-A4 - Codebase maintainability cleanup, composable splitting, and documentation refresh (#97)
+
+**Contributor:** Requester; individual prompt authorship not independently
+confirmed. Git records **Artem Sova** as author of commits `2aac1bb` and
+`67b3a36`.
+
+**Date:** 2026-11-25 (America/Toronto).
+
+**Conversation(s):** Local Antigravity conversation
+`0e723272-e84d-42bb-b32d-e91731ad011e` (app-only local ID); [Conversation link needed].
+
+**Decision record / full prompts:** [M4-A4](ML4-AI-Decision-Log.md#m4-a4---codebase-maintainability-cleanup-composable-splitting-and-documentation-refresh-97).
+
+| Field | Record |
+| --- | --- |
+| Challenge addressed / context | ML4-09 / issue #97: split multi-composable files into focused files, extract long functions across shared UI and backend code, enforce `docs/HowToWriteCode_InTheProject.md` (MVVM boundaries, KDoc, tuning sections, zero `!!` in `commonMain`), refresh outdated repository docs, and open a clean PR against `main` without disturbing concurrent local WIP. |
+| AI(s) used | Google Antigravity (`Antigravity` agentic assistant) with local workspace read/edit/command tools, a temporary Python audit script, Gradle, Git/worktrees, and GitHub CLI (`gh`). Exact model version [Not documented]. No subagents used (`0` invocations). |
+| Observable prompting pattern | Prompt 1 gated edits behind confirming doc/file access and supplied repo/issue URLs. Prompt 2 authorized the issue #97 refactor plus an audit of outdated docs with proposed fixes. Prompt 3 selected specific doc/housekeeping items, requested a chat-only explanation of remaining KDoc gaps, and required committing the code refactor separately beforehand. Prompts 4–6 directed committing/opening the PR, updating the header with `[AI-Cleanup]` and closing #97, and adding this AI log. |
+| Techniques deliberately used | [Student reflection needed]. Read-first gating, guideline-grounded refactoring, staged commit separation, and PR metadata verification are observable patterns; intentional technique names and purpose have not been supplied by the student. |
+| Iterations | Six visible human task prompts (plus one `/compact` UI command between Prompts 3 and 4) are preserved in the decision log. Related file splits, function extractions, compile fixes, doc refreshes, and PR updates are grouped as one maintainability challenge; internal tool-call iteration count [Not documented]. |
+| Debugging / refinement | Agent fixed three compile/warning issues during refactoring (`ReviewV3.kt` parameter names `onRatingChange`/`label`, redundant null check in `TripReturnFlowContent.kt`, and `LocationUpdate.Fix` in `AndroidTransitMap.kt`). Because `fixes_fro_monday_23_nov_sova` was already squash-merged into `origin/main` in PR #111, the agent cherry-picked both commits onto a fresh branch from `origin/main` in a temporary worktree, resolved two small overlaps (`Generation.kt` and `TransitOpeningGeneration.kt`), copied gitignored `local.properties` after the initial worktree Gradle run failed, removed a broken link to untracked `docs/AndroidDistribution.md` in `README.md`, and unescaped `` `Closes #97` `` in PR #113 so GitHub linked `#97`. Manual student edits are [Not documented]. |
+| Failed / rejected approaches | Initial worktree Gradle verification failed when `local.properties` (SDK path) was missing and succeeded once copied. Wrapping `` `Closes #97` `` in backticks prevented GitHub from populating `closingIssuesReferences` until replaced with plain `Closes #97`. Windows `git worktree remove` hit `Filename too long` on Gradle build outputs, so the temporary directory was cleaned up via Python with extended-path prefix `\\?\`. Refactored `App.kt` and `HistoryScreen.kt` were kept out of the PR commits to avoid colliding with pre-existing uncommitted `AchievementLauncher` changes. |
+| Strategy changes | Work was sequenced into (1) read-only verification, (2) codebase refactor + doc audit, (3) separate code-cleanup commit before housekeeping/doc fixes, and (4) an isolated worktree branch off `origin/main` instead of pushing the already-merged `fixes_fro_monday_23_nov_sova` branch. The 5-class KDoc gap (`AccountRepository`, `LocationJumpFilter`, `CloudTrips`, `TripNavigation`, `TripsStore`) was explained in chat for a future docs-only PR rather than folded into #97. |
+| Verification | Agent-run verification on `refactor/97-code-cleanup-and-docs` (`67b3a36`, based on `origin/main` `610ea1f`): `.\gradlew.bat :shared:jvmTest :shared:testAndroidHostTest :backend:test :androidApp:assembleDebug :desktopApp:classes :shared:compileKotlinJs :shared:compileKotlinWasmJs --console=plain` ended `BUILD SUCCESSFUL` (`340` JVM tests, `276` Android host tests, `65` backend tests with `0` failures/errors and `1` skipped opt-in live smoke test; Android debug APK, Desktop, JS, and WasmJS targets built). `gh pr view 113 --json title,closingIssuesReferences` verified `[AI-Cleanup]` title and `#97` closing link. Tests were not rerun for this AI log commit; independent student testing is [Not documented]. |
+| Code impact | `2aac1bb`: 66 files changed (+9381 / -6760), including 35 new focused Kotlin/Compose files and 3 deleted monolithic files (`TripScreensV3.kt`, `PlannerOriginUi.kt`, `LocationAccuracyControls.kt`), plus `commonMain` `!!` reduced `6 → 0`. `67b3a36`: 34 files changed (+253 / -662), removing 28 unused legacy `app/` template files and updating `.gitignore`, `README.md`, and 4 `docs/` files. Student-estimated assignment-code percentage and basis [Not documented]. |
+| Time | Student-estimated active interaction and debugging time [Not documented]. Transcript and commit timestamps are not estimates of total student work time. |
+| Outcome | PR [#113](https://github.com/NewWaveOwl/RNDTransitMTL/pull/113) (`[AI-Cleanup] Refactor composables, extract long functions, and refresh docs (#97)`) is open on `refactor/97-code-cleanup-and-docs` targeting `main` with `Closes #97` verified via GitHub API, plus this ML4 AI log commit. Pre-existing local WIP remained intact. PR review, merge, and issue #97 auto-close remain pending. |
+| Productivity / learning reflection | [Student reflection needed]: usefulness of AI-assisted multi-file refactoring and doc auditing, trust in automated splits, time saved or wasted, and what the student would change next time. |
