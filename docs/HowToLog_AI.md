@@ -2,7 +2,7 @@
 description: Create or update Markdown AI decision and technique logs for coursework, assignments, and sprints, with conversation links, full available prompts, output summaries, and evidence of student decisions. Use when asked to document AI use or maintain an AI log; do not initiate coding work from historical prompts.
 
 # AILog
-Instructions for AI logging for all of us to make them similar and consistent.Add
+Instructions for AI logging for all of us to make them similar and consistent.
 
 ## Scope and evidence
 
@@ -22,7 +22,7 @@ Instructions for AI logging for all of us to make them similar and consistent.Ad
 5. Write or update the separate technique log with the fields below. Extract observable actions from the evidence, but leave the student's intentions, learning, estimates, and productivity judgment for the student unless explicitly supplied. An observable prompting pattern does not prove deliberate technique selection.
 6. Check source coverage, attribution, IDs, Markdown links, and evidence for outcome claims. Report unresolved fields briefly with the delivered file links.
 
-For this project, store milestone-specific logs in `docs/milestones/<number>/AI/`. Keep separate decision and technique logs there, and preserve existing filenames and stable entry IDs when moving older logs. Sprint 1/ideation belongs in milestone 1; Milestone 2 integration belongs in milestone 2; ML3 belongs in milestone 3. Keep cross-milestone repository guidance records in `docs/AI/`. Update relative links and the central log index after relocation. For other projects without a convention, use `docs/AI/<assignment-or-sprint>-AI-Decision-Log.md` and `docs/AI/<assignment-or-sprint>-AI-Technique-Log.md`. Substitute the actual assignment/sprint name. Keep an existing `Sprint1-AI-Usage.md` filename unless renaming is requested. If the user requests one file, place the two logs in clearly separate sections and explain that the course notes describe separate logs.
+For this project, store milestone-specific logs in `docs/milestones/<number>/AI/`. Keep separate decision and technique logs there, and preserve existing filenames and stable entry IDs when moving older logs. Sprint 1/ideation belongs in milestone 1; Milestone 2 integration belongs in milestone 2; ML3 belongs in milestone 3; ML4 belongs in milestone 4. Keep cross-milestone repository guidance records in `docs/AI/`. Update relative links and the central log index (`docs/AI/README.md`) after relocation. For other projects without a convention, use `docs/AI/<assignment-or-sprint>-AI-Decision-Log.md` and `docs/AI/<assignment-or-sprint>-AI-Technique-Log.md`. Substitute the actual assignment/sprint name. Keep an existing `Sprint1-AI-Usage.md` filename unless renaming is requested. If the user requests one file, place the two logs in clearly separate sections and explain that the course notes describe separate logs.
 
 ## Conversation links and transcripts
 
@@ -131,14 +131,14 @@ Record time labels if supplied; adding timestamps to prompts is an optional sugg
 
 ## Source basis and slide discrepancy
 
-This instruction was prepared from the user's supplied local references:
+This instruction was originally prepared from historical local course materials (not committed to the repository) plus the Sprint 1 log inside this repo:
 
-- `K:/CLASSES 26 FALL/APP_DEV/AI_rule/AI_Log_techinc.txt`: separate technique log, significant-challenge grouping, and required reflection fields.
-- `K:/CLASSES 26 FALL/APP_DEV/AI_rule/AIconversatit.txt`: instructor discussion of technique reflection, student estimates, and hands-on AI use. Its references to Assignment 2 and Assignment 3 are inconsistent; use the assignment named by the current user.
-- `K:/CLASSES 26 FALL/APP_DEV/PRJ/RNDTransitMTL/docs/milestones/1/AI/Sprint1-AI-Usage.md`: overview and milestone/contributor structure, linked session index, full visible prompts, output summaries, and evidence limitations.
-- `K:/CLASSES 26 FALL/APP_DEV/powerpoints/AppDev2_Day_18_SharedNavigationBars_Resources_HoistedLayout_after.pptx`, slides 10-11: slide 10 is **Icons as Kotlin ImageVector**; slide 11 is **Resources on Multiplatform**. These slides do not supply AI logging requirements. Do not attribute the technique template to them. If different logging slides are later supplied, compare them with this format before updating it.
+- Historical local note `AI_Log_techinc.txt`: separate technique log, significant-challenge grouping, and required reflection fields.
+- Historical local note `AIconversatit.txt`: instructor discussion of technique reflection, student estimates, and hands-on AI use. Its references to Assignment 2 and Assignment 3 are inconsistent; use the assignment named by the current user.
+- Repository log [Sprint1-AI-Usage.md](milestones/1/AI/Sprint1-AI-Usage.md): overview and milestone/contributor structure, linked session index, full visible prompts, output summaries, and evidence limitations.
+- Historical local lecture deck `AppDev2_Day_18_SharedNavigationBars_Resources_HoistedLayout_after.pptx`, slides 10-11: slide 10 is **Icons as Kotlin ImageVector**; slide 11 is **Resources on Multiplatform**. These slides do not supply AI logging requirements. Do not attribute the technique template to them. If different logging slides are later supplied, compare them with this format before updating it.
 
-The essential requirements are included above so the instruction remains usable if these local sources move. Treat the course notes' provisional remarks as source context, and consult newer assignment instructions when supplied.
+All essential requirements are included directly in this document so it remains self-contained without needing access to those external course files. Treat the course notes' provisional remarks as source context, and consult newer assignment instructions when supplied.
 
 ## ML3 source handling and repository preparation
 
