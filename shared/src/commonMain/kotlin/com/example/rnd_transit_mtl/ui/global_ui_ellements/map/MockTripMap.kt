@@ -1,6 +1,9 @@
 package com.example.rnd_transit_mtl.ui.global_ui_ellements.map
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -44,6 +47,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.rnd_transit_mtl.model.trip.TripPoint
 import com.example.rnd_transit_mtl.ui.theme.TransitMain
+import com.example.rnd_transit_mtl.ui.theme.TransitHighlight
 import com.example.rnd_transit_mtl.ui.theme.tripLegColor
 import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 import org.jetbrains.compose.resources.painterResource
@@ -56,6 +60,9 @@ import rnd_transit_mtl.shared.generated.resources.start_point_marker
 // Layout settings — dp marker clearance and camera-control touch size.
 private val TripMapMarkerInset = 40.dp
 private val TripMapControlSize = 48.dp
+
+// Animation settings — explicit recentering eases to its target; GPS following stays independent.
+private const val TRIP_MAP_RECENTER_ANIMATION_DURATION_MILLIS = 500
 
 /**
  * The PNG, route, endpoints and directed pointer share one uniform transform.
@@ -86,11 +93,15 @@ private val TripMapControlSize = 48.dp
  * @param onManualCameraMove Reports a user pan or zoom.
  * @param showControls Whether to render the legacy zoom/reset row.
  * @param showPosition Whether to draw the current position pointer.
+ * @param userPosition Actual measured position on the bundled map, independent of route progress.
+ * @param topInset Overlay clearance sampled when the user explicitly recenters.
+ * @param bottomInset Overlay clearance sampled when the user explicitly recenters.
  */
 @Composable
 fun MockTripMap(
     start: TripPoint,
     destination: TripPoint,
+    waypoints: List<TripPoint> = emptyList(),
     progress: Float,
     legs: List<TripMapLeg> = listOf(TripMapLeg(listOf(start, destination), isRouted = false)),
     modifier: Modifier = Modifier,
@@ -101,7 +112,11 @@ fun MockTripMap(
     showControls: Boolean = true,
     showPosition: Boolean = true,
     followPosition: Boolean = false,
-    onManualCameraMove: () -> Unit = {}
+    onManualCameraMove: () -> Unit = {},
+    userPosition: TripPoint? = null,
+    topInset: Dp = 0.dp,
+    bottomInset: Dp = 0.dp,
+    userUncertaintyRing: List<TripPoint> = emptyList(),
 ) {
     val mapPainter = painterResource(Res.drawable.map_sample)
     val startPainter = painterResource(Res.drawable.start_point_marker)
@@ -112,12 +127,21 @@ fun MockTripMap(
     val boundedProgress = boundedTripProgress(progress)
     val latestManualCameraMove by rememberUpdatedState(onManualCameraMove)
     val followedProgress = boundedProgress.takeIf { followPosition && showPosition }
+    val followedUserPosition = userPosition.takeIf { followPosition && showPosition }
     val percentage = tripProgressPercentage(boundedProgress)
-    val markerInset = with(LocalDensity.current) { TripMapMarkerInset.toPx() }
+    val density = LocalDensity.current
+    val markerInset = with(density) { TripMapMarkerInset.toPx() }
     var viewport by remember { mutableStateOf(Size.Zero) }
     var zoom by rememberSaveable(start, destination) { mutableStateOf(1f) }
     var panX by rememberSaveable(start, destination) { mutableStateOf(0f) }
     var panY by rememberSaveable(start, destination) { mutableStateOf(0f) }
+    var handledRecenterRequest by remember(start, destination) { mutableStateOf(0) }
+    var recenterAnimating by remember(start, destination) { mutableStateOf(false) }
+    var cameraGestureGeneration by remember(start, destination) { mutableStateOf(0) }
+    var followCenterYFraction by remember(start, destination) { mutableStateOf(0.5f) }
+    val recenterProgress = remember(start, destination) { Animatable(0f) }
+    val latestTopInset by rememberUpdatedState(topInset)
+    val latestBottomInset by rememberUpdatedState(bottomInset)
 
     val baseRect = if (viewport.width > 0f && viewport.height > 0f) {
         mapImageRect(viewport, sourceSize, matchPlannerBackground, markerInset)
@@ -144,25 +168,61 @@ fun MockTripMap(
         panY = boundedPan.y / viewport.height
     }
 
-    LaunchedEffect(recenterRequest, viewport, start, destination, legs, followedProgress) {
-        if ((recenterRequest > 0 || followedProgress != null) &&
+    val cameraPoint = remember(baseRect, legs, userPosition, boundedProgress) {
+        userPosition?.toMapPosition(baseRect) ?: positionAlongPolyline(
+            routeLine(legs.map { leg -> leg.points.map { it.toMapPosition(baseRect) } }), boundedProgress
+        ).point
+    }
+    val latestCameraPoint by rememberUpdatedState(cameraPoint)
+    fun panForPoint(point: Offset, cameraZoom: Float): Offset {
+        val viewportCenter = Offset(viewport.width / 2f, viewport.height / 2f)
+        val targetCenter = Offset(viewportCenter.x, viewport.height * followCenterYFraction)
+        return (viewportCenter - point) * cameraZoom + targetCenter - viewportCenter
+    }
+
+    // GPS updates and overlay insets are not animation keys: neither restarts a recenter.
+    LaunchedEffect(recenterRequest, viewport, start, destination, showPosition, cameraGestureGeneration) {
+        val requested = recenterRequest > 0 && recenterRequest != handledRecenterRequest
+        if (showPosition && requested &&
             viewport.width > 0f &&
             viewport.height > 0f &&
             baseRect.width > 0f
         ) {
-            val point = positionAlongPolyline(
-                routeLine(legs.map { leg -> leg.points.map { it.toMapPosition(baseRect) } }),
-                boundedProgress
-            ).point
-            val center = Offset(
-                viewport.width / 2f,
-                viewport.height / 2f
+            val top = with(density) { latestTopInset.toPx() }.coerceIn(0f, viewport.height)
+            val bottom = (viewport.height - with(density) { latestBottomInset.toPx() }).coerceIn(top, viewport.height)
+            followCenterYFraction = (top + bottom) / (2f * viewport.height)
+            val point = latestCameraPoint
+            val targetCenter = Offset(viewport.width / 2f, viewport.height * followCenterYFraction)
+            // Zoom only as far as needed to center the marker above overlays while
+            // keeping the finite bundled image covering the map viewport.
+            val requiredZoom = maxOf(
+                targetCenter.x / (point.x - baseRect.left).coerceAtLeast(1f),
+                (viewport.width - targetCenter.x) / (baseRect.right - point.x).coerceAtLeast(1f),
+                targetCenter.y / (point.y - baseRect.top).coerceAtLeast(1f),
+                (viewport.height - targetCenter.y) / (baseRect.bottom - point.y).coerceAtLeast(1f),
             )
+            val initialZoom = zoom.coerceIn(minimumZoom, 4f)
+            val targetZoom = maxOf(initialZoom, requiredZoom).coerceIn(minimumZoom, 4f)
+            val initialPan = Offset(panX * viewport.width, panY * viewport.height)
+            val targetPan = clampPan(panForPoint(point, targetZoom), targetZoom)
+            handledRecenterRequest = recenterRequest
+            recenterAnimating = true
+            try {
+                recenterProgress.snapTo(0f)
+                recenterProgress.animateTo(1f, tween(TRIP_MAP_RECENTER_ANIMATION_DURATION_MILLIS, easing = FastOutSlowInEasing)) {
+                    setCamera(initialZoom + (targetZoom - initialZoom) * value,
+                        initialPan + (targetPan - initialPan) * value)
+                }
+            } finally {
+                recenterAnimating = false
+            }
+        }
+    }
+    LaunchedEffect(viewport, followedProgress, followedUserPosition, showPosition, recenterAnimating, handledRecenterRequest) {
+        if (followPosition && showPosition && !recenterAnimating && recenterRequest == handledRecenterRequest &&
+            viewport.width > 0f && viewport.height > 0f) {
             val currentZoom = zoom.coerceIn(minimumZoom, 4f)
-            setCamera(
-                currentZoom,
-                (center - point) * currentZoom
-            )
+            setCamera(currentZoom, panForPoint(latestCameraPoint, currentZoom))
         }
     }
 
@@ -173,6 +233,7 @@ fun MockTripMap(
                 contentDescription = "Mock transit map. Yellow start triangle, " +
                     "green destination triangle. " +
                     (if (showPosition) "Directed yellow position pointer. " else "Position unavailable. ") +
+                    (if (showPosition && userUncertaintyRing.isNotEmpty()) "Location uncertainty circle. " else "") +
                     (if (legs.all { it.isRouted }) "Solid line follows the planned route. "
                     else "Dashed line is a straight-line preview, not a real route. ") +
                     if (interactive) "Pinch to zoom and drag to move the picture." else ""
@@ -185,6 +246,7 @@ fun MockTripMap(
                     if (!interactive) return@pointerInput
                     detectTransformGestures { centroid, pan, zoomChange, _ ->
                         if (viewport.width > 0f && viewport.height > 0f) {
+                            cameraGestureGeneration++
                             latestManualCameraMove()
                             val oldZoom = zoom.coerceIn(minimumZoom, 4f)
                             val nextZoom = (oldZoom * zoomChange).coerceIn(minimumZoom, 4f)
@@ -215,6 +277,18 @@ fun MockTripMap(
                 with(mapPainter) { draw(size = mapRect.size) }
             }
 
+            if (showPosition && userUncertaintyRing.isNotEmpty()) {
+                val ring = Path().apply {
+                    userUncertaintyRing.forEachIndexed { index, point ->
+                        val position = point.toMapPosition(mapRect)
+                        if (index == 0) moveTo(position.x, position.y) else lineTo(position.x, position.y)
+                    }
+                    close()
+                }
+                drawPath(ring, TransitHighlight.copy(alpha = 0.2f))
+                drawPath(ring, TransitHighlight.copy(alpha = 0.53f), style = Stroke(1.5.dp.toPx()))
+            }
+
             val startPosition = start.toMapPosition(mapRect)
             val endPosition = destination.toMapPosition(mapRect)
             val legPositions = legs.map { leg -> leg.points.map { it.toMapPosition(mapRect) } }
@@ -239,12 +313,13 @@ fun MockTripMap(
                 }
             }
             drawAnchoredTripEndpoint(startPainter, startPosition, endpointSize)
-            drawAnchoredTripEndpoint(endPainter, endPosition, endpointSize)
+            if (waypoints.isEmpty()) drawAnchoredTripEndpoint(endPainter, endPosition, endpointSize)
+            else waypoints.forEach { drawAnchoredTripEndpoint(endPainter, it.toMapPosition(mapRect), endpointSize) }
             if (showPosition) {
                 val direction = current.direction.takeUnless { it == Offset.Zero }
                     ?: (endPosition - startPosition)
                 drawDirectedTripPointer(
-                    pointerPainter, current.point, pointerSize,
+                    pointerPainter, userPosition?.toMapPosition(mapRect) ?: current.point, pointerSize,
                     tripPointerRotation(Offset.Zero, direction)
                 )
             }

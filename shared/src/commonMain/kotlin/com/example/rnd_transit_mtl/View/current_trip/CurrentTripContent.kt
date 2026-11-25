@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.rnd_transit_mtl.model.trip.Trip
+import com.example.rnd_transit_mtl.model.geo.GeoPoint
 import com.example.rnd_transit_mtl.ui.theme.TransitMain
 import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.boundedTripProgress
@@ -24,6 +25,9 @@ private const val TripInformationMaximumHeightFraction = 0.6f
  * @param instruction Optional routing or explicitly labelled sample instruction.
  * @param locationState Explicit sample, stale, or missing reading state.
  * @param staleMessage Optional explanation for a stale reading.
+ * @param simulationEnabled Whether debug playback and its manual finish action are available.
+ * @param userPosition GPS point or an explicitly labelled estimate along the saved route.
+ * @param onRequestLocation Requests a reading or permission when the user presses recenter.
  */
 @Composable
 fun CurrentTripContent(
@@ -42,7 +46,11 @@ fun CurrentTripContent(
     onShowInformation: () -> Unit = {},
     instruction: ActiveMapInstruction? = null,
     locationState: TripLocationState = TripLocationState.Sample,
-    staleMessage: String? = null
+    staleMessage: String? = null,
+    simulationEnabled: Boolean = true,
+    userPosition: GeoPoint? = null,
+    onRequestLocation: () -> Unit = {},
+    userUncertaintyMeters: Double? = null,
 ) {
     val boundedProgress = boundedTripProgress(progress)
     val completed = boundedProgress == 1f
@@ -56,6 +64,10 @@ fun CurrentTripContent(
             instruction = instruction,
             locationState = locationState,
             staleMessage = staleMessage,
+            simulationEnabled = simulationEnabled,
+            userPosition = userPosition,
+            userUncertaintyMeters = userUncertaintyMeters,
+            onRequestLocation = onRequestLocation,
             onFinish = { if (completed) onRequestReview() else onFinishRequested() },
             onConfirmCancel = onCancel,
             onShowInformation = onShowInformation,
@@ -77,7 +89,8 @@ fun CurrentTripContent(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text(
-                            text = "${formatDemoDistanceKm(trip.distanceKm)} km demo",
+                            text = "${formatDemoDistanceKm(trip.distanceKm)} km" +
+                                if (simulationEnabled) " demo" else "",
                             color = TransitMain
                         )
                         TripInformationPanel(

@@ -16,6 +16,40 @@ import kotlin.test.*
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class CloudTripsTest {
+    @Test fun idleRefreshSharesOneFetchWithHistoryAndPreservesActiveTripAndReviewDraft() = runTest {
+        val completed = unreviewedHistoryPreviewTrip
+        val active = completed.copy(id = TripId("active-during-refresh"), status = TripStatus.Generated,
+            completedAt = null, review = null)
+        val store = TripsStore().apply {
+            start(active)
+            restoreFinalTrip(completed)
+            beginReview(completed.id)
+        }
+        val before = store.snapshot()
+        val repository = RecordingRepository().apply { records[completed.id] = completed }
+        val cloud = CloudTrips(repository, store)
+        cloud.refreshAfterIdle()
+        val reads = List(3) { async { cloud.history() } }.map { it.await() }
+        assertTrue(reads.all { it == listOf(completed) })
+        assertEquals(1, repository.historyReads)
+        assertEquals(before, store.snapshot())
+    }
+
+    @Test fun failedIdleRefreshKeepsCachedHistoryAndCanRetryFreshData() = runTest {
+        val trip = unreviewedHistoryPreviewTrip
+        val repository = RecordingRepository().apply { records[trip.id] = trip }
+        val cloud = CloudTrips(repository, TripsStore())
+        assertEquals(listOf(trip), cloud.history())
+        repository.failHistory = true
+        assertFailsWith<IllegalStateException> { cloud.refreshAfterIdle() }
+        assertEquals(listOf(trip), cloud.history())
+        repository.failHistory = false
+        repository.records[trip.id] = trip.copy(title = "Updated elsewhere")
+        cloud.refreshAfterIdle()
+        assertEquals("Updated elsewhere", cloud.history().single().title)
+        assertEquals(3, repository.historyReads)
+    }
+
     @Test
     fun pendingTripDetailsStayAvailableAfterFailedSave() = runTest {
         val trip = unreviewedHistoryPreviewTrip
@@ -143,6 +177,8 @@ class CloudTripsTest {
         val events = mutableListOf<String>()
         var failSave = false
         var failDelete = false
+        var failHistory = false
+        var historyReads = 0
         var beforeSave: suspend () -> Unit = {}
 
         override suspend fun saveFinalTrip(trip: Trip): Trip {
@@ -152,7 +188,11 @@ class CloudTripsTest {
             records[trip.id] = trip
             return trip
         }
-        override suspend fun listHistory() = records.values.toList()
+        override suspend fun listHistory(): List<Trip> {
+            historyReads++
+            check(!failHistory) { "Offline" }
+            return records.values.toList()
+        }
         override suspend fun getTrip(id: TripId) = records[id]
         override suspend fun updateTrip(id: TripId, title: String, description: String): Boolean =
             error("Unused")

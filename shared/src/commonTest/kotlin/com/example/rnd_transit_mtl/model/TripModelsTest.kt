@@ -83,12 +83,15 @@ class TripModelsTest {
     fun validRequestHasNoErrors() {
         assertEquals(emptyList(), request().validate(supported))
         assertEquals(emptyList(), request(destination = null).validate(supported))
+        listOf(5, 6, 7, 37, 359, 360).forEach { minutes ->
+            assertEquals(emptyList(), request(plannedMinutes = minutes).validate(supported))
+        }
     }
 
     @Test
-    fun zeroAndOffStepMinutesAreRejected() {
+    fun zeroAndOutOfRangeMinutesAreRejected() {
         assertEquals(listOf(TripRequestError.InvalidPlannedMinutes(0)), request(plannedMinutes = 0).validate(supported))
-        assertEquals(listOf(TripRequestError.InvalidPlannedMinutes(7)), request(plannedMinutes = 7).validate(supported))
+        assertEquals(listOf(TripRequestError.InvalidPlannedMinutes(4)), request(plannedMinutes = 4).validate(supported))
         assertEquals(listOf(TripRequestError.InvalidPlannedMinutes(365)), request(plannedMinutes = 365).validate(supported))
     }
 

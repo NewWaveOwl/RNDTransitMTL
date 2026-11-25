@@ -14,6 +14,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -192,6 +194,25 @@ internal fun LazyListScope.PlannerPreferenceBands(
     }
 }
 
+/** Trip-type choice uses the existing chips; transport dropdown layout remains independent. */
+internal fun LazyListScope.PlannerTripTypeBand(scale: Float, roundTrip: Boolean,
+    onRoundTripChange: (Boolean) -> Unit, enabled: Boolean) {
+    item(key = "trip-type") {
+        PreferenceBand(TransitComplementary, scale) {
+            BandTitle("Trip type", TransitWhite, scale)
+            Row(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(PreferenceChoiceSpacing * scale)) {
+                listOf(false to "One way", true to "Round trip").forEach { (value, label) ->
+                    PlannerChoice(label, roundTrip == value, enabled, { onRoundTripChange(value) },
+                        scale, Modifier.weight(1f), Role.RadioButton)
+                }
+            }
+            Text(if (roundTrip) "Explore and return to your start within your available time."
+                else "Explore to a new destination. You can plan a return after arrival.",
+                color = TransitWhite, fontSize = 13.sp * scale, lineHeight = 18.sp * scale)
+        }
+    }
+}
+
 /** Shared opening motion for walking preferences and transit-zone dropdowns. */
 private fun preferenceDropdownEnter() = expandVertically(
     animationSpec = tween(PREFERENCE_DROPDOWN_ANIMATION_DURATION_MILLIS, easing = PreferenceDropdownEasing),
@@ -338,7 +359,8 @@ private fun PlannerChoice(label: String, selected: Boolean, enabled: Boolean, on
             .graphicsLayer { alpha = if (unavailable) 0.45f else 1f }
             .then(if (unavailable) Modifier.semantics { stateDescription = "Not available yet" } else Modifier)
             .then(if (dropdownExpanded == null) {
-                Modifier.toggleable(selected, enabled = enabled, role = role, onValueChange = { onClick() })
+                if (role == Role.RadioButton) Modifier.selectable(selected, enabled = enabled, role = role, onClick = onClick)
+                else Modifier.toggleable(selected, enabled = enabled, role = role, onValueChange = { onClick() })
             } else {
                 Modifier.clickable(enabled = enabled, role = Role.Button,
                     onClickLabel = if (dropdownExpanded) "Close zone choices" else "Open zone choices",

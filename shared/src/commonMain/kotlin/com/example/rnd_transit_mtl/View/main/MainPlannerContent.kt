@@ -2,6 +2,7 @@ package com.example.rnd_transit_mtl.View.main
 
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMap
 import com.example.rnd_transit_mtl.data.location.LocalPlannerLocation
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.location.LocationAccuracyNotice
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMapData
 import com.example.rnd_transit_mtl.state.NullableTransportIdSaver
 import com.example.rnd_transit_mtl.model.ids.ZoneId
@@ -57,10 +58,12 @@ import androidx.compose.ui.unit.dp
 import com.example.rnd_transit_mtl.View.main.components.GOBox
 import com.example.rnd_transit_mtl.View.main.components.GoBoxCompactHeight
 import com.example.rnd_transit_mtl.View.main.components.PlannerPreferenceBands
+import com.example.rnd_transit_mtl.View.main.components.PlannerTripTypeBand
 import com.example.rnd_transit_mtl.data.generation.TripGenerationBounds
 import com.example.rnd_transit_mtl.model.transport.TransportType
 import com.example.rnd_transit_mtl.model.trip.Place
 import com.example.rnd_transit_mtl.model.trip.TripPoint
+import com.example.rnd_transit_mtl.model.geo.GeoPoint
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.plannerTripBounds
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.validMapSourceSize
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.transitions.GO_TRIP_TRANSITION_MILLIS
@@ -104,7 +107,8 @@ internal enum class PlannerSheetPosition { Main, Routes, Preferences, Collapsed 
 /**
  * Displays a pannable map and four draggable preference positions.
  *
- * GO follows the sheet. Expanded content scrolls after the sheet reaches its top stop.
+ * GO follows the sheet and provides a larger area to drag the same preferences panel.
+ * Expanded content scrolls after the sheet reaches its top stop.
  * Sheet position is presentation state; all editable choices belong to the caller.
  *
  * @param minutes Available minutes displayed by GO.
@@ -135,6 +139,8 @@ internal enum class PlannerSheetPosition { Main, Routes, Preferences, Collapsed 
  * @param initialSheetPosition Initial position for previews or a new planner entry.
  * @param origin Selected sample-map starting point, or none.
  * @param onEditOrigin Opens the origin options without changing saved choices.
+ * @param onTapOrigin Stages a sample-map point for confirmation.
+ * @param onTapLiveOrigin Stages a geographic map point for confirmation.
  */
 @Composable
 internal fun MainPlannerContent(
@@ -168,7 +174,11 @@ internal fun MainPlannerContent(
     onEditOrigin: () -> Unit = {},
     liveOrigin: Place? = null,
     originIsManual: Boolean = true,
-    originStatus: String? = null
+    originStatus: String? = null,
+    onTapOrigin: (TripPoint) -> Unit = {},
+    onTapLiveOrigin: (GeoPoint) -> Unit = {},
+    roundTrip: Boolean = false,
+    onRoundTripChange: (Boolean) -> Unit = {}
 ) {
     val liveLocation = LocalPlannerLocation.current
     // Expansion is presentation state, separate from transport and zone selections.
@@ -271,7 +281,8 @@ internal fun MainPlannerContent(
 
         val gapPx = geometry.goGap(sheetOffset)
         val goHeightPx = with(density) { (GoBoxCompactHeight * scale).toPx() }
-        val goTop = (sheetOffset - goHeightPx - gapPx).coerceAtLeast(0f)
+        val goTop = (sheetOffset - goHeightPx - gapPx)
+            .coerceIn(0f, (heightPx - goHeightPx).coerceAtLeast(0f))
         val showMapControls = controlsVisible && goTop >= 100f * unitPx
         var originFieldHeight by remember { mutableIntStateOf(0) }
         val visibleMapTop = if (showMapControls) {
@@ -289,7 +300,8 @@ internal fun MainPlannerContent(
                 cameraInsetsReady = !showMapControls || originFieldHeight > 0,
                 browsing = true,
                 pin = liveOrigin?.point,
-                centerOnPin = originIsManual
+                centerOnPin = originIsManual,
+                onPick = if (enabled) onTapLiveOrigin else null
             ),
             modifier = Modifier.fillMaxSize()
         ) {
@@ -297,6 +309,7 @@ internal fun MainPlannerContent(
                 origin = origin,
                 enabled = enabled,
                 recenterRequest = recenterRequest,
+                onTap = onTapOrigin,
                 modifier = Modifier.fillMaxSize()
             )
         }
@@ -340,6 +353,7 @@ internal fun MainPlannerContent(
                             )
                         }
                     }
+                    LocationAccuracyNotice(Modifier.padding(top = 8.dp), enabled = enabled && showMapControls)
                 }
             }
 
@@ -386,19 +400,6 @@ internal fun MainPlannerContent(
                         style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 4.dp))
                 }
             }
-            GOBox(
-                minutes = minutes,
-                onMinutesChange = onMinutesChange,
-                onGo = onPrimaryAction,
-                actionLabel = actionLabel,
-                actionEnabled = actionEnabled && controlsVisible,
-                minutesEnabled = enabled,
-                layoutScale = scale,
-                compact = true,
-                modifier = Modifier.offset { IntOffset(0, goTop.roundToInt()) }
-                    .fillMaxWidth().padding(horizontal = PlannerGoBoxHorizontalPadding * scale)
-                    .graphicsLayer { alpha = controlsOpacity.value }
-            )
             Column(
                 Modifier.offset { IntOffset(0, sheetOffset.roundToInt()) }
                     .fillMaxWidth()
@@ -526,6 +527,7 @@ internal fun MainPlannerContent(
                             }
                         }
                     }
+                    PlannerTripTypeBand(scale, roundTrip, onRoundTripChange, enabled)
                     PlannerPreferenceBands(
                         scale, transportTypes, selectedTransportIds, selectedZonesByTransport,
                         onToggleTransport, onToggleZone, walkingPreference, selectedAttractionIds,
@@ -542,6 +544,24 @@ internal fun MainPlannerContent(
                 }
             }
         }
+        // Draw last so even a very short window cannot cover GO with the sheet.
+        GOBox(
+            minutes = minutes,
+            onMinutesChange = onMinutesChange,
+            onGo = onPrimaryAction,
+            actionLabel = actionLabel,
+            actionEnabled = actionEnabled && controlsVisible,
+            minutesEnabled = enabled,
+            layoutScale = scale,
+            compact = true,
+            modifier = Modifier.align(Alignment.TopCenter)
+                .offset { IntOffset(0, goTop.roundToInt()) }
+                .width(panelWidth)
+                // GO enlarges the teal panel's drag area; both use the same anchors and state.
+                .anchoredDraggable(sheet, Orientation.Vertical, enabled = enabled)
+                .padding(horizontal = PlannerGoBoxHorizontalPadding * scale)
+                .graphicsLayer { alpha = controlsOpacity.value }
+        )
     }
 }
 

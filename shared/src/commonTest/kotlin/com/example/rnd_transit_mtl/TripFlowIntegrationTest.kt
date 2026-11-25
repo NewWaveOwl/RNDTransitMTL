@@ -186,7 +186,7 @@ class TripFlowIntegrationTest {
             input().copy(imageUrl = "http://example.com/trip.png"),
             input().copy(imageUrl = "https:///trip.png"),
             input().copy(selectedTransportIds = emptyList(), selectedRouteIds = emptyList()),
-            input().copy(plannedMinutes = 7)
+            input().copy(plannedMinutes = 4)
         )
 
         invalidInputs.forEach { invalid ->

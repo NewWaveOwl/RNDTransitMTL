@@ -51,7 +51,8 @@ internal val modeNames=mapOf("walk" to "WALK", "bike" to "BICYCLE", "bus" to "BU
 internal val walkingSpeeds=mapOf("Amble" to 3.0,"Walk" to 4.8,"Dash" to 6.8)
 internal fun orientationSeconds(meters: Double)=ceil(meters*60/1000).toLong()
 internal data class Request(val origin: JsonObject, val minutes: Int, val modes: List<String>, val pace: String,
-    val zones: Map<String,List<String>>, val lines: List<String>, val excluded: List<Point>, val bikeSpeedKmh: Int = 18) {
+    val zones: Map<String,List<String>>, val lines: List<String>, val excluded: List<Point>, val bikeSpeedKmh: Int = 18,
+    val destination: JsonObject? = null, val compareModes: Boolean = false, val roundTrip: Boolean = false, val interestZoneCount: Int = 1, val generationSeed: Int? = null) {
     val start get()=point(origin["point"])
     val speed get()=walkingSpeeds.getValue(pace)/3.6
     val bikeOnly get()=modes==listOf("bike")
@@ -63,7 +64,7 @@ internal fun parseRequest(v: JsonElement): Request {
     checkInput(inServiceArea(point(origin["point"])),"Starting point is outside the supported area.")
     checkInput(origin["label"].text()?.let { it.isNotBlank() && it.length<=160 } == true,"Choose a named starting point.")
     val minutes=v.field("plannedMinutes").number() ?: throw InputError("Choose 5-360 minutes.")
-    checkInput(minutes in 5.0..360.0 && minutes%5==0.0,"Choose 5-360 minutes in five-minute steps.")
+    checkInput(minutes in 5.0..360.0 && minutes%1==0.0,"Choose 5-360 whole minutes.")
     val modes=v.field("modes").strings()
     checkInput(modes.isNotEmpty() && modes.distinct()==modes && modes.all { it in modeNames },"Choose supported transport modes.")
     val pace=v.field("walkingPreference")?.text() ?: if(v.field("walkingPreference")==null) "Amble" else throw InputError("Choose Amble, Walk or Dash.")
@@ -87,7 +88,42 @@ internal fun parseRequest(v: JsonElement): Request {
         checkInput(ref.field("type").text() in listOf("Node","Way","Relation") && id!=null && id>0 && id<=9_007_199_254_740_991.0 && id%1==0.0,"Invalid origin reference.")
     }
     val clean=JsonObject(origin.filterKeys { it in listOf("label","point","osmReference") })
-    return Request(clean,minutes.toInt(),modes,pace,zones,lines,excluded,bikeSpeed.toInt())
+    val destination = v.field("destination")?.takeUnless { it == JsonNull }?.let { raw ->
+        checkInput(raw is JsonObject, "Choose a valid destination.")
+        val target = point(raw.field("point"))
+        checkInput(inServiceArea(target), "Destination is outside the supported area.")
+        checkInput(target != point(clean["point"]), "Start and destination must be different.")
+        checkInput(raw.field("label").text()?.let { it.isNotBlank() && it.length <= 160 } == true,
+            "Choose a named destination.")
+        raw.field("osmReference")?.takeUnless { it == JsonNull }?.let { ref ->
+            val id = ref.field("id").number()
+            checkInput(ref.field("type").text() in listOf("Node", "Way", "Relation") &&
+                id != null && id > 0 && id <= 9_007_199_254_740_991.0 && id % 1 == 0.0,
+                "Invalid destination reference.")
+        }
+        JsonObject(raw.jsonObject.filterKeys { it in listOf("label", "point", "osmReference") })
+    }
+    val compareModes = v.field("compareModes")?.let {
+        checkInput(it is JsonPrimitive && !it.isString && it.booleanOrNull != null, "Invalid return transport option.")
+        it.jsonPrimitive.boolean
+    } ?: false
+    checkInput(!compareModes || destination != null, "Transport comparison requires a destination.")
+    val roundTrip = v.field("roundTrip")?.let {
+        checkInput(it is JsonPrimitive && !it.isString && it.booleanOrNull != null, "Invalid trip type.")
+        it.jsonPrimitive.boolean
+    } ?: false
+    checkInput(!roundTrip || destination == null, "A round trip chooses its own turnaround.")
+    val count = v.field("interestZoneCount")?.let {
+        val n = it.number()
+        checkInput(n != null && n in 1.0..6.0 && n % 1 == 0.0, "Choose 1-6 interest zones.")
+        n!!.toInt()
+    } ?: 1 // Old clients retain their single-turnaround contract.
+    checkInput(roundTrip || count == 1, "Interest zones require round-trip mode.")
+    val seed = v.field("generationSeed")?.let {
+        checkInput(it is JsonPrimitive && !it.isString && it.intOrNull != null, "Choose a whole-number generation seed.")
+        it.jsonPrimitive.int
+    }
+    return Request(clean,minutes.toInt(),modes,pace,zones,lines,excluded,bikeSpeed.toInt(),destination,compareModes,roundTrip,count,seed)
 }
 /** Uniform-area arbitrary coordinates, independent of stops or a POI catalogue. */
 internal fun candidates(input: Request, random: Random=Random.Default, check: ()->Unit = {}): List<Point> {

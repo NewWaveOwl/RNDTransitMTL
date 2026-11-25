@@ -47,7 +47,9 @@ data class MainPlannerState(
     // Supplied by a future permission adapter, or a labelled preview fixture.
     val locationAccessOff: Boolean = false,
     val originIsManual: Boolean = false,
-    val originPlace: Place? = null
+    val originPlace: Place? = null,
+    /** Both independently routed directions share the selected available time. */
+    val roundTrip: Boolean = false
 ) {
     /** Returns independently saved zones, with legacy shared-zone fallback.
      * @param transportId Transit mode whose zones are requested.
@@ -88,6 +90,9 @@ class MainPlannerViewModel(
     /** Read-only planner state observed by the view. */
     val uiState = mutableUiState.asStateFlow()
 
+    /** Chooses whether a new adventure finishes at its stored original start. */
+    fun setRoundTrip(value: Boolean) { mutableUiState.update { it.copy(roundTrip = value) } }
+
     /** Copies only the preferences actually recorded in a completed trip.
      * @param trip Saved trip; its identity, endpoints, and review are never changed.
      */
@@ -103,6 +108,7 @@ class MainPlannerViewModel(
                     },
                 intensity = trip.attractionIntensity,
                 walkingPreference = trip.walkingPreference ?: it.walkingPreference,
+                roundTrip = trip.journey?.kind == com.example.rnd_transit_mtl.model.trip.TripJourneyKind.RoundTrip,
                 origin = if (liveMap) null else trip.origin.toSampleMapPoint(),
                 originPlace = trip.origin.takeIf { liveMap },
                 originIsManual = true
@@ -110,12 +116,16 @@ class MainPlannerViewModel(
         }
     }
 
-    /** Installs the first usable fix while the planner still has no chosen origin. */
+    /** Keeps the automatic origin current without replacing a manually chosen point. */
     fun setDefaultOrigin(place: Place) {
         mutableUiState.update { state ->
-            if (state.originPlace != null || state.originIsManual) state
+            if (state.originIsManual) state
             else state.copy(origin = null, originPlace = place)
         }
+    }
+
+    fun useCurrentOrigin(place: Place) {
+        mutableUiState.update { it.copy(origin = null, originPlace = place, originIsManual = false) }
     }
 
     fun setOrigin(place: Place) {
@@ -133,7 +143,7 @@ class MainPlannerViewModel(
     }
 
     /**
-     * Updates the time using the existing five-minute bounds.
+     * Updates whole minutes within the supported 5–360 minute range.
      *
      * @param minutes Requested available minutes.
      */

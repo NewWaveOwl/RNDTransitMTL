@@ -57,7 +57,8 @@ class Trip33FlowTest {
     private class Host(
         initialOutcome: Trip33Sample,
         liveMap: Boolean = false,
-        backend: BackendTripGenerator? = null
+        backend: BackendTripGenerator? = null,
+        providedLocation: PlannerLocation? = null
     ) : AutoCloseable {
         var outcome by mutableStateOf(initialOutcome)
         var mapData = TransitMapData()
@@ -93,7 +94,7 @@ class Trip33FlowTest {
                 LocalNavigator provides navigator,
                 LocalTripNavigation provides navigation,
                 LocalBackendTripGenerator provides backend,
-                LocalPlannerLocation provides location.takeIf { liveMap },
+                LocalPlannerLocation provides (providedLocation ?: location).takeIf { liveMap },
                 LocalTransitMap provides if (liveMap) ({ data, _ -> SideEffect { mapData = data } }) else null
             ) {
                 RNDTransitTheme {
@@ -144,6 +145,104 @@ class Trip33FlowTest {
         override fun close() {
             scene.close()
             models.viewModelStore.clear()
+        }
+    }
+
+    @Test
+    fun goWaitsForFreshPositionAndRoutesFromItInsteadOfTheEarlierAutomaticOrigin() = runBlocking(Dispatchers.Main) {
+        val old = LocationUpdate.Fix(GeoPoint(45.5, -73.6), 5.0)
+        val fresh = LocationUpdate.Fix(GeoPoint(45.51, -73.59), 5.0)
+        val updates = kotlinx.coroutines.flow.MutableStateFlow<LocationUpdate>(old)
+        var requested: ((LocationUpdate.Fix?) -> Unit)? = null
+        val location = object : PlannerLocation {
+            override val fix = old
+            override val automaticOriginUpdates = updates
+            override val containsPoint: (GeoPoint) -> Boolean = { true }
+            override fun request(onResult: ((LocationUpdate.Fix?) -> Unit)?) { requested = onResult }
+        }
+        val requests = mutableListOf<BackendGenerationRequest>()
+        val backend = BackendTripGenerator(post = { body, _ ->
+            requests += Json.decodeFromString<BackendGenerationRequest>(body)
+            """{"status":"no_trip"}"""
+        })
+        Host(Trip33Sample.Normal, liveMap = true, backend = backend, providedLocation = location).use { host ->
+            host.render()
+            assertEquals(old.point, host.planner.uiState.value.originPlace?.point)
+            host.click("GO")
+            host.render()
+            assertTrue(requests.isEmpty(), "GO must wait for a fresh measurement")
+            assertNotNull(requested).invoke(fresh)
+            host.await("No trip fits these choices")
+            assertEquals(fresh.point, requests.single().origin.point)
+            assertFalse(host.planner.uiState.value.originIsManual)
+        }
+    }
+
+    @Test
+    fun switchingToRoundTripKeepsARecentGpsOriginWithoutAnotherRefresh() = runBlocking(Dispatchers.Main) {
+        val recent = LocationUpdate.Fix(GeoPoint(45.51, -73.59), 5.0,
+            timestampEpochMillis = kotlin.time.Clock.System.now().toEpochMilliseconds() - 8_000L)
+        var refreshes = 0
+        val location = object : PlannerLocation {
+            override val fix = recent
+            override val automaticOriginUpdates = kotlinx.coroutines.flow.MutableStateFlow<LocationUpdate>(recent)
+            override val containsPoint: (GeoPoint) -> Boolean = { true }
+            override fun request(onResult: ((LocationUpdate.Fix?) -> Unit)?) {
+                refreshes++
+                onResult?.invoke(null)
+            }
+        }
+        val requests = mutableListOf<BackendGenerationRequest>()
+        val backend = BackendTripGenerator(post = { body, _ ->
+            requests += Json.decodeFromString<BackendGenerationRequest>(body)
+            """{"status":"no_trip"}"""
+        })
+        Host(Trip33Sample.Normal, liveMap = true, backend = backend, providedLocation = location).use { host ->
+            host.render()
+            host.planner.setRoundTrip(true)
+            host.render()
+            host.click("GO")
+            host.await("No trip fits these choices")
+            assertTrue(requests.single().roundTrip)
+            assertEquals(recent.point, requests.single().origin.point)
+            assertEquals(0, refreshes)
+            assertFalse(host.has("Location access is off"))
+        }
+    }
+
+    @Test
+    fun roundTripGpsOutageShowsTheCorrectWarningAndRetryRequestsLocationAgain() = runBlocking(Dispatchers.Main) {
+        var available = false
+        var refreshes = 0
+        val fresh = LocationUpdate.Fix(GeoPoint(45.51, -73.59), 5.0)
+        val location = object : PlannerLocation {
+            override val fix: LocationUpdate.Fix? = null
+            override val containsPoint: (GeoPoint) -> Boolean = { true }
+            override fun request(onResult: ((LocationUpdate.Fix?) -> Unit)?) {
+                refreshes++
+                onResult?.invoke(if (available) fresh else null)
+            }
+        }
+        val requests = mutableListOf<BackendGenerationRequest>()
+        val backend = BackendTripGenerator(post = { body, _ ->
+            requests += Json.decodeFromString<BackendGenerationRequest>(body)
+            """{"status":"no_trip"}"""
+        })
+        Host(Trip33Sample.Normal, liveMap = true, backend = backend, providedLocation = location).use { host ->
+            host.render()
+            host.planner.setDefaultOrigin(Place("Current location", fresh.point))
+            host.planner.setRoundTrip(true)
+            host.render()
+            host.click("GO")
+            host.await("Current location unavailable")
+            assertFalse(host.has("Location access is off"))
+            assertTrue(requests.isEmpty())
+            available = true
+            host.click("Try current location again")
+            host.await("No trip fits these choices")
+            assertEquals(2, refreshes)
+            assertTrue(requests.single().roundTrip)
+            assertEquals(fresh.point, requests.single().origin.point)
         }
     }
 
@@ -220,7 +319,7 @@ class Trip33FlowTest {
             host.render()
             assertNotNull(host.mapData.onPick).invoke(newPoint)
             host.render()
-            host.click("Use this starting point")
+            host.click("Start here")
             host.await("GO")
             assertEquals(Place("Pinned location", newPoint), host.planner.uiState.value.originPlace)
             assertNull(host.planner.uiState.value.origin)
@@ -228,6 +327,74 @@ class Trip33FlowTest {
             assertEquals(newPoint, host.mapData.pin)
             host.click("GO")
             host.await("Check your trip settings")
+        }
+    }
+
+    @Test
+    fun browsingLiveMapStagesEachPinUntilConfirmedAndCancelOrBackKeepsTheDraft() = runBlocking(Dispatchers.Main) {
+        Host(Trip33Sample.Normal, liveMap = true).use { host ->
+            host.render()
+            host.planner.setOrigin(Place("Previous origin", GeoPoint(45.50, -73.58)))
+            host.planner.setMinutes(45)
+            host.render()
+            val previous = host.planner.uiState.value
+            val first = GeoPoint(45.52, -73.56)
+            val second = GeoPoint(45.53, -73.57)
+
+            assertNotNull(host.mapData.onPick).invoke(first)
+            host.render()
+            assertTrue(host.has("Start here"))
+            assertEquals(first, host.mapData.pin)
+            assertEquals(previous, host.planner.uiState.value)
+            host.click("Cancel")
+            host.render()
+            assertTrue(host.has("GO"))
+            assertEquals(previous, host.planner.uiState.value)
+            assertEquals(previous.originPlace?.point, host.mapData.pin)
+
+            assertNotNull(host.mapData.onPick).invoke(first)
+            host.render()
+            host.back()
+            assertTrue(host.has("GO"))
+            assertEquals(previous, host.planner.uiState.value)
+
+            assertNotNull(host.mapData.onPick).invoke(first)
+            host.render()
+            assertNotNull(host.mapData.onPick).invoke(second)
+            host.render()
+            assertEquals(previous, host.planner.uiState.value)
+            host.click("Start here")
+            host.render()
+            assertEquals(previous.copy(origin = null, originPlace = Place("Pinned location", second), originIsManual = true),
+                host.planner.uiState.value)
+            assertEquals(second, host.mapData.pin)
+            assertFalse(host.mapData.pickerOpen)
+            assertNull(host.store.activeTrip)
+        }
+    }
+
+    @Test
+    fun browsingSampleMapStagesATapAndCancelPreservesTheSavedOrigin() = runBlocking(Dispatchers.Main) {
+        Host(Trip33Sample.Normal).use { host ->
+            host.render()
+            val previous = host.planner.uiState.value
+            host.tap(Offset(130f, 150f))
+            host.render()
+            assertTrue(host.has("Start here"))
+            assertEquals(previous, host.planner.uiState.value)
+            host.click("Cancel")
+            host.render()
+            assertTrue(host.has("GO"))
+            assertEquals(previous, host.planner.uiState.value)
+
+            host.tap(Offset(160f, 160f))
+            host.render()
+            host.click("Start here")
+            host.render()
+            val selected = host.planner.uiState.value
+            assertNotEquals(previous.origin, selected.origin)
+            assertEquals(previous.copy(origin = selected.origin, originIsManual = true), selected)
+            assertNull(host.store.activeTrip)
         }
     }
 

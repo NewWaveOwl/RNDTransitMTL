@@ -22,6 +22,7 @@ import kotlin.time.TimeSource
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @Serializable
 internal data class BackendGenerationRequest(
     val origin: Place,
@@ -31,7 +32,11 @@ internal data class BackendGenerationRequest(
     val selectedRouteIds: List<String>,
     val excludedDestinations: List<GeoPoint>,
     val walkingPreference: String = "Amble",
-    val bikeSpeedKmh: Int = 18
+    val bikeSpeedKmh: Int = 18,
+    val destination: Place? = null,
+    val compareModes: Boolean = false,
+    val roundTrip: Boolean = false,
+    @kotlinx.serialization.EncodeDefault val interestZoneCount: Int = 1
 )
 
 @Serializable
@@ -44,8 +49,18 @@ internal data class BackendGenerationResponse(
     val departure: String? = null,
     val otp: JsonObject? = null,
     val travelTimeSeconds: Long? = null,
-    val orientationBufferSeconds: Long = 0
+    val orientationBufferSeconds: Long = 0,
+    val roundTrip: Boolean = false,
+    val turnaround: Place? = null,
+    val returnOtp: JsonObject? = null,
+    val waypoints: List<Place> = emptyList(),
+    val segments: List<BackendLoopSegment> = emptyList()
 )
+
+private class JourneyContractMismatch : IllegalStateException()
+
+@Serializable
+internal data class BackendLoopSegment(val origin: Place, val destination: Place, val otp: JsonObject)
 
 /** One GO request. Destination search and OTP calls execute exclusively on the backend.
  * @param post Cancellable transport receiving the JSON body and a separate request ID.
@@ -80,6 +95,12 @@ internal class BackendTripGenerator(
                 input.plannedMinutes, input.attractionIntensity)
             require(input.selectedTransportIds.isNotEmpty()) { "Choose at least one transport type." }
             require(input.selectedTransportIds.distinct().size == input.selectedTransportIds.size)
+            require(input.destinationPlace == null || input.destinationPlace.point != origin.point) {
+                "You are already at the starting point."
+            }
+            require(!input.compareModes || input.destinationPlace != null)
+            require(!input.roundTrip || input.destinationPlace == null)
+            require(!input.roundTrip || input.interestZoneCount in 1..6)
             require(input.bikeSpeedKmh in 8..32) { "Choose a bike speed from 8 to 32 km/h." }
             require(input.walkingPreference in listOf("Amble", "Walk", "Dash")) { "Choose Amble, Walk or Dash." }
             require(input.selectedTransportIds.all { id -> OtpMode.entries.any { it.id == id } }) {
@@ -102,7 +123,8 @@ internal class BackendTripGenerator(
             val request = BackendGenerationRequest(
                 origin, input.plannedMinutes, input.selectedTransportIds.map { it.value },
                 input.selectedZonesByTransport.entries.associate { (mode, zones) -> mode.value to zones.map { it.value } },
-                input.selectedRouteIds.map { it.value }, excludedDestinations.takeLast(10), input.walkingPreference, input.bikeSpeedKmh
+                input.selectedRouteIds.map { it.value }, excludedDestinations.takeLast(10), input.walkingPreference, input.bikeSpeedKmh,
+                input.destinationPlace, input.compareModes, input.roundTrip, if (input.roundTrip) input.interestZoneCount else 1
             )
             val payload = json.encodeToString(request)
             stage = "http"
@@ -128,6 +150,7 @@ internal class BackendTripGenerator(
             log("failed stage=$stage ${generationFailureTrace(error)}")
             reportFailure(error)
             val message = when {
+                error is JourneyContractMismatch -> "The server returned a different journey. Update the routing server to support return and round trips."
                 error is HttpRequestTimeoutException || error is SocketTimeoutException || error is ConnectTimeoutException -> "Trip planner request timed out. Check your connection and retry."
                 error is GenerationHttpFailure -> when(error.status) {
                     401, 403 -> "Sign in again to generate a trip."
@@ -156,6 +179,9 @@ internal class BackendTripGenerator(
     ): TripGenerationResult {
         require(response.origin == origin) { "The backend changed the confirmed origin." }
         val destination = requireNotNull(response.destination)
+        if (response.roundTrip != input.roundTrip) throw JourneyContractMismatch()
+        if (input.roundTrip) require(destination == origin && response.turnaround?.point != origin.point)
+        if (input.destinationPlace != null && destination != input.destinationPlace) throw JourneyContractMismatch()
         val elapsed = requireNotNull(response.elapsedSeconds)
         require(elapsed in 1..input.plannedMinutes * 60L)
         require(response.orientationBufferSeconds in 0..elapsed)
@@ -166,10 +192,35 @@ internal class BackendTripGenerator(
             diagnostic("request=$requestId failed stage=itinerary-decode ${generationFailureTrace(error)}")
             reportFailure(error)
         })
-        val route = decoder.decodeResponse(requireNotNull(response.otp), request)
+        val route = if (input.roundTrip && response.segments.isNotEmpty()) {
+            val stops = response.waypoints
+            require(stops.size == input.interestZoneCount && stops.map { it.point }.distinct().size == stops.size)
+            require(stops.none { it.point == origin.point })
+            val places = listOf(origin) + stops + origin
+            require(response.segments.size == places.size - 1)
+            val decoded = response.segments.mapIndexed { index, segment ->
+                require(segment.origin == places[index] && segment.destination == places[index + 1])
+                decoder.decodeResponse(segment.otp, request.copy(origin = segment.origin, destination = segment.destination))
+                    as? RoutingResult.Success ?: return TripGenerationResult.RoutingUnavailable("The planner returned an incomplete loop.")
+            }
+            RoutingResult.Success(decoded.flatMap { it.legs }, decoded.sumOf { it.durationSeconds },
+                decoded.sumOf { it.waitingTimeSeconds }, decoded.flatMap { it.routes }.distinctBy { it.id })
+        } else if (input.roundTrip) {
+            require(input.interestZoneCount == 1 && response.waypoints.isEmpty()) { "The planner did not return the requested exploration stops." }
+            val waypoint = requireNotNull(response.turnaround)
+            val outward = decoder.decodeResponse(requireNotNull(response.otp), request.copy(destination = waypoint))
+            val inbound = decoder.decodeResponse(requireNotNull(response.returnOtp), request.copy(origin = waypoint))
+            if (outward !is RoutingResult.Success || inbound !is RoutingResult.Success) {
+                return TripGenerationResult.RoutingUnavailable("The planner did not return both directions of the round trip.")
+            }
+            RoutingResult.Success(outward.legs + inbound.legs,
+                outward.durationSeconds + inbound.durationSeconds,
+                outward.waitingTimeSeconds + inbound.waitingTimeSeconds,
+                (outward.routes + inbound.routes).distinctBy { it.id })
+        } else decoder.decodeResponse(requireNotNull(response.otp), request)
         if (route !is RoutingResult.Success) return TripGenerationResult.RoutingUnavailable("The trip planner returned an invalid route.")
         require(route.durationSeconds <= elapsed)
-        if(input.selectedTransportIds.map { it.value }.toSet()==setOf("walk","bike")) {
+        if(!input.compareModes && input.selectedTransportIds.map { it.value }.toSet()==setOf("walk","bike")) {
             val walking=route.legs.filter { it.transportId.value=="walk" }
             val cycling=route.legs.filter { it.transportId.value=="bike" }
             require(walking.sumOf { it.distanceMeters }>0 && walking.sumOf { it.durationSeconds }>0 &&
@@ -183,7 +234,8 @@ internal class BackendTripGenerator(
         val modes = (input.selectedTransportIds + route.legs.map { it.transportId }).distinct()
         val trip = Trip(
             id = id, ownerId = input.ownerId, status = TripStatus.Generated,
-            title = input.title.trim(), description = "${origin.label} to ${destination.label}", imageUrl = input.imageUrl.trim(),
+            title = input.title.trim(), description = if (input.roundTrip)
+                "Loop from ${origin.label} via ${(response.waypoints.ifEmpty { listOfNotNull(response.turnaround) }).joinToString { it.label }}" else "${origin.label} to ${destination.label}", imageUrl = input.imageUrl.trim(),
             origin = origin, destination = destination, legs = route.legs, plannedMinutes = input.plannedMinutes,
             selectedTransports = modes.map { mode -> OtpMode.entries.first { it.id == mode }.snapshot },
             selectedRoutes = route.routes, attractionIntensity = input.attractionIntensity, createdAt = now(),
@@ -191,7 +243,8 @@ internal class BackendTripGenerator(
             selectedZonesByTransport = input.selectedZonesByTransport.mapValues { it.value.toList() },
             routedDurationSeconds = elapsed, waitingTimeSeconds = route.waitingTimeSeconds,
             orientationBufferSeconds = response.orientationBufferSeconds, walkingPreference = input.walkingPreference,
-            requestedTransportIds = input.selectedTransportIds.toList()
+            requestedTransportIds = input.selectedTransportIds.toList(),
+            journey = if (input.roundTrip) TripJourney(TripJourneyKind.RoundTrip, turnaround = response.turnaround, waypoints = response.waypoints) else null
         )
         return TripGenerationResult.Success(trip)
     }

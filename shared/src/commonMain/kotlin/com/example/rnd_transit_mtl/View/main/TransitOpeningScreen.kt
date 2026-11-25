@@ -21,6 +21,8 @@ import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
 import com.example.rnd_transit_mtl.View.current_trip.ActiveMapContent
+import com.example.rnd_transit_mtl.View.current_trip.TripLocationState
+import com.example.rnd_transit_mtl.state.debug.LocalDebugModeState
 import com.example.rnd_transit_mtl.ViewModels.main.MainPlannerState
 import com.example.rnd_transit_mtl.ViewModels.main.MainPlannerViewModel
 import com.example.rnd_transit_mtl.data.generation.MockTripGenerator
@@ -50,7 +52,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.collect
+import com.example.rnd_transit_mtl.data.location.awaitPlanningLocation
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
@@ -76,6 +79,7 @@ internal fun TransitOpeningScreen(
     sampleOutcome: Trip33Sample = Trip33Sample.Normal
 ) {
     val tripsStore = LocalTripsStore.current
+    val simulationEnabled = LocalDebugModeState.current?.simulationEnabled == true
     val liveMap = LocalTransitMap.current != null
     val location = LocalPlannerLocation.current
     val backendGenerator = LocalBackendTripGenerator.current
@@ -107,7 +111,8 @@ internal fun TransitOpeningScreen(
     var originMode by rememberSaveable {
         mutableStateOf("planner")
     }
-    var liveDraft by remember(originMode == "planner") { mutableStateOf<GeoPoint?>(null) }
+    var liveDraft by remember { mutableStateOf<GeoPoint?>(null) }
+    var originPickerFromMap by rememberSaveable { mutableStateOf(false) }
     var originDraftX by rememberSaveable {
         mutableStateOf<Float?>(null)
     }
@@ -195,6 +200,10 @@ internal fun TransitOpeningScreen(
         pickingOrigin = false
         originMode = "planner"
         originMessage = null
+        liveDraft = null
+        originDraftX = null
+        originDraftY = null
+        originPickerFromMap = false
     }
 
     // Save only the opening intent and temporary labels, not a second Trip.
@@ -279,7 +288,7 @@ internal fun TransitOpeningScreen(
 
     var defaultOriginStatus by remember { mutableStateOf<String?>(null) }
     val needsDefaultOrigin = isDestinationActive && canChangeInputs() &&
-        originMode == "planner" && planner.originPlace == null && !planner.originIsManual
+        originMode == "planner" && !planner.originIsManual
     LaunchedEffect(location, needsDefaultOrigin) {
         defaultOriginStatus = null
         if (!needsDefaultOrigin || location == null) return@LaunchedEffect
@@ -291,17 +300,17 @@ internal fun TransitOpeningScreen(
             }
         }
         try {
-            val fix = updates.first { update ->
+            updates.collect { update ->
                 val usable = update is LocationUpdate.Fix && location.containsPoint(update.point)
                 defaultOriginStatus = when (update) {
                     LocationUpdate.PermissionDenied -> "Location permission is off. Choose a starting point."
                     LocationUpdate.Unavailable -> "Location unavailable. Choose a starting point."
                     is LocationUpdate.Fix -> if (usable) null else "Outside the supported area. Choose a starting point."
                 }
-                usable
-            } as LocationUpdate.Fix
-            if (canChangeInputs() && originMode == "planner") {
-                plannerViewModel.setDefaultOrigin(Place("Current location", fix.point))
+                if (usable && canChangeInputs() && originMode == "planner") {
+                    timeout.cancel()
+                    plannerViewModel.setDefaultOrigin(Place("Current location", update.point))
+                }
             }
         } finally {
             timeout.cancel()
@@ -371,12 +380,28 @@ internal fun TransitOpeningScreen(
                     return@launch
                 }
 
+                val routingOrigin = if (liveMap && !planner.originIsManual) {
+                    val update = location?.awaitPlanningLocation()
+                    println("RndTransitGeneration stage=location result=${update?.let { it::class.simpleName }} roundTrip=${planner.roundTrip} interestZones=${com.example.rnd_transit_mtl.data.generation.explorationZoneCount(planner.selectedAttractionIds.size)}")
+                    if (update !is LocationUpdate.Fix) {
+                        fail(if (update == LocationUpdate.PermissionDenied) Trip33Failure.PermissionDenied
+                            else Trip33Failure.LocationUnavailable)
+                        return@launch
+                    }
+                    if (!location.containsPoint(update.point)) {
+                        fail(Trip33Failure.LocationUnavailable, "Outside the supported area. Choose a starting point.")
+                        return@launch
+                    }
+                    Place("Current location", update.point).also { plannerViewModel.setDefaultOrigin(it) }
+                } else planner.originPlace
                 val origin = planner.origin
-                if ((if (liveMap) planner.originPlace == null else origin == null) ||
+                if ((if (liveMap) routingOrigin == null else origin == null) ||
                     (sampleOutcome == Trip33Sample.PermissionDenied &&
                         !planner.originIsManual)
                 ) {
-                    fail(Trip33Failure.PermissionDenied)
+                    fail(if (sampleOutcome == Trip33Sample.PermissionDenied || planner.locationAccessOff ||
+                        location?.currentUpdate == LocationUpdate.PermissionDenied) Trip33Failure.PermissionDenied
+                        else Trip33Failure.LocationUnavailable)
                     return@launch
                 }
 
@@ -416,9 +441,12 @@ internal fun TransitOpeningScreen(
                     selectedZoneIds = zones.values.flatten().distinct().sortedBy { it.value },
                     selectedZonesByTransport = zones,
                     origin = origin?.copy(),
-                    originPlace = planner.originPlace,
+                    originPlace = routingOrigin,
                     walkingPreference = planner.walkingPreference,
-                    bikeSpeedKmh = planner.bikeSpeedKmh
+                    bikeSpeedKmh = planner.bikeSpeedKmh,
+                    roundTrip = planner.roundTrip,
+                    interestZoneCount = com.example.rnd_transit_mtl.data.generation.explorationZoneCount(
+                        planner.selectedAttractionIds.size)
                 )
 
                 // Explicit samples are distinct from validation failures.
@@ -604,9 +632,13 @@ internal fun TransitOpeningScreen(
                 closeProposalFlow()
             },
             onUnavailableAction = {
-                failureMessage =
-                    "Address search and live location are not connected " +
+                if (liveMap) {
+                    closeProposalFlow()
+                    performPrimaryAction()
+                } else {
+                    failureMessage = "Address search and live location are not connected " +
                         "in this sample. Choose a point on the map."
+                }
             },
             onCancelPicking = {
                 pickingOrigin = false
@@ -697,14 +729,18 @@ internal fun TransitOpeningScreen(
         ActiveMapContent(
             trip = activeState.trip,
             progress = (
-                activeState.elapsedMillis.toFloat() /
-                    TRIP_SIMULATION_DURATION_MILLIS
+                activeState.routeProgress ?: (activeState.elapsedMillis.toFloat() /
+                    TRIP_SIMULATION_DURATION_MILLIS)
             ).coerceIn(0f, 1f),
             actionsEnabled = isDestinationActive && !processingAction,
             mainOverview = true,
             onResume = { performPrimaryAction() },
             onFinish = {},
             onConfirmCancel = { _ -> },
+            simulationEnabled = simulationEnabled,
+            userPosition = if (simulationEnabled) null else location?.fix?.point,
+            onRequestLocation = { location?.request() },
+            locationState = if (simulationEnabled) TripLocationState.Sample else if (location?.fix != null) TripLocationState.Live else TripLocationState.NotTracking,
             modifier = modifier
         )
         return
@@ -730,7 +766,7 @@ internal fun TransitOpeningScreen(
         OriginSelectionContent(
             origin = if (originMode == "pick") draftOrigin else planner.origin,
             minutes = boundedMinutes,
-            locationAccessOff = if (liveMap) location?.fix == null else planner.locationAccessOff,
+            locationAccessOff = if (liveMap) location?.currentUpdate == LocationUpdate.PermissionDenied else planner.locationAccessOff,
             picking = originMode == "pick",
             draftLabel = liveDraft?.let { "Pinned location" },
             enabled = canChangeInputs(),
@@ -769,7 +805,7 @@ internal fun TransitOpeningScreen(
                     location.request { fix ->
                         if (originMode == "options" && canChangeInputs()) {
                             if (fix != null && location.containsPoint(fix.point)) {
-                                plannerViewModel.setOrigin(Place("Current location", fix.point))
+                                plannerViewModel.useCurrentOrigin(Place("Current location", fix.point))
                                 proposalJson = null
                                 clearValidation()
                                 originMode = "planner"
@@ -787,9 +823,10 @@ internal fun TransitOpeningScreen(
                 originDraftX = null
                 originDraftY = null
                 originMessage = null
-                if (pickingLiveOriginFromFailure) {
+                if (pickingLiveOriginFromFailure || originPickerFromMap) {
                     pickingOrigin = false
                     originMode = "planner"
+                    originPickerFromMap = false
                 } else {
                     originMode = if (originMode == "pick") "options" else "planner"
                 }
@@ -844,6 +881,10 @@ internal fun TransitOpeningScreen(
                 }
             },
             walkingPreference = planner.walkingPreference,
+            roundTrip = planner.roundTrip,
+            onRoundTripChange = {
+                if (canChangeInputs()) { plannerViewModel.setRoundTrip(it); clearValidation() }
+            },
             bikeSpeedKmh = planner.bikeSpeedKmh,
             onBikeSpeedChange = {
                 if (canChangeInputs()) plannerViewModel.setBikeSpeedKmh(it)
@@ -893,8 +934,33 @@ internal fun TransitOpeningScreen(
             liveOrigin = planner.originPlace,
             originIsManual = planner.originIsManual,
             originStatus = defaultOriginStatus,
+            onTapOrigin = { point ->
+                if (canChangeInputs()) {
+                    liveDraft = null
+                    originDraftX = point.x
+                    originDraftY = point.y
+                    originMessage = null
+                    originPickerFromMap = true
+                    originMode = "pick"
+                }
+            },
+            onTapLiveOrigin = { point ->
+                if (canChangeInputs()) {
+                    originDraftX = null
+                    originDraftY = null
+                    val supported = location?.containsPoint?.invoke(point) == true
+                    liveDraft = point.takeIf { supported }
+                    originMessage = if (supported) null else "Choose a point inside the supported area."
+                    originPickerFromMap = true
+                    originMode = "pick"
+                }
+            },
             onEditOrigin = {
                 if (canChangeInputs()) {
+                    liveDraft = null
+                    originDraftX = null
+                    originDraftY = null
+                    originPickerFromMap = false
                     originMessage = null
                     originMode = "options"
                 }

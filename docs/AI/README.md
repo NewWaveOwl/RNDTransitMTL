@@ -4,6 +4,7 @@
 - [Milestone 1 ideation discussions](../milestones/1/AI/AI-Ideation-Discussion-Logs.md)
 - Milestone 2 integration: [decisions](../milestones/2/AI/Milestone2-As3-Merge-AI-Decision-Log.md), [techniques](../milestones/2/AI/Milestone2-As3-Merge-AI-Technique-Log.md)
 - ML3: [decisions and source prompts](../milestones/3/AI/ML3-AI-Decision-Log.md), [techniques](../milestones/3/AI/ML3-AI-Technique-Log.md)
+- ML4: [decisions and source prompts](../milestones/4/AI/ML4-AI-Decision-Log.md), [techniques](../milestones/4/AI/ML4-AI-Technique-Log.md)
 - ML3 — Jim: [decision records and conversation overviews](../milestones/3/AI/ML3-Jim-AI-Decision-Log.md), [technique log](../milestones/3/AI/ML3-Jim-AI-Technique-Log.md)
 - Repository guidance (cross-milestone): [decisions](PR11-Coding-Guidance-AI-Decision-Log.md), [techniques](PR11-Coding-Guidance-AI-Technique-Log.md)
 

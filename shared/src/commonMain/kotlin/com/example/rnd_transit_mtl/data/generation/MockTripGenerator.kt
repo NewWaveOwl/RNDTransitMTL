@@ -22,6 +22,8 @@ import com.example.rnd_transit_mtl.data.routing.RoutingResult
 import com.example.rnd_transit_mtl.data.routing.RoutingService
 import com.example.rnd_transit_mtl.model.trip.Place
 import com.example.rnd_transit_mtl.model.trip.TripRequest
+import com.example.rnd_transit_mtl.model.trip.TripJourney
+import com.example.rnd_transit_mtl.model.trip.TripJourneyKind
 import com.example.rnd_transit_mtl.model.trip.message
 
 /**
@@ -48,7 +50,15 @@ data class TripGenerationInput(
     val ownerId: UserId? = null,
     val originPlace: Place? = null,
     val walkingPreference: String = "Amble",
-    val bikeSpeedKmh: Int = 18
+    val bikeSpeedKmh: Int = 18,
+    /** Fixed geographic target for a return request; null keeps random adventure generation. */
+    val destinationPlace: Place? = null,
+    /** Compare available modes by arrival time for a fixed-target request. */
+    val compareModes: Boolean = false,
+    /** Routes outward and back within the same available-time budget. */
+    val roundTrip: Boolean = false,
+    /** Number of generated exploration waypoints; ignored for regular trips. */
+    val interestZoneCount: Int = 1
 )
 
 /**
@@ -224,16 +234,31 @@ class MockTripGenerator(
             return TripGenerationResult.InvalidInput(it.message)
         }
 
-        val legs = when (val routed = routingService.route(request)) {
-            is RoutingResult.Success -> routed.legs
-            RoutingResult.NoRouteFound, is RoutingResult.OutsideServiceArea ->
-                return TripGenerationResult.NoRoute
-            is RoutingResult.Unavailable ->
-                return TripGenerationResult.RoutingUnavailable(routed.message)
+        val waypoints = if (normalizedInput.roundTrip) {
+            if (normalizedInput.interestZoneCount !in 1..6) return TripGenerationResult.InvalidInput("Choose 1-6 interest zones.")
+            listOf(destinationPlace) + (1 until normalizedInput.interestZoneCount).map {
+                generateDestinationFromOrigin(start, bounds).toSampleMapPlace()
+            }
+        } else emptyList()
+        val places = listOf(origin) + if (normalizedInput.roundTrip) waypoints + origin else listOf(destinationPlace)
+        val legs = mutableListOf<RouteLeg>()
+        for (index in 0 until places.lastIndex) {
+            val left = normalizedInput.plannedMinutes * 60L - legs.sumOf { it.durationSeconds }
+            if (left <= 0) return TripGenerationResult.NoRoute
+            val directionalBudget = if (normalizedInput.roundTrip) left / (places.lastIndex - index) else null
+            when (val routed = routingService.route(request.copy(origin = places[index], destination = places[index + 1],
+                durationBudgetSeconds = directionalBudget))) {
+                is RoutingResult.Success -> legs += routed.legs
+                RoutingResult.NoRouteFound, is RoutingResult.OutsideServiceArea -> return TripGenerationResult.NoRoute
+                is RoutingResult.Unavailable -> return TripGenerationResult.RoutingUnavailable(routed.message)
+            }
+        }
+        if (normalizedInput.roundTrip && legs.sumOf { it.durationSeconds } > normalizedInput.plannedMinutes * 60L) {
+            return TripGenerationResult.NoRoute
         }
 
         val trip = try {
-            createTrip(id, normalizedInput, snapshots, origin, destinationPlace, legs, createdAt)
+            createTrip(id, normalizedInput, snapshots, origin, destinationPlace, legs, createdAt, waypoints)
         } catch (_: IllegalArgumentException) {
             // Legs that break Trip's rules are a provider fault, not a user input error.
             return TripGenerationResult.RoutingUnavailable("The routing service returned an invalid route.")
@@ -249,7 +274,8 @@ class MockTripGenerator(
         origin: Place,
         destinationPlace: Place,
         legs: List<RouteLeg>,
-        createdAt: Long
+        createdAt: Long,
+        waypoints: List<Place>
     ): Trip = Trip(
         id = id,
         ownerId = normalizedInput.ownerId,
@@ -258,7 +284,7 @@ class MockTripGenerator(
         description = normalizedInput.description,
         imageUrl = normalizedInput.imageUrl,
         origin = origin,
-        destination = destinationPlace,
+        destination = if (normalizedInput.roundTrip) origin else destinationPlace,
         legs = legs,
         plannedMinutes = normalizedInput.plannedMinutes,
         selectedTransports = snapshots.first,
@@ -268,7 +294,8 @@ class MockTripGenerator(
         completedAt = null,
         review = null,
         selectedZoneIds = normalizedInput.selectedZoneIds.toList(),
-        selectedZonesByTransport = normalizedInput.selectedZonesByTransport.mapValues { (_, zones) -> zones.toList() }
+        selectedZonesByTransport = normalizedInput.selectedZonesByTransport.mapValues { (_, zones) -> zones.toList() },
+        journey = if (normalizedInput.roundTrip) TripJourney(TripJourneyKind.RoundTrip, turnaround = destinationPlace, waypoints = waypoints.takeIf { it.size > 1 }.orEmpty()) else null
     )
 
     private fun resolveSelections(

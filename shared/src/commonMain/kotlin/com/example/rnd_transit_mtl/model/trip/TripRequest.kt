@@ -27,7 +27,9 @@ data class TripRequest(
     val destination: Place?,
     val plannedMinutes: Int,
     val modes: List<TransportId>,
-    val zonesByTransport: Map<TransportId, List<ZoneId>> = emptyMap()
+    val zonesByTransport: Map<TransportId, List<ZoneId>> = emptyMap(),
+    /** Optional share of the total time for one direction of a round trip. */
+    val durationBudgetSeconds: Long? = null
 ) {
     /**
      * Checks every rule and reports each problem found.
@@ -37,10 +39,12 @@ data class TripRequest(
      */
     fun validate(supportedModes: Set<TransportId>): List<TripRequestError> = buildList {
         if (
-            plannedMinutes !in Trip.MIN_PLANNED_MINUTES..Trip.MAX_PLANNED_MINUTES ||
-            plannedMinutes % Trip.PLANNED_MINUTES_STEP != 0
+            plannedMinutes !in Trip.MIN_PLANNED_MINUTES..Trip.MAX_PLANNED_MINUTES
         ) {
             add(TripRequestError.InvalidPlannedMinutes(plannedMinutes))
+        }
+        if (durationBudgetSeconds != null && durationBudgetSeconds !in 1..plannedMinutes * 60L) {
+            add(TripRequestError.InvalidDurationBudget(durationBudgetSeconds))
         }
 
         if (modes.isEmpty()) add(TripRequestError.NoModes)
@@ -62,7 +66,9 @@ data class TripRequest(
 
 /** One specific reason a TripRequest cannot be routed. */
 sealed class TripRequestError {
-    /** Minutes must be within the planner's range and steps; zero always fails. */
+    /** A directional share must fit within the overall planner time. */
+    data class InvalidDurationBudget(val seconds: Long) : TripRequestError()
+    /** Whole minutes must be within the planner's range; zero always fails. */
     data class InvalidPlannedMinutes(val minutes: Int) : TripRequestError()
 
     data object NoModes : TripRequestError()
@@ -83,8 +89,9 @@ sealed class TripRequestError {
 /** A short sentence explaining the problem to the user. */
 val TripRequestError.message: String
     get() = when (this) {
+        is TripRequestError.InvalidDurationBudget -> "The route's time budget must fit your available time."
         is TripRequestError.InvalidPlannedMinutes ->
-            "Choose ${Trip.MIN_PLANNED_MINUTES}–${Trip.MAX_PLANNED_MINUTES} minutes in ${Trip.PLANNED_MINUTES_STEP}-minute steps."
+            "Choose ${Trip.MIN_PLANNED_MINUTES}–${Trip.MAX_PLANNED_MINUTES} minutes."
         TripRequestError.NoModes -> "Choose at least one transport type."
         is TripRequestError.DuplicateMode -> "Each transport type can be chosen once."
         is TripRequestError.UnsupportedMode -> "A selected transport is unavailable: $transportId."

@@ -25,6 +25,7 @@ import com.example.rnd_transit_mtl.navigation.*
 import com.example.rnd_transit_mtl.ui.theme.TransitMain
 import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 import com.example.rnd_transit_mtl.ui.theme.TransitSelected
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.debug.rememberDebugLogoClick
 import org.jetbrains.compose.resources.painterResource
 import rnd_transit_mtl.shared.generated.resources.*
 
@@ -128,7 +129,7 @@ internal fun SharedTopBarContent(
                 }
 
                 IconButton(
-                    onClick = { onOpenSection(MainScreenKey) },
+                    onClick = rememberDebugLogoClick(resetKey = currentKey) { onOpenSection(MainScreenKey) },
                     modifier = Modifier
                         .align(Alignment.Center)
                         .size(HeaderLogoSize)

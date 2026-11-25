@@ -103,7 +103,9 @@ data class Trip(
     /** Orientation reserve already included in routedDurationSeconds. */
     val orientationBufferSeconds: Long = 0,
     /** Allowed planner alternatives, separate from walking access and other used leg modes. Null on legacy trips. */
-    val requestedTransportIds: List<TransportId>? = null
+    val requestedTransportIds: List<TransportId>? = null,
+    /** Optional return relationship or round-trip waypoint; absent on legacy one-way records. */
+    val journey: TripJourney? = null
 ) {
     init {
         require(routedDurationSeconds == null || routedDurationSeconds > 0)
@@ -119,8 +121,19 @@ data class Trip(
             attractionIntensity = attractionIntensity
         )
 
-        require(origin.point != destination.point) {
+        require(origin.point != destination.point || journey?.kind == TripJourneyKind.RoundTrip) {
             "Start and destination must be different."
+        }
+        require(journey?.outboundTripId != id) { "A return trip must reference a different outbound trip." }
+        if (journey?.kind == TripJourneyKind.RoundTrip) {
+            val waypoint = requireNotNull(journey.turnaround)
+            val stopIndices = explorationWaypoints.map { stop ->
+                require(stop.point != origin.point)
+                legs.indexOfFirst { it.end == stop.point }.also { require(it >= 0) }
+            }
+            require(stopIndices.zipWithNext().all { (a, b) -> a < b }) { "Loop waypoints must be visited in order." }
+            require(origin.point == destination.point && waypoint.point != origin.point &&
+                legs.any { it.end == waypoint.point }) { "A round trip must visit its waypoint and return to the original start." }
         }
         require(legs.isNotEmpty()) { "A trip needs at least one leg." }
         require(legs.first().start == origin.point && legs.last().end == destination.point) {
@@ -226,7 +239,7 @@ data class Trip(
 
         const val MIN_PLANNED_MINUTES: Int = 5
         const val MAX_PLANNED_MINUTES: Int = 360
-        const val PLANNED_MINUTES_STEP: Int = 5
+        const val PLANNED_MINUTES_STEP: Int = 1
 
         /**
          * Normalizes selector values into the supported 5–360 minute range.
@@ -235,15 +248,13 @@ data class Trip(
          * Submitted generation requests are validated separately.
          */
         fun coercePlannedMinutes(value: Int): Int {
-            val bounded = value.coerceIn(
+            return value.coerceIn(
                 MIN_PLANNED_MINUTES,
                 MAX_PLANNED_MINUTES
             )
-
-            return bounded - bounded % PLANNED_MINUTES_STEP
         }
 
-        /** Moves one five-minute step without crossing either boundary. */
+        /** Moves one minute without crossing either boundary. */
         fun adjustPlannedMinutes(
             value: Int,
             direction: Int
@@ -271,8 +282,8 @@ data class Trip(
         /**
          * Rejects invalid record and generation-request values.
          *
-         * Zero, negative minutes and values outside the supported five-minute
-         * steps fail validation rather than being silently accepted.
+         * Zero, negative minutes and values outside the supported range
+         * fail validation rather than being silently accepted.
          */
         fun validatePlannerValues(
             title: String,
@@ -294,10 +305,9 @@ data class Trip(
             }
 
             require(
-                plannedMinutes in MIN_PLANNED_MINUTES..MAX_PLANNED_MINUTES &&
-                    plannedMinutes % PLANNED_MINUTES_STEP == 0
+                plannedMinutes in MIN_PLANNED_MINUTES..MAX_PLANNED_MINUTES
             ) {
-                "Choose 5–360 minutes in five-minute steps."
+                "Choose 5–360 minutes."
             }
 
             require(

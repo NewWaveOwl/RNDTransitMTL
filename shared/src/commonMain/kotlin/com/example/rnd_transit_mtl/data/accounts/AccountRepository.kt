@@ -74,4 +74,10 @@ internal class AccountRepository(
         }
 
     }
+
+    /** Reloads profile/preferences without replacing session or planner state. */
+    suspend fun refreshAccount() {
+        if (mutableAccount.value == null) ensureAccount()
+        else mutableAccount.value = checkNotNull(getAccount()) { "Account is unavailable." }
+    }
 }

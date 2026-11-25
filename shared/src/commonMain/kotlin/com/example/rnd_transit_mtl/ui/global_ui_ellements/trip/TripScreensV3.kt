@@ -1,4 +1,5 @@
 package com.example.rnd_transit_mtl.ui.global_ui_ellements.trip
+import com.example.rnd_transit_mtl.model.trip.explorationWaypoints
 import com.example.rnd_transit_mtl.data.assets.toSampleMapPoint
 import com.example.rnd_transit_mtl.model.ids.TripId
 
@@ -38,6 +39,7 @@ import com.example.rnd_transit_mtl.ui.theme.*
 import kotlin.math.roundToInt
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.ratings.StarRatingRow
 import com.example.rnd_transit_mtl.model.trip.TripStatus
+import com.example.rnd_transit_mtl.View.current_trip.TripCompletionContent
 
 // Layout settings — dp dimensions shared by the supplied V3 screens.
 private val V3SectionPadding = 16.dp
@@ -203,47 +205,8 @@ fun CompleteV3(
     errorMessage: String? = null,
     syncPending: Boolean = false
 ) {
-    V3Page(modifier) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .background(TransitComplementary)
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                "You made time for discovery",
-                color = TransitWhite,
-                fontSize = 21.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                "${trip.title} · Sample trip #${trip.id.value.takeLast(3)}",
-                color = TransitWhite
-            )
-            Text(
-                "${trip.plannedMinutes} min · ${distanceText(trip)}",
-                color = TransitWhite,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                if (syncPending) "Trip completed. Saved on this device; cloud sync pending."
-                else "Trip saved as Completed",
-                color = TransitWhite
-            )
-        }
-
-        Column(
-            Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            V3Error(errorMessage)
-            V3Button("Review this trip", onReview, enabled)
-            V3Button("Skip review — view history", onSkipToHistory, enabled, true)
-            V3Button("Plan another adventure", onPlanAnother, enabled, true)
-        }
-    }
+    TripCompletionContent(trip, onReview, onSkipToHistory, onPlanAnother,
+        modifier, enabled, errorMessage, syncPending)
 }
 
 // ---------- REVIEW ----------
@@ -564,6 +527,7 @@ fun TripDetailsV3(
                 MockTripMap(
                     start = trip.origin.toSampleMapPoint(),
                     destination = trip.destination.toSampleMapPoint(),
+                waypoints = trip.explorationWaypoints.map { it.toSampleMapPoint() },
                     legs = trip.toSampleMapLegs(),
                     progress = 1f,
                     interactive = enabled,

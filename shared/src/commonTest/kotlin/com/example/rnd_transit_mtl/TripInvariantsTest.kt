@@ -269,7 +269,7 @@ class TripInvariantsTest {
             TripReview(overall = 3, `fun` = 0)
         }
         assertFailsWith<IllegalArgumentException> {
-            fixtureTrip("invalid-minutes").copy(plannedMinutes = 7)
+            fixtureTrip("invalid-minutes").copy(plannedMinutes = 4)
         }
         assertFailsWith<IllegalArgumentException> {
             fixtureTrip("invalid-intensity").copy(attractionIntensity = 101f)
@@ -283,30 +283,34 @@ class TripInvariantsTest {
         assertEquals(5, Trip.coercePlannedMinutes(0))
         assertEquals(5, Trip.coercePlannedMinutes(4))
         assertEquals(5, Trip.coercePlannedMinutes(5))
-        assertEquals(350, Trip.coercePlannedMinutes(354))
+        assertEquals(6, Trip.coercePlannedMinutes(6))
+        assertEquals(7, Trip.coercePlannedMinutes(7))
+        assertEquals(354, Trip.coercePlannedMinutes(354))
         assertEquals(360, Trip.coercePlannedMinutes(Int.MAX_VALUE))
 
-        assertEquals(10, Trip.adjustPlannedMinutes(5, 1))
-        assertEquals(5, Trip.adjustPlannedMinutes(10, -1))
+        assertEquals(6, Trip.adjustPlannedMinutes(5, 1))
+        assertEquals(9, Trip.adjustPlannedMinutes(10, -1))
+        assertEquals(5, Trip.adjustPlannedMinutes(6, -1))
         assertEquals(5, Trip.adjustPlannedMinutes(5, -1))
         assertEquals(5, Trip.adjustPlannedMinutes(0, -1))
 
-        assertEquals(360, Trip.adjustPlannedMinutes(355, 1))
+        assertEquals(356, Trip.adjustPlannedMinutes(355, 1))
+        assertEquals(360, Trip.adjustPlannedMinutes(359, 1))
         assertEquals(360, Trip.adjustPlannedMinutes(360, 1))
-        assertEquals(355, Trip.adjustPlannedMinutes(360, -1))
+        assertEquals(359, Trip.adjustPlannedMinutes(360, -1))
         assertEquals(30, Trip.adjustPlannedMinutes(30, 0))
     }
 
     @Test
     fun zeroAndUnsupportedPlannedMinutesAreRejected() {
-        listOf(-5, 0, 1, 4, 7, 365).forEach { minutes ->
+        listOf(-5, 0, 1, 4, 361, 365).forEach { minutes ->
             assertFailsWith<IllegalArgumentException> {
                 fixtureTrip("invalid-minutes-$minutes")
                     .copy(plannedMinutes = minutes)
             }
         }
 
-        listOf(5, 30, 355, 360).forEach { minutes ->
+        listOf(5, 6, 7, 30, 37, 355, 359, 360).forEach { minutes ->
             assertEquals(
                 minutes,
                 fixtureTrip("valid-minutes-$minutes")

@@ -59,7 +59,7 @@ private val MinutesNumberHorizontalInset = 8.dp
 private val MinutesArrowSlotHeight = 22.dp
 private val MinutesArrowIconSize = 20.dp
 
-// Gesture settings — vertical distance per five-minute change; this is not animation duration.
+// Gesture settings — vertical distance per one-minute change; this is not animation duration.
 private val MinutesDragStepDistance = 18.dp
 
 /**
@@ -134,7 +134,7 @@ private fun ControlDivider(layoutScale: Float, compact: Boolean) {
 }
 
 /**
- * Arrow taps and vertical dragging change minutes in five-minute steps,
+ * Arrow taps and vertical dragging change minutes in one-minute steps,
  * bounded between 5 and 360 minutes. Empty arrow slots keep the number centred.
  *
  * Updated-state references let a continuous gesture keep using the latest
@@ -177,9 +177,9 @@ private fun ScrollableMinutes(
     Box(modifier = Modifier.width(numberWidth).fillMaxHeight()) {
         Box(
             modifier = Modifier.align(Alignment.TopCenter).width(numberWidth).height(MinutesArrowSlotHeight * layoutScale)
-                .semantics { contentDescription = "Increase planned time by five minutes" }
+                .semantics { contentDescription = "Increase planned time by one minute" }
                 .clickable(enabled = enabled && boundedMinutes < Trip.MAX_PLANNED_MINUTES,
-                    role = Role.Button, onClickLabel = "Increase planned time by five minutes") {
+                    role = Role.Button, onClickLabel = "Increase planned time by one minute") {
                     latestOnMinutesChange(Trip.adjustPlannedMinutes(latestMinutes, direction = 1))
                 },
             contentAlignment = Alignment.Center
@@ -238,9 +238,9 @@ private fun ScrollableMinutes(
 
         Box(
             modifier = Modifier.align(Alignment.BottomCenter).width(numberWidth).height(MinutesArrowSlotHeight * layoutScale)
-                .semantics { contentDescription = "Decrease planned time by five minutes" }
+                .semantics { contentDescription = "Decrease planned time by one minute" }
                 .clickable(enabled = enabled && boundedMinutes > Trip.MIN_PLANNED_MINUTES,
-                    role = Role.Button, onClickLabel = "Decrease planned time by five minutes") {
+                    role = Role.Button, onClickLabel = "Decrease planned time by one minute") {
                     latestOnMinutesChange(Trip.adjustPlannedMinutes(latestMinutes, direction = -1))
                 },
             contentAlignment = Alignment.Center

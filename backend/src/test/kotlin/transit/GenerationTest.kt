@@ -81,7 +81,14 @@ class GenerationTest {
         val geometry=obj("type" to "Polygon","coordinates" to listOf(listOf(listOf(-74,45),listOf(-73,45),listOf(-73,46),listOf(-74,46),listOf(-74,45)),listOf(listOf(-73.7,45.4),listOf(-73.5,45.4),listOf(-73.5,45.6),listOf(-73.7,45.6),listOf(-73.7,45.4))))
         assertFalse(inPolygon(start,geometry)); assertTrue(inPolygon(Point(45.8,-73.8),geometry))
     }
-    @Test fun rejectsUnknownPaceModesAndZones() {
+    @Test fun validatesWholeMinutesPaceModesAndZones() {
+        listOf(5,6,7,37,359,360).forEach { minutes ->
+            assertEquals(minutes,parseRequest(JsonObject(input() + ("plannedMinutes" to JsonPrimitive(minutes)))).minutes)
+        }
+        listOf(0.0,4.0,5.5,360.5,361.0).forEach { minutes ->
+            try { parseRequest(JsonObject(input() + ("plannedMinutes" to JsonPrimitive(minutes)))); fail("Invalid minutes accepted: $minutes") }
+            catch(_: InputError) { }
+        }
         listOf(input("Sprint"),input(modes=listOf("REM")),JsonObject(input(modes=listOf("bus"))+ ("zonesByTransport" to obj("bus" to listOf("1"))))).forEach { raw ->
             try { parseRequest(raw); fail("Invalid request accepted") } catch(_: InputError) { }
         }

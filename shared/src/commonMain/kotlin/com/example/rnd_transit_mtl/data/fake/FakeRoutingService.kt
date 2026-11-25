@@ -10,7 +10,8 @@ import com.example.rnd_transit_mtl.model.trip.TripRequest
 
 /**
  * Routes without a network: one straight, unrouted leg from origin to
- * destination using the first requested mode, lasting the planned minutes.
+ * destination using the first requested mode, lasting the directional budget
+ * or the planned minutes when no directional budget is supplied.
  *
  * Points outside [serviceArea] are rejected, like a real provider limited
  * to its region. By default that is the area of the bundled sample map.
@@ -35,7 +36,7 @@ class FakeRoutingService(
                     transportId = mode,
                     from = request.origin.point,
                     to = destination.point,
-                    durationSeconds = request.plannedMinutes * 60L
+                    durationSeconds = request.durationBudgetSeconds ?: (request.plannedMinutes * 60L)
                 )
             )
         )

@@ -68,7 +68,8 @@ internal fun Trip33FallbackContent(
     var selectedY by rememberSaveable(pickingOrigin) { mutableStateOf<Float?>(null) }
     var failurePanelHeightPx by remember { mutableStateOf(0) }
     val density = LocalDensity.current
-    val permission = failure == Trip33Failure.PermissionDenied
+    val permissionDenied = failure == Trip33Failure.PermissionDenied
+    val permission = permissionDenied || failure == Trip33Failure.LocationUnavailable
     val selected = if (selectedX != null && selectedY != null) {
         TripPoint("Selected point on map", selectedX!!, selectedY!!)
     } else {
@@ -108,8 +109,9 @@ internal fun Trip33FallbackContent(
 
         if (permission && !pickingOrigin) {
             TripWarning(
-                "Location access is off",
-                "You can still plan a trip. Choose a starting point.",
+                if (permissionDenied) "Location access is off" else "Current location unavailable",
+                if (permissionDenied) "You can still plan a trip. Choose a starting point."
+                else "Try current location again or choose a starting point.",
                 Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = 16.dp)

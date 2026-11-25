@@ -53,6 +53,7 @@ import com.example.rnd_transit_mtl.ui.theme.TransitSelected
 import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 import com.example.rnd_transit_mtl.navigation.SettingsScreenKey
 import com.example.rnd_transit_mtl.layout.PageTitle
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.location.LocationAccuracySettingsEntry
 
 // Layout settings — dimensions in dp from SettingsUIDesign.png (412 px reference width).
 private val SettingsHorizontalPadding = 16.dp
@@ -134,6 +135,8 @@ internal fun SettingsContent(
 
             TransitOutlineButton("Open trip preferences", onClick = onOpenTripPreferences,
                 height = SettingsButtonHeight, fontSize = 15.sp)
+
+            LocationAccuracySettingsEntry()
 
             SettingsTextField("Display name", state.username, onUsernameChange)
 

@@ -56,20 +56,27 @@ class TripsStore private constructor(
         get() = mutableState
 
     internal var onPendingFinalTripsChanged: ((List<Trip>) -> Unit)? = null
+    internal var onReviewDraftsChanged: (() -> Unit)? = null
     internal val queueFinalTrips: Boolean get() = onPendingFinalTripsChanged != null
 
     internal fun restorePendingFinalTrips(trips: List<Trip>) {
         for (trip in trips) {
             val current = mutableState.value
             if (trip.id in current.pendingFinalTripIds) continue
-            if (current.activeTrip?.trip?.id == trip.id) {
-                mutableState.value = current.copy(activeTrip = null)
-            }
-            acceptStoredTrip(trip)
+            restoreFinalTrip(trip)
             mutableState.value = mutableState.value.copy(
                 pendingFinalTripIds = mutableState.value.pendingFinalTripIds + trip.id
             )
         }
+    }
+
+    /** A durable final record supersedes an older active-trip platform snapshot. */
+    internal fun restoreFinalTrip(trip: Trip) {
+        val current = mutableState.value
+        if (current.activeTrip?.trip?.id == trip.id) {
+            mutableState.value = current.copy(activeTrip = null)
+        }
+        acceptStoredTrip(trip)
     }
 
     internal fun acceptStoredTrip(trip: Trip, acknowledgeWrite: Boolean = false) {
@@ -104,8 +111,8 @@ class TripsStore private constructor(
      * the transition from active to completed.
      */
     val progress: Float
-        get() = elapsedMillis.toFloat() /
-                TRIP_SIMULATION_DURATION_MILLIS.toFloat()
+        get() = state.value.activeTrip?.routeProgress ?: (elapsedMillis.toFloat() /
+                TRIP_SIMULATION_DURATION_MILLIS.toFloat())
 
     val completedTrips: List<Trip>
         get() = mutableState.value.completedTrips
@@ -154,8 +161,8 @@ class TripsStore private constructor(
         val active = current.activeTrip
 
         if (active != null && active.trip.id == tripId) {
-            return active.elapsedMillis.toFloat() /
-                    TRIP_SIMULATION_DURATION_MILLIS.toFloat()
+            return active.routeProgress ?: (active.elapsedMillis.toFloat() /
+                    TRIP_SIMULATION_DURATION_MILLIS.toFloat())
         }
 
         return if (current.completedTrips.any { it.id == tripId }) {
@@ -171,14 +178,32 @@ class TripsStore private constructor(
      *
      * Another start cannot replace the existing active trip.
      */
-    fun start(trip: Trip): TripActionResult {
+    fun start(trip: Trip): TripActionResult = startTrip(trip, null)
+
+    /** Starts a separately routed return without changing its completed outbound record.
+     * The pending outbound review is deferred atomically only after the return is validated.
+     * @param trip Fresh generated route with a return relationship and the exact stored origin as its target.
+     * @param outboundTripId Completed trip whose original start is being revisited.
+     */
+    fun startReturn(trip: Trip, outboundTripId: TripId): TripActionResult = startTrip(trip, outboundTripId)
+
+    private fun startTrip(trip: Trip, outboundTripId: TripId?): TripActionResult {
         val current = mutableState.value
+
+        if (outboundTripId != null) {
+            val outbound = current.completedTrips.firstOrNull { it.id == outboundTripId }
+                ?: return TripActionResult.MissingTrip(outboundTripId)
+            if (trip.journey?.kind != com.example.rnd_transit_mtl.model.trip.TripJourneyKind.Return ||
+                trip.journey.outboundTripId != outboundTripId || trip.destination != outbound.origin) {
+                return TripActionResult.InvalidInput("Return destination must be the saved original start.")
+            }
+        }
 
         current.activeTrip?.let {
             return TripActionResult.ActiveTripExists(it.trip.id)
         }
 
-        if (current.pendingReviewTripId != null) {
+        if (current.pendingReviewTripId != null && current.pendingReviewTripId != outboundTripId) {
             return TripActionResult.InvalidInput(
                 "Handle the pending trip review before starting another trip."
             )
@@ -205,7 +230,8 @@ class TripsStore private constructor(
         }
 
         mutableState.value = current.copy(
-            activeTrip = ActiveTripState(ownedTrip, elapsedMillis = 0L)
+            activeTrip = ActiveTripState(ownedTrip, elapsedMillis = 0L),
+            pendingReviewTripId = if (outboundTripId != null) null else current.pendingReviewTripId
         )
         return TripActionResult.Applied
     }
@@ -254,14 +280,31 @@ class TripsStore private constructor(
             return commitCompletion(current, active)
         }
 
-        if (boundedElapsed != active.elapsedMillis) {
+        if (boundedElapsed != active.elapsedMillis || active.routeProgress != null) {
             mutableState.value = current.copy(
                 activeTrip = active.copy(
-                    elapsedMillis = boundedElapsed
+                    elapsedMillis = boundedElapsed,
+                    routeProgress = null,
                 )
             )
         }
 
+        return TripActionResult.Applied
+    }
+
+    /**
+     * Saves an actual GPS distance fraction without advancing the debug clock.
+     * Only the location coordinator supplies fresh, accurate, on-route readings.
+     * @param tripId Accepted active-trip identity.
+     * @param progress Distance fraction in 0..1; reaching 1 completes the trip once.
+     */
+    fun updateRouteProgress(tripId: TripId, progress: Float): TripActionResult {
+        if (!progress.isFinite() || progress !in 0f..1f) return TripActionResult.InvalidInput("Invalid route progress.")
+        val current = mutableState.value
+        if (current.completedTrips.any { it.id == tripId }) return TripActionResult.AlreadyCompleted
+        val active = current.activeTrip?.takeIf { it.trip.id == tripId } ?: return TripActionResult.MissingTrip(tripId)
+        if (progress == 1f) return commitCompletion(current, active)
+        mutableState.value = current.copy(activeTrip = active.copy(routeProgress = progress))
         return TripActionResult.Applied
     }
 
@@ -366,6 +409,7 @@ class TripsStore private constructor(
         mutableState.value = current.copy(
             reviewDrafts = current.reviewDrafts + (tripId to draft)
         )
+        onReviewDraftsChanged?.invoke()
         return TripActionResult.Applied
     }
 
@@ -382,6 +426,7 @@ class TripsStore private constructor(
         mutableState.value = current.copy(
             reviewDrafts = current.reviewDrafts + (tripId to draft)
         )
+        onReviewDraftsChanged?.invoke()
         return TripActionResult.Applied
     }
 
@@ -465,6 +510,7 @@ class TripsStore private constructor(
             reviewDrafts = current.reviewDrafts - tripId
         )
 
+        onReviewDraftsChanged?.invoke()
         return TripActionResult.Applied
     }
 
@@ -487,6 +533,7 @@ class TripsStore private constructor(
             reviewDrafts = current.reviewDrafts - tripId
         )
 
+        onReviewDraftsChanged?.invoke()
         return TripActionResult.Applied
     }
 

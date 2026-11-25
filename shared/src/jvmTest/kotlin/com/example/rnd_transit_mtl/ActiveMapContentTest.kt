@@ -3,60 +3,273 @@ package com.example.rnd_transit_mtl
 import androidx.compose.runtime.*
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import com.example.rnd_transit_mtl.View.current_trip.*
 import com.example.rnd_transit_mtl.View.history.previews.reviewedHistoryPreviewTrip
+import com.example.rnd_transit_mtl.model.trip.pointAlongRoute
+import com.example.rnd_transit_mtl.model.geo.GeoPoint
 import com.example.rnd_transit_mtl.ui.theme.RNDTransitTheme
 import java.io.File
+import java.io.ByteArrayInputStream
+import javax.imageio.ImageIO
 import kotlin.test.*
 
 /** Exercises active/overview controls and explicit provider-error fixtures without inventing provider state. */
 class ActiveMapContentTest {
     @OptIn(ExperimentalComposeUiApi::class)
     @Test
-    fun draggingPanelDownRevealsMapAndDraggingUpRestoresActions() {
+    fun estimatedPositionStaysVisibleWithoutAnErrorAndStalePositionWarnsUntilGpsRecovers() {
+        // Keep the fixture away from the finite bundled image's edge so recentering can reveal it.
+        val trip = guidanceTestTrip().let { base ->
+            fun north(point: GeoPoint) = point.copy(latitude = point.latitude + 0.01)
+            base.copy(origin = base.origin.copy(point = north(base.origin.point)),
+                destination = base.destination.copy(point = north(base.destination.point)),
+                legs = base.legs.map { it.copy(geometry = it.geometry.map(::north)) })
+        }
+        var location by mutableStateOf(TripLocationState.LastKnown)
+        var progress by mutableStateOf(0.2f)
+        var radius by mutableDoubleStateOf(20.0)
+        val scene = ImageComposeScene(412, 720) {
+            RNDTransitTheme {
+                ActiveMapContent(trip, progress, true, {}, {}, simulationEnabled = false,
+                    locationState = location, userPosition = trip.pointAlongRoute(progress), userUncertaintyMeters = radius)
+            }
+        }
+        var time = 0L
+        fun render(name: String? = null) {
+            repeat(10) { time += 16_000_000; scene.render(time).close() }
+            if (name != null) scene.render(time).use { image ->
+                val folder = File("build/planner-previews").apply { mkdirs() }
+                image.encodeToData()!!.use { File(folder, name).writeBytes(it.bytes) }
+            }
+        }
+        fun all(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::all)
+        fun nodes() = scene.semanticsOwners.flatMap { all(it.rootSemanticsNode) }
+        fun texts() = nodes().flatMap { it.config.getOrNull(SemanticsProperties.Text).orEmpty() }.map { it.text }
+        fun recenter() {
+            val point = nodes().first {
+                it.config.getOrNull(SemanticsProperties.ContentDescription)?.contains("Recenter on current position") == true
+            }.boundsInRoot.center
+            scene.sendPointerEvent(PointerEventType.Press, point, timeMillis = time / 1_000_000)
+            scene.sendPointerEvent(PointerEventType.Release, point, timeMillis = time / 1_000_000 + 1)
+            repeat(4) { render() }
+        }
+        try {
+            render("Active-trip-shared-last-position.png")
+            assertTrue(texts().any { "Last known position" in it })
+            assertFalse(texts().any { "Finding your location" in it || "not updating" in it || "Location unavailable" in it })
+            val sharedRecenter = nodes().first {
+                it.config.getOrNull(SemanticsProperties.ContentDescription)?.contains("Recenter on current position") == true
+            }
+            assertFalse(sharedRecenter.config.contains(SemanticsProperties.Disabled))
+            location = TripLocationState.LowAccuracy
+            render("Active-trip-low-gps-accuracy.png")
+            assertTrue(texts().any { "Low GPS accuracy" in it })
+            assertFalse(texts().any { "not updating" in it || "Location unavailable" in it })
+            assertFalse(nodes().first {
+                it.config.getOrNull(SemanticsProperties.ContentDescription)?.contains("Recenter on current position") == true
+            }.config.contains(SemanticsProperties.Disabled))
+            location = TripLocationState.MatchedLowAccuracy
+            radius = 150.0
+            render()
+            recenter()
+            render("Active-trip-map-matched-uncertainty.png")
+            assertTrue(texts().any { "Estimated position" in it && "Low GPS accuracy" in it })
+            fun mapDescription() = nodes().mapNotNull { it.config.getOrNull(SemanticsProperties.ContentDescription) }
+                .flatten().first { it.startsWith("Mock transit map") }
+            assertContains(mapDescription(), "Directed yellow position pointer")
+            assertContains(mapDescription(), "Location uncertainty circle")
+            location = TripLocationState.PermissionDenied
+            render()
+            recenter()
+            render("Active-trip-retained-position-permission.png")
+            assertContains(mapDescription(), "Directed yellow position pointer")
+            assertContains(mapDescription(), "Location uncertainty circle")
+            assertTrue(texts().any { "Last known position" in it })
+            location = TripLocationState.Waiting
+            render()
+            assertContains(mapDescription(), "Directed yellow position pointer")
+            location = TripLocationState.Stale
+            progress = 0.21f
+            render("Active-trip-location-paused.png")
+            assertContains(texts(), "Location is not updating")
+            assertTrue(texts().any { "Position paused" in it })
+            assertTrue(texts().any { "30 seconds" in it })
+            location = TripLocationState.Live
+            render()
+            assertFalse(texts().any { "Estimated position" in it || "Position paused" in it || "Low GPS accuracy" in it || "not updating" in it })
+        } finally { scene.close() }
+    }
+
+    /** Map-only pixels exclude the hint, attribution, recenter button and teal overlay. */
+    @OptIn(ExperimentalComposeUiApi::class)
+    private fun mapPixels(scene: ImageComposeScene, frameNanos: Long): IntArray =
+        scene.render(frameNanos).use { image ->
+            image.encodeToData()!!.use { data ->
+                ByteArrayInputStream(data.bytes).use { input ->
+                    ImageIO.read(input).getRGB(10, 180, 260, 45, null, 0, 260)
+                }
+            }
+        }
+
+    @OptIn(ExperimentalComposeUiApi::class)
+    @Test
+    fun panelTracksTheFingerAndKeepsPartialHeightsWithoutTapOrReleaseSnapping() {
         val scene = ImageComposeScene(412, 720) {
             RNDTransitTheme {
                 ActiveMapContent(reviewedHistoryPreviewTrip, 0.4f, true, {}, {})
             }
         }
         var time = 0L
-        fun render() { repeat(40) { time += 16_000_000; scene.render(time).close() } }
+        fun render(frames: Int = 40) { repeat(frames) { time += 16_000_000; scene.render(time).close() } }
         fun all(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::all)
         fun nodes() = scene.semanticsOwners.flatMap { all(it.rootSemanticsNode) }
-        fun handle() = nodes().first {
-            it.config.getOrNull(SemanticsProperties.ContentDescription)?.contains("Trip panel") == true
+        fun panel() = nodes().first {
+            it.config.getOrNull(SemanticsProperties.ContentDescription)?.contains("Trip progress panel") == true
         }
-        fun drag(distance: Float) {
-            val start = handle().boundsInRoot.center
+        fun handle() = nodes().first {
+                it.config.getOrNull(SemanticsProperties.ContentDescription)?.contains("Trip panel handle") == true
+        }
+        fun drag(distance: Float, fromBody: Boolean = false): Float {
+            val start = if (fromBody) nodes().first {
+                it.config.getOrNull(SemanticsProperties.Text)?.any { text -> text.text.startsWith("Current trip") } == true
+            }.boundsInRoot.center else handle().boundsInRoot.center
             scene.sendPointerEvent(PointerEventType.Press, start, timeMillis = time / 1_000_000)
             for (step in 1..6) {
+                time += 20_000_000
                 scene.sendPointerEvent(PointerEventType.Move,
                     start.copy(y = start.y + distance * step / 6),
-                    timeMillis = time / 1_000_000 + step * 20)
+                    timeMillis = time / 1_000_000)
+                render(1)
             }
+            val heightBeforeRelease = panel().boundsInRoot.height
             scene.sendPointerEvent(PointerEventType.Release,
-                start.copy(y = start.y + distance), timeMillis = time / 1_000_000 + 140)
-            time += 160_000_000
+                start.copy(y = start.y + distance), timeMillis = time / 1_000_000 + 1)
             render()
+            assertEquals(heightBeforeRelease, panel().boundsInRoot.height, 1f, "Releasing must preserve the dragged height")
+            return heightBeforeRelease
         }
         try {
             render()
-            val expandedTop = handle().boundsInRoot.top
-            drag(60f)
-            assertEquals("Collapsed", handle().config[SemanticsProperties.StateDescription])
-            assertTrue(handle().boundsInRoot.top > expandedTop)
-            assertFalse(nodes().any {
-                it.config.getOrNull(SemanticsProperties.Text)?.any { text -> text.text == "Finish trip" } == true
-            })
-            drag(-60f)
-            assertEquals("Expanded", handle().config[SemanticsProperties.StateDescription])
+            val recenter = nodes().first {
+                it.config.getOrNull(SemanticsProperties.ContentDescription)?.contains("Recenter on current position") == true
+            }.boundsInRoot.center
+            scene.sendPointerEvent(PointerEventType.Press, recenter, timeMillis = time / 1_000_000)
+            scene.sendPointerEvent(PointerEventType.Release, recenter, timeMillis = time / 1_000_000 + 1)
+            render(50)
+            val cameraBeforePanelDrag = mapPixels(scene, time)
+            val expandedBounds = panel().boundsInRoot
+            val titleTop = nodes().first {
+                it.config.getOrNull(SemanticsProperties.Text)?.any { text -> text.text.startsWith("Current trip") } == true
+            }.boundsInRoot.top
+            assertTrue(titleTop - expandedBounds.top < 40f, "The panel handle/header must stay compact")
+            val point = handle().boundsInRoot.center
+            assertNull(handle().config.getOrNull(androidx.compose.ui.semantics.SemanticsActions.OnClick))
+            scene.sendPointerEvent(PointerEventType.Press, point, timeMillis = time / 1_000_000)
+            scene.sendPointerEvent(PointerEventType.Release, point, timeMillis = time / 1_000_000 + 1)
+            render()
+            assertEquals(expandedBounds.height, panel().boundsInRoot.height, "Tapping must not toggle the panel")
+            val firstPartialHeight = drag(60f)
+            assertTrue(firstPartialHeight < expandedBounds.height && firstPartialHeight > expandedBounds.height / 2)
+            val secondPartialHeight = drag(40f, fromBody = true)
+            assertTrue(secondPartialHeight < firstPartialHeight, "Dragging the panel body must also resize it")
+            assertTrue(cameraBeforePanelDrag.contentEquals(mapPixels(scene, time)),
+                "Resizing the panel must not pan, zoom, or recenter the map while follow is enabled")
+            scene.render(time).use { image ->
+                val folder = File("build/planner-previews").apply { mkdirs() }
+                image.encodeToData()!!.use { File(folder, "Active-trip-partly-open.png").writeBytes(it.bytes) }
+            }
+            val raisedPartialHeight = drag(-35f)
+            assertTrue(raisedPartialHeight > secondPartialHeight && raisedPartialHeight < expandedBounds.height)
+            val collapsedHeight = drag(500f)
+            assertTrue(collapsedHeight in 20f..28f, "Only the thin drag handle should remain above the bottom edge")
+            assertEquals(720f, panel().boundsInRoot.bottom, 1f)
+            assertTrue(handle().boundsInRoot.height >= 20f, "The handle must remain usable when fully collapsed")
+            assertTrue(cameraBeforePanelDrag.contentEquals(mapPixels(scene, time)),
+                "Collapsing the panel must leave the map camera in place")
+            scene.render(time).use { image ->
+                val folder = File("build/planner-previews").apply { mkdirs() }
+                image.encodeToData()!!.use { File(folder, "Active-trip-collapsed-handle.png").writeBytes(it.bytes) }
+            }
+            assertTrue(drag(-65f) > collapsedHeight, "The same handle must pull the panel back up")
+            drag(-400f)
+            assertEquals(expandedBounds.height, panel().boundsInRoot.height, 1f)
             assertTrue(nodes().any {
                 it.config.getOrNull(SemanticsProperties.Text)?.any { text -> text.text == "Finish trip" } == true
             })
+        } finally { scene.close() }
+    }
+
+    @OptIn(ExperimentalComposeUiApi::class)
+    @Test
+    fun recenterMovesThroughIntermediateCameraFramesInsteadOfJumping() {
+        val scene = ImageComposeScene(412, 720) {
+            RNDTransitTheme { ActiveMapContent(reviewedHistoryPreviewTrip, 0.4f, true, {}, {}) }
+        }
+        var time = 0L
+        fun render(frames: Int) { repeat(frames) { time += 16_000_000; scene.render(time).close() } }
+        fun all(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::all)
+        try {
+            render(30)
+            val before = mapPixels(scene, time)
+            val recenter = scene.semanticsOwners.flatMap { all(it.rootSemanticsNode) }.first {
+                it.config.getOrNull(SemanticsProperties.ContentDescription)?.contains("Recenter on current position") == true
+            }.boundsInRoot.center
+            scene.sendPointerEvent(PointerEventType.Press, recenter, timeMillis = time / 1_000_000)
+            scene.sendPointerEvent(PointerEventType.Release, recenter, timeMillis = time / 1_000_000 + 1)
+            render(8)
+            val during = mapPixels(scene, time)
+            render(40)
+            val after = mapPixels(scene, time)
+            assertFalse(before.contentEquals(after), "The fixture must require a camera move")
+            assertFalse(before.contentEquals(during), "Recentering must begin moving before its final frame")
+            assertFalse(during.contentEquals(after), "Recentering must pass through intermediate positions")
+        } finally { scene.close() }
+    }
+
+    @OptIn(ExperimentalComposeUiApi::class)
+    @Test
+    fun directionsDropDownThroughIntermediateHeightsAndRetractToTheSameCompactHint() {
+        val scene = ImageComposeScene(360, 720) {
+            RNDTransitTheme { ActiveMapContent(guidanceTestTrip(), 0f, true, {}, {}) }
+        }
+        var time = 0L
+        fun render(frames: Int) { repeat(frames) { time += 16_000_000; scene.render(time).close() } }
+        fun all(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::all)
+        fun hint() = scene.semanticsOwners.flatMap { all(it.rootSemanticsNode) }.first {
+            it.config.getOrNull(androidx.compose.ui.semantics.SemanticsActions.OnClick)?.label in
+                setOf("Expand directions", "Collapse directions")
+        }
+        fun tapHint() {
+            val point = hint().boundsInRoot.center
+            scene.sendPointerEvent(PointerEventType.Press, point, timeMillis = time / 1_000_000)
+            scene.sendPointerEvent(PointerEventType.Release, point, timeMillis = time / 1_000_000 + 1)
+        }
+        try {
+            render(24)
+            val compact = hint().boundsInRoot
+            tapHint()
+            render(6)
+            val dropping = hint().boundsInRoot
+            render(24)
+            val expanded = hint().boundsInRoot
+            assertEquals(compact.top, expanded.top, "Expansion must stay attached to the top")
+            assertTrue(dropping.height > compact.height && dropping.height < expanded.height,
+                "The hint must visibly grow downward instead of jumping to full height")
+            scene.render(time).use { image ->
+                val folder = File("build/planner-previews").apply { mkdirs() }
+                image.encodeToData()!!.use { File(folder, "Directions-drop-down-expanded.png").writeBytes(it.bytes) }
+            }
+            tapHint()
+            render(6)
+            val retracting = hint().boundsInRoot
+            assertTrue(retracting.height > compact.height && retracting.height < expanded.height)
+            render(24)
+            assertEquals(compact.height, hint().boundsInRoot.height, 1f)
         } finally { scene.close() }
     }
 
@@ -73,7 +286,7 @@ class ActiveMapContentTest {
         }
         var time = 0L
         fun render(name: String? = null) {
-            repeat(16) { time += 16_000_000; scene.render(time).close() }
+            repeat(24) { time += 16_000_000; scene.render(time).close() }
             if (name != null) scene.render(time).use { image ->
                 val folder = File("build/planner-previews").apply { mkdirs() }
                 image.encodeToData()!!.use { File(folder, name).writeBytes(it.bytes) }
@@ -83,6 +296,13 @@ class ActiveMapContentTest {
         fun texts() = scene.semanticsOwners.flatMap { all(it.rootSemanticsNode) }
             .flatMap { it.config.getOrNull(SemanticsProperties.Text).orEmpty() }.map { it.text }
         try {
+            render("Leg-guidance-compact-small.png")
+            assertContains(texts(), "Start on Rue Sherbrooke")
+            assertFalse(texts().any { it.startsWith("Section ") || it.startsWith("Next:") })
+            val expand = scene.semanticsOwners.flatMap { all(it.rootSemanticsNode) }.first {
+                it.config.getOrNull(androidx.compose.ui.semantics.SemanticsActions.OnClick)?.label == "Expand directions"
+            }
+            expand.config[androidx.compose.ui.semantics.SemanticsActions.OnClick].action!!.invoke()
             render("Leg-guidance-walk-small.png")
             assertContains(texts(), "Section 1 of 3: Walk")
             assertContains(texts(), "Next: In 50 m, turn left onto Rue Saint-Denis")
@@ -140,10 +360,14 @@ class ActiveMapContentTest {
             assertTrue(recenter.config.contains(SemanticsProperties.Disabled))
             val section = nodes().first {
                 it.config.getOrNull(androidx.compose.ui.semantics.SemanticsActions.OnClick)?.label ==
-                    "Open current section information"
+                    "Expand directions"
             }
             section.config[androidx.compose.ui.semantics.SemanticsActions.OnClick].action!!.invoke()
-            assertEquals(1, informationRequests)
+            render()
+            assertEquals(0, informationRequests)
+            assertTrue(nodes().any {
+                it.config.getOrNull(SemanticsProperties.Text)?.any { text -> text.text == "Sample turn" } == true
+            })
             location = TripLocationState.Sample
             render()
             assertEquals("80 percent complete", map().config[SemanticsProperties.StateDescription])

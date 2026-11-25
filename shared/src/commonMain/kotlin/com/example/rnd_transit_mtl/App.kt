@@ -50,14 +50,19 @@ import com.example.rnd_transit_mtl.navigation.Router
 import com.example.rnd_transit_mtl.navigation.TripNavigation
 import com.example.rnd_transit_mtl.navigation.backStackConfig
 import com.example.rnd_transit_mtl.state.trip.LocalTripsStore
+import com.example.rnd_transit_mtl.state.debug.DebugModeState
+import com.example.rnd_transit_mtl.state.debug.LocalDebugModeState
 import com.example.rnd_transit_mtl.state.trip.SessionTripsStores
 import com.example.rnd_transit_mtl.state.user.LocalNicknameSession
 import com.example.rnd_transit_mtl.state.user.appNicknameSession
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.LocalSharedTransitMapHost
 import com.example.rnd_transit_mtl.ui.theme.RNDTransitTheme
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.debug.DebugModeDialog
 import kotlinx.coroutines.CancellationException
 import com.example.rnd_transit_mtl.data.accounts.AccountRepository
 import com.example.rnd_transit_mtl.data.accounts.LocalAccountRepository
+import com.example.rnd_transit_mtl.state.refresh.rememberInactivityRefresh
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.refresh.InactivityRefreshFeedback
 
 private data class TransportData(
     val types: List<TransportType>,
@@ -90,6 +95,7 @@ internal fun App(
     tripRepository: ((UserId) -> TripRepository)? = null,
 ) {
     val backendGenerator = rememberBackendTripGenerator(generationEndpoint)
+    val debugMode = rememberSaveable(saver = DebugModeState.Saver) { DebugModeState() }
 
     var transportData by remember {
         mutableStateOf<TransportData?>(null)
@@ -194,12 +200,7 @@ internal fun App(
                 if (owner == null || tripRepository == null) {
                     null
                 } else {
-                    tripsStore.restorePendingFinalTrips(
-                        outbox?.read(owner).orEmpty()
-                    )
-                    tripsStore.onPendingFinalTripsChanged = { pending ->
-                        outbox?.write(owner, pending)
-                    }
+                    outbox?.bind(owner, tripsStore)
                     CloudTrips(
                         tripRepository(UserId(owner)),
                         tripsStore
@@ -209,6 +210,20 @@ internal fun App(
 
             val accountRepository = remember(owner) {
                 owner?.let { AccountRepository(UserId(it)) }
+            }
+
+            val inactivityRefresh = rememberInactivityRefresh(identity) {
+                val catalogueOk = tryCloudAction {
+                    val refreshed = TransportData(
+                        FakeTransportTypeRepository().getTransportTypes(),
+                        FakeTransportRouteRepository().getTransportRoutes(),
+                    )
+                    transportData = refreshed
+                    loadingError = false
+                }
+                val accountOk = tryCloudAction { accountRepository?.refreshAccount() }
+                val historyOk = tryCloudAction { cloudTrips?.refreshAfterIdle() }
+                check(catalogueOk && accountOk && historyOk) { "App data refresh failed." }
             }
 
             LaunchedEffect(accountRepository) {
@@ -234,6 +249,7 @@ internal fun App(
             }
 
             CompositionLocalProvider(
+                LocalDebugModeState provides debugMode,
                 LocalBackendTripGenerator provides backendGenerator,
                 LocalNavigator provides navigator,
                 LocalTripsStore provides tripsStore,
@@ -244,6 +260,7 @@ internal fun App(
                 LocalAccountSession provides accountSession.value,
                 LocalAccountRepository provides accountRepository,
             ) {
+                Box(Modifier.fillMaxSize()) {
                 val showAccountScreen =
                     accountSession.value !is AccountSession.SignedIn &&
                         !continueAsGuest
@@ -271,7 +288,7 @@ internal fun App(
                                     AuthViewModel(authRepository)
                                 }
 
-                                MainLayout {
+                                MainLayout(showTopBar = false) {
                                     AuthScreen(
                                         authViewModel,
                                         onContinueAsGuest = {
@@ -331,6 +348,9 @@ internal fun App(
                         }
                     }
                 }
+                InactivityRefreshFeedback(inactivityRefresh)
+                }
+                DebugModeDialog(debugMode)
             }
         }
     }

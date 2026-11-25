@@ -15,17 +15,20 @@ import com.example.rnd_transit_mtl.state.review.ReviewDraft
 const val TRIP_SIMULATION_DURATION_MILLIS: Long = 10_000L
 
 /**
- * An unfinished Trip and its accumulated active simulation time.
+ * An unfinished Trip, GPS distance fraction, and independent debug playback time.
  *
  * No running flag, clock mark, coroutine, or lifecycle owner is saved.
- * The future CurrentTripScreen determines whether timing is eligible.
+ * CurrentTripScreen determines which progress source is active.
  */
 @Serializable
 data class ActiveTripState(
     val trip: Trip,
-    val elapsedMillis: Long = 0L
+    val elapsedMillis: Long = 0L,
+    /** Last distance fraction measured from GPS; independent of the debug playback clock. */
+    val routeProgress: Float? = null,
 ) {
     init {
+        require(routeProgress == null || routeProgress.isFinite() && routeProgress in 0f..1f)
         require(trip.status == TripStatus.Active) {
             "An active trip must have the Active status."
         }

@@ -10,7 +10,8 @@ enum class Trip33Failure {
     InvalidInput,
     NoRoute,
     ProviderUnavailable,
-    PermissionDenied
+    PermissionDenied,
+    LocationUnavailable
 }
 
 /** Explicit fixtures, never inferred from an arbitrary exception. */

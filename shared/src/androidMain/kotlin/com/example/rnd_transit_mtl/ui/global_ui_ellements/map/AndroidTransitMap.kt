@@ -1,5 +1,7 @@
 package com.example.rnd_transit_mtl.ui.global_ui_ellements.map
 
+import com.example.rnd_transit_mtl.model.trip.explorationWaypoints
+
 import android.net.ConnectivityManager
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -48,6 +50,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.UiComposable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalInspectionMode
@@ -60,6 +63,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.rnd_transit_mtl.data.assets.SampleMapBounds
 import com.example.rnd_transit_mtl.model.geo.GeoPoint
+import com.example.rnd_transit_mtl.model.geo.uncertaintyRing
 import com.example.rnd_transit_mtl.model.ids.TripId
 import com.example.rnd_transit_mtl.model.trip.RouteLeg
 import com.example.rnd_transit_mtl.navigation.CurrentTripScreenKey
@@ -190,14 +194,16 @@ private fun AndroidTransitMap(
     }
     val path = remember(legs) { legs.flatMap { it.geometry.zipWithNext() } }
     val distances = remember(path) { path.map { (from, to) -> from.distanceMetersTo(to) } }
-    val marker = data.progress?.let { positionAlongRoute(path, distances, it) }
-    val travelled = remember(path, distances, marker, data.progress) {
+    val routeMarker = data.progress?.let { positionAlongRoute(path, distances, it) }
+    val marker = data.userPosition ?: routeMarker.takeIf { data.simulatePosition }
+    val browsingPosition = rememberAnimatedMapPosition(fix?.point.takeIf { data.browsing })
+    val travelled = remember(path, distances, routeMarker, data.progress) {
         val progress = data.progress?.coerceIn(0f, 1f) ?: 0f
         var remaining = distances.sum() * progress
         path.zip(distances).mapNotNull { (segment, distance) ->
             if (remaining <= 0 || distance <= 0) return@mapNotNull null
             remaining -= distance
-            listOf(segment.first, if (remaining >= 0) segment.second else marker ?: segment.second)
+            listOf(segment.first, if (remaining >= 0) segment.second else routeMarker ?: segment.second)
         }
     }
 
@@ -215,8 +221,10 @@ private fun AndroidTransitMap(
                 val source = rememberImageSource(OfflineCorners, offlineImage)
                 RasterLayer(id = "bundled-montreal-map", source = source)
             }
-            if (fix != null && fix.accuracyMeters > 0) {
-                AccuracyArea(fix.point, fix.accuracyMeters)
+            val uncertaintyCenter = data.userPosition ?: browsingPosition ?: fix?.point
+            val uncertaintyMeters = data.userUncertaintyMeters ?: session.uncertaintyMeters ?: fix?.accuracyMeters
+            if (uncertaintyCenter != null && uncertaintyMeters != null && uncertaintyMeters.isFinite() && uncertaintyMeters > 0) {
+                AccuracyArea(uncertaintyCenter, uncertaintyMeters)
             }
             if (trip != null) {
                 val routeData = remember(legs) { GeoJsonData.JsonString(routeGeoJson(legs)) }
@@ -285,15 +293,37 @@ private fun AndroidTransitMap(
             snapshotFlow { map.isCameraMoving && map.cameraMoveReason == CameraMoveReason.Gesture }
                 .collect { moving -> if (moving) onManualCameraMove() }
         }
-        LaunchedEffect(map, data.followPosition, marker, data.recenterRequest, data.topInset, data.bottomInset) {
-            if (data.followPosition && marker != null) {
-                val viewport = map.awaitViewport()
-                map.setCameraPosition(
-                    map.cameraPosition.copy(
-                        center = marker.position(),
-                        padding = data.visibleMapPadding(viewport.size.height)
-                    )
+        var handledRecenterRequest by remember(map, trip?.id) { mutableIntStateOf(0) }
+        var recenterAnimating by remember(map, trip?.id) { mutableStateOf(false) }
+        val latestMarker by rememberUpdatedState(marker)
+        // A moving GPS marker must not cancel and restart an explicit recenter animation.
+        LaunchedEffect(map, trip?.id, data.recenterRequest, marker != null) {
+            val request = data.recenterRequest
+            if (request <= 0 || request == handledRecenterRequest || marker == null) return@LaunchedEffect
+            snapshotFlow { latestData.cameraInsetsReady }.first { it }
+            val viewport = map.awaitViewport()
+            val target = latestMarker ?: return@LaunchedEffect
+            handledRecenterRequest = request
+            recenterAnimating = true
+            try {
+                map.animateCamera(
+                    CameraUpdate(
+                        center = target.position(),
+                        zoom = maxOf(16.0, map.cameraPosition.zoom),
+                        padding = latestData.visibleMapPadding(viewport.size.height),
+                    ),
+                    CameraAnimation.Ease.Standard,
                 )
+            } finally {
+                recenterAnimating = false
+            }
+        }
+        // Overlay resizing only reveals/hides the map. Keep the last camera padding
+        // until the user explicitly recenters, including on subsequent GPS updates.
+        LaunchedEffect(map, trip?.id, data.followPosition, marker, recenterAnimating, handledRecenterRequest) {
+            if (data.followPosition && marker != null && !recenterAnimating &&
+                data.recenterRequest == handledRecenterRequest) {
+                map.setCameraPosition(map.cameraPosition.copy(center = marker.position()))
             }
         }
 
@@ -413,11 +443,13 @@ private fun AndroidTransitMap(
                 } else MapInteractions.None,
                 overlay = {
                     val selectedOrigin = data.pin.takeIf { data.pickerOpen || data.centerOnPin }
-                    if (fix != null && fix.point != selectedOrigin) UserPointer(fix.point)
+                    if (browsingPosition != null && browsingPosition != selectedOrigin) UserPointer(browsingPosition, session.movementHeading.degrees - map.cameraPosition.bearing.toFloat())
+                    data.userPosition?.let { UserPointer(it, session.movementHeading.degrees - map.cameraPosition.bearing.toFloat()) }
                     selectedOrigin?.let { OriginMarker(it) }
                     if (trip != null && map.style.loadState == StyleLoadState.Ready) {
-                        DestinationMarker(trip.destination.point)
-                        if (marker != null) {
+                        if (trip.explorationWaypoints.isEmpty()) DestinationMarker(trip.destination.point)
+                        else trip.explorationWaypoints.forEach { DestinationMarker(it.point) }
+                        if (marker != null && data.userPosition == null && data.progress != null) {
                             val ahead = positionAlongRoute(path, distances, (data.progress + 0.001f).coerceAtMost(1f))
                             val to = ahead ?: marker
                             val from = if (to == marker) {
@@ -526,17 +558,14 @@ private fun TripDot(id: String, point: GeoPoint, color: Color, radius: Int) {
 
 @Composable
 private fun AccuracyArea(point: GeoPoint, meters: Double) {
-    val ring = (0..48).joinToString(",") { index ->
-        val angle = 2.0 * kotlin.math.PI * (index % 48) / 48
-        val latitude = point.latitude + meters * kotlin.math.sin(angle) / 111_320.0
-        val longitude = point.longitude + meters * kotlin.math.cos(angle) /
-            (111_320.0 * kotlin.math.cos(Math.toRadians(point.latitude)).coerceAtLeast(0.01))
-        "[$longitude,$latitude]"
+    val ring = remember(point, meters) {
+        point.uncertaintyRing(meters).joinToString(",") { "[${it.longitude},${it.latitude}]" }
     }
     val source = rememberGeoJsonSource(
         GeoJsonData.JsonString("""{"type":"Polygon","coordinates":[[$ring]]}""")
     )
     org.maplibre.compose.layers.FillLayer(id = "device-accuracy", source = source, color = const(Color(0x33FFBA00)))
+    LineLayer(id = "device-accuracy-outline", source = source, color = const(Color(0x88FFBA00)), width = const(1.5.dp))
 }
 
 private fun TransitMapData.visibleMapPadding(height: Dp): DpPadding {
@@ -548,7 +577,7 @@ private fun TransitMapData.visibleMapPadding(height: Dp): DpPadding {
 @Composable
 private fun MapOverlayScope.UserPointer(point: GeoPoint, rotation: Float = 0f) {
     val pointer = painterResource(Res.drawable.map_user_pointer_marker)
-    Canvas(Modifier.placedAt(point.position()).size(36.dp)) {
+    Canvas(Modifier.placedAt(point.position()).zIndex(1f).size(36.dp)) {
         drawDirectedTripPointer(pointer, center, size.width, rotation)
     }
 }
