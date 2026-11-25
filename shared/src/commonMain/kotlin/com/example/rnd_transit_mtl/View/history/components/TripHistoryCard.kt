@@ -36,7 +36,15 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.rnd_transit_mtl.View.history.formatTripTimestampUtc
+import com.example.rnd_transit_mtl.View.history.tripRouteSummary
+import com.example.rnd_transit_mtl.View.history.tripTransportSummary
 import com.example.rnd_transit_mtl.model.trip.Trip
+import com.example.rnd_transit_mtl.model.trip.TripStatus
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.formatDemoDistanceKm
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.formatGeoPoint
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.ratings.RatingStarsDisplay
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.trip.TripReviewSummary
 import com.example.rnd_transit_mtl.ui.theme.TransitHighlight
 import com.example.rnd_transit_mtl.ui.theme.TransitMain
 import com.example.rnd_transit_mtl.ui.theme.TransitSelected
@@ -47,16 +55,8 @@ import rnd_transit_mtl.shared.generated.resources.ic_arrow_drop_down
 import rnd_transit_mtl.shared.generated.resources.ic_arrow_drop_up
 import rnd_transit_mtl.shared.generated.resources.ic_google_demo_delete
 import rnd_transit_mtl.shared.generated.resources.ic_google_demo_edit
-import com.example.rnd_transit_mtl.View.history.formatTripTimestampUtc
-import com.example.rnd_transit_mtl.View.history.tripRouteSummary
-import com.example.rnd_transit_mtl.View.history.tripTransportSummary
-import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.formatDemoDistanceKm
-import com.example.rnd_transit_mtl.ui.global_ui_ellements.ratings.RatingStarsDisplay
-import com.example.rnd_transit_mtl.ui.global_ui_ellements.trip.TripReviewSummary
-import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.formatGeoPoint
-import com.example.rnd_transit_mtl.model.trip.TripStatus
 
-// Layout settings — dp sizes used by the history card.
+// Layout settings — dp sizes and horizontal swipe threshold used by the history card.
 private val HistoryCardContentPadding = 16.dp
 private val HistoryCardSectionSpacing = 12.dp
 private val HistoryCardButtonMinHeight = 48.dp
@@ -68,12 +68,19 @@ private val HistoryCardSwipeThreshold = 64.dp
  *
  * Collapsed, it shows two summary lines; More expands every detail,
  * including the full review. The parent owns expansion and action-tray
- * visibility by trip ID.
- * A drag only requests a presentation change; it never removes a trip.
+ * visibility by trip ID. A drag only requests a presentation change; it never removes a trip.
  *
- * Single-tap toggles the action tray; double-tap opens trip details.
- * Swipe left or long-press to reveal the action tray.
- * Swipe right or use Actions again to hide it.
+ * @param trip Completed or cancelled trip record to display.
+ * @param expanded Whether full route and review details are currently expanded.
+ * @param actionsVisible Whether the Review / Remove action tray below the card is visible.
+ * @param onToggleExpanded Toggles the expanded details section.
+ * @param onShowActions Reveals the action tray.
+ * @param onHideActions Hides the action tray.
+ * @param onOpenDetails Opens saved trip details, or null if navigation is unavailable.
+ * @param onReview Opens the review editor, or null if unavailable.
+ * @param onRemove Requests removal confirmation for this trip.
+ * @param modifier Parent layout constraints.
+ * @param actionsEnabled Whether gestures and action buttons accept input.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -88,339 +95,326 @@ fun TripHistoryCard(
     onReview: (() -> Unit)?,
     onRemove: () -> Unit,
     modifier: Modifier = Modifier,
-    actionsEnabled: Boolean = true
+    actionsEnabled: Boolean = true,
 ) {
     val density = LocalDensity.current
     val swipeThreshold = with(density) { HistoryCardSwipeThreshold.toPx() }
-
     val latestShowActions by rememberUpdatedState(onShowActions)
     val latestHideActions by rememberUpdatedState(onHideActions)
-
     val review = trip.review
     val cancelled = trip.status == TripStatus.Cancelled
 
     Column(modifier.fillMaxWidth().animateContentSize()) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .animateContentSize()
-            .pointerInput(trip.id, swipeThreshold, actionsEnabled) {
-                if (!actionsEnabled) return@pointerInput
-
-                var horizontalDrag = 0f
-
-                detectHorizontalDragGestures(
-                    onDragStart = {
-                        horizontalDrag = 0f
-                    },
-                    onHorizontalDrag = { change, amount ->
-                        change.consume()
-                        horizontalDrag += amount
-                    },
-                    onDragEnd = {
-                        when {
-                            horizontalDrag <= -swipeThreshold ->
-                                latestShowActions()
-
-                            horizontalDrag >= swipeThreshold ->
-                                latestHideActions()
-                        }
-                        horizontalDrag = 0f
-                    },
-                    onDragCancel = {
-                        horizontalDrag = 0f
-                    }
-                )
-            }
-            .combinedClickable(
-                enabled = actionsEnabled,
-                onClickLabel = if (actionsVisible) "Hide trip actions" else "Show trip actions",
-                onDoubleClick = onOpenDetails,
-                onLongClickLabel = "Show edit and remove actions",
-                onLongClick = { latestShowActions() },
-                onClick = {
-                    if (actionsVisible) latestHideActions() else latestShowActions()
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize()
+                .pointerInput(trip.id, swipeThreshold, actionsEnabled) {
+                    if (!actionsEnabled) return@pointerInput
+                    var horizontalDrag = 0f
+                    detectHorizontalDragGestures(
+                        onDragStart = { horizontalDrag = 0f },
+                        onHorizontalDrag = { change, amount ->
+                            change.consume()
+                            horizontalDrag += amount
+                        },
+                        onDragEnd = {
+                            when {
+                                horizontalDrag <= -swipeThreshold -> latestShowActions()
+                                horizontalDrag >= swipeThreshold -> latestHideActions()
+                            }
+                            horizontalDrag = 0f
+                        },
+                        onDragCancel = { horizontalDrag = 0f },
+                    )
                 }
-            ),
-        shape = RoundedCornerShape(0.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = TransitWhite,
-            contentColor = TransitMain
-        ),
-        border = BorderStroke(
-            width = 1.dp,
-            color = TransitMain.copy(alpha = 0.15f)
-        ),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 2.dp
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(HistoryCardContentPadding),
-            verticalArrangement = Arrangement.spacedBy(HistoryCardSectionSpacing)
+                .combinedClickable(
+                    enabled = actionsEnabled,
+                    onClickLabel = if (actionsVisible) "Hide trip actions" else "Show trip actions",
+                    onDoubleClick = onOpenDetails,
+                    onLongClickLabel = "Show edit and remove actions",
+                    onLongClick = { latestShowActions() },
+                    onClick = { if (actionsVisible) latestHideActions() else latestShowActions() },
+                ),
+            shape = RoundedCornerShape(0.dp),
+            colors = CardDefaults.cardColors(containerColor = TransitWhite, contentColor = TransitMain),
+            border = BorderStroke(width = 1.dp, color = TransitMain.copy(alpha = 0.15f)),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(HistoryCardSectionSpacing),
-                verticalAlignment = Alignment.Top
+            Column(
+                modifier = Modifier.padding(HistoryCardContentPadding),
+                verticalArrangement = Arrangement.spacedBy(HistoryCardSectionSpacing),
             ) {
-                Text(
-                    text = trip.title,
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.weight(1f)
+                HistoryCardHeaderRow(title = trip.title, cancelled = cancelled, hasReview = review != null)
+                HistoryCardSummaryRow(
+                    trip = trip,
+                    expanded = expanded,
+                    actionsEnabled = actionsEnabled,
+                    onToggleExpanded = onToggleExpanded,
                 )
-
-                Text(
-                    text = when {
-                        cancelled -> "Cancelled"
-                        review == null -> "Not reviewed"
-                        else -> "Reviewed"
-                    },
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier
-                        .background(
-                            color = when {
-                                cancelled -> TransitMain.copy(alpha = 0.15f)
-                                review == null -> TransitHighlight
-                                else -> TransitSelected
-                            },
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                AnimatedVisibility(
+                    visible = expanded,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut(),
+                ) {
+                    HistoryCardExpandedDetails(
+                        trip = trip,
+                        cancelled = cancelled,
+                        actionsEnabled = actionsEnabled,
+                    )
+                }
+                HistoryCardFooterRow(
+                    actionsVisible = actionsVisible,
+                    actionsEnabled = actionsEnabled,
+                    onOpenDetails = onOpenDetails,
+                    onToggleActions = { if (actionsVisible) onHideActions() else onShowActions() },
                 )
-            }
-
-            // Collapsed summary: two lines, plus a small button to show everything.
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = "${trip.origin.label} to ${trip.destination.label}",
-                        style = MaterialTheme.typography.bodyLarge,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = historyCardSummaryLine(trip),
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                TextButton(
-                    onClick = onToggleExpanded,
-                    enabled = actionsEnabled,
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = TransitMain,
-                        disabledContentColor = TransitMain.copy(alpha = 0.45f)
-                    ),
-                    modifier = Modifier.heightIn(min = HistoryCardButtonMinHeight)
-                ) {
-                    Text(if (expanded) "Less" else "More", style = MaterialTheme.typography.labelMedium)
-                    Icon(
-                        painter = painterResource(
-                            if (expanded) Res.drawable.ic_arrow_drop_up else Res.drawable.ic_arrow_drop_down
-                        ),
-                        contentDescription = null,
-                        modifier = Modifier.size(HistoryCardExpandIconSize)
-                    )
-                }
-            }
-
-            AnimatedVisibility(
-                visible = expanded,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(HistoryCardSectionSpacing)) {
-                    Text(
-                        text = "From ${formatGeoPoint(trip.origin.point)} " +
-                            "to ${formatGeoPoint(trip.destination.point)}",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-
-                    Text(
-                        text = "Transport: ${tripTransportSummary(trip)}",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-
-                    Text(
-                        text = "Routes: ${tripRouteSummary(trip)}",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-
-                    if (cancelled) {
-                        Text(
-                            text = "Cancelled: " + formatTripTimestampUtc(trip.cancelledAt ?: trip.createdAt),
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Text(
-                            text = "Cancelled before the end, so it cannot be reviewed.",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    } else {
-                        val completionText = trip.completedAt
-                            ?.let(::formatTripTimestampUtc)
-                            ?: "Completion information unavailable"
-
-                        Text(
-                            text = "Completed: $completionText",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-
-                        if (review == null) {
-                            Text(
-                                text = "No review saved. You can review this trip later.",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        } else {
-                            RatingStarsDisplay(
-                                label = "Overall experience",
-                                rating = review.overall,
-                                prominent = true,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(
-                                        color = TransitMain,
-                                        shape = RoundedCornerShape(16.dp)
-                                    )
-                                    .padding(12.dp)
-                            )
-
-                            TripReviewSummary(
-                                review = review,
-                                includeOverall = false,
-                                linksEnabled = actionsEnabled
-                            )
-                        }
-                    }
-                }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                TextButton(
-                    onClick = { onOpenDetails?.invoke() },
-                    enabled = actionsEnabled && onOpenDetails != null,
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = TransitMain,
-                        disabledContentColor = TransitMain.copy(alpha = 0.45f)
-                    ),
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = HistoryCardButtonMinHeight)
-                ) {
-                    Text("Details")
-                }
-
-                TextButton(
-                    onClick = {
-                        if (actionsVisible) {
-                            onHideActions()
-                        } else {
-                            onShowActions()
-                        }
-                    },
-                    enabled = actionsEnabled,
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = TransitMain,
-                        disabledContentColor = TransitMain.copy(alpha = 0.45f)
-                    ),
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = HistoryCardButtonMinHeight)
-                ) {
-                    Text(
-                        if (actionsVisible) {
-                            "Hide actions"
-                        } else {
-                            "Actions"
-                        }
-                    )
-                }
             }
         }
-
-    }
 
         AnimatedVisibility(
             visible = actionsVisible,
             enter = expandVertically() + fadeIn(),
-            exit = shrinkVertically() + fadeOut()
+            exit = shrinkVertically() + fadeOut(),
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                if (!cancelled) Button(
-                    onClick = { onReview?.invoke() },
-                    enabled = actionsEnabled && onReview != null,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = TransitSelected,
-                        contentColor = TransitMain,
-                        disabledContainerColor = TransitMain.copy(alpha = 0.08f),
-                        disabledContentColor = TransitMain.copy(alpha = 0.45f)
-                    ),
+            HistoryCardActionTray(
+                cancelled = cancelled,
+                hasReview = review != null,
+                actionsEnabled = actionsEnabled,
+                onReview = onReview,
+                onRemove = onRemove,
+            )
+        }
+    }
+}
+
+/** Title and status pill row at the top of [TripHistoryCard]. */
+@Composable
+private fun HistoryCardHeaderRow(title: String, cancelled: Boolean, hasReview: Boolean) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(HistoryCardSectionSpacing),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = when {
+                cancelled -> "Cancelled"
+                !hasReview -> "Not reviewed"
+                else -> "Reviewed"
+            },
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier
+                .background(
+                    color = when {
+                        cancelled -> TransitMain.copy(alpha = 0.15f)
+                        !hasReview -> TransitHighlight
+                        else -> TransitSelected
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                )
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+        )
+    }
+}
+
+/** Two-line collapsed summary paired with the More/Less expansion toggle. */
+@Composable
+private fun HistoryCardSummaryRow(
+    trip: Trip,
+    expanded: Boolean,
+    actionsEnabled: Boolean,
+    onToggleExpanded: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = "${trip.origin.label} to ${trip.destination.label}",
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = historyCardSummaryLine(trip),
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        TextButton(
+            onClick = onToggleExpanded,
+            enabled = actionsEnabled,
+            colors = ButtonDefaults.textButtonColors(
+                contentColor = TransitMain,
+                disabledContentColor = TransitMain.copy(alpha = 0.45f),
+            ),
+            modifier = Modifier.heightIn(min = HistoryCardButtonMinHeight),
+        ) {
+            Text(if (expanded) "Less" else "More", style = MaterialTheme.typography.labelMedium)
+            Icon(
+                painter = painterResource(
+                    if (expanded) Res.drawable.ic_arrow_drop_up else Res.drawable.ic_arrow_drop_down,
+                ),
+                contentDescription = null,
+                modifier = Modifier.size(HistoryCardExpandIconSize),
+            )
+        }
+    }
+}
+
+/** Expanded coordinates, transport summary, timestamp, and full review summary inside [TripHistoryCard]. */
+@Composable
+private fun HistoryCardExpandedDetails(
+    trip: Trip,
+    cancelled: Boolean,
+    actionsEnabled: Boolean,
+) {
+    val review = trip.review
+    Column(verticalArrangement = Arrangement.spacedBy(HistoryCardSectionSpacing)) {
+        Text(
+            text = "From ${formatGeoPoint(trip.origin.point)} to ${formatGeoPoint(trip.destination.point)}",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Text(text = "Transport: ${tripTransportSummary(trip)}", style = MaterialTheme.typography.bodyMedium)
+        Text(text = "Routes: ${tripRouteSummary(trip)}", style = MaterialTheme.typography.bodyMedium)
+        if (cancelled) {
+            Text(
+                text = "Cancelled: " + formatTripTimestampUtc(trip.cancelledAt ?: trip.createdAt),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                text = "Cancelled before the end, so it cannot be reviewed.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        } else {
+            val completionText = trip.completedAt?.let(::formatTripTimestampUtc) ?: "Completion information unavailable"
+            Text(text = "Completed: $completionText", style = MaterialTheme.typography.bodySmall)
+            if (review == null) {
+                Text(
+                    text = "No review saved. You can review this trip later.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            } else {
+                RatingStarsDisplay(
+                    label = "Overall experience",
+                    rating = review.overall,
+                    prominent = true,
                     modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = HistoryCardButtonMinHeight)
-                ) {
-                    Icon(
-                        painter = painterResource(
-                            Res.drawable.ic_google_demo_edit
-                        ),
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-
-                    Text(
-                        text = if (review == null) {
-                            "Review"
-                        } else {
-                            "Edit review"
-                        },
-                        modifier = Modifier.padding(start = 6.dp)
-                    )
-                }
-
-                Button(
-                    onClick = onRemove,
-                    enabled = actionsEnabled,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = TransitHighlight,
-                        contentColor = TransitMain,
-                        disabledContainerColor = TransitMain.copy(alpha = 0.08f),
-                        disabledContentColor = TransitMain.copy(alpha = 0.45f)
-                    ),
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = HistoryCardButtonMinHeight)
-                ) {
-                    Icon(
-                        painter = painterResource(
-                            Res.drawable.ic_google_demo_delete
-                        ),
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-
-                    Text(
-                        text = "Remove",
-                        modifier = Modifier.padding(start = 6.dp)
-                    )
-                }
+                        .fillMaxWidth()
+                        .background(color = TransitMain, shape = RoundedCornerShape(16.dp))
+                        .padding(12.dp),
+                )
+                TripReviewSummary(
+                    review = review,
+                    includeOverall = false,
+                    linksEnabled = actionsEnabled,
+                )
             }
+        }
+    }
+}
+
+/** Footer row offering Details and Actions toggle buttons inside [TripHistoryCard]. */
+@Composable
+private fun HistoryCardFooterRow(
+    actionsVisible: Boolean,
+    actionsEnabled: Boolean,
+    onOpenDetails: (() -> Unit)?,
+    onToggleActions: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        TextButton(
+            onClick = { onOpenDetails?.invoke() },
+            enabled = actionsEnabled && onOpenDetails != null,
+            colors = ButtonDefaults.textButtonColors(
+                contentColor = TransitMain,
+                disabledContentColor = TransitMain.copy(alpha = 0.45f),
+            ),
+            modifier = Modifier.weight(1f).heightIn(min = HistoryCardButtonMinHeight),
+        ) {
+            Text("Details")
+        }
+        TextButton(
+            onClick = onToggleActions,
+            enabled = actionsEnabled,
+            colors = ButtonDefaults.textButtonColors(
+                contentColor = TransitMain,
+                disabledContentColor = TransitMain.copy(alpha = 0.45f),
+            ),
+            modifier = Modifier.weight(1f).heightIn(min = HistoryCardButtonMinHeight),
+        ) {
+            Text(if (actionsVisible) "Hide actions" else "Actions")
+        }
+    }
+}
+
+/** Expandable Review / Edit review and Remove action tray beneath [TripHistoryCard]. */
+@Composable
+private fun HistoryCardActionTray(
+    cancelled: Boolean,
+    hasReview: Boolean,
+    actionsEnabled: Boolean,
+    onReview: (() -> Unit)?,
+    onRemove: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        if (!cancelled) {
+            Button(
+                onClick = { onReview?.invoke() },
+                enabled = actionsEnabled && onReview != null,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = TransitSelected,
+                    contentColor = TransitMain,
+                    disabledContainerColor = TransitMain.copy(alpha = 0.08f),
+                    disabledContentColor = TransitMain.copy(alpha = 0.45f),
+                ),
+                modifier = Modifier.weight(1f).heightIn(min = HistoryCardButtonMinHeight),
+            ) {
+                Icon(
+                    painter = painterResource(Res.drawable.ic_google_demo_edit),
+                    contentDescription = null,
+                    modifier = Modifier.size(HistoryCardExpandIconSize),
+                )
+                Text(
+                    text = if (!hasReview) "Review" else "Edit review",
+                    modifier = Modifier.padding(start = 6.dp),
+                )
+            }
+        }
+        Button(
+            onClick = onRemove,
+            enabled = actionsEnabled,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = TransitHighlight,
+                contentColor = TransitMain,
+                disabledContainerColor = TransitMain.copy(alpha = 0.08f),
+                disabledContentColor = TransitMain.copy(alpha = 0.45f),
+            ),
+            modifier = Modifier.weight(1f).heightIn(min = HistoryCardButtonMinHeight),
+        ) {
+            Icon(
+                painter = painterResource(Res.drawable.ic_google_demo_delete),
+                contentDescription = null,
+                modifier = Modifier.size(HistoryCardExpandIconSize),
+            )
+            Text(text = "Remove", modifier = Modifier.padding(start = 6.dp))
         }
     }
 }
@@ -430,6 +424,7 @@ fun TripHistoryCard(
  * for a reviewed trip, its overall rating.
  *
  * @param trip Completed or kept cancelled trip.
+ * @return Formatted summary string.
  */
 internal fun historyCardSummaryLine(trip: Trip): String {
     val endedAt = trip.completedAt ?: trip.cancelledAt ?: trip.createdAt

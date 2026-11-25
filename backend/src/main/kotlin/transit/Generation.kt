@@ -183,124 +183,248 @@ internal class Generator(private val routes: List<JsonElement>, private val zone
     private val diagnostic: (String)->Unit = { println("RndTransitGeneration $it") },
     private val preparationDispatcher: CoroutineDispatcher = Dispatchers.Default) {
     suspend fun generate(input: Request, requestId: String = "internal"): JsonObject {
-        if (input.roundTrip) return generateRoundTrip(input, routes, zones, route, now(), sample,
-            timeoutMillis ?: searchBudgetSeconds(input.minutes) * 1000, requestId, diagnostic)
-        if (input.destination != null) return routeToDestination(input, routes, zones, route, now(),
-            timeoutMillis ?: 30_000)
-        val timer=TimeSource.Monotonic.markNow()
+        if (input.roundTrip) return generateRoundTrip(
+            input, routes, zones, route, now(), sample,
+            timeoutMillis ?: searchBudgetSeconds(input.minutes) * 1000, requestId, diagnostic,
+        )
+        if (input.destination != null) return routeToDestination(
+            input, routes, zones, route, now(), timeoutMillis ?: 30_000,
+        )
+        val timer = TimeSource.Monotonic.markNow()
         fun log(event: String) = diagnostic("request=$requestId elapsedMs=${timer.elapsedNow().inWholeMilliseconds} $event")
         log("search=start modes=${input.modes.joinToString()} minutes=${input.minutes}")
-        val start=now(); var attempts=0
+        val start = now()
+        var attempts = 0
         var best: JsonObject? = null
         var bestTotal = Long.MIN_VALUE
-        val budget=timeoutMillis ?: searchBudgetSeconds(input.minutes)*1000
-        val result=withTimeoutOrNull(budget) {
-            val searchContext=currentCoroutineContext()
-            val allowed=withContext(preparationDispatcher) { allowedLines(input,routes) { searchContext.ensureActive() } }
-            // Reserve at least three quarters of the deadline for the main search.
-            // One direct attempt uses geographic candidates, never another scan of transit stops.
-            val alternative=when {
-                "walk" in input.modes && input.modes.any { it !in listOf("walk","bike") } -> "walk"
-                "bike" in input.modes && !input.bikeOnly && !input.walkBike -> "bike"
-                else -> null
-            }
-            if(alternative!=null && maxAttempts>0) {
-                val mode=alternative
-                val directInput=input.copy(modes=listOf(mode),zones=emptyMap(),lines=emptyList())
-                val fallback=try {
-                    Generator(emptyList(),zones,{ query -> attempts++; route(query) },{start},
-                        sample ?: { request -> candidates(request) },(budget/4).coerceAtLeast(1),1,
-                        { event -> diagnostic("phase=$mode $event") },preparationDispatcher).generate(directInput,requestId)
-                } catch(e: CancellationException) { throw e } catch(_: ProviderError) { null }
-                val total=fallback?.field("elapsedSeconds")?.number()?.toLong()
-                if(fallback?.field("status").text()=="success" && total!=null && total>bestTotal) {
-                    best=fallback; bestTotal=total
+        val budget = timeoutMillis ?: searchBudgetSeconds(input.minutes) * 1000
+        val result = withTimeoutOrNull(budget) {
+            val searchContext = currentCoroutineContext()
+            val allowed = withContext(preparationDispatcher) { allowedLines(input, routes) { searchContext.ensureActive() } }
+            tryDirectFallback(input, start, budget, requestId) { query -> attempts++; route(query) }?.let { fallback ->
+                val total = fallback.field("elapsedSeconds")?.number()?.toLong()
+                if (fallback.field("status").text() == "success" && total != null && total > bestTotal) {
+                    best = fallback
+                    bestTotal = total
                 }
             }
-            var failures=0
+            var failures = 0
             log("candidates=start")
-            val pending = ArrayDeque((sample?.invoke(input) ?: destinationCandidates(input,routes,zones,allowed,
-                dispatcher=preparationDispatcher)).filter { p ->
-                input.excluded.none { distance(p,it)<100 } && inServiceArea(p) &&
-                    (input.modes.any { it in listOf("walk","bike") } || input.zones.values.any { zones.allows(p,it) { searchContext.ensureActive() } })
-            })
+            val pending = loadCandidateQueue(input, allowed) { searchContext.ensureActive() }
             log("candidates=ready count=${pending.size}")
             val visited = mutableListOf<Point>()
-            while(pending.isNotEmpty() && attempts<maxAttempts) {
-                val end=pending.removeFirst()
-                if(visited.any { distance(it,end)<50 }) continue
-                visited+=end
-                currentCoroutineContext().ensureActive(); attempts++
-                val routeTimer=TimeSource.Monotonic.markNow()
-                log("attempt=$attempts otp=start")
-                val body=try {
-                    val initial=route(otpRequest(input,end,start,allowed))
-                    val planned=if(input.walkBike) walkBikeResponse(initial,input,end,start,zones) { query ->
-                        if(attempts>=maxAttempts) emptyPlanningResponse() else {
-                            attempts++
-                            log("attempt=$attempts otp=walk-bike-section")
-                            route(query)
-                        }
-                    } else bikeResponse(initial,input)
-                    planned.also { log("attempt=$attempts otp=response latencyMs=${routeTimer.elapsedNow().inWholeMilliseconds}") }
-                }
-                    catch(e: CancellationException) { throw e }
-                    catch(e: Exception) { log("attempt=$attempts otp=failed type=${e.javaClass.simpleName} http=${(e as? ProviderError)?.httpStatus ?: "none"}"); if(++failures>=2) { if(best!=null) break else throw ProviderError("Routing service unavailable.",e) }; continue }
+            while (pending.isNotEmpty() && attempts < maxAttempts) {
+                val end = pending.removeFirst()
+                if (visited.any { distance(it, end) < 50 }) continue
+                visited += end
                 currentCoroutineContext().ensureActive()
-                val plan=body.field("data").field("planConnection")
-                val codes=plan.field("routingErrors").items().mapNotNull { it.field("code").text() }
-                    .filter { it.matches(Regex("[A-Z_]{1,80}")) }.take(8)
-                if(codes.isNotEmpty() || body["errors"].items().isNotEmpty())
-                    log("attempt=$attempts routingCodes=${codes.joinToString()} graphqlErrors=${body["errors"].items().size}")
-                val noRoute=setOf("LOCATION_NOT_FOUND","NO_DIRECT_MODE_CONNECTION","NO_STOPS_IN_RANGE","NO_TRANSIT_CONNECTION","NO_TRANSIT_CONNECTION_IN_SEARCH_WINDOW","OUTSIDE_SERVICE_PERIOD","WALKING_BETTER_THAN_TRANSIT","OUTSIDE_BOUNDS")
-                if(body["errors"].items().isNotEmpty() || plan.field("edges") !is JsonArray || plan.field("routingErrors").items().any { it.field("code").text() !in noRoute }) {
+                attempts++
+                val routeTimer = TimeSource.Monotonic.markNow()
+                log("attempt=$attempts otp=start")
+                val body = try {
+                    val initial = route(otpRequest(input, end, start, allowed))
+                    val planned = if (input.walkBike) {
+                        walkBikeResponse(initial, input, end, start, zones) { query ->
+                            if (attempts >= maxAttempts) emptyPlanningResponse() else {
+                                attempts++
+                                log("attempt=$attempts otp=walk-bike-section")
+                                route(query)
+                            }
+                        }
+                    } else bikeResponse(initial, input)
+                    planned.also { log("attempt=$attempts otp=response latencyMs=${routeTimer.elapsedNow().inWholeMilliseconds}") }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    log("attempt=$attempts otp=failed type=${e.javaClass.simpleName} http=${(e as? ProviderError)?.httpStatus ?: "none"}")
+                    if (++failures >= 2) {
+                        if (best != null) break else throw ProviderError("Routing service unavailable.", e)
+                    }
+                    continue
+                }
+                currentCoroutineContext().ensureActive()
+                val plan = body.field("data").field("planConnection") as? JsonObject
+                logRoutingErrorsIfAny(body, plan, attempts, ::log)
+                if (plan == null || isInvalidPlanningResponse(body, plan)) {
                     // A malformed candidate response does not invalidate other destinations.
-                    // Share the existing failure budget with transport errors to bound retries.
-                    if(systemicOtpError(body) || ++failures>=2) {
-                        if(best!=null) break
+                    if (systemicOtpError(body) || ++failures >= 2) {
+                        if (best != null) break
                         throw ProviderError("OTP returned an invalid planning response.")
                     }
                     continue
                 }
-                for(edge in plan.field("edges").items()) {
-                    val itinerary=edge.field("node") ?: continue
-                    val travel=elapsed(itinerary,start) ?: continue
-                    val meters=itinerary.field("legs").items().sumOf { it.field("distance").number() ?: Double.NaN }
-                    if(!meters.isFinite() || meters<=0) continue
-                    val buffer=orientationSeconds(meters); val total=travel+buffer
-                    // Reuse known linked geometry to try a shorter destination when a route overshoots.
-                    if(total>input.minutes*60) {
-                        val points=runCatching { itinerary.field("legs").items().flatMap { decodePolyline(it.field("legGeometry").field("points").text()!!) { searchContext.ensureActive() } } }.getOrElse { error ->
-                            if(error is CancellationException) throw error
-                            emptyList()
-                        }
-                        if(points.size>2) {
-                            val index=((points.lastIndex*input.minutes*60.0/total)*0.95).toInt().coerceIn(1,points.lastIndex)
-                            val linked=points[index]
-                            if(inServiceArea(linked) && input.excluded.none { distance(linked,it)<100 } &&
-                                (input.modes.any { it in listOf("walk","bike") } || input.zones.values.any { zones.allows(linked,it) })) pending.addFirst(linked)
-                        }
+                for (edge in plan.field("edges").items()) {
+                    val itinerary = edge.field("node") ?: continue
+                    val travel = elapsed(itinerary, start) ?: continue
+                    val meters = itinerary.field("legs").items().sumOf { it.field("distance").number() ?: Double.NaN }
+                    if (!meters.isFinite() || meters <= 0) continue
+                    val buffer = orientationSeconds(meters)
+                    val total = travel + buffer
+                    if (total > input.minutes * 60) {
+                        maybeQueueShortenedCandidate(itinerary, input, total, pending) { searchContext.ensureActive() }
                         continue
                     }
-                    val context=currentCoroutineContext()
-                    if(!accepts(itinerary,input,end,zones,allowed) { context.ensureActive() }) { log("attempt=$attempts rejected=geometry-mode-line-zone"); continue }
-                    if(total<=bestTotal) continue
-                    bestTotal=total
+                    val context = currentCoroutineContext()
+                    if (!accepts(itinerary, input, end, zones, allowed) { context.ensureActive() }) {
+                        log("attempt=$attempts rejected=geometry-mode-line-zone")
+                        continue
+                    }
+                    if (total <= bestTotal) continue
+                    bestTotal = total
                     log("attempt=$attempts accepted totalSeconds=$total")
-                    best = obj("status" to "success","origin" to input.origin,"destination" to obj("label" to "Random destination","point" to end.toJson()),
-                        "elapsedSeconds" to total,"travelTimeSeconds" to travel,"orientationBufferSeconds" to buffer,"walkingPreference" to input.pace,
-                        "walkingSpeedKmh" to walkingSpeeds.getValue(input.pace),"departure" to start.toString(),"attempts" to attempts,
-                        "otp" to JsonObject(body+ ("data" to obj("planConnection" to JsonObject(plan!!.jsonObject+mapOf("routingErrors" to JsonArray(emptyList()),"edges" to JsonArray(listOf(edge))))))))
-                    if(total>=input.minutes*60*0.95) return@withTimeoutOrNull best
+                    best = buildSuccessPayload(input, end, start, total, travel, buffer, attempts, body, plan, edge)
+                    if (total >= input.minutes * 60 * 0.95) return@withTimeoutOrNull best
                 }
             }
-            if(best!=null) return@withTimeoutOrNull best
-            if(failures>0) throw ProviderError("Routing service unavailable.")
-            obj("status" to "no_trip","message" to "No reachable trip fits these choices. Try again or increase the time.","attempts" to attempts)
+            if (best != null) return@withTimeoutOrNull best
+            if (failures > 0) throw ProviderError("Routing service unavailable.")
+            obj("status" to "no_trip", "message" to "No reachable trip fits these choices. Try again or increase the time.", "attempts" to attempts)
         }
         currentCoroutineContext().ensureActive()
-        val accepted=result ?: best
-        log("search=end deadline=${result==null} attempts=$attempts status=${accepted?.field("status").text() ?: "timeout"}")
-        return accepted?.let { JsonObject(it + ("attempts" to JsonPrimitive(attempts))) } ?: obj("status" to "timeout","message" to "Trip search timed out. Try again.","attempts" to attempts)
+        val accepted = result ?: best
+        log("search=end deadline=${result == null} attempts=$attempts status=${accepted?.field("status").text() ?: "timeout"}")
+        return accepted?.let { JsonObject(it + ("attempts" to JsonPrimitive(attempts))) }
+            ?: obj("status" to "timeout", "message" to "Trip search timed out. Try again.", "attempts" to attempts)
     }
+
+    /** Reserves up to one quarter of the deadline for a single direct-mode fallback candidate when mixed modes include walk or bike. */
+    private suspend fun tryDirectFallback(
+        input: Request,
+        start: Instant,
+        budget: Long,
+        requestId: String,
+        countedRoute: suspend (JsonObject) -> JsonObject,
+    ): JsonObject? {
+        val alternative = when {
+            "walk" in input.modes && input.modes.any { it !in listOf("walk", "bike") } -> "walk"
+            "bike" in input.modes && !input.bikeOnly && !input.walkBike -> "bike"
+            else -> null
+        } ?: return null
+        if (maxAttempts <= 0) return null
+        val directInput = input.copy(modes = listOf(alternative), zones = emptyMap(), lines = emptyList())
+        return try {
+            Generator(
+                emptyList(), zones, countedRoute, { start },
+                sample ?: { request -> candidates(request) }, (budget / 4).coerceAtLeast(1), 1,
+                { event -> diagnostic("phase=$alternative $event") }, preparationDispatcher,
+            ).generate(directInput, requestId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: ProviderError) {
+            null
+        }
+    }
+
+    /** Builds the filtered FIFO queue of destination candidates inside the service area and selected fare zones. */
+    private suspend fun loadCandidateQueue(
+        input: Request,
+        allowed: Set<String>?,
+        checkActive: () -> Unit,
+    ): ArrayDeque<Point> {
+        val raw = sample?.invoke(input)
+            ?: destinationCandidates(input, routes, zones, allowed, dispatcher = preparationDispatcher)
+        return ArrayDeque(
+            raw.filter { point ->
+                input.excluded.none { distance(point, it) < 100 } &&
+                    inServiceArea(point) &&
+                    (input.modes.any { it in listOf("walk", "bike") } ||
+                        input.zones.values.any { zones.allows(point, it, checkActive) })
+            },
+        )
+    }
+
+    /** Logs OTP GraphQL and routing error codes when present on a candidate response. */
+    private fun logRoutingErrorsIfAny(
+        body: JsonObject,
+        plan: JsonObject?,
+        attempts: Int,
+        log: (String) -> Unit,
+    ) {
+        val codes = plan.field("routingErrors").items().mapNotNull { it.field("code").text() }
+            .filter { it.matches(Regex("[A-Z_]{1,80}")) }.take(8)
+        if (codes.isNotEmpty() || body["errors"].items().isNotEmpty()) {
+            log("attempt=$attempts routingCodes=${codes.joinToString()} graphqlErrors=${body["errors"].items().size}")
+        }
+    }
+
+    /** Returns true when OTP returned GraphQL errors, missing edges, or unexpected routing error codes. */
+    private fun isInvalidPlanningResponse(body: JsonObject, plan: JsonObject): Boolean {
+        val expectedNoRouteCodes = setOf(
+            "LOCATION_NOT_FOUND",
+            "NO_DIRECT_MODE_CONNECTION",
+            "NO_STOPS_IN_RANGE",
+            "NO_TRANSIT_CONNECTION",
+            "NO_TRANSIT_CONNECTION_IN_SEARCH_WINDOW",
+            "OUTSIDE_SERVICE_PERIOD",
+            "WALKING_BETTER_THAN_TRANSIT",
+            "OUTSIDE_BOUNDS",
+        )
+        return body["errors"].items().isNotEmpty() ||
+            plan.field("edges") !is JsonArray ||
+            plan.field("routingErrors").items().any { it.field("code").text() !in expectedNoRouteCodes }
+    }
+
+    /** Reuses routed geometry from an over-budget itinerary to enqueue a proportionally closer candidate. */
+    private fun maybeQueueShortenedCandidate(
+        itinerary: JsonElement,
+        input: Request,
+        totalSeconds: Long,
+        pending: ArrayDeque<Point>,
+        checkActive: () -> Unit,
+    ) {
+        val points = runCatching {
+            itinerary.field("legs").items().flatMap { leg ->
+                val encoded = leg.field("legGeometry").field("points").text() ?: return@flatMap emptyList()
+                decodePolyline(encoded, checkActive)
+            }
+        }.getOrElse { error ->
+            if (error is CancellationException) throw error
+            emptyList()
+        }
+        if (points.size > 2) {
+            val index = ((points.lastIndex * input.minutes * 60.0 / totalSeconds) * 0.95)
+                .toInt().coerceIn(1, points.lastIndex)
+            val linked = points[index]
+            if (inServiceArea(linked) &&
+                input.excluded.none { distance(linked, it) < 100 } &&
+                (input.modes.any { it in listOf("walk", "bike") } || input.zones.values.any { zones.allows(linked, it) })
+            ) {
+                pending.addFirst(linked)
+            }
+        }
+    }
+
+    /** Assembles the JSON success response containing the accepted OTP edge and timing breakdown. */
+    private fun buildSuccessPayload(
+        input: Request,
+        end: Point,
+        start: Instant,
+        total: Long,
+        travel: Long,
+        buffer: Long,
+        attempts: Int,
+        body: JsonObject,
+        plan: JsonObject,
+        edge: JsonElement,
+    ): JsonObject = obj(
+        "status" to "success",
+        "origin" to input.origin,
+        "destination" to obj("label" to "Random destination", "point" to end.toJson()),
+        "elapsedSeconds" to total,
+        "travelTimeSeconds" to travel,
+        "orientationBufferSeconds" to buffer,
+        "walkingPreference" to input.pace,
+        "walkingSpeedKmh" to walkingSpeeds.getValue(input.pace),
+        "departure" to start.toString(),
+        "attempts" to attempts,
+        "otp" to JsonObject(
+            body + (
+                "data" to obj(
+                    "planConnection" to JsonObject(
+                        plan + mapOf("routingErrors" to JsonArray(emptyList()), "edges" to JsonArray(listOf(edge))),
+                    ),
+                )
+            ),
+        ),
+    )
 }

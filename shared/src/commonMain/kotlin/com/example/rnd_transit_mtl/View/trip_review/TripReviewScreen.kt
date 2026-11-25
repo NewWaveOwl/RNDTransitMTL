@@ -1,54 +1,50 @@
 package com.example.rnd_transit_mtl.View.trip_review
-import com.example.rnd_transit_mtl.model.ids.TripId
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
-import com.example.rnd_transit_mtl.data.trips.LocalCloudTrips
-import com.example.rnd_transit_mtl.data.trips.tryCloudAction
-import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
+import com.example.rnd_transit_mtl.data.trips.LocalCloudTrips
+import com.example.rnd_transit_mtl.data.trips.tryCloudAction
+import com.example.rnd_transit_mtl.model.ids.TripId
 import com.example.rnd_transit_mtl.model.review.TripReviewMode
-import com.example.rnd_transit_mtl.state.trip.LocalTripsStore
-import com.example.rnd_transit_mtl.state.review.ReviewDraft
-import com.example.rnd_transit_mtl.state.review.ReviewStep
-import com.example.rnd_transit_mtl.state.trip.TripActionResult
-import com.example.rnd_transit_mtl.ui.theme.TransitMain
-import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 import com.example.rnd_transit_mtl.navigation.RegisterReviewBackHandler
+import com.example.rnd_transit_mtl.state.review.ReviewDraft
+import com.example.rnd_transit_mtl.state.trip.LocalTripsStore
+import com.example.rnd_transit_mtl.state.trip.TripActionResult
+import kotlinx.coroutines.launch
+
+// Layout settings — delegated to TripReviewContent.kt and TripReviewStatusViews.kt.
 
 /**
  * Coordinates the latest stored record and its ID-associated review draft.
  *
  * Navigation callbacks return true only after their destination exists.
- * registerBackHandler connects the shared header to this screen's close action.
+ * [registerBackHandler] connects the shared header to this screen's close action.
+ *
+ * @param tripId Stable identifier of the completed trip being reviewed.
+ * @param mode Whether this is an initial post-trip review or an edit from History/Details.
+ * @param isDestinationActive True only while this review destination is the active navigation entry.
+ * @param onOpenHistory Navigates to History after an initial review completes or is skipped.
+ * @param onReturnToOrigin Returns to the previous destination after an edit review finishes.
+ * @param modifier Parent layout constraints.
+ * @param registerBackHandler Optional hook connecting the shared top bar back action to discard/close.
+ * @param onOpenFeedback Optional callback for per-leg or per-place feedback.
+ * @param feedbackAvailable Whether per-leg/place feedback navigation is enabled.
  */
 @Composable
 fun TripReviewScreen(
@@ -60,7 +56,7 @@ fun TripReviewScreen(
     modifier: Modifier = Modifier,
     registerBackHandler: RegisterReviewBackHandler? = null,
     onOpenFeedback: () -> Unit = {},
-    feedbackAvailable: Boolean = false
+    feedbackAvailable: Boolean = false,
 ) {
     val tripsStore = LocalTripsStore.current
     val cloud = LocalCloudTrips.current
@@ -78,42 +74,27 @@ fun TripReviewScreen(
     val latestReturnToOrigin by rememberUpdatedState(onReturnToOrigin)
 
     var isAppResumed by remember(lifecycle) {
-        mutableStateOf(
-            lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
-        )
+        mutableStateOf(lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
     }
-    var errorMessage by remember(tripId, mode) {
-        mutableStateOf<String?>(null)
-    }
+    var errorMessage by remember(tripId, mode) { mutableStateOf<String?>(null) }
 
     // These flags prevent replaying Save/Skip while navigation is pending.
-    var exitMessage by rememberSaveable(tripId, mode.name) {
-        mutableStateOf<String?>(null)
-    }
-    var exitHandled by rememberSaveable(tripId, mode.name) {
-        mutableStateOf(false)
-    }
+    var exitMessage by rememberSaveable(tripId, mode.name) { mutableStateOf<String?>(null) }
+    var exitHandled by rememberSaveable(tripId, mode.name) { mutableStateOf(false) }
 
     DisposableEffect(lifecycle) {
         val observer = LifecycleEventObserver { _, _ ->
-            isAppResumed = lifecycle.currentState
-                .isAtLeast(Lifecycle.State.RESUMED)
+            isAppResumed = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
         }
         lifecycle.addObserver(observer)
-        isAppResumed = lifecycle.currentState
-            .isAtLeast(Lifecycle.State.RESUMED)
-
-        onDispose {
-            lifecycle.removeObserver(observer)
-        }
+        isAppResumed = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+        onDispose { lifecycle.removeObserver(observer) }
     }
 
     fun isInteractive(): Boolean =
-        latestDestinationActive &&
-                lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+        latestDestinationActive && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
 
-    fun canEdit(): Boolean =
-        isInteractive() && exitMessage == null && !saving
+    fun canEdit(): Boolean = isInteractive() && exitMessage == null && !saving
 
     fun finish(message: String) {
         focusManager.clearFocus()
@@ -124,46 +105,28 @@ fun TripReviewScreen(
 
     fun requestExit() {
         if (!isInteractive() || exitMessage == null) return
-
         val handled = when (mode) {
             TripReviewMode.INITIAL -> latestOpenHistory()
             TripReviewMode.EDIT -> latestReturnToOrigin()
         }
-
         exitHandled = handled
-        errorMessage = if (handled) {
-            null
-        } else {
-            "Navigation has not finished. Your trip is preserved. " +
-                    "Use Continue to retry."
-        }
+        errorMessage = if (handled) null
+        else "Navigation has not finished. Your trip is preserved. Use Continue to retry."
     }
 
     fun discardAndExit() {
-        if (saving) return
-        if (!isInteractive()) return
-
+        if (saving || !isInteractive()) return
         if (exitMessage != null) {
             requestExit()
             return
         }
-
         when (val result = tripsStore.skipReview(tripId)) {
-            TripActionResult.Applied -> {
-                finish(
-                    if (mode == TripReviewMode.INITIAL) {
-                        "Review skipped. Your completed trip is preserved."
-                    } else {
-                        "Changes discarded. Your saved review is preserved."
-                    }
-                )
-            }
-            is TripActionResult.MissingTrip -> {
-                finish("This trip is no longer available.")
-            }
-            is TripActionResult.InvalidInput -> {
-                errorMessage = result.message
-            }
+            TripActionResult.Applied -> finish(
+                if (mode == TripReviewMode.INITIAL) "Review skipped. Your completed trip is preserved."
+                else "Changes discarded. Your saved review is preserved.",
+            )
+            is TripActionResult.MissingTrip -> finish("This trip is no longer available.")
+            is TripActionResult.InvalidInput -> errorMessage = result.message
             else -> errorMessage = "The review could not be closed."
         }
     }
@@ -171,40 +134,28 @@ fun TripReviewScreen(
     fun updateDraft(transform: (ReviewDraft) -> ReviewDraft) {
         if (!canEdit()) return
         val latestDraft = tripsStore.reviewDrafts[tripId] ?: return
-
-        when (
-            val result = tripsStore.updateReviewDraft(
-                tripId,
-                transform(latestDraft)
-            )
-        ) {
-            TripActionResult.Applied -> errorMessage = null
-            is TripActionResult.MissingTrip -> {
-                errorMessage = "This trip is no longer available."
-            }
-            is TripActionResult.InvalidInput -> {
-                errorMessage = result.message
-            }
-            else -> errorMessage = "The review draft could not be updated."
-        }
+        errorMessage = describeReviewActionError(
+            result = tripsStore.updateReviewDraft(tripId, transform(latestDraft)),
+            fallback = "The review draft could not be updated.",
+        )
     }
 
     fun saveAndExit() {
         if (!canEdit()) return
-
         if (cloud != null) {
             val result = tripsStore.prepareReview(tripId) { review ->
                 saving = true
                 scope.launch {
                     try {
                         if (tryCloudAction {
-                            // A review needs its parent trip even when completion saving is pending.
-                            cloud.flushFinalTrip(tripId)
-                            cloud.mutate {
-                                val stored = saveReview(tripId, review)
-                                tripsStore.saveReview(tripId, stored)
+                                // A review needs its parent trip even when completion saving is pending.
+                                cloud.flushFinalTrip(tripId)
+                                cloud.mutate {
+                                    val stored = saveReview(tripId, review)
+                                    tripsStore.saveReview(tripId, stored)
+                                }
                             }
-                        }) {
+                        ) {
                             finish("Review saved.")
                         } else {
                             errorMessage = "Could not save your review. Please retry."
@@ -215,50 +166,27 @@ fun TripReviewScreen(
                 }
                 TripActionResult.Applied
             }
-            when (result) {
-                is TripActionResult.InvalidInput -> errorMessage = result.message
-                is TripActionResult.MissingTrip -> errorMessage = "This trip is no longer available."
-                else -> Unit
+            if (result != TripActionResult.Applied) {
+                errorMessage = describeReviewActionError(result, "The review could not be saved.")
             }
             return
         }
 
         when (val result = tripsStore.saveReview(tripId)) {
             TripActionResult.Applied -> finish("Review saved.")
-            is TripActionResult.MissingTrip -> {
-                finish("This trip is no longer available.")
-            }
-            is TripActionResult.InvalidInput -> {
-                errorMessage = result.message
-            }
+            is TripActionResult.MissingTrip -> finish("This trip is no longer available.")
+            is TripActionResult.InvalidInput -> errorMessage = result.message
             else -> errorMessage = "The review could not be saved."
         }
     }
 
-    val latestClose: () -> Unit by rememberUpdatedState(
-        newValue = { discardAndExit() }
-    )
-
+    val latestClose: () -> Unit by rememberUpdatedState(newValue = { discardAndExit() })
     DisposableEffect(registerBackHandler, isDestinationActive) {
-        val unregister = if (isDestinationActive) {
-            registerBackHandler?.invoke { latestClose() }
-        } else {
-            null
-        }
-
-        onDispose {
-            unregister?.invoke()
-        }
+        val unregister = if (isDestinationActive) registerBackHandler?.invoke { latestClose() } else null
+        onDispose { unregister?.invoke() }
     }
 
-    LaunchedEffect(
-        tripsStore,
-        tripId,
-        mode,
-        isDestinationActive,
-        trip != null,
-        exitMessage
-    ) {
+    LaunchedEffect(tripsStore, tripId, mode, isDestinationActive, trip != null, exitMessage) {
         if (isDestinationActive && trip != null && exitMessage == null) {
             when (val result = tripsStore.beginReview(tripId)) {
                 TripActionResult.Applied -> {
@@ -266,167 +194,69 @@ fun TripReviewScreen(
                         tripsStore.acknowledgeReviewNavigation(tripId)
                     }
                 }
-                is TripActionResult.MissingTrip -> {
-                    errorMessage = "This trip is no longer available."
-                }
-                is TripActionResult.InvalidInput -> {
-                    errorMessage = result.message
-                }
-                else -> errorMessage = "The review could not be opened."
+                else -> errorMessage = describeReviewActionError(result, "The review could not be opened.")
             }
         }
     }
 
-    LaunchedEffect(
-        tripId,
-        mode,
-        isDestinationActive,
-        isAppResumed,
-        exitMessage,
-        exitHandled
-    ) {
-        if (
-            isDestinationActive &&
-            isAppResumed &&
-            exitMessage != null &&
-            !exitHandled
-        ) {
+    LaunchedEffect(tripId, mode, isDestinationActive, isAppResumed, exitMessage, exitHandled) {
+        if (isDestinationActive && isAppResumed && exitMessage != null && !exitHandled) {
             requestExit()
         }
     }
 
-    val backState = rememberNavigationEventState(
-        currentInfo = NavigationEventInfo.None
-    )
-
+    val backState = rememberNavigationEventState(currentInfo = NavigationEventInfo.None)
     NavigationBackHandler(
         state = backState,
         isBackEnabled = isDestinationActive && isAppResumed,
-        onBackCompleted = { discardAndExit() }
+        onBackCompleted = { discardAndExit() },
     )
 
+    val activeAndResumed = isDestinationActive && isAppResumed
     when {
-        exitMessage != null -> {
-            Column(
-                modifier = modifier
-                    .fillMaxSize()
-                    .background(TransitWhite)
-                    .imePadding()
-                    .verticalScroll(rememberScrollState())
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text(
-                    text = exitMessage.orEmpty(),
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = TransitMain
-                )
-                if (errorMessage != null) {
-                    Text(
-                        text = errorMessage.orEmpty(),
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-                Button(
-                    onClick = { requestExit() },
-                    enabled = isDestinationActive && isAppResumed,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        if (mode == TripReviewMode.INITIAL) {
-                            "Continue to History"
-                        } else {
-                            "Return to previous view"
-                        }
-                    )
-                }
-            }
-        }
+        exitMessage != null -> TripReviewExitView(
+            exitMessage = exitMessage.orEmpty(),
+            errorMessage = errorMessage,
+            mode = mode,
+            enabled = activeAndResumed,
+            onContinue = { requestExit() },
+            modifier = modifier,
+        )
 
-        trip == null -> {
-            Column(
-                modifier = modifier
-                    .fillMaxSize()
-                    .background(TransitWhite)
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text(
-                    text = "Trip unavailable",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = TransitMain
-                )
-                Text(
-                    text = "This completed trip was removed or is not " +
-                            "available in the current session.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = TransitMain
-                )
-                Button(
-                    onClick = {
-                        if (isInteractive()) {
-                            finish("This trip is no longer available.")
-                        }
-                    },
-                    enabled = isDestinationActive && isAppResumed,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Return")
-                }
-            }
-        }
+        trip == null -> TripReviewUnavailableView(
+            enabled = activeAndResumed,
+            onReturn = { if (isInteractive()) finish("This trip is no longer available.") },
+            modifier = modifier,
+        )
 
-        draft == null -> {
-            Column(
-                modifier = modifier
-                    .fillMaxSize()
-                    .background(TransitWhite)
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text(
-                    text = "Opening review",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = TransitMain
-                )
-                if (errorMessage != null) {
-                    Text(
-                        text = errorMessage.orEmpty(),
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-                Button(
-                    onClick = { discardAndExit() },
-                    enabled = isDestinationActive && isAppResumed
-                ) {
-                    Text("Close")
-                }
-            }
-        }
+        draft == null -> TripReviewOpeningView(
+            errorMessage = errorMessage,
+            enabled = activeAndResumed,
+            onClose = { discardAndExit() },
+            modifier = modifier,
+        )
 
-        else -> {
-            TripReviewContent(
-                tripTitle = trip.title,
-                mode = mode,
-                draft = draft,
-                controlsEnabled = canEdit(),
-                errorMessage = errorMessage,
-                onRatingChange = { question, rating ->
-                    updateDraft { it.withRating(question, rating) }
-                },
-                onCommentChange = { comment ->
-                    updateDraft { it.copy(comment = comment) }
-                },
-                onImageUrlChange = { imageUrl ->
-                    updateDraft { it.copy(imageUrl = imageUrl) }
-                },
-                onStepChange = { step ->
-                    updateDraft { it.copy(step = step) }
-                },
-                onSave = { saveAndExit() },
-                onDiscard = { discardAndExit() },
-                modifier = modifier
-            )
-        }
+        else -> TripReviewContent(
+            tripTitle = trip.title,
+            mode = mode,
+            draft = draft,
+            controlsEnabled = canEdit(),
+            errorMessage = errorMessage,
+            onRatingChange = { question, rating -> updateDraft { it.withRating(question, rating) } },
+            onCommentChange = { comment -> updateDraft { it.copy(comment = comment) } },
+            onImageUrlChange = { imageUrl -> updateDraft { it.copy(imageUrl = imageUrl) } },
+            onStepChange = { step -> updateDraft { it.copy(step = step) } },
+            onSave = { saveAndExit() },
+            onDiscard = { discardAndExit() },
+            modifier = modifier,
+        )
     }
+}
+
+/** Maps a [TripActionResult] from review draft/open/prepare operations into an optional error message. */
+private fun describeReviewActionError(result: TripActionResult, fallback: String): String? = when (result) {
+    TripActionResult.Applied -> null
+    is TripActionResult.MissingTrip -> "This trip is no longer available."
+    is TripActionResult.InvalidInput -> result.message
+    else -> fallback
 }

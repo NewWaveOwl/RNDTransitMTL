@@ -38,6 +38,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.example.rnd_transit_mtl.View.trip_review.components.ReviewQuestionCard
 import com.example.rnd_transit_mtl.model.review.TripReviewMode
 import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.state.review.ReviewDraft
@@ -48,16 +49,38 @@ import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 import org.jetbrains.compose.resources.painterResource
 import rnd_transit_mtl.shared.generated.resources.Res
 import rnd_transit_mtl.shared.generated.resources.ic_close
-import com.example.rnd_transit_mtl.View.trip_review.components.ReviewQuestionCard
+
+// Layout settings — dp width limit, spacing, step bar, and button heights for the review form.
+private val ReviewFormMaximumWidth = 640.dp
+private val ReviewFormPadding = 16.dp
+private val ReviewFormSpacing = 20.dp
+private val ReviewCloseButtonSize = 48.dp
+private val ReviewStepBarHeight = 6.dp
+private val ReviewStepBarSpacing = 8.dp
+private val ReviewPrimaryButtonMinHeight = 52.dp
+private val ReviewSecondaryButtonMinHeight = 48.dp
+
+// Animation settings — milliseconds for vertical rolling transitions between review questions.
+private const val REVIEW_STEP_SLIDE_DURATION_MILLIS = 300
+private const val REVIEW_STEP_FADE_IN_DURATION_MILLIS = 200
+private const val REVIEW_STEP_FADE_OUT_DURATION_MILLIS = 150
 
 /**
  * Stateless sequential review form.
+ * The draft supplies both values and the current question; only transient animation and scrolling live here.
  *
- * The draft supplies both values and the current question.
- * Only transient presentation animation and scrolling live here.
- *
- * Next rolls the new panel upward; Previous reverses that direction.
- * Outgoing panels cannot receive edits during their transition.
+ * @param tripTitle Display title of the trip being reviewed.
+ * @param mode Initial post-trip review versus editing an existing review.
+ * @param draft Current in-progress review ratings, comment, image URL, and active step.
+ * @param controlsEnabled Whether form edits and navigation buttons accept input.
+ * @param errorMessage Optional persistence or validation error message.
+ * @param onRatingChange Called when a star rating is selected or cleared for a step.
+ * @param onCommentChange Called when the user edits the review comment.
+ * @param onImageUrlChange Called when the user edits the optional review image link.
+ * @param onStepChange Called when moving to the previous or next question.
+ * @param onSave Called when saving the completed review on the final step.
+ * @param onDiscard Called when skipping the review or cancelling edits.
+ * @param modifier Parent layout constraints.
  */
 @Composable
 fun TripReviewContent(
@@ -72,141 +95,62 @@ fun TripReviewContent(
     onStepChange: (ReviewStep) -> Unit,
     onSave: () -> Unit,
     onDiscard: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val focusManager = LocalFocusManager.current
 
-    BoxWithConstraints(
-        modifier = modifier
-            .fillMaxSize()
-            .background(TransitWhite)
-    ) {
+    BoxWithConstraints(modifier = modifier.fillMaxSize().background(TransitWhite)) {
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .widthIn(max = 640.dp)
+                .widthIn(max = ReviewFormMaximumWidth)
                 .fillMaxSize()
                 .imePadding()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+                .padding(ReviewFormPadding),
+            verticalArrangement = Arrangement.spacedBy(ReviewFormSpacing),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = "Rate your trip",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = TransitMain
-                    )
-
-                    Text(
-                        text = tripTitle,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = TransitMain
-                    )
-                }
-
-                IconButton(
-                    onClick = {
-                        focusManager.clearFocus()
-                        onDiscard()
-                    },
-                    enabled = controlsEnabled,
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Icon(
-                        painter = painterResource(Res.drawable.ic_close),
-                        contentDescription = if (
-                            mode == TripReviewMode.INITIAL
-                        ) {
-                            "Close and skip review"
-                        } else {
-                            "Close and discard review changes"
-                        },
-                        tint = TransitMain
-                    )
-                }
-            }
-
-            Text(
-                text = "Question ${draft.step.ordinal + 1} " +
-                        "of ${ReviewStep.entries.size}",
-                style = MaterialTheme.typography.labelLarge,
-                color = TransitMain
+            ReviewHeaderRow(
+                tripTitle = tripTitle,
+                mode = mode,
+                controlsEnabled = controlsEnabled,
+                onClose = {
+                    focusManager.clearFocus()
+                    onDiscard()
+                },
             )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                ReviewStep.entries.forEach { question ->
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(6.dp)
-                            .background(
-                                color = if (
-                                    question.ordinal <= draft.step.ordinal
-                                ) {
-                                    TransitSelected
-                                } else {
-                                    TransitMain.copy(alpha = 0.15f)
-                                },
-                                shape = RoundedCornerShape(3.dp)
-                            )
-                    )
-                }
-            }
+            ReviewStepProgressBar(currentStep = draft.step)
 
             AnimatedContent(
                 targetState = draft.step,
                 modifier = Modifier.fillMaxWidth(),
                 transitionSpec = {
-                    val direction = if (
-                        targetState.ordinal > initialState.ordinal
-                    ) {
-                        1
-                    } else {
-                        -1
-                    }
-
+                    val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
                     (
-                            slideInVertically(
-                                animationSpec = tween(300),
-                                initialOffsetY = { it * direction }
-                            ) + fadeIn(animationSpec = tween(200))
-                            ) togetherWith (
-                            slideOutVertically(
-                                animationSpec = tween(300),
-                                targetOffsetY = { -it * direction }
-                            ) + fadeOut(animationSpec = tween(150))
-                            )
+                        slideInVertically(
+                            animationSpec = tween(REVIEW_STEP_SLIDE_DURATION_MILLIS),
+                            initialOffsetY = { it * direction },
+                        ) + fadeIn(animationSpec = tween(REVIEW_STEP_FADE_IN_DURATION_MILLIS))
+                    ) togetherWith (
+                        slideOutVertically(
+                            animationSpec = tween(REVIEW_STEP_SLIDE_DURATION_MILLIS),
+                            targetOffsetY = { -it * direction },
+                        ) + fadeOut(animationSpec = tween(REVIEW_STEP_FADE_OUT_DURATION_MILLIS))
+                    )
                 },
-                label = "Review question rolling slide"
+                label = "Review question rolling slide",
             ) { question ->
-                val panelEnabled =
-                    controlsEnabled && question == draft.step
-
                 ReviewQuestionCard(
                     step = question,
                     rating = draft.ratingFor(question),
                     comment = draft.comment,
                     imageUrl = draft.imageUrl,
-                    enabled = panelEnabled,
-                    onRatingChange = { rating ->
-                        onRatingChange(question, rating)
-                    },
-                    onClearRating = {
-                        onRatingChange(question, null)
-                    },
+                    enabled = controlsEnabled && question == draft.step,
+                    onRatingChange = { rating -> onRatingChange(question, rating) },
+                    onClearRating = { onRatingChange(question, null) },
                     onCommentChange = onCommentChange,
-                    onImageUrlChange = onImageUrlChange
+                    onImageUrlChange = onImageUrlChange,
                 )
             }
 
@@ -215,89 +159,151 @@ fun TripReviewContent(
                     text = errorMessage,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.semantics {
-                        liveRegion = LiveRegionMode.Polite
-                    }
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                 )
             }
 
-            val next = draft.step.nextOrNull()
-            val imageUrl = draft.imageUrl.trim()
-            val validImageUrl = imageUrl.isEmpty() || Trip.isSupportedImageUrl(imageUrl)
-            val continueHint = when {
-                draft.overall == null -> "Select Overall experience stars to continue."
-                !validImageUrl -> "Correct the image link or leave it empty to continue."
-                else -> null
-            }
-
-            if (controlsEnabled && continueHint != null) {
-                Text(
-                    text = continueHint,
-                    color = TransitMain,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.semantics {
-                        liveRegion = LiveRegionMode.Polite
-                    }
-                )
-            }
-
-            Button(
-                onClick = {
+            ReviewFooterActions(
+                draft = draft,
+                mode = mode,
+                controlsEnabled = controlsEnabled,
+                onStepChange = { step ->
                     focusManager.clearFocus()
-
-                    if (next == null) {
-                        onSave()
-                    } else {
-                        onStepChange(next)
-                    }
+                    onStepChange(step)
                 },
-                enabled = controlsEnabled && draft.overall != null && validImageUrl,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 52.dp)
-            ) {
-                Text(
-                    if (next == null) {
-                        "Save review"
-                    } else {
-                        "Continue"
-                    }
-                )
-            }
-
-            val previous = draft.step.previousOrNull()
-
-            TextButton(
-                onClick = {
+                onSave = {
                     focusManager.clearFocus()
-                    previous?.let(onStepChange)
+                    onSave()
                 },
-                enabled = controlsEnabled && previous != null,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 48.dp)
-            ) {
-                Text("Previous question")
-            }
-
-            TextButton(
-                onClick = {
+                onDiscard = {
                     focusManager.clearFocus()
                     onDiscard()
                 },
-                enabled = controlsEnabled,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 48.dp)
-            ) {
-                Text(
-                    if (mode == TripReviewMode.INITIAL) {
-                        "Skip review"
-                    } else {
-                        "Cancel changes"
-                    }
+            )
+        }
+    }
+}
+
+/** Header displaying the screen title, trip name, and close/discard icon button. */
+@Composable
+private fun ReviewHeaderRow(
+    tripTitle: String,
+    mode: TripReviewMode,
+    controlsEnabled: Boolean,
+    onClose: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(text = "Rate your trip", style = MaterialTheme.typography.headlineSmall, color = TransitMain)
+            Text(text = tripTitle, style = MaterialTheme.typography.bodyLarge, color = TransitMain)
+        }
+
+        IconButton(
+            onClick = onClose,
+            enabled = controlsEnabled,
+            modifier = Modifier.size(ReviewCloseButtonSize),
+        ) {
+            Icon(
+                painter = painterResource(Res.drawable.ic_close),
+                contentDescription = if (mode == TripReviewMode.INITIAL) {
+                    "Close and skip review"
+                } else {
+                    "Close and discard review changes"
+                },
+                tint = TransitMain,
+            )
+        }
+    }
+}
+
+/** Displays the question counter label and segmented step progress indicators. */
+@Composable
+private fun ReviewStepProgressBar(currentStep: ReviewStep) {
+    Column(verticalArrangement = Arrangement.spacedBy(ReviewFormSpacing)) {
+        Text(
+            text = "Question ${currentStep.ordinal + 1} of ${ReviewStep.entries.size}",
+            style = MaterialTheme.typography.labelLarge,
+            color = TransitMain,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(ReviewStepBarSpacing),
+        ) {
+            ReviewStep.entries.forEach { question ->
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(ReviewStepBarHeight)
+                        .background(
+                            color = if (question.ordinal <= currentStep.ordinal) {
+                                TransitSelected
+                            } else {
+                                TransitMain.copy(alpha = 0.15f)
+                            },
+                            shape = RoundedCornerShape(3.dp),
+                        ),
                 )
             }
         }
+    }
+}
+
+/** Validation hint and Continue/Save, Previous, and Skip/Cancel buttons for the review form. */
+@Composable
+private fun ReviewFooterActions(
+    draft: ReviewDraft,
+    mode: TripReviewMode,
+    controlsEnabled: Boolean,
+    onStepChange: (ReviewStep) -> Unit,
+    onSave: () -> Unit,
+    onDiscard: () -> Unit,
+) {
+    val next = draft.step.nextOrNull()
+    val previous = draft.step.previousOrNull()
+    val imageUrl = draft.imageUrl.trim()
+    val validImageUrl = imageUrl.isEmpty() || Trip.isSupportedImageUrl(imageUrl)
+    val continueHint = when {
+        draft.overall == null -> "Select Overall experience stars to continue."
+        !validImageUrl -> "Correct the image link or leave it empty to continue."
+        else -> null
+    }
+
+    if (controlsEnabled && continueHint != null) {
+        Text(
+            text = continueHint,
+            color = TransitMain,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+        )
+    }
+
+    Button(
+        onClick = { if (next == null) onSave() else onStepChange(next) },
+        enabled = controlsEnabled && draft.overall != null && validImageUrl,
+        modifier = Modifier.fillMaxWidth().heightIn(min = ReviewPrimaryButtonMinHeight),
+    ) {
+        Text(if (next == null) "Save review" else "Continue")
+    }
+
+    TextButton(
+        onClick = { previous?.let(onStepChange) },
+        enabled = controlsEnabled && previous != null,
+        modifier = Modifier.fillMaxWidth().heightIn(min = ReviewSecondaryButtonMinHeight),
+    ) {
+        Text("Previous question")
+    }
+
+    TextButton(
+        onClick = onDiscard,
+        enabled = controlsEnabled,
+        modifier = Modifier.fillMaxWidth().heightIn(min = ReviewSecondaryButtonMinHeight),
+    ) {
+        Text(if (mode == TripReviewMode.INITIAL) "Skip review" else "Cancel changes")
     }
 }

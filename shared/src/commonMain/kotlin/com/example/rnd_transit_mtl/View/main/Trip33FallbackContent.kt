@@ -2,27 +2,42 @@ package com.example.rnd_transit_mtl.View.main
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.rnd_transit_mtl.View.current_trip.TripActionButton
 import com.example.rnd_transit_mtl.View.current_trip.TripWarning
 import com.example.rnd_transit_mtl.model.trip.TripPoint
-import com.example.rnd_transit_mtl.ui.theme.*
+import com.example.rnd_transit_mtl.ui.theme.TransitComplementary
+import com.example.rnd_transit_mtl.ui.theme.TransitMain
+import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 
 // Layout settings — dp widths/padding and viewport fractions from the supplied layouts.
 private val FallbackPanelMaximumWidth = 620.dp
@@ -31,7 +46,9 @@ private val FallbackPanelSpacing = 16.dp
 private const val FallbackPermissionTopFraction = 390f / 716f
 private const val FallbackFailureMaximumHeightFraction = 0.65f
 
-/** Renders explicit request failures and a temporary manual-origin selection.
+/**
+ * Renders explicit request failures and a temporary manual-origin selection.
+ *
  * @param failure Explicit validation, routing, or permission outcome.
  * @param detail Optional explanation without altering the saved request.
  * @param requestSummary Original request retained for retry.
@@ -62,7 +79,7 @@ internal fun Trip33FallbackContent(
     onUnavailableAction: () -> Unit,
     onCancelPicking: () -> Unit,
     modifier: Modifier = Modifier,
-    sampleLabel: String? = null
+    sampleLabel: String? = null,
 ) {
     var selectedX by rememberSaveable(pickingOrigin) { mutableStateOf<Float?>(null) }
     var selectedY by rememberSaveable(pickingOrigin) { mutableStateOf<Float?>(null) }
@@ -70,11 +87,9 @@ internal fun Trip33FallbackContent(
     val density = LocalDensity.current
     val permissionDenied = failure == Trip33Failure.PermissionDenied
     val permission = permissionDenied || failure == Trip33Failure.LocationUnavailable
-    val selected = if (selectedX != null && selectedY != null) {
-        TripPoint("Selected point on map", selectedX!!, selectedY!!)
-    } else {
-        null
-    }
+    val x = selectedX
+    val y = selectedY
+    val selected = if (x != null && y != null) TripPoint("Selected point on map", x, y) else null
 
     BoxWithConstraints(modifier.fillMaxSize()) {
         val panelWidth = maxWidth.coerceAtMost(FallbackPanelMaximumWidth)
@@ -83,11 +98,13 @@ internal fun Trip33FallbackContent(
         FigmaOriginMap(
             origin = if (pickingOrigin) selected else null,
             enabled = enabled,
-            onPick = if (pickingOrigin) { point ->
-                selectedX = point.x
-                selectedY = point.y
+            onPick = if (pickingOrigin) {
+                { point ->
+                    selectedX = point.x
+                    selectedY = point.y
+                }
             } else null,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
         )
 
         if (!permission && !pickingOrigin) {
@@ -99,23 +116,19 @@ internal fun Trip33FallbackContent(
                     .align(Alignment.TopCenter)
                     .widthIn(max = FallbackPanelMaximumWidth)
                     .padding(16.dp)
-                    .clickable(
-                        enabled = enabled,
-                        role = Role.Button,
-                        onClick = onChooseMap
-                    )
+                    .clickable(enabled = enabled, role = Role.Button, onClick = onChooseMap),
             )
         }
 
         if (permission && !pickingOrigin) {
             TripWarning(
-                if (permissionDenied) "Location access is off" else "Current location unavailable",
-                if (permissionDenied) "You can still plan a trip. Choose a starting point."
+                title = if (permissionDenied) "Location access is off" else "Current location unavailable",
+                detail = if (permissionDenied) "You can still plan a trip. Choose a starting point."
                 else "Try current location again or choose a starting point.",
-                Modifier
+                modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = 16.dp)
-                    .width(panelWidth)
+                    .width(panelWidth),
             )
         }
 
@@ -125,172 +138,174 @@ internal fun Trip33FallbackContent(
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(end = 16.dp, top = 112.dp)
+                    .padding(end = 16.dp, top = 112.dp),
             ) {
-                Text(
-                    sampleLabel,
-                    color = TransitMain,
-                    fontSize = 11.sp,
-                    modifier = Modifier.padding(6.dp)
-                )
+                Text(sampleLabel, color = TransitMain, fontSize = 11.sp, modifier = Modifier.padding(6.dp))
             }
         }
 
         if (permission || pickingOrigin) {
-            Column(
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = permissionTop)
-                    .width(panelWidth)
-                    .heightIn(
-                        max = (maxHeight - permissionTop).coerceAtLeast(1.dp)
-                    )
-                    .background(TransitWhite)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = FallbackPanelHorizontalPadding, vertical = FallbackPanelSpacing),
-                verticalArrangement = Arrangement.spacedBy(FallbackPanelSpacing)
-            ) {
-                TripLabelValueField(
-                    "Starting point",
-                    if (pickingOrigin) {
-                        selected?.label ?: "Choose a point on the map"
-                    } else {
-                        "Search a place or address"
-                    },
-                    showLocationIcon = true,
-                    modifier = Modifier.clickable(
-                        enabled = enabled && !pickingOrigin,
-                        onClick = onUnavailableAction
-                    )
-                )
-
-                if (pickingOrigin) {
-                    TripActionButton(
-                        label = "Use this starting point",
-                        enabled = enabled && selected != null,
-                        onClick = {
-                            selected?.let(onConfirmOrigin)
-                        }
-                    )
-                    TripActionButton(
-                        "Cancel",
-                        onCancelPicking,
-                        secondary = true,
-                        enabled = enabled
-                    )
-                    Text(
-                        "Tap the sample map, or focus it and use arrow keys.",
-                        color = TransitComplementary,
-                        fontSize = 12.sp
-                    )
-                } else {
-                    TripActionButton(
-                        "Choose a point on the map",
-                        onChooseMap,
-                        enabled = enabled
-                    )
-                    TripActionButton(
-                        "Try current location again",
-                        onUnavailableAction,
-                        secondary = true,
-                        enabled = enabled
-                    )
-                    Text(
-                        "Your time and transport choices are kept.",
-                        color = TransitComplementary,
-                        fontSize = 12.sp
-                    )
-                }
-
-                if (detail.isNotBlank()) {
-                    Text(
-                        detail,
-                        color = TransitComplementary,
-                        fontSize = 12.sp
-                    )
-                }
-            }
+            FallbackOriginRecoverySheet(
+                panelWidth = panelWidth,
+                permissionTop = permissionTop,
+                maxHeight = maxHeight,
+                pickingOrigin = pickingOrigin,
+                selected = selected,
+                detail = detail,
+                enabled = enabled,
+                onChooseMap = onChooseMap,
+                onConfirmOrigin = onConfirmOrigin,
+                onUnavailableAction = onUnavailableAction,
+                onCancelPicking = onCancelPicking,
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
         } else {
-            Column(
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .width(panelWidth)
-                    .heightIn(max = maxHeight * FallbackFailureMaximumHeightFraction)
-                    .onSizeChanged { failurePanelHeightPx = it.height }
-                    .background(TransitComplementary)
-                    .verticalScroll(rememberScrollState())
-            ) {
-                val title = when (failure) {
-                    Trip33Failure.NoRoute -> "No trip fits these choices"
-                    Trip33Failure.ProviderUnavailable ->
-                        "Routing service unavailable"
-                    else -> "Check your trip settings"
-                }
-
-                val explanation = detail.ifBlank {
-                    when (failure) {
-                        Trip33Failure.NoRoute ->
-                            "Try more time or another supported transport mode."
-                        Trip33Failure.ProviderUnavailable ->
-                            "The service could not be reached. Your choices are saved."
-                        else -> "Correct the request and try again."
-                    }
-                }
-
-                TripWarning(title, explanation)
-
-                Column(
-                    Modifier.padding(
-                        start = 16.dp, end = 16.dp,
-                        top = 14.dp, bottom = 32.dp
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    Text(
-                        "Your request is unchanged",
-                        color = TransitWhite,
-                        fontSize = 19.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        requestSummary,
-                        color = TransitWhite,
-                        fontSize = 14.sp
-                    )
-
-                    val provider =
-                        failure == Trip33Failure.ProviderUnavailable
-
-                    TripActionButton(
-                        if (provider) "Try again" else "Adjust time or modes",
-                        if (provider) onRetry else onEditSettings,
-                        enabled = enabled
-                    )
-                    TripActionButton(
-                        if (provider) "Edit trip settings"
-                        else "Try another search",
-                        if (provider) onEditSettings else onRetry,
-                        secondary = true,
-                        enabled = enabled
-                    )
-                }
-            }
+            FallbackRouteFailureSheet(
+                failure = failure,
+                detail = detail,
+                requestSummary = requestSummary,
+                panelWidth = panelWidth,
+                maxHeight = maxHeight,
+                enabled = enabled,
+                onRetry = onRetry,
+                onEditSettings = onEditSettings,
+                onMeasuredHeight = { failurePanelHeightPx = it },
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
         }
 
         val panelTop = if (permission || pickingOrigin) permissionTop
-            else maxHeight - with(density) { failurePanelHeightPx.toDp() }
+        else maxHeight - with(density) { failurePanelHeightPx.toDp() }
         Text(
             "© OpenStreetMap contributors · Sample map",
             color = TransitComplementary,
             style = MaterialTheme.typography.labelSmall,
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .offset(
-                    y = (panelTop - 24.dp).coerceAtLeast(0.dp)
-                )
+                .offset(y = (panelTop - 24.dp).coerceAtLeast(0.dp))
                 .padding(start = 8.dp)
                 .background(TransitWhite, RoundedCornerShape(4.dp))
-                .padding(4.dp)
+                .padding(4.dp),
         )
+    }
+}
+
+/** White origin-recovery and map-picking sheet shown when location access is off or picking manually. */
+@Composable
+private fun FallbackOriginRecoverySheet(
+    panelWidth: Dp,
+    permissionTop: Dp,
+    maxHeight: Dp,
+    pickingOrigin: Boolean,
+    selected: TripPoint?,
+    detail: String,
+    enabled: Boolean,
+    onChooseMap: () -> Unit,
+    onConfirmOrigin: (TripPoint) -> Unit,
+    onUnavailableAction: () -> Unit,
+    onCancelPicking: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier
+            .offset(y = permissionTop)
+            .width(panelWidth)
+            .heightIn(max = (maxHeight - permissionTop).coerceAtLeast(1.dp))
+            .background(TransitWhite)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = FallbackPanelHorizontalPadding, vertical = FallbackPanelSpacing),
+        verticalArrangement = Arrangement.spacedBy(FallbackPanelSpacing),
+    ) {
+        TripLabelValueField(
+            label = "Starting point",
+            value = if (pickingOrigin) {
+                selected?.label ?: "Choose a point on the map"
+            } else {
+                "Search a place or address"
+            },
+            showLocationIcon = true,
+            modifier = Modifier.clickable(enabled = enabled && !pickingOrigin, onClick = onUnavailableAction),
+        )
+
+        if (pickingOrigin) {
+            TripActionButton(
+                label = "Use this starting point",
+                enabled = enabled && selected != null,
+                onClick = { selected?.let(onConfirmOrigin) },
+            )
+            TripActionButton("Cancel", onCancelPicking, secondary = true, enabled = enabled)
+            Text(
+                "Tap the sample map, or focus it and use arrow keys.",
+                color = TransitComplementary,
+                fontSize = 12.sp,
+            )
+        } else {
+            TripActionButton("Choose a point on the map", onChooseMap, enabled = enabled)
+            TripActionButton("Try current location again", onUnavailableAction, secondary = true, enabled = enabled)
+            Text("Your time and transport choices are kept.", color = TransitComplementary, fontSize = 12.sp)
+        }
+
+        if (detail.isNotBlank()) {
+            Text(detail, color = TransitComplementary, fontSize = 12.sp)
+        }
+    }
+}
+
+/** Teal failure summary sheet shown for NoRoute, ProviderUnavailable, and InvalidInput outcomes. */
+@Composable
+private fun FallbackRouteFailureSheet(
+    failure: Trip33Failure,
+    detail: String,
+    requestSummary: String,
+    panelWidth: Dp,
+    maxHeight: Dp,
+    enabled: Boolean,
+    onRetry: () -> Unit,
+    onEditSettings: () -> Unit,
+    onMeasuredHeight: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier
+            .width(panelWidth)
+            .heightIn(max = maxHeight * FallbackFailureMaximumHeightFraction)
+            .onSizeChanged { onMeasuredHeight(it.height) }
+            .background(TransitComplementary)
+            .verticalScroll(rememberScrollState()),
+    ) {
+        val title = when (failure) {
+            Trip33Failure.NoRoute -> "No trip fits these choices"
+            Trip33Failure.ProviderUnavailable -> "Routing service unavailable"
+            else -> "Check your trip settings"
+        }
+        val explanation = detail.ifBlank {
+            when (failure) {
+                Trip33Failure.NoRoute -> "Try more time or another supported transport mode."
+                Trip33Failure.ProviderUnavailable -> "The service could not be reached. Your choices are saved."
+                else -> "Correct the request and try again."
+            }
+        }
+        TripWarning(title, explanation)
+
+        Column(
+            Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Text("Your request is unchanged", color = TransitWhite, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+            Text(requestSummary, color = TransitWhite, fontSize = 14.sp)
+
+            val provider = failure == Trip33Failure.ProviderUnavailable
+            TripActionButton(
+                label = if (provider) "Try again" else "Adjust time or modes",
+                onClick = if (provider) onRetry else onEditSettings,
+                enabled = enabled,
+            )
+            TripActionButton(
+                label = if (provider) "Edit trip settings" else "Try another search",
+                onClick = if (provider) onEditSettings else onRetry,
+                secondary = true,
+                enabled = enabled,
+            )
+        }
     }
 }

@@ -1,6 +1,5 @@
 package com.example.rnd_transit_mtl.navigation
 
-import com.example.rnd_transit_mtl.model.ids.TripId
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -12,38 +11,26 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.getValue
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
-import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.ui.NavDisplay
-import androidx.savedstate.serialization.SavedStateConfiguration
-import com.example.rnd_transit_mtl.model.transport.TransportRoute
-import com.example.rnd_transit_mtl.model.transport.TransportType
-import com.example.rnd_transit_mtl.model.trip.Trip
-import com.example.rnd_transit_mtl.model.review.TripReviewMode
-import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.LocalSharedTransitMapHost
-import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.LocalTransitMap
-import com.example.rnd_transit_mtl.ui.global_ui_ellements.transitions.GO_TRIP_TRANSITION_MILLIS
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.modules.SerializersModule
-import kotlinx.serialization.modules.polymorphic
 import com.example.rnd_transit_mtl.View.about.AboutScreen
 import com.example.rnd_transit_mtl.View.authentication.AuthScreen
-import com.example.rnd_transit_mtl.ViewModels.authentication.AuthViewModel
-import com.example.rnd_transit_mtl.data.authentication.AccountSession
-import com.example.rnd_transit_mtl.data.authentication.LocalAccountSession
-import com.example.rnd_transit_mtl.data.authentication.LocalAuthRepository
+import com.example.rnd_transit_mtl.View.compass.CompassScreen
 import com.example.rnd_transit_mtl.View.current_trip.CurrentTripScreen
 import com.example.rnd_transit_mtl.View.history.HistoryScreen
 import com.example.rnd_transit_mtl.View.main.MainScreen
@@ -53,179 +40,65 @@ import com.example.rnd_transit_mtl.View.trip_details.TripDetailsScreen
 import com.example.rnd_transit_mtl.View.trip_review.TripReviewScreen
 import com.example.rnd_transit_mtl.ViewModels.Accounts.ProfileViewModel
 import com.example.rnd_transit_mtl.ViewModels.Settings.SettingsViewModel
+import com.example.rnd_transit_mtl.ViewModels.authentication.AuthViewModel
 import com.example.rnd_transit_mtl.data.accounts.LocalAccountRepository
+import com.example.rnd_transit_mtl.data.authentication.AccountSession
+import com.example.rnd_transit_mtl.data.authentication.LocalAccountSession
+import com.example.rnd_transit_mtl.data.authentication.LocalAuthRepository
+import com.example.rnd_transit_mtl.model.review.TripReviewMode
+import com.example.rnd_transit_mtl.model.transport.TransportRoute
+import com.example.rnd_transit_mtl.model.transport.TransportType
+import com.example.rnd_transit_mtl.state.trip.LocalTripsStore
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.LocalSharedTransitMapHost
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.LocalTransitMap
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.transitions.GO_TRIP_TRANSITION_MILLIS
 
-/**
- * Literal sealed-class route hierarchy required by the assignment.
- */
-@Serializable
-@SerialName("com.example.rnd_transit_mtl.ScreenKey")
-sealed class ScreenKey : NavKey {
-    abstract val screenTitle: String
-}
-
-@Serializable
-@SerialName("com.example.rnd_transit_mtl.MainScreenKey")
-data object MainScreenKey : ScreenKey() {
-    override val screenTitle = "Home"
-}
-
-@Serializable
-@SerialName("com.example.rnd_transit_mtl.CompassScreenKey")
-data object CompassScreenKey : ScreenKey() {
-    override val screenTitle = "Compass"
-}
-
-@Serializable
-@SerialName("com.example.rnd_transit_mtl.ProfileScreenKey")
-data object ProfileScreenKey : ScreenKey() {
-    override val screenTitle = "user"
-}
-
-@Serializable
-@SerialName("com.example.rnd_transit_mtl.AuthScreenKey")
-data class AuthScreenKey(val register: Boolean = false) : ScreenKey() {
-    override val screenTitle = "Sign in"
-}
-
-@Serializable
-@SerialName("com.example.rnd_transit_mtl.AboutScreenKey")
-data object AboutScreenKey : ScreenKey() {
-    override val screenTitle = "about"
-}
-
-@Serializable
-@SerialName("com.example.rnd_transit_mtl.SettingsScreenKey")
-data object SettingsScreenKey : ScreenKey() {
-    override val screenTitle = "settings"
-}
-
-@Serializable
-@SerialName("com.example.rnd_transit_mtl.HistoryScreenKey")
-data object HistoryScreenKey : ScreenKey() {
-    override val screenTitle = "history"
-}
-
-/**
- * Demonstrates passing the generated item to the second content screen.
- *
- * The screen uses trip.id to resolve authoritative runtime state.
- */
-@Serializable
-@SerialName("com.example.rnd_transit_mtl.CurrentTripScreenKey")
-data class CurrentTripScreenKey(
-    val trip: Trip
-) : ScreenKey() {
-    override val screenTitle = "Current trip"
-}
-
-@Serializable
-@SerialName("com.example.rnd_transit_mtl.TripDetailsScreenKey")
-data class TripDetailsScreenKey(
-    val tripId: TripId
-) : ScreenKey() {
-    override val screenTitle = "Trip details"
-}
-
-
-/**
- * Restricted, serializable return destinations for review editing.
- *
- * Saving the origin avoids relying on a transient callback after rotation.
- */
-@Serializable
-@SerialName("com.example.rnd_transit_mtl.ReviewOrigin")
-sealed class ReviewOrigin {
-    abstract fun destination(): ScreenKey
-
-    @Serializable
-    @SerialName("com.example.rnd_transit_mtl.ReviewOrigin.History")
-    data object History : ReviewOrigin() {
-        override fun destination(): ScreenKey = HistoryScreenKey
-    }
-
-    @Serializable
-    @SerialName("com.example.rnd_transit_mtl.ReviewOrigin.Details")
-    data class Details(
-        val tripId: TripId
-    ) : ReviewOrigin() {
-        override fun destination(): ScreenKey =
-            TripDetailsScreenKey(tripId)
-    }
-}
-
-@Serializable
-@SerialName("com.example.rnd_transit_mtl.TripReviewScreenKey")
-data class TripReviewScreenKey(
-    val tripId: TripId,
-    val mode: TripReviewMode,
-    val origin: ReviewOrigin = ReviewOrigin.History
-) : ScreenKey() {
-    override val screenTitle = "Rate your trip"
-}
-
-/**
- * Every concrete NavKey remains explicitly registered.
- * ReviewOrigin uses its generated sealed serializer inside the review key.
- */
-val backStackConfig = SavedStateConfiguration {
-    serializersModule = SerializersModule {
-        polymorphic(NavKey::class) {
-            subclass(MainScreenKey::class, MainScreenKey.serializer())
-            subclass(CompassScreenKey::class, CompassScreenKey.serializer())
-            subclass(ProfileScreenKey::class, ProfileScreenKey.serializer())
-            subclass(AuthScreenKey::class, AuthScreenKey.serializer())
-            subclass(AboutScreenKey::class, AboutScreenKey.serializer())
-            subclass(SettingsScreenKey::class, SettingsScreenKey.serializer())
-            subclass(HistoryScreenKey::class, HistoryScreenKey.serializer())
-            subclass(
-                CurrentTripScreenKey::class,
-                CurrentTripScreenKey.serializer()
-            )
-            subclass(
-                TripReviewScreenKey::class,
-                TripReviewScreenKey.serializer()
-            )
-            subclass(
-                TripDetailsScreenKey::class,
-                TripDetailsScreenKey.serializer()
-            )
-        }
-    }
-}
+// Animation settings — milliseconds for lateral slides between the planner map and secondary tabs.
+// Planner/trip handoff timing is defined in ui/global_ui_ellements/transitions/TripTransition.kt.
+private const val PLANNER_TAB_SLIDE_DURATION_MILLIS = 480
+private const val PLANNER_MAP_CONTENT_KEY = "planner-map"
+private const val TRIP_MAP_CONTENT_KEY_PREFIX = "current-trip-map:"
 
 val LocalNavigator = compositionLocalOf<Navigator> {
     error("Navigator must be provided by App.")
 }
 
 /**
- * Renders destinations beneath the already-hoisted MainLayout.
- *
+ * Renders destinations beneath the already-hoisted [MainLayout] and coordinates the shared map layer.
  * All outgoing-screen callbacks check the live stack top.
+ *
+ * @param backStack Observable Navigation 3 destination back stack.
+ * @param transportTypes Loaded transport modes, or null while loading.
+ * @param transportRoutes Loaded transport routes, or null while loading.
+ * @param loadingError Whether loading the bundled transport catalogue failed.
  */
 @Composable
 fun Router(
     backStack: NavBackStack<NavKey>,
     transportTypes: List<TransportType>?,
     transportRoutes: List<TransportRoute>?,
-    loadingError: Boolean
+    loadingError: Boolean,
 ) {
     val navigator = LocalNavigator.current
     val mapHost = LocalSharedTransitMapHost.current
     val destination = navigator.current
 
     Box(Modifier.fillMaxSize()) {
-        mapHost?.invoke(Modifier.matchParentSize(), destination == MainScreenKey || destination is CurrentTripScreenKey)
+        mapHost?.invoke(
+            Modifier.matchParentSize(),
+            destination == MainScreenKey || destination is CurrentTripScreenKey,
+        )
         DestinationDisplay(backStack, transportTypes, transportRoutes, loadingError)
     }
 }
 
+/** Hosts [NavDisplay] with destination-scoped ViewModel decorators and coordinated transitions. */
 @Composable
 private fun DestinationDisplay(
     backStack: NavBackStack<NavKey>,
     transportTypes: List<TransportType>?,
     transportRoutes: List<TransportRoute>?,
-    loadingError: Boolean
+    loadingError: Boolean,
 ) {
     val navigator = LocalNavigator.current
     val navigation = LocalTripNavigation.current
@@ -237,11 +110,9 @@ private fun DestinationDisplay(
         backStack = backStack,
         entryDecorators = listOf(
             rememberSaveableStateHolderNavEntryDecorator(),
-            rememberViewModelStoreNavEntryDecorator()
+            rememberViewModelStoreNavEntryDecorator(),
         ),
-        onBack = {
-            navigation.back()
-        },
+        onBack = { navigation.back() },
         entryProvider = entryProvider {
             entry<MainScreenKey>(clazzContentKey = { PLANNER_MAP_CONTENT_KEY }) {
                 // Only the foreground destination can place the shared map during the handoff.
@@ -250,35 +121,20 @@ private fun DestinationDisplay(
                     transportTypes = transportTypes,
                     transportRoutes = transportRoutes,
                     loadingError = loadingError,
-                    isDestinationActive =
-                        navigator.current == MainScreenKey,
+                    isDestinationActive = navigator.current == MainScreenKey,
                     onOpenCurrentTrip = { trip ->
                         val current = navigator.current
-                        val alreadyOpened =
-                            current is CurrentTripScreenKey &&
-                                    current.trip.id == trip.id
-
-                        if (
-                            current == MainScreenKey ||
-                            alreadyOpened
-                        ) {
-                            navigation.openCurrentTrip(trip)
-                        } else {
-                            false
-                        }
+                        val alreadyOpened = current is CurrentTripScreenKey && current.trip.id == trip.id
+                        if (current == MainScreenKey || alreadyOpened) navigation.openCurrentTrip(trip) else false
                     },
                     onOpenCompletedTrip = { tripId ->
-                        if (navigator.current == MainScreenKey) {
-                            navigation.openCompletedTrip(tripId)
-                        } else {
-                            false
-                        }
-                    }
+                        if (navigator.current == MainScreenKey) navigation.openCompletedTrip(tripId) else false
+                    },
                 )
             }
 
             entry<CurrentTripScreenKey>(
-                clazzContentKey = { key -> TRIP_MAP_CONTENT_KEY_PREFIX + key.trip.id }
+                clazzContentKey = { key -> TRIP_MAP_CONTENT_KEY_PREFIX + key.trip.id },
             ) { key ->
                 if (sharedLiveMap && navigator.current == MainScreenKey) return@entry
                 CurrentTripScreen(
@@ -288,48 +144,30 @@ private fun DestinationDisplay(
                         val current = navigator.current
                         val alreadyOpened =
                             current is TripReviewScreenKey &&
-                                    current.tripId == tripId &&
-                                    current.mode == TripReviewMode.INITIAL
-
-                        if (
-                            tripId == key.trip.id &&
-                            (current == key || alreadyOpened)
-                        ) {
+                                current.tripId == tripId &&
+                                current.mode == TripReviewMode.INITIAL
+                        if (tripId == key.trip.id && (current == key || alreadyOpened)) {
                             navigation.openInitialReview(tripId)
                         } else {
                             false
                         }
                     },
-                    onLeave = {
-                        if (navigator.current == key) {
-                            navigation.returnToPlanner()
-                        }
-                    },
-                    onReturnToPlanner = {
-                        if (navigator.current == key) {
-                            navigation.returnToPlanner()
-                        }
-                    }
+                    onLeave = { if (navigator.current == key) navigation.returnToPlanner() },
+                    onReturnToPlanner = { if (navigator.current == key) navigation.returnToPlanner() },
                 )
             }
 
             entry<HistoryScreenKey> {
                 HistoryScreen(
-                    isDestinationActive =
-                        navigator.current == HistoryScreenKey,
+                    isDestinationActive = navigator.current == HistoryScreenKey,
                     onOpenDetails = { tripId ->
-                        if (navigator.current == HistoryScreenKey) {
-                            navigation.openDetails(tripId)
-                        }
+                        if (navigator.current == HistoryScreenKey) navigation.openDetails(tripId)
                     },
                     onReview = { tripId ->
                         if (navigator.current == HistoryScreenKey) {
-                            navigation.openReview(
-                                tripId = tripId,
-                                origin = ReviewOrigin.History
-                            )
+                            navigation.openReview(tripId = tripId, origin = ReviewOrigin.History)
                         }
-                    }
+                    },
                 )
             }
 
@@ -338,58 +176,39 @@ private fun DestinationDisplay(
                     tripId = key.tripId,
                     isDestinationActive = navigator.current == key,
                     onReturnToHistory = {
-                        if (navigator.current == key) {
-                            navigation.openSection(HistoryScreenKey)
-                        }
+                        if (navigator.current == key) navigation.openSection(HistoryScreenKey)
                     },
                     onReview = { tripId ->
-                        if (
-                            navigator.current == key &&
-                            tripId == key.tripId
-                        ) {
-                            navigation.openReview(
-                                tripId = tripId,
-                                origin = ReviewOrigin.Details(key.tripId)
-                            )
+                        if (navigator.current == key && tripId == key.tripId) {
+                            navigation.openReview(tripId = tripId, origin = ReviewOrigin.Details(key.tripId))
                         }
-                    }
+                    },
                 )
             }
 
             entry<TripReviewScreenKey> { key ->
-                val registerBack: RegisterReviewBackHandler =
-                    remember(navigation, key) {
-                        { onBack ->
-                            navigation.registerReviewBackHandler(
-                                key = key,
-                                onBack = onBack
-                            )
-                        }
-                    }
-
+                val registerBack: RegisterReviewBackHandler = remember(navigation, key) {
+                    { onBack -> navigation.registerReviewBackHandler(key = key, onBack = onBack) }
+                }
                 TripReviewScreen(
                     tripId = key.tripId,
                     mode = key.mode,
                     isDestinationActive = navigator.current == key,
-                    onOpenHistory = {
-                        navigation.finishReview(key)
-                    },
-                    onReturnToOrigin = {
-                        navigation.finishReview(key)
-                    },
-                    registerBackHandler = registerBack
+                    onOpenHistory = { navigation.finishReview(key) },
+                    onReturnToOrigin = { navigation.finishReview(key) },
+                    registerBackHandler = registerBack,
                 )
             }
 
             entry<CompassScreenKey> {
-                val trips by com.example.rnd_transit_mtl.state.trip.LocalTripsStore.current.state
-                com.example.rnd_transit_mtl.View.compass.CompassScreen(
+                val trips by LocalTripsStore.current.state
+                CompassScreen(
                     activeTrip = trips.activeTrip?.trip,
                     onOpenMap = {
                         val active = trips.activeTrip?.trip
                         if (active != null) navigation.openCurrentTrip(active)
                         else navigation.returnToPlanner()
-                    }
+                    },
                 )
             }
 
@@ -423,65 +242,73 @@ private fun DestinationDisplay(
             entry<SettingsScreenKey> {
                 val accountRepository = LocalAccountRepository.current
                 val authRepository = LocalAuthRepository.current
-                val settingsViewModel = viewModel { SettingsViewModel(accountRepository!!, authRepository) }
-
-                SettingsScreen(settingsViewModel)
+                if (accountRepository != null) {
+                    val settingsViewModel = viewModel { SettingsViewModel(accountRepository, authRepository) }
+                    SettingsScreen(settingsViewModel)
+                } else {
+                    Text(
+                        text = "Sign in to manage account settings.",
+                        modifier = Modifier.padding(16.dp),
+                    )
+                }
             }
         },
         transitionSpec = {
-            val from = initialState.entries.lastOrNull()?.contentKey
-            val to = targetState.entries.lastOrNull()?.contentKey
-            if (isPlannerToTripTransition(from, to) || (sharedLiveMap && isPlannerMapTransition(from, to))) {
-                EnterTransition.None togetherWith ExitTransition.None
-            } else if (isPlannerMapTransition(from, to)) {
-                // Returning to the planner crossfades over the stationary map.
-                (EnterTransition.None togetherWith fadeOut(tween(GO_TRIP_TRANSITION_MILLIS))).apply {
-                    targetContentZIndex = -1f
-                }
-            } else if (from == PLANNER_MAP_CONTENT_KEY || to == PLANNER_MAP_CONTENT_KEY) {
-                plannerTabSlide(enteringPlanner = to == PLANNER_MAP_CONTENT_KEY, hostedMap = hostedMap)
-            } else {
-                slideInHorizontally(initialOffsetX = { it }) togetherWith
-                    slideOutHorizontally(targetOffsetX = { -it })
-            }
+            routerTransition(
+                from = initialState.entries.lastOrNull()?.contentKey,
+                to = targetState.entries.lastOrNull()?.contentKey,
+                sharedLiveMap = sharedLiveMap,
+                hostedMap = hostedMap,
+                isPop = false,
+            )
         },
         popTransitionSpec = {
-            val from = initialState.entries.lastOrNull()?.contentKey
-            val to = targetState.entries.lastOrNull()?.contentKey
-            if (isPlannerToTripTransition(from, to) || (sharedLiveMap && isPlannerMapTransition(from, to))) {
-                EnterTransition.None togetherWith ExitTransition.None
-            } else if (isPlannerMapTransition(from, to)) {
-                (EnterTransition.None togetherWith fadeOut(tween(GO_TRIP_TRANSITION_MILLIS))).apply {
-                    targetContentZIndex = -1f
-                }
-            } else if (from == PLANNER_MAP_CONTENT_KEY || to == PLANNER_MAP_CONTENT_KEY) {
-                plannerTabSlide(enteringPlanner = to == PLANNER_MAP_CONTENT_KEY, hostedMap = hostedMap)
-            } else {
-                slideInHorizontally(initialOffsetX = { -it }) togetherWith
-                    slideOutHorizontally(targetOffsetX = { it })
-            }
+            routerTransition(
+                from = initialState.entries.lastOrNull()?.contentKey,
+                to = targetState.entries.lastOrNull()?.contentKey,
+                sharedLiveMap = sharedLiveMap,
+                hostedMap = hostedMap,
+                isPop = true,
+            )
         },
         predictivePopTransitionSpec = {
-            val from = initialState.entries.lastOrNull()?.contentKey
-            val to = targetState.entries.lastOrNull()?.contentKey
-            if (isPlannerToTripTransition(from, to) || (sharedLiveMap && isPlannerMapTransition(from, to))) {
-                EnterTransition.None togetherWith ExitTransition.None
-            } else if (isPlannerMapTransition(from, to)) {
-                (EnterTransition.None togetherWith fadeOut(tween(GO_TRIP_TRANSITION_MILLIS))).apply {
-                    targetContentZIndex = -1f
-                }
-            } else if (from == PLANNER_MAP_CONTENT_KEY || to == PLANNER_MAP_CONTENT_KEY) {
-                plannerTabSlide(enteringPlanner = to == PLANNER_MAP_CONTENT_KEY, hostedMap = hostedMap)
-            } else {
-                slideInHorizontally(initialOffsetX = { -it }) togetherWith
-                    slideOutHorizontally(targetOffsetX = { it })
-            }
-        }
+            routerTransition(
+                from = initialState.entries.lastOrNull()?.contentKey,
+                to = targetState.entries.lastOrNull()?.contentKey,
+                sharedLiveMap = sharedLiveMap,
+                hostedMap = hostedMap,
+                isPop = true,
+            )
+        },
     )
 }
 
-private const val PLANNER_MAP_CONTENT_KEY = "planner-map"
-private const val TRIP_MAP_CONTENT_KEY_PREFIX = "current-trip-map:"
+/** Selects the coordinated map crossfade, tab slide, or standard horizontal slide transition. */
+private fun routerTransition(
+    from: Any?,
+    to: Any?,
+    sharedLiveMap: Boolean,
+    hostedMap: Boolean,
+    isPop: Boolean,
+): ContentTransform = when {
+    isPlannerToTripTransition(from, to) || (sharedLiveMap && isPlannerMapTransition(from, to)) ->
+        EnterTransition.None togetherWith ExitTransition.None
+
+    isPlannerMapTransition(from, to) ->
+        // Returning to the planner crossfades over the stationary map.
+        (EnterTransition.None togetherWith fadeOut(tween(GO_TRIP_TRANSITION_MILLIS))).apply {
+            targetContentZIndex = -1f
+        }
+
+    from == PLANNER_MAP_CONTENT_KEY || to == PLANNER_MAP_CONTENT_KEY ->
+        plannerTabSlide(enteringPlanner = to == PLANNER_MAP_CONTENT_KEY, hostedMap = hostedMap)
+
+    isPop ->
+        slideInHorizontally(initialOffsetX = { -it }) togetherWith slideOutHorizontally(targetOffsetX = { it })
+
+    else ->
+        slideInHorizontally(initialOffsetX = { it }) togetherWith slideOutHorizontally(targetOffsetX = { -it })
+}
 
 private fun isPlannerMapTransition(initialKey: Any?, targetKey: Any?): Boolean =
     (initialKey == PLANNER_MAP_CONTENT_KEY &&
@@ -494,7 +321,7 @@ private fun isPlannerToTripTransition(initialKey: Any?, targetKey: Any?): Boolea
         targetKey is String && targetKey.startsWith(TRIP_MAP_CONTENT_KEY_PREFIX)
 
 private fun plannerTabSlide(enteringPlanner: Boolean, hostedMap: Boolean): ContentTransform {
-    val slide = tween<IntOffset>(durationMillis = 480, easing = FastOutSlowInEasing)
+    val slide = tween<IntOffset>(durationMillis = PLANNER_TAB_SLIDE_DURATION_MILLIS, easing = FastOutSlowInEasing)
     return if (enteringPlanner) {
         (EnterTransition.None togetherWith slideOutHorizontally(slide) { it }).apply {
             targetContentZIndex = -1f

@@ -1,7 +1,4 @@
 package com.example.rnd_transit_mtl.View.main
-import com.example.rnd_transit_mtl.data.assets.toSampleMapPoint
-import com.example.rnd_transit_mtl.state.NullableTripIdSaver
-import com.example.rnd_transit_mtl.model.ids.TripId
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -14,7 +11,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.key.*
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigationevent.NavigationEventInfo
@@ -22,51 +23,55 @@ import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
 import com.example.rnd_transit_mtl.View.current_trip.ActiveMapContent
 import com.example.rnd_transit_mtl.View.current_trip.TripLocationState
-import com.example.rnd_transit_mtl.state.debug.LocalDebugModeState
 import com.example.rnd_transit_mtl.ViewModels.main.MainPlannerState
 import com.example.rnd_transit_mtl.ViewModels.main.MainPlannerViewModel
-import com.example.rnd_transit_mtl.data.generation.MockTripGenerator
+import com.example.rnd_transit_mtl.data.fake.FakeRoutingService
 import com.example.rnd_transit_mtl.data.generation.LocalBackendTripGenerator
+import com.example.rnd_transit_mtl.data.generation.MockTripGenerator
+import com.example.rnd_transit_mtl.data.generation.TripGenerationBounds
+import com.example.rnd_transit_mtl.data.generation.TripGenerationResult
 import com.example.rnd_transit_mtl.data.location.LocalPlannerLocation
 import com.example.rnd_transit_mtl.data.location.LocationUpdate
-import com.example.rnd_transit_mtl.data.fake.FakeRoutingService
+import com.example.rnd_transit_mtl.data.location.PlannerLocation
 import com.example.rnd_transit_mtl.model.geo.GeoPoint
-import com.example.rnd_transit_mtl.model.trip.Place
-import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMapData
-import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.LocalTransitMap
-import com.example.rnd_transit_mtl.data.generation.TripGenerationBounds
-import com.example.rnd_transit_mtl.data.generation.TripGenerationInput
-import com.example.rnd_transit_mtl.data.generation.TripGenerationResult
+import com.example.rnd_transit_mtl.model.ids.TripId
 import com.example.rnd_transit_mtl.model.transport.TransportRoute
 import com.example.rnd_transit_mtl.model.transport.TransportType
+import com.example.rnd_transit_mtl.model.trip.Place
 import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.model.trip.TripPoint
 import com.example.rnd_transit_mtl.navigation.LocalNavigator
 import com.example.rnd_transit_mtl.navigation.LocalTripNavigation
 import com.example.rnd_transit_mtl.navigation.MainScreenKey
 import com.example.rnd_transit_mtl.navigation.SettingsScreenKey
+import com.example.rnd_transit_mtl.state.NullableTripIdSaver
+import com.example.rnd_transit_mtl.state.debug.LocalDebugModeState
 import com.example.rnd_transit_mtl.state.trip.LocalTripsStore
 import com.example.rnd_transit_mtl.state.trip.TRIP_SIMULATION_DURATION_MILLIS
 import com.example.rnd_transit_mtl.state.trip.TripActionResult
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.LocalTransitMap
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMapData
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.collect
-import com.example.rnd_transit_mtl.data.location.awaitPlanningLocation
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-/** Saves planner selections and starts or resumes one generated mock trip.
+// Timing settings — milliseconds before surfacing an automatic-origin timeout notice.
+private const val AUTOMATIC_ORIGIN_TIMEOUT_MILLIS = 15_000L
+private const val RECENT_DESTINATIONS_HISTORY_LIMIT = 10
+
+/**
+ * Saves planner selections and coordinates trip generation, proposals, origin picking, and active-trip resume.
+ *
  * @param transportTypes Supported mode catalogue.
  * @param transportRoutes Supported route catalogue.
  * @param onOpenCurrentTrip Requests active-trip navigation after the planner exit.
  * @param onOpenCompletedTrip Requests saved completion navigation.
  * @param isDestinationActive Whether this destination accepts actions.
  * @param modifier Parent layout constraints.
- * @param sampleOutcome Explicit preview/test fixture; Normal is used by the application.
+ * @param sampleOutcome Explicit preview/test fixture; [Trip33Sample.Normal] is used by the application.
  */
 @Composable
 internal fun TransitOpeningScreen(
@@ -76,7 +81,7 @@ internal fun TransitOpeningScreen(
     onOpenCompletedTrip: ((TripId) -> Boolean)? = null,
     isDestinationActive: Boolean = true,
     modifier: Modifier = Modifier,
-    sampleOutcome: Trip33Sample = Trip33Sample.Normal
+    sampleOutcome: Trip33Sample = Trip33Sample.Normal,
 ) {
     val tripsStore = LocalTripsStore.current
     val simulationEnabled = LocalDebugModeState.current?.simulationEnabled == true
@@ -90,38 +95,26 @@ internal fun TransitOpeningScreen(
     // Viewport is measured again after rotation; stored trip endpoints are unchanged.
     var generationBounds by remember { mutableStateOf<TripGenerationBounds?>(null) }
 
-    // This serialized value is a restoration snapshot.
-    // The ViewModel remains the authoritative runtime state owner.
+    // Serialized restoration snapshot; the ViewModel remains the authoritative runtime state owner.
     var savedPlannerDraft by rememberSaveable {
         mutableStateOf(Json.encodeToString(if (liveMap) MainPlannerState(origin = null) else MainPlannerState()))
     }
-
     val plannerViewModel = viewModel<MainPlannerViewModel> {
         MainPlannerViewModel(
             initialState = runCatching {
                 Json.decodeFromString<MainPlannerState>(savedPlannerDraft)
-            }.getOrDefault(MainPlannerState())
+            }.getOrDefault(MainPlannerState()),
         )
     }
-
     val planner by plannerViewModel.uiState.collectAsStateWithLifecycle()
-
     val plannerPresentationState = rememberSaveableStateHolder()
 
-    var originMode by rememberSaveable {
-        mutableStateOf("planner")
-    }
+    var originMode by rememberSaveable { mutableStateOf("planner") }
     var liveDraft by remember { mutableStateOf<GeoPoint?>(null) }
     var originPickerFromMap by rememberSaveable { mutableStateOf(false) }
-    var originDraftX by rememberSaveable {
-        mutableStateOf<Float?>(null)
-    }
-    var originDraftY by rememberSaveable {
-        mutableStateOf<Float?>(null)
-    }
-    var originMessage by rememberSaveable {
-        mutableStateOf<String?>(null)
-    }
+    var originDraftX by rememberSaveable { mutableStateOf<Float?>(null) }
+    var originDraftY by rememberSaveable { mutableStateOf<Float?>(null) }
+    var originMessage by rememberSaveable { mutableStateOf<String?>(null) }
 
     LaunchedEffect(isDestinationActive) {
         if (!isDestinationActive) {
@@ -129,21 +122,11 @@ internal fun TransitOpeningScreen(
             originMessage = null
         }
     }
-
-    LaunchedEffect(
-        isDestinationActive,
-        planner.origin == null,
-        planner.locationAccessOff
-    ) {
-        if (isDestinationActive &&
-            planner.origin == null &&
-            planner.locationAccessOff
-        ) {
+    LaunchedEffect(isDestinationActive, planner.origin == null, planner.locationAccessOff) {
+        if (isDestinationActive && planner.origin == null && planner.locationAccessOff) {
             originMode = "options"
         }
     }
-
-
     LaunchedEffect(plannerViewModel) {
         plannerViewModel.uiState.collect { state ->
             savedPlannerDraft = Json.encodeToString(state)
@@ -152,9 +135,7 @@ internal fun TransitOpeningScreen(
 
     val boundedMinutes = Trip.coercePlannedMinutes(planner.minutes)
     val selectedTransportIds = planner.selectedTransportIds
-    var validationMessage by rememberSaveable {
-        mutableStateOf("")
-    }
+    var validationMessage by rememberSaveable { mutableStateOf("") }
 
     // Blocks overlapping GO actions; the store also prevents another active trip.
     var processingAction by remember { mutableStateOf(false) }
@@ -163,30 +144,14 @@ internal fun TransitOpeningScreen(
 
     // Store a proposal separately. It becomes an active trip only after Start Trip.
     var proposalJson by rememberSaveable { mutableStateOf<String?>(null) }
-    val proposal = remember(proposalJson) {
-        proposalJson?.let { Json.decodeFromString<Trip>(it) }
-    }
-    var failureName by rememberSaveable {
-        mutableStateOf<String?>(null)
-    }
-    var failureMessage by rememberSaveable {
-        mutableStateOf("")
-    }
-    var requestSummary by rememberSaveable {
-        mutableStateOf("")
-    }
-    var pickingOrigin by rememberSaveable {
-        mutableStateOf(false)
-    }
-
-    val failure = Trip33Failure.entries.firstOrNull {
-        it.name == failureName
-    }
-
+    val proposal = remember(proposalJson) { proposalJson?.let { Json.decodeFromString<Trip>(it) } }
+    var failureName by rememberSaveable { mutableStateOf<String?>(null) }
+    var failureMessage by rememberSaveable { mutableStateOf("") }
+    var requestSummary by rememberSaveable { mutableStateOf("") }
+    var pickingOrigin by rememberSaveable { mutableStateOf(false) }
+    val failure = Trip33Failure.entries.firstOrNull { it.name == failureName }
     val proposalGuard = remember {
-        ProposalGuard(
-            initialProposalId = if (failureName == null) proposal?.id else null
-        )
+        ProposalGuard(initialProposalId = if (failureName == null) proposal?.id else null)
     }
 
     fun closeProposalFlow() {
@@ -211,15 +176,9 @@ internal fun TransitOpeningScreen(
     var pendingActionLabel by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingSummary by rememberSaveable { mutableStateOf<String?>(null) }
 
-    val latestDestinationActive by rememberUpdatedState(
-        isDestinationActive
-    )
-    val latestOpenCurrentTrip by rememberUpdatedState(
-        onOpenCurrentTrip
-    )
-    val latestOpenCompletedTrip by rememberUpdatedState(
-        onOpenCompletedTrip
-    )
+    val latestDestinationActive by rememberUpdatedState(isDestinationActive)
+    val latestOpenCurrentTrip by rememberUpdatedState(onOpenCurrentTrip)
+    val latestOpenCompletedTrip by rememberUpdatedState(onOpenCompletedTrip)
 
     val currentState by tripsStore.state
     val activeState = currentState.activeTrip
@@ -287,46 +246,22 @@ internal fun TransitOpeningScreen(
         latestDestinationActive && !processingAction && pendingOpenTripId == null
 
     var defaultOriginStatus by remember { mutableStateOf<String?>(null) }
-    val needsDefaultOrigin = isDestinationActive && canChangeInputs() &&
-        originMode == "planner" && !planner.originIsManual
-    LaunchedEffect(location, needsDefaultOrigin) {
-        defaultOriginStatus = null
-        if (!needsDefaultOrigin || location == null) return@LaunchedEffect
-        val updates = location.automaticOriginUpdates ?: return@LaunchedEffect
-        val timeout = launch {
-            delay(15_000)
-            if (defaultOriginStatus == null) {
-                defaultOriginStatus = "Location unavailable. Choose a starting point."
-            }
-        }
-        try {
-            updates.collect { update ->
-                val usable = update is LocationUpdate.Fix && location.containsPoint(update.point)
-                defaultOriginStatus = when (update) {
-                    LocationUpdate.PermissionDenied -> "Location permission is off. Choose a starting point."
-                    LocationUpdate.Unavailable -> "Location unavailable. Choose a starting point."
-                    is LocationUpdate.Fix -> if (usable) null else "Outside the supported area. Choose a starting point."
-                }
-                if (usable && canChangeInputs() && originMode == "planner") {
-                    timeout.cancel()
-                    plannerViewModel.setDefaultOrigin(Place("Current location", update.point))
-                }
-            }
-        } finally {
-            timeout.cancel()
-        }
-    }
+    AutomaticOriginUpdatesEffect(
+        location = location,
+        enabled = isDestinationActive && canChangeInputs() && originMode == "planner" && !planner.originIsManual,
+        canApplyFix = { canChangeInputs() && originMode == "planner" },
+        onStatusChanged = { defaultOriginStatus = it },
+        onDefaultOriginFound = plannerViewModel::setDefaultOrigin,
+    )
 
     fun clearValidation() {
         validationMessage = ""
     }
 
     fun performPrimaryAction() {
-        if (!latestDestinationActive ||
-            processingAction || generationJob?.isActive == true ||
-            pendingOpenTripId != null
-        ) return
-
+        if (!latestDestinationActive || processingAction || generationJob?.isActive == true || pendingOpenTripId != null) {
+            return
+        }
         tripsStore.activeTrip?.let { active ->
             if (latestOpenCurrentTrip != null) {
                 queueTripOpening(active.id)
@@ -336,7 +271,6 @@ internal fun TransitOpeningScreen(
             }
             return
         }
-
         tripsStore.pendingReviewTripId?.let { completedId ->
             if (latestOpenCompletedTrip != null) {
                 queueTripOpening(completedId)
@@ -356,10 +290,8 @@ internal fun TransitOpeningScreen(
         val modes = transportTypes
             .filter { it.id in planner.selectedTransportIds }
             .joinToString(" + ") { it.label }
-
-        requestSummary =
-            "$boundedMinutes minutes · $modes · " +
-                (planner.originPlace?.label ?: planner.origin?.label ?: "Choose starting point")
+        requestSummary = "$boundedMinutes minutes · $modes · " +
+            (planner.originPlace?.label ?: planner.origin?.label ?: "Choose starting point")
 
         generationJob = generationScope.launch {
             fun fail(kind: Trip33Failure, message: String = "") {
@@ -371,159 +303,59 @@ internal fun TransitOpeningScreen(
             }
 
             try {
-                val bounds = if (liveMap) TripGenerationBounds() else generationBounds
-                if (bounds == null) {
-                    fail(
-                        Trip33Failure.InvalidInput,
-                        "The map is preparing. Please try again."
-                    )
-                    return@launch
-                }
-
-                val routingOrigin = if (liveMap && !planner.originIsManual) {
-                    val update = location?.awaitPlanningLocation()
-                    println("RndTransitGeneration stage=location result=${update?.let { it::class.simpleName }} roundTrip=${planner.roundTrip} interestZones=${com.example.rnd_transit_mtl.data.generation.explorationZoneCount(planner.selectedAttractionIds.size)}")
-                    if (update !is LocationUpdate.Fix) {
-                        fail(if (update == LocationUpdate.PermissionDenied) Trip33Failure.PermissionDenied
-                            else Trip33Failure.LocationUnavailable)
-                        return@launch
-                    }
-                    if (!location.containsPoint(update.point)) {
-                        fail(Trip33Failure.LocationUnavailable, "Outside the supported area. Choose a starting point.")
-                        return@launch
-                    }
-                    Place("Current location", update.point).also { plannerViewModel.setDefaultOrigin(it) }
-                } else planner.originPlace
-                val origin = planner.origin
-                if ((if (liveMap) routingOrigin == null else origin == null) ||
-                    (sampleOutcome == Trip33Sample.PermissionDenied &&
-                        !planner.originIsManual)
-                ) {
-                    fail(if (sampleOutcome == Trip33Sample.PermissionDenied || planner.locationAccessOff ||
-                        location?.currentUpdate == LocationUpdate.PermissionDenied) Trip33Failure.PermissionDenied
-                        else Trip33Failure.LocationUnavailable)
-                    return@launch
-                }
-
-                val transitModes = transportTypes.filter {
-                    it.usesRoutes && it.id in planner.selectedTransportIds
-                }
-
-                if (planner.selectedTransportIds.isEmpty()) {
-                    fail(Trip33Failure.InvalidInput, "Choose at least one transport type.")
-                    return@launch
-                }
-
-                val zones = transitModes.associate {
-                    it.id to planner.zonesForTransport(it.id).toList()
-                }
-
-                val missingZones = transitModes.firstOrNull {
-                    zones[it.id].isNullOrEmpty()
-                }
-
-                if (missingZones != null) {
-                    fail(
-                        Trip33Failure.InvalidInput,
-                        "Choose at least one transit zone for ${missingZones.label}."
-                    )
-                    return@launch
-                }
-
-                val input = TripGenerationInput(
-                    title = "Trip ${tripsStore.completedTrips.size + 1}",
-                    description = "Random route with $boundedMinutes planned minutes.",
-                    imageUrl = "",
-                    plannedMinutes = boundedMinutes,
-                    selectedTransportIds = planner.selectedTransportIds.toList(),
-                    selectedRouteIds = emptyList(),
-                    attractionIntensity = planner.intensity,
-                    selectedZoneIds = zones.values.flatten().distinct().sortedBy { it.value },
-                    selectedZonesByTransport = zones,
-                    origin = origin?.copy(),
-                    originPlace = routingOrigin,
-                    walkingPreference = planner.walkingPreference,
-                    bikeSpeedKmh = planner.bikeSpeedKmh,
-                    roundTrip = planner.roundTrip,
-                    interestZoneCount = com.example.rnd_transit_mtl.data.generation.explorationZoneCount(
-                        planner.selectedAttractionIds.size)
-                )
-
-                // Explicit samples are distinct from validation failures.
-                when (sampleOutcome) {
-                    Trip33Sample.NoRoute -> {
-                        fail(Trip33Failure.NoRoute)
-                        return@launch
-                    }
-                    Trip33Sample.ProviderError -> {
-                        fail(Trip33Failure.ProviderUnavailable)
-                        return@launch
-                    }
-                    else -> Unit
-                }
-
-                val existingIds = buildSet {
-                    addAll(tripsStore.completedTrips.map { it.id })
-                    addAll(tripsStore.cancelledTrips.map { it.id })
-                    tripsStore.activeTrip?.let { add(it.id) }
-                }
-
-                val generated = withContext(Dispatchers.Default) {
-                    if (liveMap || backendGenerator != null) {
-                        backendGenerator?.generate(
-                            input = input, transportTypes = transportTypes, existingTripIds = existingIds,
-                            excludedDestinations = previousDestinations.map { Json.decodeFromString<GeoPoint>(it) }
-                        ) ?: TripGenerationResult.RoutingUnavailable("The trip planner is not configured. Please try again later.")
-                    } else generator.generate(
-                        input = input,
+                when (
+                    val prepared = prepareTripGenerationInput(
+                        planner = planner,
+                        boundedMinutes = boundedMinutes,
+                        liveMap = liveMap,
+                        generationBounds = generationBounds,
+                        location = location,
                         transportTypes = transportTypes,
-                        transportRoutes = transportRoutes,
-                        existingTripIds = existingIds,
-                        bounds = bounds
+                        completedTripsCount = tripsStore.completedTrips.size,
+                        sampleOutcome = sampleOutcome,
+                        onDefaultOriginResolved = plannerViewModel::setDefaultOrigin,
                     )
-                }
+                ) {
+                    is PreparedTripGeneration.Failed -> fail(prepared.kind, prepared.message)
+                    is PreparedTripGeneration.Ready -> {
+                        val generated = executeTripGeneration(
+                            ready = prepared,
+                            liveMap = liveMap,
+                            backendGenerator = backendGenerator,
+                            mockGenerator = generator,
+                            tripsStore = tripsStore,
+                            transportTypes = transportTypes,
+                            transportRoutes = transportRoutes,
+                            previousDestinations = previousDestinations,
+                        )
+                        when (generated) {
+                            is TripGenerationResult.Success -> {
+                                val encoded = Json.encodeToString(generated.trip)
+                                if (latestDestinationActive && proposalGuard.complete(token, generated.trip.id)) {
+                                    previousDestinations = (
+                                        previousDestinations + Json.encodeToString(generated.trip.destination.point)
+                                    ).takeLast(RECENT_DESTINATIONS_HISTORY_LIMIT)
+                                    proposalJson = encoded
+                                }
+                            }
 
-                when (generated) {
-                    is TripGenerationResult.Success -> {
-                        val encoded = Json.encodeToString(generated.trip)
-
-                        if (latestDestinationActive &&
-                            proposalGuard.complete(token, generated.trip.id)
-                        ) {
-                            previousDestinations = (previousDestinations + Json.encodeToString(generated.trip.destination.point)).takeLast(10)
-                            proposalJson = encoded
+                            is TripGenerationResult.InvalidInput -> fail(Trip33Failure.InvalidInput, generated.message)
+                            TripGenerationResult.IdUnavailable -> fail(
+                                Trip33Failure.InvalidInput,
+                                "A unique trip ID could not be created. Try again.",
+                            )
+                            TripGenerationResult.NoRoute -> fail(Trip33Failure.NoRoute)
+                            is TripGenerationResult.RoutingUnavailable -> fail(
+                                Trip33Failure.ProviderUnavailable,
+                                generated.message,
+                            )
                         }
-                    }
-
-                    is TripGenerationResult.InvalidInput -> {
-                        fail(
-                            Trip33Failure.InvalidInput,
-                            generated.message
-                        )
-                    }
-
-                    TripGenerationResult.IdUnavailable -> {
-                        fail(
-                            Trip33Failure.InvalidInput,
-                            "A unique trip ID could not be created. Try again."
-                        )
-                    }
-
-                    TripGenerationResult.NoRoute -> {
-                        fail(Trip33Failure.NoRoute)
-                    }
-
-                    is TripGenerationResult.RoutingUnavailable -> {
-                        fail(Trip33Failure.ProviderUnavailable, generated.message)
                     }
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                fail(
-                    Trip33Failure.ProviderUnavailable,
-                    "The trip request could not finish. Please try again."
-                )
+                fail(Trip33Failure.ProviderUnavailable, "The trip request could not finish. Please try again.")
             } finally {
                 if (proposalGuard.isCurrent(token)) {
                     processingAction = false
@@ -555,46 +387,27 @@ internal fun TransitOpeningScreen(
     }
     LaunchedEffect(planner, copiedTripToGenerate, isDestinationActive) {
         val saved = copiedTripToGenerate
-        if (saved != null && isDestinationActive &&
-            planner.minutes == saved.plannedMinutes &&
-            planner.selectedTransportIds == (saved.requestedTransportIds ?: saved.selectedTransports.map { it.id }) &&
-            planner.selectedZoneIds == saved.selectedZoneIds &&
-            planner.selectedZonesByTransport == saved.selectedZonesByTransport &&
-            (if (liveMap) planner.originPlace == saved.origin else planner.origin == saved.origin.toSampleMapPoint()) &&
-            planner.intensity == saved.attractionIntensity) {
+        if (saved != null && isDestinationActive && plannerMatchesSavedTrip(planner, saved, liveMap)) {
             copiedTripToGenerate = null
             performPrimaryAction()
         }
     }
 
     fun closeCurrentProposalScreen() {
-        if (pickingOrigin) {
-            pickingOrigin = false
-        } else {
-            closeProposalFlow()
-        }
+        if (pickingOrigin) pickingOrigin = false else closeProposalFlow()
     }
 
-    val proposalScreenVisible =
-        processingAction || proposal != null || failure != null
+    val proposalScreenVisible = processingAction || proposal != null || failure != null
     val pickingLiveOriginFromFailure = liveMap && failure != null && pickingOrigin
-
-    val proposalBackState = rememberNavigationEventState(
-        currentInfo = NavigationEventInfo.None
-    )
-
+    val proposalBackState = rememberNavigationEventState(currentInfo = NavigationEventInfo.None)
     NavigationBackHandler(
         state = proposalBackState,
         isBackEnabled = isDestinationActive && proposalScreenVisible && !pickingLiveOriginFromFailure,
-        onBackCompleted = { closeCurrentProposalScreen() }
+        onBackCompleted = { closeCurrentProposalScreen() },
     )
 
     val proposalModifier = modifier.onPreviewKeyEvent {
-        if (isDestinationActive &&
-            proposalScreenVisible &&
-            it.type == KeyEventType.KeyDown &&
-            it.key == Key.Escape
-        ) {
+        if (isDestinationActive && proposalScreenVisible && it.type == KeyEventType.KeyDown && it.key == Key.Escape) {
             closeCurrentProposalScreen()
             true
         } else {
@@ -628,9 +441,7 @@ internal fun TransitOpeningScreen(
                 closeProposalFlow()
                 performPrimaryAction()
             },
-            onEditSettings = {
-                closeProposalFlow()
-            },
+            onEditSettings = { closeProposalFlow() },
             onUnavailableAction = {
                 if (liveMap) {
                     closeProposalFlow()
@@ -640,23 +451,14 @@ internal fun TransitOpeningScreen(
                         "in this sample. Choose a point on the map."
                 }
             },
-            onCancelPicking = {
-                pickingOrigin = false
-            },
-            sampleLabel = if (sampleOutcome != Trip33Sample.Normal) {
-                "Sample · ${sampleOutcome.name}"
-            } else {
-                null
-            },
-            modifier = proposalModifier
+            onCancelPicking = { pickingOrigin = false },
+            sampleLabel = if (sampleOutcome != Trip33Sample.Normal) "Sample · ${sampleOutcome.name}" else null,
+            modifier = proposalModifier,
         )
         return
     }
 
-    if (processingAction &&
-        activeState == null &&
-        pendingReviewId == null
-    ) {
+    if (processingAction && activeState == null && pendingReviewId == null) {
         TripLoadingContent(
             origin = planner.origin,
             liveOrigin = planner.originPlace,
@@ -666,7 +468,7 @@ internal fun TransitOpeningScreen(
                 .filter { it.id in selectedTransportIds }
                 .joinToString(" and ") { it.label },
             onCancel = { closeProposalFlow() },
-            modifier = proposalModifier
+            modifier = proposalModifier,
         )
         return
     }
@@ -676,42 +478,21 @@ internal fun TransitOpeningScreen(
             trip = proposal,
             scheduled = proposal.routedDurationSeconds != null,
             onRename = { name ->
-                if (latestDestinationActive && !processingAction &&
-                    proposalGuard.canStart(proposal.id) && name.isNotBlank()
-                ) {
+                if (latestDestinationActive && !processingAction && proposalGuard.canStart(proposal.id) && name.isNotBlank()) {
                     proposalJson = Json.encodeToString(proposal.copy(title = name.trim()))
                 }
             },
             onStart = {
-                if (latestDestinationActive &&
-                    !processingAction &&
-                    failure == null &&
-                    proposalGuard.canStart(proposal.id) &&
-                    pendingOpenTripId == null
+                if (latestDestinationActive && !processingAction && failure == null &&
+                    proposalGuard.canStart(proposal.id) && pendingOpenTripId == null
                 ) {
-                    when (val result = proposalGuard.start(tripsStore, proposal)) {
-                        TripActionResult.Applied -> {
-                            proposalJson = null
-                            queueTripOpening(proposal.id)
-                            if (liveMap) finishPlannerExit()
-                        }
-
-                        is TripActionResult.ActiveTripExists -> {
-                            proposalJson = null
-                            validationMessage =
-                                "An unfinished trip already exists. Use Resume trip."
-                        }
-
-                        is TripActionResult.InvalidInput -> {
-                            proposalJson = null
-                            validationMessage = result.message
-                        }
-
-                        else -> {
-                            proposalJson = null
-                            validationMessage =
-                                "The trip could not be started. Please try again."
-                        }
+                    val result = proposalGuard.start(tripsStore, proposal)
+                    proposalJson = null
+                    if (result == TripActionResult.Applied) {
+                        queueTripOpening(proposal.id)
+                        if (liveMap) finishPlannerExit()
+                    } else {
+                        validationMessage = describeProposalStartFailure(result)
                     }
                 }
             },
@@ -720,7 +501,7 @@ internal fun TransitOpeningScreen(
                 performPrimaryAction()
             },
             onEditSettings = { closeProposalFlow() },
-            modifier = proposalModifier
+            modifier = proposalModifier,
         )
         return
     }
@@ -729,8 +510,7 @@ internal fun TransitOpeningScreen(
         ActiveMapContent(
             trip = activeState.trip,
             progress = (
-                activeState.routeProgress ?: (activeState.elapsedMillis.toFloat() /
-                    TRIP_SIMULATION_DURATION_MILLIS)
+                activeState.routeProgress ?: (activeState.elapsedMillis.toFloat() / TRIP_SIMULATION_DURATION_MILLIS)
             ).coerceIn(0f, 1f),
             actionsEnabled = isDestinationActive && !processingAction,
             mainOverview = true,
@@ -740,29 +520,24 @@ internal fun TransitOpeningScreen(
             simulationEnabled = simulationEnabled,
             userPosition = if (simulationEnabled) null else location?.fix?.point,
             onRequestLocation = { location?.request() },
-            locationState = if (simulationEnabled) TripLocationState.Sample else if (location?.fix != null) TripLocationState.Live else TripLocationState.NotTracking,
-            modifier = modifier
+            locationState = when {
+                simulationEnabled -> TripLocationState.Sample
+                location?.fix != null -> TripLocationState.Live
+                else -> TripLocationState.NotTracking
+            },
+            modifier = modifier,
         )
         return
     }
 
-    if (originMode != "planner" &&
-        isDestinationActive &&
-        activeState == null &&
-        pendingOpenTripId == null
-    ) {
-        val draftOrigin = if (
-            originDraftX != null && originDraftY != null
-        ) {
-            TripPoint(
-                "Selected point on map",
-                originDraftX!!,
-                originDraftY!!
-            )
+    if (originMode != "planner" && isDestinationActive && activeState == null && pendingOpenTripId == null) {
+        val draftX = originDraftX
+        val draftY = originDraftY
+        val draftOrigin = if (draftX != null && draftY != null) {
+            TripPoint("Selected point on map", draftX, draftY)
         } else {
             null
         }
-
         OriginSelectionContent(
             origin = if (originMode == "pick") draftOrigin else planner.origin,
             minutes = boundedMinutes,
@@ -796,9 +571,7 @@ internal fun TransitOpeningScreen(
                 }
             },
             onSearch = {
-                originMessage =
-                    "Place and address search is not connected in this sample. " +
-                        "Choose a point on the map."
+                originMessage = "Place and address search is not connected in this sample. Choose a point on the map."
             },
             onRetryLocation = {
                 if (location != null) {
@@ -831,22 +604,26 @@ internal fun TransitOpeningScreen(
                     originMode = if (originMode == "pick") "options" else "planner"
                 }
             },
-            liveMapData = if (liveMap) TransitMapData(
-                browsing = true,
-                pickerOpen = true,
-                interactive = canChangeInputs(),
-                pin = liveDraft,
-                onPick = if (canChangeInputs()) { point ->
-                    if (location?.containsPoint?.invoke(point) == true) {
-                        liveDraft = point
-                        originMessage = null
-                        originMode = "pick"
-                    } else {
-                        originMessage = "Choose a point inside the supported area."
-                    }
-                } else null
-            ) else null,
-            modifier = modifier
+            liveMapData = if (liveMap) {
+                TransitMapData(
+                    browsing = true,
+                    pickerOpen = true,
+                    interactive = canChangeInputs(),
+                    pin = liveDraft,
+                    onPick = if (canChangeInputs()) {
+                        { point ->
+                            if (location?.containsPoint?.invoke(point) == true) {
+                                liveDraft = point
+                                originMessage = null
+                                originMode = "pick"
+                            } else {
+                                originMessage = "Choose a point inside the supported area."
+                            }
+                        }
+                    } else null,
+                )
+            } else null,
+            modifier = modifier,
         )
         return
     }
@@ -867,10 +644,7 @@ internal fun TransitOpeningScreen(
                 .associate { it.id to planner.zonesForTransport(it.id) },
             onToggleTransport = { id ->
                 if (canChangeInputs()) {
-                    plannerViewModel.toggleTransport(
-                        id,
-                        transportTypes.map { it.id }.toSet()
-                    )
+                    plannerViewModel.toggleTransport(id, transportTypes.map { it.id }.toSet())
                     clearValidation()
                 }
             },
@@ -883,21 +657,16 @@ internal fun TransitOpeningScreen(
             walkingPreference = planner.walkingPreference,
             roundTrip = planner.roundTrip,
             onRoundTripChange = {
-                if (canChangeInputs()) { plannerViewModel.setRoundTrip(it); clearValidation() }
-            },
-            bikeSpeedKmh = planner.bikeSpeedKmh,
-            onBikeSpeedChange = {
-                if (canChangeInputs()) plannerViewModel.setBikeSpeedKmh(it)
-            },
-            selectedAttractionIds = planner.selectedAttractionIds,
-            onWalkingPreferenceChange = {
                 if (canChangeInputs()) {
-                    plannerViewModel.setWalkingPreference(it)
+                    plannerViewModel.setRoundTrip(it)
+                    clearValidation()
                 }
             },
-            onToggleAttraction = {
-                if (canChangeInputs()) plannerViewModel.toggleAttraction(it)
-            },
+            bikeSpeedKmh = planner.bikeSpeedKmh,
+            onBikeSpeedChange = { if (canChangeInputs()) plannerViewModel.setBikeSpeedKmh(it) },
+            selectedAttractionIds = planner.selectedAttractionIds,
+            onWalkingPreferenceChange = { if (canChangeInputs()) plannerViewModel.setWalkingPreference(it) },
+            onToggleAttraction = { if (canChangeInputs()) plannerViewModel.toggleAttraction(it) },
             validationMessage = validationMessage,
             actionLabel = pendingActionLabel ?: actionLabel,
             actionEnabled = isDestinationActive &&
@@ -910,18 +679,9 @@ internal fun TransitOpeningScreen(
                         (if (liveMap) planner.originPlace != null else generationBounds != null && planner.origin != null)
                 ),
             inputsEnabled = canChangeInputs(),
-            activeTripSummary = if (pendingOpenTripId != null) {
-                pendingSummary
-            } else {
-                activeSummary
-            },
-            pendingReviewSummary = if (pendingOpenTripId != null) {
-                null
-            } else {
-                completedSummary
-            },
+            activeTripSummary = if (pendingOpenTripId != null) pendingSummary else activeSummary,
+            pendingReviewSummary = if (pendingOpenTripId != null) null else completedSummary,
             onPrimaryAction = { performPrimaryAction() },
-
             onOpenDetailedSettings = {
                 if (canChangeInputs() && navigator.current == MainScreenKey) {
                     navigation.openSection(SettingsScreenKey)
@@ -965,8 +725,55 @@ internal fun TransitOpeningScreen(
                     originMode = "options"
                 }
             },
-            modifier = modifier
+            modifier = modifier,
         )
     }
+}
 
+/**
+ * Collects automatic location updates for the planner's default origin and surfaces a timeout notice
+ * when no reading arrives within [AUTOMATIC_ORIGIN_TIMEOUT_MILLIS].
+ */
+@Composable
+private fun AutomaticOriginUpdatesEffect(
+    location: PlannerLocation?,
+    enabled: Boolean,
+    canApplyFix: () -> Boolean,
+    onStatusChanged: (String?) -> Unit,
+    onDefaultOriginFound: (Place) -> Unit,
+) {
+    val latestCanApply by rememberUpdatedState(canApplyFix)
+    val latestOnStatus by rememberUpdatedState(onStatusChanged)
+    val latestOnFound by rememberUpdatedState(onDefaultOriginFound)
+
+    LaunchedEffect(location, enabled) {
+        latestOnStatus(null)
+        if (!enabled || location == null) return@LaunchedEffect
+        val updates = location.automaticOriginUpdates ?: return@LaunchedEffect
+        var resolvedStatus: String? = null
+        val timeout = launch {
+            delay(AUTOMATIC_ORIGIN_TIMEOUT_MILLIS)
+            if (resolvedStatus == null) {
+                resolvedStatus = "Location unavailable. Choose a starting point."
+                latestOnStatus(resolvedStatus)
+            }
+        }
+        try {
+            updates.collect { update ->
+                val usable = update is LocationUpdate.Fix && location.containsPoint(update.point)
+                resolvedStatus = when (update) {
+                    LocationUpdate.PermissionDenied -> "Location permission is off. Choose a starting point."
+                    LocationUpdate.Unavailable -> "Location unavailable. Choose a starting point."
+                    is LocationUpdate.Fix -> if (usable) null else "Outside the supported area. Choose a starting point."
+                }
+                latestOnStatus(resolvedStatus)
+                if (usable && latestCanApply()) {
+                    timeout.cancel()
+                    latestOnFound(Place("Current location", update.point))
+                }
+            }
+        } finally {
+            timeout.cancel()
+        }
+    }
 }
