@@ -81,6 +81,9 @@ sealed class TripGenerationResult {
  * Endpoints are chosen in normalized PNG units and projected to geographic [Place] instances.
  * Random, ID creation, and time are injectable for deterministic verification.
  *
+ * Check for an unfinished trip before calling [generate]. Generate once in response to a user
+ * action and reuse the returned [Trip] for navigation and restoration across recompositions.
+ *
  * @param routingService Plans the legs between the chosen places.
  * @param random Source of randomness for endpoint sampling.
  * @param idFactory Supplies candidate unique trip IDs.

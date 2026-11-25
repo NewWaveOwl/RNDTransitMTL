@@ -156,7 +156,6 @@ Screen-specific components and previews belong with their screen. Shared compone
 ```text
 rnd_transit_mtl/
 │
-├── AchievementLauncher.kt
 ├── AnimatedStartupOverlay.kt
 ├── App.kt
 ├── Platform.kt
@@ -305,7 +304,7 @@ rnd_transit_mtl/
 │   ├── current_trip/
 │   │   ├── CurrentTripLocationViewModel.kt
 │   │   └── ReturnTripViewModel.kt
-│   ├── settings/
+│   ├── Settings/
 │   │   └── SettingsViewModel.kt
 │   ├── trip_details/
 │   ├── trip_review/

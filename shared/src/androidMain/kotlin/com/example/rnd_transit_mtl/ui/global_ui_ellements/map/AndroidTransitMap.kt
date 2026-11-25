@@ -157,6 +157,22 @@ fun ProvideAndroidTransitMap(
     }
 }
 
+/**
+ * Identifies the style instance displayed by MapLibre.
+ *
+ * @property offline Whether this attempt uses the bundled map.
+ * @property attempt Incremented to load a fresh instance of the same style.
+ */
+internal data class MapStyleAttempt(val offline: Boolean = false, val attempt: Int = 0) {
+    /** Reloads the current style, even when the device is offline. */
+    fun retry() = copy(attempt = attempt + 1)
+
+    /** Switches from the bundled style when a network is available.
+     * @param hasNetwork Whether Android currently reports an active network.
+     */
+    fun retryOnline(hasNetwork: Boolean) = if (hasNetwork) MapStyleAttempt(attempt = attempt + 1) else this
+}
+
 /** Renders the MapLibre map, route/uncertainty layers, camera controllers, and status overlays. */
 @Composable
 @UiComposable
@@ -169,8 +185,8 @@ private fun AndroidTransitMap(
 ) {
     val connectivity = LocalContext.current.getSystemService(ConnectivityManager::class.java)
     // Let MapLibre try its ambient cache before switching to the bundled image.
-    var offline by remember(styleUrl) { mutableStateOf(false) }
-    var attempt by remember(styleUrl) { mutableIntStateOf(0) }
+    var styleAttempt by remember(styleUrl) { mutableStateOf(MapStyleAttempt()) }
+    val offline = styleAttempt.offline
     val trip = data.trip
     val fix = session.fix.takeIf { data.browsing }
     val confirmedPin = data.pin.takeIf { !data.pickerOpen && data.centerOnPin }
@@ -189,7 +205,7 @@ private fun AndroidTransitMap(
         computeTravelledSegments(path, distances, routeMarker, data.progress)
     }
 
-    key(styleUrl, attempt, offline) {
+    key(styleUrl, styleAttempt) {
         val savedCamera = remember { session.camera.takeIf { data.browsing } }
         val offlineImage = if (offline) {
             val bitmap = imageResource(Res.drawable.map_sample)
@@ -240,11 +256,11 @@ private fun AndroidTransitMap(
         LaunchedEffect(map, styleLoadState) {
             if (offline || styleLoadState == StyleLoadState.Ready) return@LaunchedEffect
             if (styleLoadState is StyleLoadState.Failed) {
-                offline = true
+                styleAttempt = styleAttempt.copy(offline = true)
             } else if (connectivity.activeNetwork == null) {
                 delay(OFFLINE_STYLE_FALLBACK_DELAY_MILLIS)
                 if (connectivity.activeNetwork == null && map.style.loadState != StyleLoadState.Ready) {
-                    offline = true
+                    styleAttempt = styleAttempt.copy(offline = true)
                 }
             }
         }
@@ -303,11 +319,9 @@ private fun AndroidTransitMap(
                 offline = offline,
                 styleLoadState = styleLoadState,
                 data = data,
+                onRetryStyle = { styleAttempt = styleAttempt.retry() },
                 onRetryOnline = {
-                    if (!offline || connectivity.activeNetwork != null) {
-                        offline = false
-                        attempt++
-                    }
+                    styleAttempt = styleAttempt.retryOnline(connectivity.activeNetwork != null)
                 },
             )
         }

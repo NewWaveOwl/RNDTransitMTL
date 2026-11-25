@@ -37,7 +37,8 @@ private val MapStatusSpinnerSize = 24.dp
  * @param offline Whether the map is currently showing the bundled offline fallback.
  * @param styleLoadState Current MapLibre style load state.
  * @param data Active map presentation configuration.
- * @param onRetryOnline Called when the user taps Retry on offline or failed map states.
+ * @param onRetryStyle Reloads the failed style, including the bundled style while offline.
+ * @param onRetryOnline Tries to switch a working bundled map back to the online style.
  */
 @Composable
 internal fun BoxScope.AndroidMapStatusOverlays(
@@ -45,6 +46,7 @@ internal fun BoxScope.AndroidMapStatusOverlays(
     offline: Boolean,
     styleLoadState: StyleLoadState,
     data: TransitMapData,
+    onRetryStyle: () -> Unit,
     onRetryOnline: () -> Unit,
 ) {
     if (!offline && !data.attributionHandledByScreen &&
@@ -107,7 +109,7 @@ internal fun BoxScope.AndroidMapStatusOverlays(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text("Couldn’t load the map")
-                TextButton(onClick = onRetryOnline) { Text("Retry") }
+                TextButton(onClick = onRetryStyle) { Text("Retry") }
             }
         }
 
