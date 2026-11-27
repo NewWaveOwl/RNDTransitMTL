@@ -1,5 +1,6 @@
 package com.example.rnd_transit_mtl.model.trip
 
+import com.example.rnd_transit_mtl.model.ids.GroupTripId
 import com.example.rnd_transit_mtl.model.ids.RouteId
 import com.example.rnd_transit_mtl.model.ids.TripId
 import com.example.rnd_transit_mtl.model.ids.UserId
@@ -105,9 +106,17 @@ data class Trip(
     /** Allowed planner alternatives, separate from walking access and other used leg modes. Null on legacy trips. */
     val requestedTransportIds: List<TransportId>? = null,
     /** Optional return relationship or round-trip waypoint; absent on legacy one-way records. */
-    val journey: TripJourney? = null
+    val journey: TripJourney? = null,
+    /**
+     * Shared group trip this trip belongs to; null for a solo trip. The route came from that
+     * group trip, and the stored History row points to it instead of storing its own copy.
+     */
+    val groupTripId: GroupTripId? = null
 ) {
     init {
+        require(groupTripId == null || journey?.kind != TripJourneyKind.Return) {
+            "A return trip belongs to one member, so it cannot be a group trip."
+        }
         require(routedDurationSeconds == null || routedDurationSeconds > 0)
         require(waitingTimeSeconds == null || waitingTimeSeconds >= 0)
         require(walkingPreference == null || walkingPreference in listOf("Amble", "Walk", "Dash"))

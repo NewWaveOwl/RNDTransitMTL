@@ -8,6 +8,7 @@ import com.example.rnd_transit_mtl.data.remote.dto.toDomainOrNull
 import com.example.rnd_transit_mtl.data.remote.dto.toDto
 import com.example.rnd_transit_mtl.data.remote.dto.tripStatusFromDtoOrNull
 import com.example.rnd_transit_mtl.model.geo.GeoPoint
+import com.example.rnd_transit_mtl.model.ids.GroupTripId
 import com.example.rnd_transit_mtl.model.ids.RouteId
 import com.example.rnd_transit_mtl.model.ids.TransportId
 import com.example.rnd_transit_mtl.model.ids.UserId
@@ -17,6 +18,8 @@ import com.example.rnd_transit_mtl.model.trip.OsmReference
 import com.example.rnd_transit_mtl.model.trip.Place
 import com.example.rnd_transit_mtl.model.trip.RouteLeg
 import com.example.rnd_transit_mtl.model.trip.TripRequest
+import com.example.rnd_transit_mtl.model.trip.TripJourney
+import com.example.rnd_transit_mtl.model.trip.TripJourneyKind
 import com.example.rnd_transit_mtl.model.trip.TripStatus
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
@@ -142,6 +145,27 @@ class TripDtoTest {
         val json = Json.encodeToString(TripDto.serializer(), trip.toDto())
 
         assertEquals(trip, Json.decodeFromString(TripDto.serializer(), json).toDomainOrNull())
+    }
+
+    @Test
+    fun groupTripLinkConvertsBothWaysAndSoloTripsHaveNone() {
+        val groupTrip = completedTrip().copy(groupTripId = GroupTripId("shared-route"))
+        val json = Json.encodeToString(TripDto.serializer(), groupTrip.toDto())
+
+        assertTrue("\"group_trip_id\":\"shared-route\"" in json)
+        assertEquals(groupTrip, Json.decodeFromString(TripDto.serializer(), json).toDomainOrNull())
+        assertNull(completedTrip().toDto().groupTripId)
+    }
+
+    @Test
+    fun aReturnTripCannotBeAGroupTrip() {
+        val returnTrip = completedTrip().copy(
+            journey = TripJourney(TripJourneyKind.Return, outboundTripId = TripId("outbound"))
+        )
+
+        kotlin.test.assertFailsWith<IllegalArgumentException> {
+            returnTrip.copy(groupTripId = GroupTripId("shared-route"))
+        }
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.example.rnd_transit_mtl.data.remote.dto
 
+import com.example.rnd_transit_mtl.model.ids.GroupTripId
 import com.example.rnd_transit_mtl.model.ids.RouteId
 import com.example.rnd_transit_mtl.model.ids.TransportId
 import com.example.rnd_transit_mtl.model.ids.TripId
@@ -85,7 +86,9 @@ data class TripDto(
     @SerialName("walking_preference") val walkingPreference: String? = null,
     @SerialName("orientation_buffer_seconds") val orientationBufferSeconds: Long = 0,
     @SerialName("requested_transport_ids") val requestedTransportIds: List<String>? = null,
-    val journey: TripJourneyDto? = null
+    val journey: TripJourneyDto? = null,
+    /** Shared group trip this History row points to; null for a solo trip. */
+    @SerialName("group_trip_id") val groupTripId: String? = null
 )
 
 /** Converts a trip into its backend form. */
@@ -119,7 +122,8 @@ fun Trip.toDto(): TripDto = TripDto(
         it.outboundTripId?.value, it.turnaround?.toDto(), it.waypoints.map { place -> place.toDto() }) },
     zonesByTransport = selectedZonesByTransport.entries.associate { (mode, zones) ->
         mode.value to zones.map { it.value }
-    }
+    },
+    groupTripId = groupTripId?.value,
 )
 
 /**
@@ -167,6 +171,7 @@ fun TripDto.toDomainOrNull(): Trip? = runCatchingInvalid {
         },
         selectedZonesByTransport = zonesByTransport.entries.associate { (mode, zones) ->
             TransportId(mode) to zones.map(::ZoneId)
-        }
+        },
+        groupTripId = groupTripId?.let(::GroupTripId)
     )
 }
