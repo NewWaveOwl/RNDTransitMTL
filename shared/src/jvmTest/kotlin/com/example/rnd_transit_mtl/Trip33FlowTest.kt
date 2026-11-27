@@ -50,6 +50,49 @@ import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMapData
 /** Runs the real planner coordinator with explicit outcomes and an isolated store. */
 @OptIn(ExperimentalComposeUiApi::class)
 class Trip33FlowTest {
+    @Test
+    fun failedFetchAndGuestLimitKeepTheLastRouteAvailableToStart() = runBlocking(Dispatchers.Main) {
+        for (reason in listOf("offline", "guest_daily_limit")) {
+            var calls = 0
+            val backend = BackendTripGenerator(post = { body, _ ->
+                calls++
+                if (calls > 1) {
+                    if (reason == "offline") error("Fixture fetch failure")
+                    throw com.example.rnd_transit_mtl.data.generation.GenerationHttpFailure(429, 3600, reason)
+                }
+                val request = Json.decodeFromString<BackendGenerationRequest>(body)
+                val otp = Json.parseToJsonElement("""
+                    {"data":{"planConnection":{"routingErrors":[],"edges":[{"node":{
+                      "duration":600,"waitingTime":0,"legs":[{"mode":"WALK","distance":560,"duration":600,
+                        "legGeometry":{"length":2,"points":"_vutG~~e`Mg^?"}}]
+                    }}]}}}
+                """.trimIndent()).jsonObject
+                Json.encodeToString(BackendGenerationResponse("success", origin = request.origin,
+                    destination = Place("Last valid destination", GeoPoint(45.505, -73.6)), elapsedSeconds = 600, otp = otp))
+            })
+            Host(Trip33Sample.Normal, liveMap = true, backend = backend).use { host ->
+                host.render()
+                host.planner.setOrigin(Place("Confirmed origin", GeoPoint(45.5, -73.6)))
+                host.render()
+                host.click("GO")
+                host.await("Start Trip")
+                val accepted = assertNotNull(host.mapData.trip)
+                host.click("Generate another")
+                host.await("retained proposal after $reason") {
+                    host.has("Start Trip") && host.has(if (reason == "offline")
+                        "Could not reach the trip planner. Check your connection and retry." else
+                        "Guests can generate five trips per day. Try again after midnight in Montréal or sign in. Your last trip is still available.")
+                }
+                assertEquals(accepted, host.mapData.trip)
+                assertEquals(2, calls)
+                host.render(30) // Settle the proposal entrance before recording visual evidence.
+                host.snapshot("Issue99-retained-$reason.png")
+                host.click("Start Trip")
+                host.render(20)
+                assertEquals(accepted.id, host.store.activeTrip?.id)
+            }
+        }
+    }
     private class BackInput : NavigationEventInput() {
         fun back() = dispatchOnBackCompleted()
     }

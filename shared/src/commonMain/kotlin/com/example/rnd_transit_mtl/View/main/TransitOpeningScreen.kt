@@ -151,7 +151,7 @@ internal fun TransitOpeningScreen(
     var pickingOrigin by rememberSaveable { mutableStateOf(false) }
     val failure = Trip33Failure.entries.firstOrNull { it.name == failureName }
     val proposalGuard = remember {
-        ProposalGuard(initialProposalId = if (failureName == null) proposal?.id else null)
+        ProposalGuard(initialProposalId = proposal?.id)
     }
 
     fun closeProposalFlow() {
@@ -281,7 +281,6 @@ internal fun TransitOpeningScreen(
         }
 
         val token = proposalGuard.begin()
-        proposalJson = null
         failureName = null
         failureMessage = ""
         validationMessage = ""
@@ -296,9 +295,8 @@ internal fun TransitOpeningScreen(
         generationJob = generationScope.launch {
             fun fail(kind: Trip33Failure, message: String = "") {
                 if (proposalGuard.complete(token, null)) {
-                    proposalJson = null
                     failureName = kind.name
-                    failureMessage = message
+                    failureMessage = message.ifBlank { "No new trip could be generated. Your last trip is still available." }
                 }
             }
 
@@ -415,7 +413,7 @@ internal fun TransitOpeningScreen(
         }
     }
 
-    if (failure != null && isDestinationActive && !pickingLiveOriginFromFailure) {
+    if (failure != null && proposal == null && isDestinationActive && !pickingLiveOriginFromFailure) {
         Trip33FallbackContent(
             failure = failure,
             detail = failureMessage,
@@ -476,6 +474,7 @@ internal fun TransitOpeningScreen(
     if (proposal != null) {
         TripProposalContent(
             trip = proposal,
+            generationError = failureMessage.takeIf { failure != null },
             scheduled = proposal.routedDurationSeconds != null,
             onRename = { name ->
                 if (latestDestinationActive && !processingAction && proposalGuard.canStart(proposal.id) && name.isNotBlank()) {
@@ -483,7 +482,7 @@ internal fun TransitOpeningScreen(
                 }
             },
             onStart = {
-                if (latestDestinationActive && !processingAction && failure == null &&
+                if (latestDestinationActive && !processingAction &&
                     proposalGuard.canStart(proposal.id) && pendingOpenTripId == null
                 ) {
                     val result = proposalGuard.start(tripsStore, proposal)
@@ -497,7 +496,6 @@ internal fun TransitOpeningScreen(
                 }
             },
             onGenerateAnother = {
-                closeProposalFlow()
                 performPrimaryAction()
             },
             onEditSettings = { closeProposalFlow() },

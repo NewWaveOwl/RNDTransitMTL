@@ -26,3 +26,6 @@ tool/
 
 # Local Android release identity. Back up securely; never commit.
 .release-private/
+
+# Private server guest allowance (verified anonymous account IDs).
+**/data/guest-generation-quota.json

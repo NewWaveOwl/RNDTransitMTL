@@ -37,7 +37,6 @@ internal class ProposalGuard(
     fun begin(): Long {
         revision += 1
         waiting = true
-        proposalId = null
         return revision
     }
 
@@ -53,7 +52,7 @@ internal class ProposalGuard(
         if (!isCurrent(token) || !waiting) return false
 
         waiting = false
-        proposalId = acceptedProposalId
+        if (acceptedProposalId != null) proposalId = acceptedProposalId
         return true
     }
 

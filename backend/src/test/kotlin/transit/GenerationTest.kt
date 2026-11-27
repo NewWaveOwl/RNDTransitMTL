@@ -10,6 +10,45 @@ import java.time.Instant
 import kotlin.random.Random
 
 class GenerationTest {
+    @Test fun guestAllowanceRejectsSixthSuccessButDoesNotAffectAnotherIdentity() = runBlocking {
+        var time = 0L
+        var calls = 0
+        val api = Api(generator { calls++; response() }, authorize = { it ?: "guest:a" },
+            userLimit = UserGenerationLimit { time })
+        // A fixed destination models repeated requests without destination-history exclusions.
+        val body = JsonObject(input() + ("destination" to obj("label" to "Target", "point" to end.toJson()))).toString()
+        repeat(5) {
+            assertEquals("success", api.handle("application/json", null) { body }.second.field("status").text())
+            time += 3000
+        }
+        time -= 3000 // Daily-limit copy takes precedence even during the existing cooldown.
+        val completedCalls = calls
+        val limited = api.handle("application/json", null) { body }
+        assertEquals(429, limited.first)
+        assertEquals("guest_daily_limit", limited.second.field("reason").text())
+        assertTrue(limited.second.field("retryAfterSeconds").number()!! > 0)
+        assertEquals(completedCalls, calls)
+        val before = calls
+        assertEquals("success", api.handle("application/json", "guest:b") { body }.second.field("status").text())
+        assertTrue(calls > before)
+    }
+
+    @Test fun eachCandidateFetchRefreshesDepartureAndAcceptedEstimates() = runBlocking {
+        var current = now
+        val departures = mutableListOf<Instant>()
+        val generator = Generator(emptyList(), zones(), { query ->
+            val departure = Instant.parse(query.field("variables").field("departure").text())
+            departures += departure
+            if (departures.size == 1) {
+                current = now.plusSeconds(30)
+                obj("data" to obj("planConnection" to obj("routingErrors" to emptyList<Any>(), "edges" to emptyList<Any>())))
+            } else response(20.5)
+        }, { current }, { listOf(Point(45.52, -73.6), end) })
+        val result = generator.generate(parseRequest(input()))
+        assertEquals(listOf(now, now.plusSeconds(30)), departures)
+        assertEquals(now.plusSeconds(30).toString(), result.field("departure").text())
+        assertEquals(1260.0, result.field("elapsedSeconds").number()!!, 0.0)
+    }
     private val start=Point(45.5,-73.6)
     private val end=Point(45.51,-73.6)
     private val now=Instant.parse("2026-11-13T15:00:00Z")

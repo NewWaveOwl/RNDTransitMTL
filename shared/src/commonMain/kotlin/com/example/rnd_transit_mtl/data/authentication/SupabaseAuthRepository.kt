@@ -28,6 +28,7 @@ internal class SupabaseAuthRepository(
                         null
                     }
                     user?.let {
+                        if (it.isAnonymous == true) return@let AccountSession.Guest
                         AccountSession.SignedIn(userId = it.id, email = it.email)
                     } ?: AccountSession.Unavailable
                 }
@@ -35,6 +36,8 @@ internal class SupabaseAuthRepository(
                     val user = status.session.user
                     if (user == null) {
                         AccountSession.Unavailable
+                    } else if (user.isAnonymous == true) {
+                        AccountSession.Guest
                     } else {
                         AccountSession.SignedIn(
                             userId = user.id,
