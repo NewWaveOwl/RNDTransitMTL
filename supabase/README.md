@@ -31,3 +31,24 @@ it from History, and check its timing and requested transport choices. Repeat
 with a cancelled trip that the user chooses to keep. Verify another account
 cannot see either trip. A successful generation request only verifies routing,
 not cloud persistence.
+
+## Live groups (#88)
+
+`20261127200000_create_groups.sql` adds `groups`, `group_members`, `group_trips`
+(the shared route) and `group_trip_participants`, plus `trips.group_trip_id`. A
+member's History row for a group trip stores no route of its own; it points to
+the group trip. App users can only read the group tables, and only for groups
+they belong to or group trips they started. Every write goes through
+`create_group`, `join_group`, `leave_group`, `share_group_trip` and
+`start_group_trip`. They raise fixed messages (`GROUP_CODE_INVALID`,
+`GROUP_ALREADY_JOINED`, `GROUP_NOT_HOST`, `GROUP_NOT_MEMBER`, `GROUP_TRIP_INVALID`,
+`GROUP_CODE_GENERATION_FAILED`, `GROUP_NOT_SIGNED_IN`), which the app maps to
+messages. The migration adds `groups` and `group_members` to the
+`supabase_realtime` publication when it exists.
+
+Run `tests/groups.sql` the same way as the other tests. It covers create/join,
+idempotent rejoin, wrong and expired codes, direct writes being denied, the
+host-only share, participants saving History, outsiders seeing nothing, and the
+host leaving. Without the Supabase CLI, a plain Postgres container works: run
+`tests/support/plain_postgres_auth_shim.sql` first, then every migration in
+order, then the test.
