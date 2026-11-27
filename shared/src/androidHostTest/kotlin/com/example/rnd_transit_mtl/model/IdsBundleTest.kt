@@ -1,6 +1,7 @@
 package com.example.rnd_transit_mtl.model
 
 import com.example.rnd_transit_mtl.model.ids.GroupId
+import com.example.rnd_transit_mtl.model.ids.GroupTripId
 import com.example.rnd_transit_mtl.model.ids.RouteId
 import com.example.rnd_transit_mtl.model.ids.TransportId
 import com.example.rnd_transit_mtl.model.ids.TripId
@@ -22,6 +23,7 @@ class IdsBundleTest {
         TripId("trip-1"),
         UserId("user-1"),
         GroupId("group-1"),
+        GroupTripId("group-trip-1"),
         TransportId("bus"),
         RouteId("bus:401"),
         ZoneId("A")

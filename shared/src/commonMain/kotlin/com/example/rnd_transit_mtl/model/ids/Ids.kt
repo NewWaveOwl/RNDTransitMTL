@@ -57,6 +57,22 @@ value class GroupId(val value: String) : PlatformSerializable {
 }
 
 /**
+ * Identifies one shared group trip: the route a host shared with their group.
+ * Each participant's own trip keeps its own TripId and points to this one.
+ *
+ * @property value Nonblank identifier text.
+ */
+@Serializable
+@JvmInline
+value class GroupTripId(val value: String) : PlatformSerializable {
+    init {
+        require(value.isNotBlank()) { "Group trip ID must not be blank." }
+    }
+
+    override fun toString(): String = value
+}
+
+/**
  * Identifies a transport mode from the transport catalogue.
  *
  * @property value Nonblank catalogue identifier, such as walk or metro.

@@ -2,6 +2,7 @@ package com.example.rnd_transit_mtl.model
 
 import androidx.compose.runtime.saveable.SaverScope
 import com.example.rnd_transit_mtl.model.ids.GroupId
+import com.example.rnd_transit_mtl.model.ids.GroupTripId
 import com.example.rnd_transit_mtl.model.ids.RouteId
 import com.example.rnd_transit_mtl.model.ids.TransportId
 import com.example.rnd_transit_mtl.model.ids.TripId
@@ -43,6 +44,7 @@ class IdsTest {
         assertFailsWith<IllegalArgumentException> { TripId(" ") }
         assertFailsWith<IllegalArgumentException> { UserId("") }
         assertFailsWith<IllegalArgumentException> { GroupId(" ") }
+        assertFailsWith<IllegalArgumentException> { GroupTripId("") }
         assertFailsWith<IllegalArgumentException> { TransportId("") }
         assertFailsWith<IllegalArgumentException> { RouteId(" ") }
         assertFailsWith<IllegalArgumentException> { ZoneId("") }
