@@ -27,6 +27,9 @@ import org.maplibre.compose.map.StyleLoadState
 // Layout settings — dp insets and indicator sizes for map attribution and style-loading status badges.
 private val MapAttributionInset = 8.dp
 private val MapAttributionBottomGap = 4.dp
+private val MapOverlayTextHorizontalPadding = 8.dp
+private val MapStillOfflineBottomGap = 2.dp
+private val MapCopyrightBottomGap = 4.dp
 private val MapStatusTopOffset = 64.dp
 private val MapStatusSpinnerSize = 24.dp
 
@@ -35,6 +38,7 @@ private val MapStatusSpinnerSize = 24.dp
  *
  * @param hasTrip Whether a trip route is currently displayed (adjusts overlay alignment).
  * @param offline Whether the map is currently showing the bundled offline fallback.
+ * @param showStillOffline Whether to show feedback after an online retry while still offline.
  * @param styleLoadState Current MapLibre style load state.
  * @param data Active map presentation configuration.
  * @param onRetryStyle Reloads the failed style, including the bundled style while offline.
@@ -44,6 +48,7 @@ private val MapStatusSpinnerSize = 24.dp
 internal fun BoxScope.AndroidMapStatusOverlays(
     hasTrip: Boolean,
     offline: Boolean,
+    showStillOffline: Boolean = false,
     styleLoadState: StyleLoadState,
     data: TransitMapData,
     onRetryStyle: () -> Unit,
@@ -89,11 +94,23 @@ internal fun BoxScope.AndroidMapStatusOverlays(
                     TextButton(onClick = onRetryOnline) {
                         Text("Offline map · Retry", color = TransitComplementary)
                     }
+                    if (showStillOffline) {
+                        Text(
+                            "Still offline",
+                            color = TransitComplementary,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier
+                                .padding(horizontal = MapOverlayTextHorizontalPadding)
+                                .padding(bottom = MapStillOfflineBottomGap),
+                        )
+                    }
                     Text(
                         "© OpenStreetMap contributors",
                         color = TransitComplementary,
                         style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(horizontal = 8.dp).padding(bottom = 4.dp),
+                        modifier = Modifier
+                            .padding(horizontal = MapOverlayTextHorizontalPadding)
+                            .padding(bottom = MapCopyrightBottomGap),
                     )
                 }
             }

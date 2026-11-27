@@ -11,8 +11,6 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
@@ -20,7 +18,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavBackStack
@@ -242,15 +239,11 @@ private fun DestinationDisplay(
             entry<SettingsScreenKey> {
                 val accountRepository = LocalAccountRepository.current
                 val authRepository = LocalAuthRepository.current
-                if (accountRepository != null) {
-                    val settingsViewModel = viewModel { SettingsViewModel(accountRepository, authRepository) }
-                    SettingsScreen(settingsViewModel)
-                } else {
-                    Text(
-                        text = "Sign in to manage account settings.",
-                        modifier = Modifier.padding(16.dp),
-                    )
+                // Guests have no account repository, so they get no ViewModel.
+                val settingsViewModel = accountRepository?.let {
+                    viewModel { SettingsViewModel(it, authRepository) }
                 }
+                SettingsScreen(settingsViewModel)
             }
         },
         transitionSpec = {

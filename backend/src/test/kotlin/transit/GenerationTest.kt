@@ -248,6 +248,37 @@ class GenerationTest {
         assertEquals(next.toJson(), result.field("destination").field("point"))
     }
 
+    @Test fun overBudgetRouteWithEmptyLegPolylineStillShortensRemainingGeometry() = runBlocking {
+        val middle = Point(45.505, -73.6)
+        var calls = 0
+        val emptySecondLeg = planResponse(
+            obj("mode" to "WALK", "distance" to 1000, "legGeometry" to obj("points" to encode(listOf(start, middle, end)))),
+            obj(
+                "mode" to "WALK",
+                "distance" to 0,
+                "end" to obj("scheduledTime" to now.plusSeconds(2400).toString()),
+                "legGeometry" to obj("points" to ""),
+            ),
+        )
+        val generator = Generator(
+            emptyList(), zones(),
+            route = { query ->
+                if (++calls == 1) {
+                    emptySecondLeg
+                } else {
+                    assertEquals(middle.latitude, query.field("variables").field("destinationLat").number()!!, 0.0)
+                    response(25.0, points = listOf(start, middle))
+                }
+            },
+            now = { now }, sample = { listOf(end) },
+        )
+
+        val result = generator.generate(parseRequest(input()))
+        assertEquals("success", result.field("status").text())
+        assertEquals(middle.toJson(), result.field("destination").field("point"))
+        assertEquals(2, calls)
+    }
+
     @Test fun candidateFailuresCanRecoverButRepeatedFailuresAreBounded()=runBlocking {
         val destinations=listOf(end,Point(45.52,-73.6),Point(45.53,-73.6))
         val failures=listOf(

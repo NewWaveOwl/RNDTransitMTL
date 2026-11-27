@@ -156,6 +156,47 @@ internal fun SettingsContent(
 }
 
 /**
+ * Guest fallback for Settings when no signed-in account repository is available.
+ *
+ * @param onSignIn Opens the sign-in screen so the guest can authenticate and manage settings.
+ */
+@Composable
+internal fun GuestSettingsContent(onSignIn: () -> Unit) {
+    Column(Modifier.fillMaxSize().background(TransitWhite)) {
+        PageTitle(title = SettingsScreenKey.screenTitle, layoutScale = 1f, highlighted = false)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .background(TransitWhite)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = SettingsHorizontalPadding, vertical = SettingsVerticalPadding),
+            verticalArrangement = Arrangement.spacedBy(SettingsSectionSpacing),
+        ) {
+            Text(
+                "Settings",
+                color = TransitComplementary,
+                fontSize = 28.sp,
+                lineHeight = 36.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                "Sign in to manage account settings.",
+                color = TransitComplementary,
+                fontSize = 15.sp,
+                lineHeight = 22.sp,
+            )
+            TransitOutlineButton(
+                "Sign in",
+                onClick = onSignIn,
+                height = SettingsButtonHeight,
+                fontSize = 15.sp,
+            )
+        }
+    }
+}
+
+/**
  * Heading, hint and one chip per [TransportModes]; exactly one mode is selected.
  *
  * @param selected Current default mode.

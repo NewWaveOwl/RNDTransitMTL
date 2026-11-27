@@ -374,8 +374,8 @@ internal class Generator(private val routes: List<JsonElement>, private val zone
     ) {
         val points = runCatching {
             itinerary.field("legs").items().flatMap { leg ->
-                val encoded = leg.field("legGeometry").field("points").text()
-                if (encoded.isNullOrEmpty()) return
+                // Non-local return exits maybeQueueShortenedCandidate when any leg lacks geometry.
+                val encoded = leg.field("legGeometry").field("points").text() ?: return
                 decodePolyline(encoded, checkActive)
             }
         }.getOrElse { error ->

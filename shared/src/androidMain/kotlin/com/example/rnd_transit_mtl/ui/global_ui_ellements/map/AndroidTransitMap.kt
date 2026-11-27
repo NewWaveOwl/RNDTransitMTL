@@ -81,8 +81,9 @@ private const val BrowsingMinZoom = 7.0
 private const val BrowsingFocusMinZoom = 13.0
 private const val ActiveTripRecenterMinZoom = 16.0
 
-// Animation settings — milliseconds for offline fallback check and automatic browsing recenter.
+// Animation settings — milliseconds for offline fallback check, offline retry notice, and automatic browsing recenter.
 private const val OFFLINE_STYLE_FALLBACK_DELAY_MILLIS = 2_000L
+private const val STILL_OFFLINE_NOTICE_DURATION_MILLIS = 3_000L
 private const val AUTO_CENTER_SETTLE_DELAY_MILLIS = 1_200L
 private const val AUTO_CENTER_EASE_DURATION_MILLIS = 1_800
 
@@ -173,6 +174,43 @@ internal data class MapStyleAttempt(val offline: Boolean = false, val attempt: I
     fun retryOnline(hasNetwork: Boolean) = if (hasNetwork) MapStyleAttempt(attempt = attempt + 1) else this
 }
 
+/**
+ * Tracks the active [MapStyleAttempt] alongside transient offline retry feedback without
+ * changing [styleAttempt] when an online retry is rejected offline.
+ *
+ * @property styleAttempt Style key controlling the MapLibre [MapState] instance.
+ * @property showStillOffline Whether to show the "Still offline" caption in the offline badge.
+ * @property offlineRetryCount Monotonic counter incremented on rejected offline retries to restart the notice timer.
+ */
+internal data class MapStyleUiState(
+    val styleAttempt: MapStyleAttempt = MapStyleAttempt(),
+    val showStillOffline: Boolean = false,
+    val offlineRetryCount: Int = 0,
+) {
+    /** Switches to the bundled offline style when online loading fails or times out without network. */
+    fun fallBackToOffline() = copy(styleAttempt = styleAttempt.copy(offline = true), showStillOffline = false)
+
+    /** Reloads the current style on failure, clearing any stale offline retry caption. */
+    fun retryStyle() = copy(styleAttempt = styleAttempt.retry(), showStillOffline = false)
+
+    /**
+     * Attempts to switch from the bundled map back to the online style.
+     *
+     * @param hasNetwork Whether Android currently reports an active network.
+     */
+    fun retryOnline(hasNetwork: Boolean): MapStyleUiState {
+        val next = styleAttempt.retryOnline(hasNetwork)
+        return if (next == styleAttempt) {
+            copy(showStillOffline = true, offlineRetryCount = offlineRetryCount + 1)
+        } else {
+            copy(styleAttempt = next, showStillOffline = false)
+        }
+    }
+
+    /** Hides the temporary "Still offline" caption after its display duration elapses. */
+    fun dismissStillOffline() = copy(showStillOffline = false)
+}
+
 /** Renders the MapLibre map, route/uncertainty layers, camera controllers, and status overlays. */
 @Composable
 @UiComposable
@@ -185,8 +223,14 @@ private fun AndroidTransitMap(
 ) {
     val connectivity = LocalContext.current.getSystemService(ConnectivityManager::class.java)
     // Let MapLibre try its ambient cache before switching to the bundled image.
-    var styleAttempt by remember(styleUrl) { mutableStateOf(MapStyleAttempt()) }
+    var styleState by remember(styleUrl) { mutableStateOf(MapStyleUiState()) }
+    val styleAttempt = styleState.styleAttempt
     val offline = styleAttempt.offline
+    LaunchedEffect(styleAttempt, styleState.offlineRetryCount) {
+        if (!styleState.showStillOffline || styleState.offlineRetryCount == 0) return@LaunchedEffect
+        delay(STILL_OFFLINE_NOTICE_DURATION_MILLIS)
+        styleState = styleState.dismissStillOffline()
+    }
     val trip = data.trip
     val fix = session.fix.takeIf { data.browsing }
     val confirmedPin = data.pin.takeIf { !data.pickerOpen && data.centerOnPin }
@@ -256,11 +300,11 @@ private fun AndroidTransitMap(
         LaunchedEffect(map, styleLoadState) {
             if (offline || styleLoadState == StyleLoadState.Ready) return@LaunchedEffect
             if (styleLoadState is StyleLoadState.Failed) {
-                styleAttempt = styleAttempt.copy(offline = true)
+                styleState = styleState.fallBackToOffline()
             } else if (connectivity.activeNetwork == null) {
                 delay(OFFLINE_STYLE_FALLBACK_DELAY_MILLIS)
                 if (connectivity.activeNetwork == null && map.style.loadState != StyleLoadState.Ready) {
-                    styleAttempt = styleAttempt.copy(offline = true)
+                    styleState = styleState.fallBackToOffline()
                 }
             }
         }
@@ -317,11 +361,12 @@ private fun AndroidTransitMap(
             AndroidMapStatusOverlays(
                 hasTrip = trip != null,
                 offline = offline,
+                showStillOffline = styleState.showStillOffline,
                 styleLoadState = styleLoadState,
                 data = data,
-                onRetryStyle = { styleAttempt = styleAttempt.retry() },
+                onRetryStyle = { styleState = styleState.retryStyle() },
                 onRetryOnline = {
-                    styleAttempt = styleAttempt.retryOnline(connectivity.activeNetwork != null)
+                    styleState = styleState.retryOnline(connectivity.activeNetwork != null)
                 },
             )
         }

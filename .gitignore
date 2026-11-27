@@ -26,8 +26,3 @@ tool/
 
 # Local Android release identity. Back up securely; never commit.
 .release-private/
-
-# Local scratch/review artifacts at repository root
-/main.zip
-/pr-74.diff
-/pr72-clean/
