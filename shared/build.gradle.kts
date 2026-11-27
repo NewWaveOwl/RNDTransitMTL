@@ -86,6 +86,7 @@ kotlin {
 
             implementation("io.github.jan-tennert.supabase:auth-kt:$supabaseVersion")
             implementation("io.github.jan-tennert.supabase:postgrest-kt:$supabaseVersion")
+            implementation("io.github.jan-tennert.supabase:realtime-kt:$supabaseVersion")
             implementation("com.russhwolf:multiplatform-settings-no-arg:1.3.0")
         }
 
