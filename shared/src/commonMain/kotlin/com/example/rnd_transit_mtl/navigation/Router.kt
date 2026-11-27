@@ -35,6 +35,10 @@ import com.example.rnd_transit_mtl.View.profile.ProfileScreen
 import com.example.rnd_transit_mtl.View.settings.SettingsScreen
 import com.example.rnd_transit_mtl.View.trip_details.TripDetailsScreen
 import com.example.rnd_transit_mtl.View.trip_review.TripReviewScreen
+import com.example.rnd_transit_mtl.View.together.TogetherScreen
+import com.example.rnd_transit_mtl.ViewModels.together.TogetherViewModel
+import com.example.rnd_transit_mtl.data.group.LocalGroupRepository
+import com.example.rnd_transit_mtl.model.ids.UserId
 import com.example.rnd_transit_mtl.ViewModels.Accounts.ProfileViewModel
 import com.example.rnd_transit_mtl.ViewModels.Settings.SettingsViewModel
 import com.example.rnd_transit_mtl.ViewModels.authentication.AuthViewModel
@@ -206,6 +210,23 @@ private fun DestinationDisplay(
                         if (active != null) navigation.openCurrentTrip(active)
                         else navigation.returnToPlanner()
                     },
+                )
+            }
+
+            entry<TogetherScreenKey> {
+                val groupRepository = LocalGroupRepository.current
+                val tripsStore = LocalTripsStore.current
+                val userId = (LocalAccountSession.current as? AccountSession.SignedIn)?.userId?.let(::UserId)
+                // Guests have no group repository, so they get no ViewModel.
+                val togetherViewModel = groupRepository?.let {
+                    viewModel { TogetherViewModel(it, tripsStore) }
+                }
+                TogetherScreen(
+                    viewModel = togetherViewModel,
+                    currentUserId = userId,
+                    onGo = { navigation.returnToPlanner() },
+                    onSignIn = { navigator.open(AuthScreenKey()) },
+                    onOpenTrip = { trip -> navigation.openCurrentTrip(trip) },
                 )
             }
 

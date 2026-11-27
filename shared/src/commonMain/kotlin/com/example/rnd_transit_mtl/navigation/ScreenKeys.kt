@@ -33,6 +33,13 @@ data object CompassScreenKey : ScreenKey() {
     override val screenTitle = "Compass"
 }
 
+/** Together tab: create, join and follow a live group (#88). */
+@Serializable
+@SerialName("com.example.rnd_transit_mtl.TogetherScreenKey")
+data object TogetherScreenKey : ScreenKey() {
+    override val screenTitle = "Together"
+}
+
 @Serializable
 @SerialName("com.example.rnd_transit_mtl.ProfileScreenKey")
 data object ProfileScreenKey : ScreenKey() {
@@ -149,6 +156,7 @@ val backStackConfig = SavedStateConfiguration {
         polymorphic(NavKey::class) {
             subclass(MainScreenKey::class, MainScreenKey.serializer())
             subclass(CompassScreenKey::class, CompassScreenKey.serializer())
+            subclass(TogetherScreenKey::class, TogetherScreenKey.serializer())
             subclass(ProfileScreenKey::class, ProfileScreenKey.serializer())
             subclass(AuthScreenKey::class, AuthScreenKey.serializer())
             subclass(AboutScreenKey::class, AboutScreenKey.serializer())

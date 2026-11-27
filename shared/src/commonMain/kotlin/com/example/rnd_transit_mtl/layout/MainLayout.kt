@@ -21,8 +21,8 @@ import com.example.rnd_transit_mtl.ui.theme.TransitMain
  * Compass or Together navigation.
  * @param onOpenCompass Working Compass navigation callback, or null
  * while that feature is unavailable.
- * @param onOpenTogether Working Together navigation callback, or null
- * while that feature is unavailable.
+ * @param onOpenTogether Together navigation callback; null opens the
+ * Together screen.
  * @param showTopBar Whether to show shared header navigation; false at the initial account gate.
  * @param content Destination content rendered inside scaffold padding.
  */
@@ -43,9 +43,11 @@ fun MainLayout(
     val isCompass = currentKey == CompassScreenKey
     var controlsVisible by remember(currentKey) { mutableStateOf(false) }
     val openCompass = onOpenCompass ?: { navigator.open(CompassScreenKey) }
+    val openTogether = onOpenTogether ?: { navigator.open(TogetherScreenKey) }
 
     val displayedTab = selectedTab ?: when (currentKey) {
         CompassScreenKey -> MainViewTab.Compass
+        TogetherScreenKey -> MainViewTab.Together
         MainScreenKey -> MainViewTab.Map
         is CurrentTripScreenKey -> MainViewTab.Map
         else -> null
@@ -54,7 +56,7 @@ fun MainLayout(
     val enabledTabs = buildSet {
         add(MainViewTab.Map)
         add(MainViewTab.Compass)
-        if (onOpenTogether != null) add(MainViewTab.Together)
+        add(MainViewTab.Together)
     }
 
     Scaffold(
@@ -110,7 +112,7 @@ fun MainLayout(
                                 openCompass()
 
                             MainViewTab.Together ->
-                                onOpenTogether?.invoke()
+                                openTogether()
                         }
                     }
                 }

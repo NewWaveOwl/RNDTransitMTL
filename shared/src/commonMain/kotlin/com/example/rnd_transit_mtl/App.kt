@@ -37,6 +37,9 @@ import com.example.rnd_transit_mtl.data.trips.FinalTripOutbox
 import com.example.rnd_transit_mtl.data.trips.LocalCloudTrips
 import com.example.rnd_transit_mtl.data.trips.SupabaseTripRepository
 import com.example.rnd_transit_mtl.data.trips.TripRepository
+import com.example.rnd_transit_mtl.data.group.GroupRepository
+import com.example.rnd_transit_mtl.data.group.LocalGroupRepository
+import com.example.rnd_transit_mtl.data.group.SupabaseGroupRepository
 import com.example.rnd_transit_mtl.data.trips.tryCloudAction
 import com.example.rnd_transit_mtl.layout.MainLayout
 import com.example.rnd_transit_mtl.model.ids.UserId
@@ -85,6 +88,7 @@ fun App(
         authRepository = remember { SupabaseAuthRepository() },
         generationEndpoint = generationEndpoint,
         tripRepository = { SupabaseTripRepository(it) },
+        groupRepository = { SupabaseGroupRepository(it) },
     )
 }
 
@@ -93,6 +97,7 @@ internal fun App(
     authRepository: AuthRepository,
     generationEndpoint: String? = null,
     tripRepository: ((UserId) -> TripRepository)? = null,
+    groupRepository: ((UserId) -> GroupRepository)? = null,
 ) {
     val backendGenerator = rememberBackendTripGenerator(generationEndpoint)
     val debugMode = rememberSaveable(saver = DebugModeState.Saver) { DebugModeState() }
@@ -212,6 +217,11 @@ internal fun App(
                 owner?.let { AccountRepository(UserId(it)) }
             }
 
+            // Groups need an account; guests get none.
+            val accountGroups = remember(owner, groupRepository) {
+                owner?.let { groupRepository?.invoke(UserId(it)) }
+            }
+
             val inactivityRefresh = rememberInactivityRefresh(identity) {
                 val catalogueOk = tryCloudAction {
                     val refreshed = TransportData(
@@ -259,6 +269,7 @@ internal fun App(
                 LocalAuthRepository provides authRepository,
                 LocalAccountSession provides accountSession.value,
                 LocalAccountRepository provides accountRepository,
+                LocalGroupRepository provides accountGroups,
             ) {
                 Box(Modifier.fillMaxSize()) {
                 val showAccountScreen =
