@@ -1,5 +1,6 @@
 package com.example.rnd_transit_mtl.state.trip
 
+import com.example.rnd_transit_mtl.model.ids.GroupTripId
 import com.example.rnd_transit_mtl.model.ids.TripId
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
@@ -305,6 +306,29 @@ class TripsStore private constructor(
         val active = current.activeTrip?.takeIf { it.trip.id == tripId } ?: return TripActionResult.MissingTrip(tripId)
         if (progress == 1f) return commitCompletion(current, active)
         mutableState.value = current.copy(activeTrip = active.copy(routeProgress = progress))
+        return TripActionResult.Applied
+    }
+
+    /**
+     * Links the host's active trip to the group trip it was just shared as, so its
+     * History row points to the shared route. A trip is linked at most once.
+     *
+     * @param tripId The active trip that was shared.
+     * @param groupTripId The shared group trip the server created for it.
+     */
+    fun attachGroupTrip(tripId: TripId, groupTripId: GroupTripId): TripActionResult {
+        val current = mutableState.value
+        val active = current.activeTrip?.takeIf { it.trip.id == tripId }
+            ?: return TripActionResult.MissingTrip(tripId)
+        if (active.trip.groupTripId != null) {
+            return TripActionResult.InvalidInput("This trip is already shared with a group.")
+        }
+        val linked = try {
+            active.trip.copy(groupTripId = groupTripId)
+        } catch (invalid: IllegalArgumentException) {
+            return TripActionResult.InvalidInput(invalid.message ?: "This trip can't be shared.")
+        }
+        mutableState.value = current.copy(activeTrip = active.copy(trip = linked))
         return TripActionResult.Applied
     }
 
