@@ -2,6 +2,7 @@ package com.example.rnd_transit_mtl.View.settings.previews
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
+import com.example.rnd_transit_mtl.View.settings.GuestSettingsContent
 import com.example.rnd_transit_mtl.View.settings.SettingsContent
 import com.example.rnd_transit_mtl.ViewModels.Settings.SettingsUIState
 import com.example.rnd_transit_mtl.layout.previews.NavigationPreviewHost
@@ -25,5 +26,16 @@ fun SettingsScreenPreview() {
             onOpenTripPreferences = {},
             onSave = {}
         )
+    }
+}
+
+@Preview(showBackground = true, widthDp = 412, heightDp = 892)
+@Composable
+fun GuestSettingsScreenPreview() {
+    NavigationPreviewHost(
+        MainScreenKey,
+        SettingsScreenKey
+    ) {
+        GuestSettingsContent(onSignIn = {})
     }
 }

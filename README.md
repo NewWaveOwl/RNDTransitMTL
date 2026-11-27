@@ -1,62 +1,71 @@
 # RNDTransitMTL
 
-RNDTransitMTL is a discovery app for Greater Montreal. Choose how much time you
+RNDTransitMTL is a discovery app for Greater Montréal. Choose how much time you
 have, how you want to travel, and where to start. The app finds a route to a
 surprise destination so you can explore without planning the destination first.
 
 Built with Kotlin Multiplatform, the current Android prototype combines a map-based
-planner, real walking/cycling and transit routes, Supabase account sign-in,
-persistent trips and reviews, and History. Android is the primary development
-target; Desktop, Web and iOS targets are also included in the project.
+planner, real walking/cycling and transit routes, live GPS trip tracking, optional
+round-trip and return journeys, Supabase account sign-in, persistent trips and
+reviews, and History. Android is the primary development target; Desktop, Web, and
+iOS targets are also included in the project.
 
 ## What you can do
 
 - Choose your starting point on the map or use your device location.
-- Set your available time, walking pace, transport choices and transit zones.
-- Preview route geometry, duration, distance and transport modes before starting,
+- Set your available time (5–360 minutes), one-way or round-trip mode, walking pace,
+  cycling speed, transport choices, and transit zones.
+- Preview route geometry, duration, distance, and transport modes before starting,
   or generate another destination from the same origin.
 - See transit line details and departure estimates in the preview, including
   metro line colours when available.
-- Follow coloured trip sections with the current section and next action displayed.
-- Save completed and cancelled trips to your account through Supabase.
+- Follow coloured trip sections with live GPS tracking, jump filtering, location
+  accuracy diagnostics, and expandable street/transit guidance (with opt-in trip
+  simulation available via triple-tapping the RND Transit logo for Debug mode).
+- Compare Fastest vs. Same-transport return routes after arrival on one-way trips.
+- Save completed and cancelled trips to your account through Supabase, with local
+  outbox recovery across restarts when offline.
 - Rate trips across four questions, add comments or an image link, and revisit
   or edit reviews in History.
 - Filter History, open trip details, edit saved trip information, or remove trips.
 
 ## Plan an adventure
 
-1. Sign in, confirm a starting point and choose your trip preferences.
+1. Sign in, confirm a starting point, and choose your trip preferences.
 2. Press **GO**. The app searches for a reachable route close to your available
    time without exceeding it. Selected transport modes are allowed alternatives;
    walking connections are available for transit.
 3. Review the proposal. **Generate another** keeps your starting point and looks
    for another destination; **Start Trip** keeps the route you accepted.
-4. Follow the current section and next action while the trip simulation runs.
-5. On the completion screen, choose **Review this trip**, **Skip review — view
-   history**, or **Plan another adventure**. Saved trips remain accessible in
-   History for details and later reviews.
+4. Follow the current section, next action, and live GPS position while travelling
+   (or enable **Trip simulation** from the triple-tap logo Debug menu for demo playback).
+5. On arrival, view trip statistics, optionally plan a return journey, or choose
+   **Trip Review**, **Skip review — view history**, or **Plan another adventure**.
+   Saved trips remain accessible in History for details and later reviews.
 
 ## Android availability
 
-APK distribution is planned. For now, developers can build and install the Android
-app from source using the [Android development guide](docs/AndroidDevelopment.md).
-APK download and installation details will be added here when a release is published.
+Developers can build and install the Android app from source (including APK builds)
+using the [Android development guide](docs/AndroidDevelopment.md).
 
 The current app requires Android 7.0 / API 24 or newer and internet access for
-sign-in, maps and trip generation. Remote trip generation requires a running
+sign-in, maps, and trip generation. Remote trip generation requires a running
 configured server and a signed-in account. Guest mode is available for local
 development; it cannot access the authenticated public generation service.
 
 ## Current prototype limits
 
-Trip progress is **simulated**; this is not live GPS navigation. Route timing and
-realtime estimates can change after a trip is generated. Available transit routes
-depend on the server's imported schedules and configured feeds.
+Live GPS tracking is the default on Android, while Desktop and Web hosts without
+a location adapter pause live progress unless **Trip simulation** is enabled in
+Debug mode. Route timing and realtime estimates can change after a trip is
+generated, and available transit routes depend on the server's imported schedules
+and configured feeds.
 
-Attraction preferences are saved but do not yet rank destinations. The Compass
-screen is a demonstration UI; live compass navigation and the Together feature
-are not implemented. Desktop and Web previews use sample trips unless connected
-to a generation service.
+Attraction checkboxes control the number of random exploration waypoints on round
+trips, but verified POI ranking is not yet implemented. The Compass screen is a
+demonstration UI; live compass navigation and the Together feature are not
+implemented. Desktop and Web previews use sample trips unless connected to a
+generation service.
 
 Account trip and review storage requires a configured Supabase project with the
 repository migrations applied. Cloud synchronization can fail when the network
@@ -67,9 +76,14 @@ or service is unavailable; check the app’s save status and retry feedback.
 - [Android development, APK builds and client tests](docs/AndroidDevelopment.md)
 - [Backend setup, server updates and hosting](backend/README.md)
 - [Routing rules and generation verification](backend/TripGeneration.md)
-- [Trip playback and guidance checks](docs/RunTripSimulation.md)
+- [Live GPS tracking and debug trip simulation](docs/RunTripSimulation.md)
+- [One-way, round-trip and return journeys](docs/ReturnTrips.md)
+- [Location accuracy diagnostics and help](docs/LocationAccuracy.md)
+- [Inactivity refresh behavior](docs/InactivityRefresh.md)
 - [Design document and planned features](docs/MainDesignDoc.md)
+- [Coding guidelines](docs/HowToWriteCode_InTheProject.md)
 - [Team practices](docs/TeamPractices.md)
+- [AI usage log index](docs/AI/README.md)
 
 The trip/review flow originated in
 [Artiom's Assignment 3 repository](https://github.com/NewWaveOwl/As3_APPDEV2_RND_Tranzit_Sova/tree/8b1b538)
@@ -87,14 +101,13 @@ and has since been integrated with the real-route backend.
 
 | Contribution (rough estimates) | Jimmy | AI |
 | --- | ---: | ---: |
-| UI - original mock-ups and design (history screen, compass screen, based on PREMADE MOCKUPS | 50% | 50% |
-| Supabase connection and setup|  60%  | 40% |
+| UI - original mock-ups and design (history screen, compass screen, based on PREMADE MOCKUPS) | 50% | 50% |
+| Supabase connection and setup | 60% | 40% |
 | App tests (for supabase) | 0% | 100% |
-| **Total Code contribution average | 55%  | 45%   |
+| **Total Code contribution average** | **55%** | **45%** |
 
-
-| Final split | Caio      | Claude    |
-|---|-----------|-----------|
+| Final split | Caio | Claude |
+| --- | ---: | ---: |
 | All code | 233 (44%) | 292 (56%) |
 | Without the Settings UI code | 214 (60%) | 145 (40%) |
 | Without the Settings UI code and the migration | 214 (65%) | 115 (35%) |
@@ -136,4 +149,4 @@ These captures document the earlier UI and are kept for comparison.
 
 - Artiom Sova
 - Caio Nunes
-- Jimmy Rashid
+- Jimmy Rashed

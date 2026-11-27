@@ -26,7 +26,10 @@ class GenerationTest {
             "route" to obj("gtfsId" to "STM:55"),
             "end" to obj("scheduledTime" to now.plusMillis((minutes*60000).toLong()).toString()),
             "legGeometry" to obj("length" to points.size,"points" to encode(points)))
-        val itinerary=obj("duration" to 600,"legs" to listOf(leg))
+        return planResponse(leg)
+    }
+    private fun planResponse(vararg legs: JsonObject): JsonObject {
+        val itinerary=obj("duration" to 600,"legs" to legs.toList())
         val plan=obj("routingErrors" to emptyList<Any>(),"edges" to listOf(obj("node" to itinerary)))
         return obj("data" to obj("planConnection" to plan))
     }
@@ -211,6 +214,69 @@ class GenerationTest {
         val result=g.generate(parseRequest(input()))
         assertEquals(middle.toJson(),result.field("destination").field("point"))
         assertEquals(2,calls)
+    }
+
+    @Test fun overBudgetRouteWithMissingLegGeometryKeepsNextDestination() = runBlocking {
+        val middle = Point(45.505, -73.6)
+        val next = Point(45.52, -73.6)
+        val attempted = mutableListOf<Point>()
+        val partial = planResponse(
+            obj("mode" to "WALK", "distance" to 500, "legGeometry" to obj("points" to encode(listOf(start, middle, end)))),
+            obj("mode" to "WALK", "distance" to 500, "end" to obj("scheduledTime" to now.plusSeconds(2400).toString())),
+        )
+        val generator = Generator(
+            emptyList(), zones(),
+            route = { query ->
+                val variables = query.field("variables")
+                val target = Point(
+                    requireNotNull(variables.field("destinationLat").number()),
+                    requireNotNull(variables.field("destinationLon").number()),
+                )
+                attempted += target
+                when (target) {
+                    end -> partial
+                    next -> response(points = listOf(start, next))
+                    else -> emptyPlanningResponse()
+                }
+            },
+            now = { now }, sample = { listOf(end, next) }, maxAttempts = 2,
+        )
+
+        val result = generator.generate(parseRequest(input()))
+        assertEquals(listOf(end, next), attempted)
+        assertEquals("success", result.field("status").text())
+        assertEquals(next.toJson(), result.field("destination").field("point"))
+    }
+
+    @Test fun overBudgetRouteWithEmptyLegPolylineStillShortensRemainingGeometry() = runBlocking {
+        val middle = Point(45.505, -73.6)
+        var calls = 0
+        val emptySecondLeg = planResponse(
+            obj("mode" to "WALK", "distance" to 1000, "legGeometry" to obj("points" to encode(listOf(start, middle, end)))),
+            obj(
+                "mode" to "WALK",
+                "distance" to 0,
+                "end" to obj("scheduledTime" to now.plusSeconds(2400).toString()),
+                "legGeometry" to obj("points" to ""),
+            ),
+        )
+        val generator = Generator(
+            emptyList(), zones(),
+            route = { query ->
+                if (++calls == 1) {
+                    emptySecondLeg
+                } else {
+                    assertEquals(middle.latitude, query.field("variables").field("destinationLat").number()!!, 0.0)
+                    response(25.0, points = listOf(start, middle))
+                }
+            },
+            now = { now }, sample = { listOf(end) },
+        )
+
+        val result = generator.generate(parseRequest(input()))
+        assertEquals("success", result.field("status").text())
+        assertEquals(middle.toJson(), result.field("destination").field("point"))
+        assertEquals(2, calls)
     }
 
     @Test fun candidateFailuresCanRecoverButRepeatedFailuresAreBounded()=runBlocking {

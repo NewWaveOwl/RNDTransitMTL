@@ -23,3 +23,6 @@ docs/ai-log/raw/
 
 # Local OTP runtime: downloaded JDK, otp.jar, graph data and zips (backend/otp/ holds the tracked sources)
 tool/
+
+# Local Android release identity. Back up securely; never commit.
+.release-private/

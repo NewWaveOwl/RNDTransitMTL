@@ -1,86 +1,59 @@
 package com.example.rnd_transit_mtl.ui.global_ui_ellements.map
 
-import com.example.rnd_transit_mtl.model.trip.explorationWaypoints
-
 import android.net.ConnectivityManager
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.shape.RoundedCornerShape
-import com.example.rnd_transit_mtl.ui.theme.TransitWhite
-import com.example.rnd_transit_mtl.ui.theme.TransitComplementary
-import androidx.compose.ui.geometry.Offset
-import org.jetbrains.compose.resources.painterResource
-import org.maplibre.compose.overlay.MapOverlayScope
-import rnd_transit_mtl.shared.generated.resources.Res
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
-import com.example.rnd_transit_mtl.ui.theme.TransitMain
-import com.example.rnd_transit_mtl.ui.theme.tripLegColor
-import rnd_transit_mtl.shared.generated.resources.map_user_pointer_marker
-import androidx.compose.foundation.layout.size
-import androidx.compose.runtime.snapshotFlow
-import androidx.compose.runtime.movableContentOf
-import androidx.compose.runtime.SideEffect
-import com.example.rnd_transit_mtl.data.location.LocalPlannerLocation
-import org.maplibre.compose.camera.CameraMoveReason
-import org.maplibre.compose.interaction.ClickResult
-import org.maplibre.compose.map.AndroidRenderMode
-import org.maplibre.compose.map.CameraConstraints
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.UiComposable
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.rnd_transit_mtl.data.assets.SampleMapBounds
+import com.example.rnd_transit_mtl.data.location.LocalPlannerLocation
 import com.example.rnd_transit_mtl.model.geo.GeoPoint
-import com.example.rnd_transit_mtl.model.geo.uncertaintyRing
 import com.example.rnd_transit_mtl.model.ids.TripId
-import com.example.rnd_transit_mtl.model.trip.RouteLeg
+import com.example.rnd_transit_mtl.model.trip.Trip
+import com.example.rnd_transit_mtl.model.trip.explorationWaypoints
 import com.example.rnd_transit_mtl.navigation.CurrentTripScreenKey
 import com.example.rnd_transit_mtl.navigation.LocalNavigator
 import com.example.rnd_transit_mtl.navigation.MainScreenKey
+import com.example.rnd_transit_mtl.ui.theme.TransitMain
+import com.example.rnd_transit_mtl.ui.theme.tripLegColor
+import kotlin.math.cos
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import org.jetbrains.compose.resources.imageResource
 import org.maplibre.compose.camera.CameraAnimation
 import org.maplibre.compose.camera.CameraFit
+import org.maplibre.compose.camera.CameraMoveReason
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.CameraUpdate
 import org.maplibre.compose.expressions.dsl.const
+import org.maplibre.compose.interaction.ClickResult
 import org.maplibre.compose.interaction.MapInteractions
-import org.maplibre.compose.layers.CircleLayer
 import org.maplibre.compose.layers.LineLayer
 import org.maplibre.compose.layers.RasterLayer
+import org.maplibre.compose.map.AndroidRenderMode
+import org.maplibre.compose.map.CameraConstraints
+import org.maplibre.compose.map.MapState
 import org.maplibre.compose.map.MapUiOptions
 import org.maplibre.compose.map.MaplibreMap
 import org.maplibre.compose.map.StyleLoadState
@@ -94,9 +67,25 @@ import org.maplibre.compose.util.PositionQuad
 import org.maplibre.compose.util.PreparedImage
 import org.maplibre.spatialk.geojson.BoundingBox
 import org.maplibre.spatialk.geojson.Position
+import rnd_transit_mtl.shared.generated.resources.Res
 import rnd_transit_mtl.shared.generated.resources.map_sample
-import rnd_transit_mtl.shared.generated.resources.ellipse_starting
-import kotlin.time.Duration.Companion.milliseconds
+
+// Layout settings — dp route widths, camera margins, and zoom limits for the live Android map.
+private val RouteOutlineWidth = 13.dp
+private val RouteLegWidth = 7.dp
+private val RouteTravelledWidth = 2.dp
+private val TripFitMaxMargin = 24.dp
+private val BrowsingRegionalFitPadding = 24.dp
+private const val DefaultMontrealZoom = 12.0
+private const val BrowsingMinZoom = 7.0
+private const val BrowsingFocusMinZoom = 13.0
+private const val ActiveTripRecenterMinZoom = 16.0
+
+// Animation settings — milliseconds for offline fallback check, offline retry notice, and automatic browsing recenter.
+private const val OFFLINE_STYLE_FALLBACK_DELAY_MILLIS = 2_000L
+private const val STILL_OFFLINE_NOTICE_DURATION_MILLIS = 3_000L
+private const val AUTO_CENTER_SETTLE_DELAY_MILLIS = 1_200L
+private const val AUTO_CENTER_EASE_DURATION_MILLIS = 1_800
 
 // The shared map moves through Compose during navigation, so its native view must
 // respect Compose clipping and opacity when parked.
@@ -104,7 +93,7 @@ private val SharedMapUiOptions = MapUiOptions(MapUiOptions.Standard) { renderMod
 
 private val MontrealCamera = CameraPosition(
     center = Position(MontrealCenter.longitude, MontrealCenter.latitude),
-    zoom = 12.0
+    zoom = DefaultMontrealZoom,
 )
 private val OfflineBounds = with(SampleMapBounds) {
     BoundingBox(west = west, south = south, east = east, north = north)
@@ -114,17 +103,23 @@ private val OfflineCorners = with(SampleMapBounds) {
         topLeft = Position(west, north),
         topRight = Position(east, north),
         bottomRight = Position(east, south),
-        bottomLeft = Position(west, south)
+        bottomLeft = Position(west, south),
     )
 }
 
-/** Supplies the live Android renderer. The URL can be overridden by the Android host. */
+/**
+ * Supplies the live Android MapLibre renderer and shared planner location session.
+ *
+ * @param styleUrl MapLibre style URL; can be overridden by the Android host.
+ * @param onMapReady Called once the shared map style and viewport have rendered their first frame.
+ * @param content Application content rendered with [LocalTransitMap] and [LocalPlannerLocation] provided.
+ */
 @Composable
 @UiComposable
 fun ProvideAndroidTransitMap(
     styleUrl: String,
     onMapReady: () -> Unit = {},
-    content: @Composable @UiComposable () -> Unit
+    content: @Composable @UiComposable () -> Unit,
 ) {
     if (LocalInspectionMode.current) {
         content()
@@ -144,7 +139,7 @@ fun ProvideAndroidTransitMap(
                 val data = sharedMapData
                 tripFlowMap(
                     if (active) data else data.copy(interactive = false, onPick = null, followPosition = false),
-                    if (active) modifier else modifier.clearAndSetSemantics {}
+                    if (active) modifier else modifier.clearAndSetSemantics {},
                 )
             },
             LocalPlannerLocation provides session,
@@ -158,11 +153,65 @@ fun ProvideAndroidTransitMap(
                     AndroidTransitMap(data, styleUrl, session, modifier)
                 }
             },
-            content = content
+            content = content,
         )
     }
 }
 
+/**
+ * Identifies the style instance displayed by MapLibre.
+ *
+ * @property offline Whether this attempt uses the bundled map.
+ * @property attempt Incremented to load a fresh instance of the same style.
+ */
+internal data class MapStyleAttempt(val offline: Boolean = false, val attempt: Int = 0) {
+    /** Reloads the current style, even when the device is offline. */
+    fun retry() = copy(attempt = attempt + 1)
+
+    /** Switches from the bundled style when a network is available.
+     * @param hasNetwork Whether Android currently reports an active network.
+     */
+    fun retryOnline(hasNetwork: Boolean) = if (hasNetwork) MapStyleAttempt(attempt = attempt + 1) else this
+}
+
+/**
+ * Tracks the active [MapStyleAttempt] alongside transient offline retry feedback without
+ * changing [styleAttempt] when an online retry is rejected offline.
+ *
+ * @property styleAttempt Style key controlling the MapLibre [MapState] instance.
+ * @property showStillOffline Whether to show the "Still offline" caption in the offline badge.
+ * @property offlineRetryCount Monotonic counter incremented on rejected offline retries to restart the notice timer.
+ */
+internal data class MapStyleUiState(
+    val styleAttempt: MapStyleAttempt = MapStyleAttempt(),
+    val showStillOffline: Boolean = false,
+    val offlineRetryCount: Int = 0,
+) {
+    /** Switches to the bundled offline style when online loading fails or times out without network. */
+    fun fallBackToOffline() = copy(styleAttempt = styleAttempt.copy(offline = true), showStillOffline = false)
+
+    /** Reloads the current style on failure, clearing any stale offline retry caption. */
+    fun retryStyle() = copy(styleAttempt = styleAttempt.retry(), showStillOffline = false)
+
+    /**
+     * Attempts to switch from the bundled map back to the online style.
+     *
+     * @param hasNetwork Whether Android currently reports an active network.
+     */
+    fun retryOnline(hasNetwork: Boolean): MapStyleUiState {
+        val next = styleAttempt.retryOnline(hasNetwork)
+        return if (next == styleAttempt) {
+            copy(showStillOffline = true, offlineRetryCount = offlineRetryCount + 1)
+        } else {
+            copy(styleAttempt = next, showStillOffline = false)
+        }
+    }
+
+    /** Hides the temporary "Still offline" caption after its display duration elapses. */
+    fun dismissStillOffline() = copy(showStillOffline = false)
+}
+
+/** Renders the MapLibre map, route/uncertainty layers, camera controllers, and status overlays. */
 @Composable
 @UiComposable
 private fun AndroidTransitMap(
@@ -170,44 +219,37 @@ private fun AndroidTransitMap(
     styleUrl: String,
     session: AndroidPlannerMapSession,
     modifier: Modifier,
-    onFirstFrame: (() -> Unit)? = null
+    onFirstFrame: (() -> Unit)? = null,
 ) {
     val connectivity = LocalContext.current.getSystemService(ConnectivityManager::class.java)
     // Let MapLibre try its ambient cache before switching to the bundled image.
-    var offline by remember(styleUrl) { mutableStateOf(false) }
-    var attempt by remember(styleUrl) { mutableIntStateOf(0) }
+    var styleState by remember(styleUrl) { mutableStateOf(MapStyleUiState()) }
+    val styleAttempt = styleState.styleAttempt
+    val offline = styleAttempt.offline
+    LaunchedEffect(styleAttempt, styleState.offlineRetryCount) {
+        if (!styleState.showStillOffline || styleState.offlineRetryCount == 0) return@LaunchedEffect
+        delay(STILL_OFFLINE_NOTICE_DURATION_MILLIS)
+        styleState = styleState.dismissStillOffline()
+    }
     val trip = data.trip
     val fix = session.fix.takeIf { data.browsing }
     val confirmedPin = data.pin.takeIf { !data.pickerOpen && data.centerOnPin }
-    val region = MontrealBrowsingBounds
-    val regionalBounds = BoundingBox(west = region.west, south = region.south, east = region.east, north = region.north)
+    val regionalBounds = remember {
+        with(MontrealBrowsingBounds) { BoundingBox(west = west, south = south, east = east, north = north) }
+    }
     if (data.pickerOpen) SideEffect { session.autoCenterPending = false }
     val legs = trip?.legs.orEmpty()
-    val bounds = remember(legs) {
-        val points = legs.flatMap { it.geometry }
-        if (points.isEmpty()) null else BoundingBox(
-            west = points.minOf { it.longitude },
-            south = points.minOf { it.latitude },
-            east = points.maxOf { it.longitude },
-            north = points.maxOf { it.latitude }
-        )
-    }
+    val bounds = remember(legs) { computeRouteBounds(legs) }
     val path = remember(legs) { legs.flatMap { it.geometry.zipWithNext() } }
     val distances = remember(path) { path.map { (from, to) -> from.distanceMetersTo(to) } }
     val routeMarker = data.progress?.let { positionAlongRoute(path, distances, it) }
     val marker = data.userPosition ?: routeMarker.takeIf { data.simulatePosition }
     val browsingPosition = rememberAnimatedMapPosition(fix?.point.takeIf { data.browsing })
     val travelled = remember(path, distances, routeMarker, data.progress) {
-        val progress = data.progress?.coerceIn(0f, 1f) ?: 0f
-        var remaining = distances.sum() * progress
-        path.zip(distances).mapNotNull { (segment, distance) ->
-            if (remaining <= 0 || distance <= 0) return@mapNotNull null
-            remaining -= distance
-            listOf(segment.first, if (remaining >= 0) segment.second else routeMarker ?: segment.second)
-        }
+        computeTravelledSegments(path, distances, routeMarker, data.progress)
     }
 
-    key(styleUrl, attempt, offline) {
+    key(styleUrl, styleAttempt) {
         val savedCamera = remember { session.camera.takeIf { data.browsing } }
         val offlineImage = if (offline) {
             val bitmap = imageResource(Res.drawable.map_sample)
@@ -215,7 +257,7 @@ private fun AndroidTransitMap(
         } else null
         val map = rememberMapState(
             baseStyle = if (offline) BaseStyle.Empty else BaseStyle.Uri(styleUrl),
-            initialCameraPosition = savedCamera ?: MontrealCamera
+            initialCameraPosition = savedCamera ?: MontrealCamera,
         ) {
             if (offlineImage != null) {
                 val source = rememberImageSource(OfflineCorners, offlineImage)
@@ -229,15 +271,20 @@ private fun AndroidTransitMap(
             if (trip != null) {
                 val routeData = remember(legs) { GeoJsonData.JsonString(routeGeoJson(legs)) }
                 val route = rememberGeoJsonSource(routeData)
-                LineLayer(id = "trip-route-outline", source = route, color = const(Color.White), width = const(13.dp))
+                LineLayer(id = "trip-route-outline", source = route, color = const(Color.White), width = const(RouteOutlineWidth))
                 legs.forEachIndexed { index, leg ->
                     val legData = remember(leg) { GeoJsonData.JsonString(routeGeoJson(listOf(leg))) }
                     val legSource = rememberGeoJsonSource(legData)
-                    LineLayer(id = "trip-leg-$index", source = legSource, color = const(tripLegColor(index)), width = const(7.dp))
+                    LineLayer(id = "trip-leg-$index", source = legSource, color = const(tripLegColor(index)), width = const(RouteLegWidth))
                 }
                 if (travelled.isNotEmpty()) {
                     val travelledRoute = rememberGeoJsonSource(GeoJsonData.JsonString(linesGeoJson(travelled)))
-                    LineLayer(id = "trip-travelled", source = travelledRoute, color = const(Color.White.copy(alpha = 0.5f)), width = const(2.dp))
+                    LineLayer(
+                        id = "trip-travelled",
+                        source = travelledRoute,
+                        color = const(Color.White.copy(alpha = 0.5f)),
+                        width = const(RouteTravelledWidth),
+                    )
                 }
                 TripDot("trip-start", trip.origin.point, TransitMain, 7)
             }
@@ -253,167 +300,28 @@ private fun AndroidTransitMap(
         LaunchedEffect(map, styleLoadState) {
             if (offline || styleLoadState == StyleLoadState.Ready) return@LaunchedEffect
             if (styleLoadState is StyleLoadState.Failed) {
-                offline = true
+                styleState = styleState.fallBackToOffline()
             } else if (connectivity.activeNetwork == null) {
-                delay(2_000)
+                delay(OFFLINE_STYLE_FALLBACK_DELAY_MILLIS)
                 if (connectivity.activeNetwork == null && map.style.loadState != StyleLoadState.Ready) {
-                    offline = true
+                    styleState = styleState.fallBackToOffline()
                 }
             }
         }
-        val latestData by rememberUpdatedState(data)
-        var fittedTripId by remember { mutableStateOf<TripId?>(null) }
-        LaunchedEffect(map, trip?.id, data.recenterRequest) {
-            if (trip == null) {
-                fittedTripId = null
-                return@LaunchedEffect
-            }
-            if (bounds == null || data.followPosition ||
-                (fittedTripId == trip.id && data.recenterRequest == 0)
-            ) return@LaunchedEffect
 
-            snapshotFlow { latestData.cameraInsetsReady }.first { it }
-            val viewport = map.awaitViewport()
-            val padding = latestData.visibleMapPadding(viewport.size.height)
-            val margin = minOf(24.dp, viewport.size.width / 4, (viewport.size.height - padding.top - padding.bottom) / 4)
-            fittedTripId = trip.id
-            map.animateCameraToBounds(
-                bounds,
-                CameraFit(
-                    cameraPadding = DpPadding.Zero,
-                    fitPadding = DpPadding(margin, padding.top + margin, margin, padding.bottom + margin)
-                ),
-                CameraAnimation.Ease.Standard
-            )
-        }
-
-        val onManualCameraMove by rememberUpdatedState(data.onManualCameraMove)
-        LaunchedEffect(map, data.followPosition) {
-            if (!data.followPosition) return@LaunchedEffect
-            snapshotFlow { map.isCameraMoving && map.cameraMoveReason == CameraMoveReason.Gesture }
-                .collect { moving -> if (moving) onManualCameraMove() }
-        }
-        var handledRecenterRequest by remember(map, trip?.id) { mutableIntStateOf(0) }
-        var recenterAnimating by remember(map, trip?.id) { mutableStateOf(false) }
-        val latestMarker by rememberUpdatedState(marker)
-        // A moving GPS marker must not cancel and restart an explicit recenter animation.
-        LaunchedEffect(map, trip?.id, data.recenterRequest, marker != null) {
-            val request = data.recenterRequest
-            if (request <= 0 || request == handledRecenterRequest || marker == null) return@LaunchedEffect
-            snapshotFlow { latestData.cameraInsetsReady }.first { it }
-            val viewport = map.awaitViewport()
-            val target = latestMarker ?: return@LaunchedEffect
-            handledRecenterRequest = request
-            recenterAnimating = true
-            try {
-                map.animateCamera(
-                    CameraUpdate(
-                        center = target.position(),
-                        zoom = maxOf(16.0, map.cameraPosition.zoom),
-                        padding = latestData.visibleMapPadding(viewport.size.height),
-                    ),
-                    CameraAnimation.Ease.Standard,
-                )
-            } finally {
-                recenterAnimating = false
-            }
-        }
-        // Overlay resizing only reveals/hides the map. Keep the last camera padding
-        // until the user explicitly recenters, including on subsequent GPS updates.
-        LaunchedEffect(map, trip?.id, data.followPosition, marker, recenterAnimating, handledRecenterRequest) {
-            if (data.followPosition && marker != null && !recenterAnimating &&
-                data.recenterRequest == handledRecenterRequest) {
-                map.setCameraPosition(map.cameraPosition.copy(center = marker.position()))
-            }
-        }
-
+        AndroidTripCameraEffects(map = map, data = data, trip = trip, bounds = bounds, marker = marker)
         if (data.browsing) {
-            val localFix = fix?.takeIf { session.containsPoint(it.point) }
-            val latestLocalFix by rememberUpdatedState(localFix)
-            val hasLocalFix = localFix != null
-            var centeredPin by remember { mutableStateOf(confirmedPin.takeIf { savedCamera != null }) }
-            var cameraReady by remember { mutableStateOf(false) }
-            LaunchedEffect(map) {
-                val viewport = map.awaitViewport()
-                if (savedCamera == null && confirmedPin == null &&
-                    map.cameraMoveReason != CameraMoveReason.Gesture
-                ) {
-                    val fit = if (offline) {
-                        CameraFit(cameraPadding = latestData.visibleMapPadding(viewport.size.height))
-                    } else {
-                        CameraFit(fitPadding = DpPadding(24.dp, 24.dp, 24.dp, 24.dp))
-                    }
-                    map.fitCameraToBounds(if (offline) OfflineBounds else regionalBounds, fit)
-                }
-                cameraReady = true
-                snapshotFlow {
-                    if (!map.isCameraMoving) map.cameraPosition else null
-                }.collect { position -> if (position != null) session.saveCamera(position) }
-            }
-            LaunchedEffect(map, cameraReady, offline, data.pickerOpen) {
-                if (!cameraReady || !offline || !data.pickerOpen) return@LaunchedEffect
-
-                snapshotFlow { latestData.cameraInsetsReady }.first { it }
-                val viewport = map.awaitViewport()
-                val visible = viewport.visibleBounds
-                // Preserve a usable saved view, but bring the bundled image back when it is off screen.
-                val overlapsOfflineMap = visible.west < OfflineBounds.east &&
-                    visible.east > OfflineBounds.west &&
-                    visible.south < OfflineBounds.north &&
-                    visible.north > OfflineBounds.south
-                if (!overlapsOfflineMap) {
-                    map.fitCameraToBounds(
-                        OfflineBounds,
-                        CameraFit(cameraPadding = latestData.visibleMapPadding(viewport.size.height))
-                    )
-                }
-            }
-            LaunchedEffect(map) {
-                snapshotFlow { map.cameraMoveReason }.collect { reason ->
-                    if (reason == CameraMoveReason.Gesture) session.autoCenterPending = false
-                }
-            }
-            LaunchedEffect(map, cameraReady, styleLoadState, hasLocalFix, session.recenter, data.pickerOpen, data.interactive, confirmedPin) {
-                if (data.pickerOpen) {
-                    centeredPin = null
-                    return@LaunchedEffect
-                }
-                if (!cameraReady || styleLoadState != StyleLoadState.Ready || !data.interactive) return@LaunchedEffect
-                val request = session.recenter
-                val recenterOnFix = hasLocalFix && request != 0
-                val targetPin = confirmedPin?.takeIf { it != centeredPin && !recenterOnFix }
-                val centeringOnFix = recenterOnFix ||
-                    (hasLocalFix && session.autoCenterPending)
-                if (targetPin == null && !centeringOnFix) return@LaunchedEffect
-
-                snapshotFlow { latestData.cameraInsetsReady }.first { it }
-                val viewport = map.awaitViewport()
-                val automatic = targetPin == null && request == 0
-                if (automatic && savedCamera != null) delay(1_200)
-
-                val point = targetPin ?: latestLocalFix?.point ?: return@LaunchedEffect
-                if (automatic && (!session.autoCenterPending || map.cameraMoveReason == CameraMoveReason.Gesture)) {
-                    return@LaunchedEffect
-                }
-                centeredPin = confirmedPin
-                session.autoCenterPending = false
-                val camera = map.cameraPosition
-                val center = GeoPoint(camera.center.latitude, camera.center.longitude)
-                if (automatic && savedCamera != null &&
-                    center.distanceMetersTo(point) <= maxOf(50.0, latestLocalFix?.accuracyMeters ?: 0.0)
-                ) return@LaunchedEffect
-
-                map.animateCamera(
-                    CameraUpdate(
-                        center = point.position(),
-                        zoom = if (automatic && savedCamera != null) camera.zoom else maxOf(13.0, camera.zoom),
-                        padding = latestData.visibleMapPadding(viewport.size.height)
-                    ),
-                    if (automatic) CameraAnimation.Ease { duration = 1_800.milliseconds }
-                    else CameraAnimation.Ease.Standard
-                )
-                if (session.recenter == request) session.recenter = 0
-            }
+            AndroidBrowsingCameraEffects(
+                map = map,
+                data = data,
+                session = session,
+                savedCamera = savedCamera,
+                confirmedPin = confirmedPin,
+                fix = fix,
+                offline = offline,
+                regionalBounds = regionalBounds,
+                styleLoadState = styleLoadState,
+            )
         }
 
         Box(modifier.background(Color(0xFFE9ECE8))) {
@@ -421,229 +329,313 @@ private fun AndroidTransitMap(
                 state = map,
                 modifier = Modifier.fillMaxSize(),
                 uiOptions = if (data.sharedTripFlow) SharedMapUiOptions else MapUiOptions.Standard,
-                cameraConstraints = if (data.browsing) CameraConstraints {
-                    boundingBox = regionalBounds
-                    minZoom = 7.0
-                } else CameraConstraints.Standard,
-                interactions = if (data.interactive) MapInteractions {
-                    if (data.onPick != null) callbacks {
-                        // Register a separate long press so releasing a hold cannot select a point.
-                        longClick { onEvent { ClickResult.Pass } }
-                        click {
-                            onEvent { event ->
-                                val point = event.position
-                                if (point != null && point.longitude in -180.0..180.0) {
-                                    val geoPoint = GeoPoint(point.latitude, point.longitude)
-                                    if (!offline || geoPoint in SampleMapBounds) data.onPick(geoPoint)
-                                    ClickResult.Consume
-                                } else ClickResult.Pass
-                            }
-                        }
+                cameraConstraints = if (data.browsing) {
+                    CameraConstraints {
+                        boundingBox = regionalBounds
+                        minZoom = BrowsingMinZoom
                     }
-                } else MapInteractions.None,
+                } else {
+                    CameraConstraints.Standard
+                },
+                interactions = buildMapInteractions(data, offline),
                 overlay = {
                     val selectedOrigin = data.pin.takeIf { data.pickerOpen || data.centerOnPin }
-                    if (browsingPosition != null && browsingPosition != selectedOrigin) UserPointer(browsingPosition, session.movementHeading.degrees - map.cameraPosition.bearing.toFloat())
-                    data.userPosition?.let { UserPointer(it, session.movementHeading.degrees - map.cameraPosition.bearing.toFloat()) }
+                    if (browsingPosition != null && browsingPosition != selectedOrigin) {
+                        UserPointer(browsingPosition, session.movementHeading.degrees - map.cameraPosition.bearing.toFloat())
+                    }
+                    data.userPosition?.let {
+                        UserPointer(it, session.movementHeading.degrees - map.cameraPosition.bearing.toFloat())
+                    }
                     selectedOrigin?.let { OriginMarker(it) }
                     if (trip != null && map.style.loadState == StyleLoadState.Ready) {
                         if (trip.explorationWaypoints.isEmpty()) DestinationMarker(trip.destination.point)
                         else trip.explorationWaypoints.forEach { DestinationMarker(it.point) }
                         if (marker != null && data.userPosition == null && data.progress != null) {
-                            val ahead = positionAlongRoute(path, distances, (data.progress + 0.001f).coerceAtMost(1f))
-                            val to = ahead ?: marker
-                            val from = if (to == marker) {
-                                positionAlongRoute(path, distances, (data.progress - 0.001f).coerceAtLeast(0f)) ?: marker
-                            } else marker
-                            val direction = Offset(
-                                ((to.longitude - from.longitude) *
-                                    kotlin.math.cos(Math.toRadians(marker.latitude))).toFloat(),
-                                (from.latitude - to.latitude).toFloat()
-                            )
-                            val rotation = tripPointerRotation(Offset.Zero, direction) -
-                                map.cameraPosition.bearing.toFloat()
+                            val rotation = simulatedPointerRotation(path, distances, marker, data.progress, map.cameraPosition.bearing)
                             UserPointer(marker, rotation)
                         }
                     }
-                }
+                },
             )
 
-            if (!offline && !data.attributionHandledByScreen &&
-                (!data.browsing || data.pickerOpen || !data.interactive)
-            ) {
-                val uriHandler = LocalUriHandler.current
-                Surface(
-                    modifier = Modifier
-                        .align(if (trip == null) Alignment.TopStart else Alignment.BottomStart)
-                        .padding(start = 8.dp, top = 8.dp, bottom = data.bottomInset + 4.dp)
-                        .clickable { uriHandler.openUri("https://openfreemap.org/quick_start/") },
-                    color = TransitWhite,
-                    shape = RoundedCornerShape(4.dp)
-                ) {
-                    Text(
-                        "OpenFreeMap",
-                        color = TransitComplementary,
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(horizontal = 4.dp)
-                    )
-                }
-            }
+            AndroidMapStatusOverlays(
+                hasTrip = trip != null,
+                offline = offline,
+                showStillOffline = styleState.showStillOffline,
+                styleLoadState = styleLoadState,
+                data = data,
+                onRetryStyle = { styleState = styleState.retryStyle() },
+                onRetryOnline = {
+                    styleState = styleState.retryOnline(connectivity.activeNetwork != null)
+                },
+            )
+        }
+    }
+}
 
-            val statusAlignment = if (trip == null) Alignment.TopCenter else Alignment.Center
-            val statusOffset = if (trip == null) 64.dp else 0.dp
-            when (map.style.loadState) {
-                StyleLoadState.Ready -> if (offline) {
-                    Surface(
-                        modifier = Modifier.align(Alignment.BottomStart)
-                            .padding(start = 8.dp, bottom = data.bottomInset + 4.dp),
-                        color = TransitWhite,
-                        shape = MaterialTheme.shapes.small
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            TextButton(onClick = {
-                                if (connectivity.activeNetwork != null) {
-                                    offline = false
-                                    attempt++
-                                }
-                            }) {
-                                Text("Offline map · Retry", color = TransitComplementary)
+/** Coordinates route-bounds fitting, explicit recentering, and follow-position camera tracking for trips. */
+@Composable
+private fun AndroidTripCameraEffects(
+    map: MapState,
+    data: TransitMapData,
+    trip: Trip?,
+    bounds: BoundingBox?,
+    marker: GeoPoint?,
+) {
+    val latestData by rememberUpdatedState(data)
+    var fittedTripId by remember { mutableStateOf<TripId?>(null) }
+    LaunchedEffect(map, trip?.id, data.recenterRequest) {
+        if (trip == null) {
+            fittedTripId = null
+            return@LaunchedEffect
+        }
+        if (bounds == null || data.followPosition || (fittedTripId == trip.id && data.recenterRequest == 0)) {
+            return@LaunchedEffect
+        }
+        snapshotFlow { latestData.cameraInsetsReady }.first { it }
+        val viewport = map.awaitViewport()
+        val padding = latestData.visibleMapPadding(viewport.size.height)
+        val margin = minOf(
+            TripFitMaxMargin,
+            viewport.size.width / 4,
+            (viewport.size.height - padding.top - padding.bottom) / 4,
+        )
+        fittedTripId = trip.id
+        map.animateCameraToBounds(
+            bounds,
+            CameraFit(
+                cameraPadding = DpPadding.Zero,
+                fitPadding = DpPadding(margin, padding.top + margin, margin, padding.bottom + margin),
+            ),
+            CameraAnimation.Ease.Standard,
+        )
+    }
+
+    val onManualCameraMove by rememberUpdatedState(data.onManualCameraMove)
+    LaunchedEffect(map, data.followPosition) {
+        if (!data.followPosition) return@LaunchedEffect
+        snapshotFlow { map.isCameraMoving && map.cameraMoveReason == CameraMoveReason.Gesture }
+            .collect { moving -> if (moving) onManualCameraMove() }
+    }
+
+    var handledRecenterRequest by remember(map, trip?.id) { mutableIntStateOf(0) }
+    var recenterAnimating by remember(map, trip?.id) { mutableStateOf(false) }
+    val latestMarker by rememberUpdatedState(marker)
+    // A moving GPS marker must not cancel and restart an explicit recenter animation.
+    LaunchedEffect(map, trip?.id, data.recenterRequest, marker != null) {
+        val request = data.recenterRequest
+        if (request <= 0 || request == handledRecenterRequest || marker == null) return@LaunchedEffect
+        snapshotFlow { latestData.cameraInsetsReady }.first { it }
+        val viewport = map.awaitViewport()
+        val target = latestMarker ?: return@LaunchedEffect
+        handledRecenterRequest = request
+        recenterAnimating = true
+        try {
+            map.animateCamera(
+                CameraUpdate(
+                    center = target.position(),
+                    zoom = maxOf(ActiveTripRecenterMinZoom, map.cameraPosition.zoom),
+                    padding = latestData.visibleMapPadding(viewport.size.height),
+                ),
+                CameraAnimation.Ease.Standard,
+            )
+        } finally {
+            recenterAnimating = false
+        }
+    }
+
+    // Overlay resizing only reveals/hides the map. Keep the last camera padding
+    // until the user explicitly recenters, including on subsequent GPS updates.
+    LaunchedEffect(map, trip?.id, data.followPosition, marker, recenterAnimating, handledRecenterRequest) {
+        if (data.followPosition && marker != null && !recenterAnimating && data.recenterRequest == handledRecenterRequest) {
+            map.setCameraPosition(map.cameraPosition.copy(center = marker.position()))
+        }
+    }
+}
+
+/** Coordinates initial regional fit, saved camera persistence, and auto/manual recentering in browsing mode. */
+@Composable
+private fun AndroidBrowsingCameraEffects(
+    map: MapState,
+    data: TransitMapData,
+    session: AndroidPlannerMapSession,
+    savedCamera: CameraPosition?,
+    confirmedPin: GeoPoint?,
+    fix: com.example.rnd_transit_mtl.data.location.LocationUpdate.Fix?,
+    offline: Boolean,
+    regionalBounds: BoundingBox,
+    styleLoadState: StyleLoadState,
+) {
+    val latestData by rememberUpdatedState(data)
+    val localFix = fix?.takeIf { session.containsPoint(it.point) }
+    val latestLocalFix by rememberUpdatedState(localFix)
+    val hasLocalFix = localFix != null
+    var centeredPin by remember { mutableStateOf(confirmedPin.takeIf { savedCamera != null }) }
+    var cameraReady by remember { mutableStateOf(false) }
+
+    LaunchedEffect(map) {
+        val viewport = map.awaitViewport()
+        if (savedCamera == null && confirmedPin == null && map.cameraMoveReason != CameraMoveReason.Gesture) {
+            val fit = if (offline) {
+                CameraFit(cameraPadding = latestData.visibleMapPadding(viewport.size.height))
+            } else {
+                CameraFit(
+                    fitPadding = DpPadding(
+                        BrowsingRegionalFitPadding,
+                        BrowsingRegionalFitPadding,
+                        BrowsingRegionalFitPadding,
+                        BrowsingRegionalFitPadding,
+                    ),
+                )
+            }
+            map.fitCameraToBounds(if (offline) OfflineBounds else regionalBounds, fit)
+        }
+        cameraReady = true
+        snapshotFlow { if (!map.isCameraMoving) map.cameraPosition else null }
+            .collect { position -> if (position != null) session.saveCamera(position) }
+    }
+
+    LaunchedEffect(map, cameraReady, offline, data.pickerOpen) {
+        if (!cameraReady || !offline || !data.pickerOpen) return@LaunchedEffect
+        snapshotFlow { latestData.cameraInsetsReady }.first { it }
+        val viewport = map.awaitViewport()
+        val visible = viewport.visibleBounds
+        // Preserve a usable saved view, but bring the bundled image back when it is off screen.
+        val overlapsOfflineMap = visible.west < OfflineBounds.east &&
+            visible.east > OfflineBounds.west &&
+            visible.south < OfflineBounds.north &&
+            visible.north > OfflineBounds.south
+        if (!overlapsOfflineMap) {
+            map.fitCameraToBounds(
+                OfflineBounds,
+                CameraFit(cameraPadding = latestData.visibleMapPadding(viewport.size.height)),
+            )
+        }
+    }
+
+    LaunchedEffect(map) {
+        snapshotFlow { map.cameraMoveReason }.collect { reason ->
+            if (reason == CameraMoveReason.Gesture) session.autoCenterPending = false
+        }
+    }
+
+    LaunchedEffect(map, cameraReady, styleLoadState, hasLocalFix, session.recenter, data.pickerOpen, data.interactive, confirmedPin) {
+        if (data.pickerOpen) {
+            centeredPin = null
+            return@LaunchedEffect
+        }
+        if (!cameraReady || styleLoadState != StyleLoadState.Ready || !data.interactive) return@LaunchedEffect
+        val request = session.recenter
+        val recenterOnFix = hasLocalFix && request != 0
+        val targetPin = confirmedPin?.takeIf { it != centeredPin && !recenterOnFix }
+        val centeringOnFix = recenterOnFix || (hasLocalFix && session.autoCenterPending)
+        if (targetPin == null && !centeringOnFix) return@LaunchedEffect
+
+        snapshotFlow { latestData.cameraInsetsReady }.first { it }
+        val viewport = map.awaitViewport()
+        val automatic = targetPin == null && request == 0
+        if (automatic && savedCamera != null) delay(AUTO_CENTER_SETTLE_DELAY_MILLIS)
+
+        val point = targetPin ?: latestLocalFix?.point ?: return@LaunchedEffect
+        if (automatic && (!session.autoCenterPending || map.cameraMoveReason == CameraMoveReason.Gesture)) {
+            return@LaunchedEffect
+        }
+        centeredPin = confirmedPin
+        session.autoCenterPending = false
+        val camera = map.cameraPosition
+        val center = GeoPoint(camera.center.latitude, camera.center.longitude)
+        if (automatic && savedCamera != null &&
+            center.distanceMetersTo(point) <= maxOf(50.0, latestLocalFix?.accuracyMeters ?: 0.0)
+        ) {
+            return@LaunchedEffect
+        }
+
+        map.animateCamera(
+            CameraUpdate(
+                center = point.position(),
+                zoom = if (automatic && savedCamera != null) camera.zoom else maxOf(BrowsingFocusMinZoom, camera.zoom),
+                padding = latestData.visibleMapPadding(viewport.size.height),
+            ),
+            if (automatic) CameraAnimation.Ease { duration = AUTO_CENTER_EASE_DURATION_MILLIS.milliseconds }
+            else CameraAnimation.Ease.Standard,
+        )
+        if (session.recenter == request) session.recenter = 0
+    }
+}
+
+/** Builds MapLibre click/long-click handlers respecting interactivity and offline sample bounds. */
+private fun buildMapInteractions(data: TransitMapData, offline: Boolean): MapInteractions =
+    if (data.interactive) {
+        MapInteractions {
+            if (data.onPick != null) {
+                callbacks {
+                    // Register a separate long press so releasing a hold cannot select a point.
+                    longClick { onEvent { ClickResult.Pass } }
+                    click {
+                        onEvent { event ->
+                            val point = event.position
+                            if (point != null && point.longitude in -180.0..180.0) {
+                                val geoPoint = GeoPoint(point.latitude, point.longitude)
+                                if (!offline || geoPoint in SampleMapBounds) data.onPick(geoPoint)
+                                ClickResult.Consume
+                            } else {
+                                ClickResult.Pass
                             }
-                            Text(
-                                "© OpenStreetMap contributors",
-                                color = TransitComplementary,
-                                style = MaterialTheme.typography.labelSmall,
-                                modifier = Modifier.padding(horizontal = 8.dp).padding(bottom = 4.dp)
-                            )
                         }
                     }
                 }
-                is StyleLoadState.Failed -> Surface(
-                    modifier = Modifier.align(statusAlignment).padding(top = statusOffset),
-                    shape = MaterialTheme.shapes.medium
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text("Couldn’t load the map")
-                        TextButton(onClick = {
-                            offline = false
-                            attempt++
-                        }) { Text("Retry") }
-                    }
-                }
-                else -> CircularProgressIndicator(
-                    modifier = Modifier.align(statusAlignment).padding(top = statusOffset).size(24.dp).semantics { contentDescription = "Loading map" }
-                )
             }
         }
+    } else {
+        MapInteractions.None
     }
-}
 
-@Composable
-private fun TripDot(id: String, point: GeoPoint, color: Color, radius: Int) {
-    val source = rememberGeoJsonSource(
-        GeoJsonData.JsonString("""{"type":"Point","coordinates":${point.coordinates()}}""")
-    )
-    CircleLayer(
-        id = id,
-        source = source,
-        color = const(color),
-        radius = const(radius.dp),
-        strokeColor = const(Color.White),
-        strokeWidth = const(2.dp)
+/** Computes the bounding box enclosing all coordinates across [legs], or null if empty. */
+private fun computeRouteBounds(legs: List<com.example.rnd_transit_mtl.model.trip.RouteLeg>): BoundingBox? {
+    val points = legs.flatMap { it.geometry }
+    if (points.isEmpty()) return null
+    return BoundingBox(
+        west = points.minOf { it.longitude },
+        south = points.minOf { it.latitude },
+        east = points.maxOf { it.longitude },
+        north = points.maxOf { it.latitude },
     )
 }
 
-@Composable
-private fun AccuracyArea(point: GeoPoint, meters: Double) {
-    val ring = remember(point, meters) {
-        point.uncertaintyRing(meters).joinToString(",") { "[${it.longitude},${it.latitude}]" }
-    }
-    val source = rememberGeoJsonSource(
-        GeoJsonData.JsonString("""{"type":"Polygon","coordinates":[[$ring]]}""")
-    )
-    org.maplibre.compose.layers.FillLayer(id = "device-accuracy", source = source, color = const(Color(0x33FFBA00)))
-    LineLayer(id = "device-accuracy-outline", source = source, color = const(Color(0x88FFBA00)), width = const(1.5.dp))
-}
-
-private fun TransitMapData.visibleMapPadding(height: Dp): DpPadding {
-    val maxInset = (height - 1.dp).coerceAtLeast(0.dp)
-    val top = topInset.coerceIn(0.dp, maxInset)
-    return DpPadding(top = top, bottom = bottomInset.coerceIn(0.dp, maxInset - top))
-}
-
-@Composable
-private fun MapOverlayScope.UserPointer(point: GeoPoint, rotation: Float = 0f) {
-    val pointer = painterResource(Res.drawable.map_user_pointer_marker)
-    Canvas(Modifier.placedAt(point.position()).zIndex(1f).size(36.dp)) {
-        drawDirectedTripPointer(pointer, center, size.width, rotation)
-    }
-}
-
-@Composable
-private fun MapOverlayScope.OriginMarker(point: GeoPoint) {
-    Image(
-        painter = painterResource(Res.drawable.ellipse_starting),
-        contentDescription = "Starting point",
-        modifier = Modifier.placedAt(point.position()).size(16.dp)
-    )
-}
-
-@Composable
-private fun MapOverlayScope.DestinationMarker(point: GeoPoint) {
-    Canvas(Modifier.placedAt(point.position()).size(36.dp)) {
-        drawCircle(Color(0xFFFFBA00))
-        val flag = Path().apply {
-            moveTo(12.dp.toPx(), 26.dp.toPx())
-            lineTo(12.dp.toPx(), 11.dp.toPx())
-            lineTo(18.dp.toPx(), 11.dp.toPx())
-            lineTo(19.dp.toPx(), 13.dp.toPx())
-            lineTo(25.dp.toPx(), 13.dp.toPx())
-            lineTo(25.dp.toPx(), 20.dp.toPx())
-            lineTo(19.dp.toPx(), 20.dp.toPx())
-            lineTo(18.dp.toPx(), 18.dp.toPx())
-            lineTo(12.dp.toPx(), 18.dp.toPx())
-        }
-        drawPath(flag, TransitComplementary, style = Stroke(2.dp.toPx()))
-    }
-}
-
-private fun GeoPoint.position(): Position = Position(longitude, latitude)
-
-private fun GeoPoint.coordinates(): String = "[$longitude,$latitude]"
-
-private fun routeGeoJson(legs: List<RouteLeg>): String = linesGeoJson(legs.map { it.geometry })
-
-private fun linesGeoJson(geometry: List<List<GeoPoint>>): String {
-    val lines = geometry.joinToString(",") { line ->
-        line.joinToString(",", prefix = "[", postfix = "]") { it.coordinates() }
-    }
-    return """{"type":"MultiLineString","coordinates":[$lines]}"""
-}
-
-private fun positionAlongRoute(
-    segments: List<Pair<GeoPoint, GeoPoint>>,
+/** Computes the travelled portion of route polylines up to [progress]. */
+private fun computeTravelledSegments(
+    path: List<Pair<GeoPoint, GeoPoint>>,
     distances: List<Double>,
-    progress: Float
-): GeoPoint? {
-    if (segments.isEmpty()) return null
-    val fraction = progress.coerceIn(0f, 1f)
-    if (fraction == 0f) return segments.first().first
-    if (fraction == 1f) return segments.last().second
-    var remaining = distances.sum() * fraction
-    for ((index, segment) in segments.withIndex()) {
-        val distance = distances[index]
-        if (distance > 0.0 && remaining <= distance) {
-            val (start, end) = segment
-            val t = remaining / distance
-            return GeoPoint(
-                start.latitude + (end.latitude - start.latitude) * t,
-                start.longitude + (end.longitude - start.longitude) * t
-            )
-        }
+    routeMarker: GeoPoint?,
+    progress: Float?,
+): List<List<GeoPoint>> {
+    val bounded = progress?.coerceIn(0f, 1f) ?: 0f
+    var remaining = distances.sum() * bounded
+    return path.zip(distances).mapNotNull { (segment, distance) ->
+        if (remaining <= 0 || distance <= 0) return@mapNotNull null
         remaining -= distance
+        listOf(segment.first, if (remaining >= 0) segment.second else routeMarker ?: segment.second)
     }
-    return segments.last().second
+}
+
+/** Computes screen-space pointer rotation for simulated playback along the route geometry. */
+private fun simulatedPointerRotation(
+    path: List<Pair<GeoPoint, GeoPoint>>,
+    distances: List<Double>,
+    marker: GeoPoint,
+    progress: Float,
+    cameraBearing: Double,
+): Float {
+    val ahead = positionAlongRoute(path, distances, (progress + 0.001f).coerceAtMost(1f))
+    val to = ahead ?: marker
+    val from = if (to == marker) {
+        positionAlongRoute(path, distances, (progress - 0.001f).coerceAtLeast(0f)) ?: marker
+    } else {
+        marker
+    }
+    val direction = Offset(
+        ((to.longitude - from.longitude) * cos(Math.toRadians(marker.latitude))).toFloat(),
+        (from.latitude - to.latitude).toFloat(),
+    )
+    return tripPointerRotation(Offset.Zero, direction) - cameraBearing.toFloat()
 }

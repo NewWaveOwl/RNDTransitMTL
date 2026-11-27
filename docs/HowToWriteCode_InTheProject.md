@@ -1,4 +1,4 @@
-# HowToWriteCode_InTheProjec
+# HowToWriteCode_InTheProject
 
 ## Purpose and source boundaries
 
@@ -43,7 +43,7 @@ RNDTransitMTL must use MVVM. Generate new application code with these responsibi
 6. Distinguish presentation state, restorable drafts, and persisted defaults. Do not claim that a ViewModel persists data after process termination.
 Place screen code in View/<screen_name>/, ViewModels in ViewModels/<screen_name>/, and components used by multiple screens in ui/global_ui_ellements/. Screen-specific components belong beside their screen, optionally in a local components/ folder.
 
-`ui/global_ui_ellements/trip/TripScreensV3.kt` contains the shared completion, overall review, feedback, history, and saved-details presentations. Their callbacks delegate to the existing coordinators. Leg/place feedback stays disabled until target-based persistence and navigation exist. Repeat generates a fresh proposal; Edit copy restores recorded planner preferences without modifying the completed trip.
+`ui/global_ui_ellements/trip/` (`ReviewV3.kt`, `FeedbackV3.kt`, `HistoryV3.kt`, `TripDetailsV3.kt`, and `TripV3Shared.kt`) contains the shared overall review, feedback, history, and saved-details presentations. Their callbacks delegate to the existing coordinators. The completion presentation lives in `View/current_trip/TripCompletionContent.kt`. Leg/place feedback stays disabled until target-based persistence and navigation exist. Repeat generates a fresh proposal; Edit copy restores recorded planner preferences without modifying the completed trip.
 
 Keep theme code in ui/theme, application assembly in App.kt, shared scaffold and navigation bars in layout/, navigation state and destinations in navigation/, models in the corresponding model/<domain> folder, and repository/provider implementations in the named data subfolders.
 
@@ -83,7 +83,7 @@ private val TransportButtonWidthFraction = 1f // 0.9f uses 90% of its responsive
 private const val PREFERENCE_DROPDOWN_ANIMATION_DURATION_MILLIS = 500
 ```
 
-Current tuning locations: `View/main/MainPlannerContent.kt` for sheet width, GO margins, drag-handle size and sheet motion; `View/main/components/PlannerPreferenceBands.kt` for transport/zone/walking/attraction button widths and dropdown timing; `View/main/components/GOBox.kt` for time selector and GO button dimensions; `View/main/components/IntensityPanel.kt` for slider width via side padding; `View/landing/LandingContent.kt` for landing form width; and `layout/SharedTopBar.kt` for header button widths.
+Current tuning locations: `View/main/MainPlannerContent.kt` for sheet width and GO margins; `View/main/PlannerSheetGeometry.kt` and `View/main/components/PlannerSheetDragHandle.kt` for drag-handle size, stops and sheet motion; `View/main/components/PlannerPreferenceBands.kt` for transport/zone/walking/attraction button widths and dropdown timing; `View/main/components/GOBox.kt` and `View/main/components/ScrollableMinutes.kt` for time selector and GO button dimensions; `View/main/components/IntensityPanel.kt` and `View/main/components/IntensitySlider.kt` for slider sizing and side padding; `View/landing/LandingContent.kt` for landing form width; and `layout/SharedTopBar.kt` for header button widths.
 
 ## 2. Course structure and coverage
 
@@ -148,19 +148,23 @@ Now in Android groups app assembly, features, and shared core functionality. Its
 | Platform data adapters | Network, database, preferences, and device capabilities |
 | Testing support | Fakes, fixtures, and shared test helpers |
 
-**Required RNDTransitMTL organization (implemented folder migration):**
+**Required RNDTransitMTL organization (current Milestone 4 layout):**
 
 Source root: `shared/src/commonMain/kotlin/com/example/rnd_transit_mtl/`.
-Screen-specific components and previews belong with their screen. Shared components belong in the named `ui/global_ui_ellements/` subfolders; preserve that spelling. Future areas contain empty directories only, without placeholder services or artificial ViewModels.
+Screen-specific components and previews belong with their screen. Shared components belong in the named `ui/global_ui_ellements/` subfolders; preserve that spelling. Unimplemented future areas (such as `View/together/` and unused `ViewModels/` or `model/` subfolders) remain empty directories only, without placeholder services or artificial ViewModels.
 
 ```text
 rnd_transit_mtl/
 │
+├── AnimatedStartupOverlay.kt
 ├── App.kt
 ├── Platform.kt
+├── StartupLogoArtwork.kt
+├── SupabaseTestScreen.kt
 │
 ├── navigation/
 │   ├── Router.kt
+│   ├── ScreenKeys.kt
 │   ├── Navigator.kt
 │   └── TripNavigation.kt
 │
@@ -177,24 +181,58 @@ rnd_transit_mtl/
 │   ├── main/
 │   │   ├── MainScreen.kt
 │   │   ├── MainPlannerContent.kt
-│   │   ├── TripProposalContent.kt
+│   │   ├── OriginSelectionContent.kt
+│   │   ├── PlannerOriginOverlay.kt
+│   │   ├── PlannerMapAttributionBadge.kt
+│   │   ├── PlannerSheetGeometry.kt
+│   │   ├── FigmaOriginMap.kt
+│   │   ├── FigmaRecenterButton.kt
+│   │   ├── ProposalGuard.kt
+│   │   ├── TransitDepartureSummary.kt
+│   │   ├── TransitOpeningGeneration.kt
 │   │   ├── TransitOpeningScreen.kt
+│   │   ├── Trip33FallbackContent.kt
+│   │   ├── TripLabelValueField.kt
+│   │   ├── TripLoadingContent.kt
 │   │   ├── TripPlannerContent.kt
+│   │   ├── TripProposalContent.kt
 │   │   ├── components/
 │   │   │   ├── PlannerPreferenceBands.kt
+│   │   │   ├── PlannerSheetDragHandle.kt
 │   │   │   ├── BikeSpeedPanel.kt
 │   │   │   ├── GOBox.kt
+│   │   │   ├── ScrollableMinutes.kt
 │   │   │   ├── TransportPanel.kt
-│   │   │   └── IntensityPanel.kt
+│   │   │   ├── IntensityPanel.kt
+│   │   │   ├── IntensitySlider.kt
+│   │   │   └── TripSearchBar.kt
 │   │   └── previews/
 │   │       ├── MainPlannerFlowPreview.kt
+│   │       ├── Trip33Samples.kt
 │   │       ├── TripPlannerPreview.kt
 │   │       └── IntensityPanelPreview.kt
 │   │
 │   ├── current_trip/
+│   │   ├── ActiveMapBottomSheet.kt
 │   │   ├── ActiveMapContent.kt
+│   │   ├── ActiveMapDialogs.kt
+│   │   ├── ActiveMapDirectionsBanner.kt
+│   │   ├── ActiveMapLocationWarning.kt
+│   │   ├── ActiveMapSurface.kt
+│   │   ├── ArrivalCelebration.kt
+│   │   ├── BackAtStartContent.kt
 │   │   ├── CurrentTripScreen.kt
 │   │   ├── CurrentTripContent.kt
+│   │   ├── CurrentTripEffects.kt
+│   │   ├── CurrentTripUnavailableContent.kt
+│   │   ├── EstimatedTripProgress.kt
+│   │   ├── JourneyPresentation.kt
+│   │   ├── RouteFailurePanel.kt
+│   │   ├── TripActionButton.kt
+│   │   ├── TripCompletionContent.kt
+│   │   ├── TripJourneySheet.kt
+│   │   ├── TripReturnFlowContent.kt
+│   │   ├── TripWarning.kt
 │   │   ├── components/
 │   │   │   └── TripProgressPanel.kt
 │   │   └── previews/
@@ -210,6 +248,7 @@ rnd_transit_mtl/
 │   ├── trip_review/
 │   │   ├── TripReviewScreen.kt
 │   │   ├── TripReviewContent.kt
+│   │   ├── TripReviewStatusViews.kt
 │   │   ├── components/
 │   │   │   └── ReviewQuestionCard.kt
 │   │   └── previews/
@@ -227,6 +266,7 @@ rnd_transit_mtl/
 │   │
 │   ├── settings/
 │   │   ├── SettingsScreen.kt
+│   │   ├── SettingsContent.kt
 │   │   ├── components/
 │   │   └── previews/
 │   │       └── SettingsScreenPreview.kt
@@ -236,6 +276,9 @@ rnd_transit_mtl/
 │   │   ├── components/
 │   │   └── previews/
 │   │       └── ProfileScreenPreview.kt
+│   │
+│   ├── authentication/
+│   │   └── AuthScreen.kt
 │   │
 │   ├── landing/
 │   │   ├── LandingScreen.kt
@@ -252,29 +295,57 @@ rnd_transit_mtl/
 │   │       └── AboutScreenPreview.kt
 │   │
 │   ├── compass/
+│   │   ├── CompassScreen.kt
+│   │   └── CompassDial.kt
+│   │
 │   └── together/
 │
 ├── ViewModels/
+│   ├── Accounts/
+│   │   └── ProfileViewModel.kt
+│   ├── authentication/
+│   │   └── AuthViewModel.kt
 │   ├── main/
 │   │   └── MainPlannerViewModel.kt
 │   ├── current_trip/
+│   │   ├── CurrentTripLocationViewModel.kt
+│   │   └── ReturnTripViewModel.kt
+│   ├── Settings/
+│   │   └── SettingsViewModel.kt
 │   ├── trip_details/
 │   ├── trip_review/
 │   ├── history/
-│   ├── settings/
 │   ├── profile/
 │   ├── landing/
 │   ├── compass/
 │   └── together/
 │
 ├── model/
+│   ├── Accounts/
+│   │   ├── Account.kt
+│   │   └── Preferences.kt
+│   │
+│   ├── geo/
+│   │   ├── GeoBounds.kt
+│   │   ├── GeoPoint.kt
+│   │   ├── MapProjection.kt
+│   │   └── UncertaintyRing.kt
+│   │
 │   ├── ids/
 │   │   ├── Ids.kt
 │   │   └── PlatformSerializable.kt
 │   │
 │   ├── trip/
+│   │   ├── Place.kt
+│   │   ├── RouteLeg.kt
 │   │   ├── Trip.kt
-│   │   └── TripPoint.kt
+│   │   ├── TripCompletionStatistics.kt
+│   │   ├── TripGuidance.kt
+│   │   ├── TripJourney.kt
+│   │   ├── TripPoint.kt
+│   │   ├── TripRequest.kt
+│   │   ├── TripRoutePosition.kt
+│   │   └── TripStatus.kt
 │   │
 │   ├── transport/
 │   │   ├── TransportType.kt
@@ -290,32 +361,84 @@ rnd_transit_mtl/
 │   └── group/
 │
 ├── data/
-│   ├── repository/
+│   ├── accounts/
+│   │   ├── AccountRepository.kt
+│   │   ├── IAccountRepository.kt
+│   │   ├── LocalAccountRepository.kt
+│   │   └── UsernameGenerator.kt
+│   │
+│   ├── authentication/
+│   │   ├── AuthRepository.kt
+│   │   ├── LocalAccountSession.kt
+│   │   └── SupabaseAuthRepository.kt
+│   │
+│   ├── assets/
+│   │   ├── JsonAssetReader.kt
+│   │   └── SampleMapCalibration.kt
 │   │
 │   ├── fake/
+│   │   ├── FakeLocationSource.kt
+│   │   ├── FakeRoutingService.kt
 │   │   ├── FakeTransportTypeRepository.kt
 │   │   └── FakeTransportRouteRepository.kt
 │   │
 │   ├── generation/
+│   │   ├── BackendGenerationClient.kt
+│   │   ├── BackendTripGenerator.kt
+│   │   ├── ExplorationZoneCount.kt
 │   │   ├── MockTripGenerator.kt
+│   │   ├── OldMontrealSample.kt
 │   │   └── TripGenerationBounds.kt
 │   │
-│   ├── assets/
-│   │   └── JsonAssetReader.kt
+│   ├── location/
+│   │   ├── LocationAccuracyMonitor.kt
+│   │   ├── LocationJumpFilter.kt
+│   │   ├── LocationRecoveryPolicy.kt
+│   │   ├── LocationRequestQueue.kt
+│   │   ├── LocationSource.kt
+│   │   ├── MovementHeading.kt
+│   │   └── PlannerLocation.kt
 │   │
+│   ├── routing/
+│   │   ├── OtpItineraryDecoder.kt
+│   │   └── RoutingService.kt
+│   │
+│   ├── supabase/
+│   │   └── SupabaseBackend.kt
+│   │
+│   ├── trips/
+│   │   ├── CloudTrips.kt
+│   │   ├── FinalTripOutbox.kt
+│   │   ├── SupabaseTripRepository.kt
+│   │   └── TripRepository.kt
+│   │
+│   ├── repository/
 │   ├── local/
 │   │   └── entity/
 │   │
 │   └── remote/
 │       └── dto/
+│           ├── AccountDto.kt
+│           ├── PlaceDto.kt
+│           ├── RouteLegDto.kt
+│           ├── TripDto.kt
+│           └── TripRequestDto.kt
 │
 ├── state/
 │   ├── IdSavers.kt
+│   │
+│   ├── debug/
+│   │   └── DebugModeState.kt
+│   │
+│   ├── refresh/
+│   │   └── InactivityRefresh.kt
 │   │
 │   ├── trip/
 │   │   ├── TripsStore.kt
 │   │   ├── TripState.kt
 │   │   ├── TripActionResult.kt
+│   │   ├── TripsStateV1Migration.kt
+│   │   ├── SessionTripsStores.kt
 │   │   └── LocalTripsStore.kt
 │   │
 │   ├── review/
@@ -330,8 +453,22 @@ rnd_transit_mtl/
 │
 └── ui/
     ├── global_ui_ellements/
+    │   ├── buttons/
+    │   │   ├── FilledButton.kt
+    │   │   ├── OutlinedButton.kt
+    │   │   └── TripFlowButton.kt
+    │   │
     │   ├── cards/
     │   │   └── PlaceholderCard.kt
+    │   │
+    │   ├── debug/
+    │   │   ├── DebugLogoClick.kt
+    │   │   └── DebugModeDialog.kt
+    │   │
+    │   ├── location/
+    │   │   ├── LocationAccuracyDialog.kt
+    │   │   ├── LocationAccuracyNotice.kt
+    │   │   └── LocationAccuracySettingsEntry.kt
     │   │
     │   ├── ratings/
     │   │   ├── StarRatingRow.kt
@@ -339,15 +476,27 @@ rnd_transit_mtl/
     │   │
     │   ├── media/
     │   │   ├── ReviewImage.kt
-    │   │   └── ReviewImageLink.kt
+    │   │   ├── ReviewImageLink.kt
+    │   │   └── ReviewImageStatus.kt
+    │   │
+    │   ├── refresh/
+    │   │   └── InactivityRefreshFeedback.kt
     │   │
     │   ├── trip/
+    │   │   ├── FeedbackV3.kt
+    │   │   ├── HistoryV3.kt
+    │   │   ├── ReviewV3.kt
+    │   │   ├── TripDetailsV3.kt
+    │   │   ├── TripV3Shared.kt
     │   │   ├── TripInformationPanel.kt
     │   │   ├── TripReviewSummary.kt
-    │   │   └── TripReferenceImage.kt
+    │   │   ├── TripReferenceImage.kt
+    │   │   └── TripReferenceImageStatus.kt
     │   │
     │   ├── map/
+    │   │   ├── AnimatedMapPosition.kt
     │   │   ├── MockTripMap.kt
+    │   │   ├── TransitMap.kt
     │   │   ├── TripMapGeometry.kt
     │   │   ├── TripMapMarkers.kt
     │   │   ├── TripVisualMath.kt
@@ -364,12 +513,13 @@ rnd_transit_mtl/
     └── theme/
         ├── Color.kt
         ├── Theme.kt
+        ├── TripLegColors.kt
         └── Type.kt
 ```
 
 Keep `MainPlannerState` with `MainPlannerViewModel`, and generation input/result contracts in `data/generation/MockTripGenerator.kt` until a separate responsibility migration is requested. Keep the legacy planner and transport panel while their previews still reference them. Keep `ReviewImage` and `ReviewImageLink` in shared media because entry screens and saved-review summaries both use them.
 
-A folder move must preserve independent per-mode zones, walking/attraction choices, the legacy `selectedZoneIds` draft fallback, active-trip identity, and review/resume behavior. Preserve serialized route discriminators when navigation packages move. Moving files does not complete the remaining business-logic migration from `TransitOpeningScreen` into a ViewModel/repository boundary.
+A folder move must preserve independent per-mode zones, walking/attraction choices, the legacy `selectedZoneIds` draft fallback, active-trip identity, and review/resume behavior. Preserve serialized route discriminators when navigation packages move. Moving files does not complete the remaining business-logic migration from `TransitOpeningScreen` (and `TransitOpeningGeneration.kt`) into a ViewModel/repository boundary.
 
 Use the actual source root in the existing project. Older CMP projects may use `composeApp/src/commonMain`; the slides also show the newer `shared` module organization.
 
@@ -1896,7 +2046,7 @@ Context:
 
 Requirements:
 - Intended behavior and acceptance criteria: [list them].
-- Follow AI_HowToWriteCode.md.
+- Follow docs/HowToWriteCode_InTheProject.md.
 - Separate UI rendering, state ownership, navigation, and data access.
 - Use Material 3 and the project's Navigation 3 patterns where relevant.
 - Document the contract with KDoc and @param tags.

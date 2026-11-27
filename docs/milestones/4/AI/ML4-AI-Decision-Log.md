@@ -9,18 +9,24 @@ the GO/settings-sheet handle and confirmed map origin in #94. M4-A3 covers the
 Figma arrival, return, and round-trip flow in #92/#107 and the subsequent chat
 clarification. Placement of M4-A2/M4-A3 in ML4 is inferred from the existing
 milestone records and related trip features; the latest logging request did
-not name a milestone again.
+not name a milestone again. M4-A4 covers issue #97 (`ML4-09`), including the
+codebase maintainability review, composable splitting, long-function extraction,
+documentation refresh, PR #113 creation/header update, and this AI log update.
 
-The source is the visible current Codex conversation, logged on 2026-11-22
-(America/Toronto), together with locally verified Git evidence. The conversation
-URL has not been supplied: [Conversation link needed]. No conversation was
-published to obtain a link. Full available human task prompts are preserved
-below. Tool and build results from the implementation are historical evidence
-for this documentation update; application tests were not rerun while writing
-the logs. For M4-A2/M4-A3, earlier implementation details also come from the
-conversation's retained continuation record; exact available user prompts are
-copied below. That record is distinguished from freshly inspected Git and
-saved build logs. M4-A1's original evidence and attribution remain unchanged.
+The source for M4-A1–M4-A3 is the visible Codex conversation logged on
+2026-11-22 (America/Toronto), together with locally verified Git evidence. The
+source for M4-A4 is the local Antigravity conversation
+`0e723272-e84d-42bb-b32d-e91731ad011e` logged on 2026-11-25 (America/Toronto),
+together with locally verified Git, Gradle, and GitHub CLI evidence. Public
+conversation URLs have not been supplied: [Conversation link needed]. No
+conversation was published to obtain a link. Full available human task prompts
+are preserved below. Tool and build results from the implementation are
+historical evidence for documentation updates; application tests were not rerun
+while writing the logs. For M4-A2/M4-A3, earlier implementation details also
+come from the conversation's retained continuation record; exact available user
+prompts are copied below. That record is distinguished from freshly inspected
+Git and saved build logs. M4-A1's original evidence and attribution remain
+unchanged.
 
 ## Contributor and milestone coverage
 
@@ -29,8 +35,9 @@ saved build logs. M4-A1's original evidence and attribution remain unchanged.
 | Requester; individual prompt authorship not independently confirmed | ML4-04.S2, issue #93, parent #45 | Issue review, explicitly authorized implementation, regression tests, commit, status clarification, and logging | M4-A1 |
 | Requester; individual prompt authorship not independently confirmed | Issue #94; ML4 placement inferred above | Implement confirmed map origin, refine GO into the settings-sheet drag handle, preserve unrelated changes, test, and commit | M4-A2 |
 | Requester; individual prompt authorship not independently confirmed | Issues #92/#107; ML4 placement inferred above | Implement supplied Figma flow, commit each feature, inspect the resulting UI flow, and document this chat | M4-A3 |
+| Requester; individual prompt authorship not independently confirmed | ML4-09, issue #97, PR #113 | Full-codebase maintainability review, composable splitting, function extraction, guideline enforcement, doc cleanup, PR creation/update, and AI logging | M4-A4 |
 
-The implementation commit identifies **Artem Sova** as its Git author. The
+The implementation commits identify **Artem Sova** as their Git author. The
 supplied issue text identifies **@NewWaveOwl** as its owner. These are source
 attributions, not independent confirmation of the author of every prompt.
 
@@ -41,6 +48,7 @@ attributions, not independent confirmation of the author of every prompt.
 | M4-A1 | 2026-11-22 | Codex; [Conversation link needed] | Review issue #93, preserve failed trip/review input across restarts, test retries, commit, and clarify remaining sign-off | ML4-04.S2 / #93 |
 | M4-A2 | 2026-11-22 | Codex; [Conversation link needed] | GO/settings-sheet drag behavior and map-tap origin confirmation, including the user's correction | #94 |
 | M4-A3 | 2026-11-22 | Codex; [Conversation link needed] | Figma arrival statistics/celebration, optional return, round-trip planning, UI-flow clarification, and this log update | #92 / #107 |
+| M4-A4 | 2026-11-25 | Google Antigravity (`0e723272-e84d-42bb-b32d-e91731ad011e`, local app-only ID); [Conversation link needed] | Codebase maintainability review, composable splitting, function extraction, doc refresh, PR #113 `[AI-Cleanup]` / `Closes #97`, and this log update | ML4-09 / #97 |
 
 ## M4-A1 - Completed and cancelled trip persistence with review recovery
 
@@ -278,9 +286,8 @@ Independent student testing and personal learning are [Not documented].
 
 Both commits are on the history of `fixes_fro_monday_23_nov_sova`. Current source
 references include [MainPlannerContent.kt](../../../../shared/src/commonMain/kotlin/com/example/rnd_transit_mtl/View/main/MainPlannerContent.kt)
-and [PlannerOriginUi.kt](../../../../shared/src/commonMain/kotlin/com/example/rnd_transit_mtl/View/main/PlannerOriginUi.kt).
-These links may include later edits; use the recorded commits for historical
-scope. Unrelated debug work was kept outside these commits. No push was made.
+and [PlannerOriginUi.kt at `cabce97`](https://github.com/NewWaveOwl/RNDTransitMTL/blob/cabce97f5447c6c1390cd77e99c6593fc3c06fe6/shared/src/commonMain/kotlin/com/example/rnd_transit_mtl/View/main/PlannerOriginUi.kt).
+The planner content link tracks later edits. The origin UI link points to the recorded #94 commit. Unrelated debug work was kept outside these commits. No push was made.
 
 **Verification evidence:** The saved `build/issue94-work/focused-tests.log`
 records an early failure in
@@ -467,6 +474,123 @@ Itinerary statistics include estimates; fastest GPS speed is not recorded.
 
 **Technique record:** [M4-A3](ML4-AI-Technique-Log.md#m4-a3---figma-arrival-return-and-round-trip-flow).
 
+## M4-A4 - Codebase maintainability cleanup, composable splitting, and documentation refresh (#97)
+
+**Contributor:** Requester; individual prompt authorship not independently
+confirmed. Git commits `2aac1bb` and `67b3a36` record **Artem Sova** as Git
+author, and GitHub CLI is authenticated as `@NewWaveOwl`.
+
+**Date:** 2026-11-25 (America/Toronto). Local transcript timestamps span
+`2026-11-25T10:17:32-05:00` through `2026-11-25T11:41:02-05:00`, and PR branch
+commits record `2026-11-25T11:02:39-05:00` (`2aac1bb`, cherry-picked from
+`5b8ed89`) and `2026-11-25T11:29:08-05:00` (`67b3a36`, cherry-picked from
+`3440511`). These are log and commit timestamps, not an estimate of active
+student work time.
+
+**AI tool / model:** Google Antigravity (`Antigravity` agentic assistant);
+exact model version [Not documented]. The agent inspected workspace files, ran
+a local scratch audit script, refactored Kotlin/Compose source files, updated
+project documentation, ran local Gradle builds/tests, executed Git commits and
+worktree cherry-picks/push, and created/updated PR #113 via `gh`. No subagents
+were used (`0` `invoke_subagent` calls in the conversation transcript).
+
+**Source:** Local Antigravity conversation ID
+`0e723272-e84d-42bb-b32d-e91731ad011e` (app-only local transcript, not a
+publicly shared URL); [Conversation link needed].
+
+**Requirement / milestone:** [Issue #97](https://github.com/NewWaveOwl/RNDTransitMTL/issues/97)
+(`ML4-09 Split composables into separate files, extract long functions and review maintainability with AI`),
+tracked in [PR #113](https://github.com/NewWaveOwl/RNDTransitMTL/pull/113).
+
+**Task/context:** Fulfill issue #97 across the KMP shared UI and backend
+codebase while enforcing `docs/HowToWriteCode_InTheProject.md` (file-per-composable
+structure, extracted helpers, KDoc with `@param`, top-of-file layout/animation
+tuning sections, and zero `!!` assertions), flag and refresh outdated repository
+documentation, preserve pre-existing uncommitted work in the local workspace,
+and publish a clean pull request targeting `main`.
+
+**Purpose of AI use:** Confirm repository/doc readability first, audit the full
+codebase for maintainability and guideline compliance, perform the authorized
+refactors and documentation updates in separate commits, open/update PR #113
+with `[AI-Cleanup]` and `Closes #97`, and log this conversation in ML4 AI logs.
+
+**Attachments:** No binary or image uploads reported. Prompt 1 supplied the
+local workspace path, repository URL, and issue #97 URL; Prompt 3 referenced
+`docs/HowToWriteCode_InTheProject.md` via `@[...]` file mention; Prompt 5
+supplied the issue #97 URL.
+
+### Full prompt 1 - Readiness check and issue #97 scope
+
+```text
+Reveiw all code base K:\CLASSES 26 FALL\APP_DEV\PRJ\RNDTransitMTL | https://github.com/NewWaveOwl/RNDTransitMTL to fullfill :https://github.com/NewWaveOwl/RNDTransitMTL/issues/97 Split composables into separate files, extract long functions and review maintainability with AI also ishure tha code base follow HowTowrite code md instuctions | before you start reply in  caht that found docs and can read all the files
+```
+
+### Full prompt 2 - Authorize issue #97 review, refactor, and doc audit
+
+```text
+YOu can start to revei the code and complet issue 97. aslo flag outdated docs and propose in the caht after possbile fixes
+```
+
+### Full prompt 3 - Commit code cleanup first, apply selected doc/housekeeping fixes, and explain KDoc gaps
+
+```text
+1) Stray root artifacts (main.zip, pr-74.diff, pr72-clean/) are untracked in the workspace and should be cleaned up or added to .gitignore. add them to git ignore. 2) Lets remove Unused legacy Android template folder app/ (com.example.emptyactivity, not included in settings.gradle.kts) can be removed in a housekeeping PR. 3) Fix Readme.md Jimmy Rashed is poper name.  4) fix MainDesignDoc.md 5)@[k:\CLASSES 26 FALL\APP_DEV\PRJ\RNDTransitMTL\docs\HowToWriteCode_InTheProject.md] fix it 6) Fix how log Ai 7)update Teram Practices 7) explain Pre-existing missing KDoc remains on several data/location/store classes (AccountRepository, LocationJumpFilter, CloudTrips, TripNavigation, TripsStore) — good candidate for a focused documentation-only follow-up. in the chat | !but before commit cahgnes to code base as code_cleanup_separation_of_composabel e.t.c
+```
+
+*(Interface note: a `/compact` context-compaction command was triggered at
+`2026-11-25T11:14:48-05:00` between Prompt 3 and Prompt 4.)*
+
+### Full prompt 4 - Commit housekeeping/docs and create PR
+
+```text
+commit and create a PR 
+```
+
+### Full prompt 5 - Close issue #97 and add `[AI-Cleanup]` to PR header
+
+```text
+https://github.com/NewWaveOwl/RNDTransitMTL/issues/97 close this iisue in the PR IN HEader mentoin [AI-Cleanup]
+```
+
+### Full prompt 6 - Add AI log for this chat, commit, and update PR
+
+```text
+also add AI logof this chat  (0e723272-e84d-42bb-b32d-e91731ad011e) commit and update the pr
+```
+
+**AI output summary:**
+- After Prompt 1, the agent confirmed it located `docs/HowToWriteCode_InTheProject.md`, read issue #97, and could access the repository files before making edits.
+- After Prompt 2, the agent audited the codebase, split multi-composable files (`TripScreensV3.kt`, `PlannerOriginUi.kt`, `LocationAccuracyControls.kt`, `DebugModeControls.kt`, `ActiveMapContent.kt`, `TripReturnFlowContent.kt`, `TripCompletionContent.kt`, `TripProposalContent.kt`, `SettingsScreen.kt`, `CompassScreen.kt`, `IntensityPanel.kt`, `GOBox.kt`, `ReviewImage.kt`, `TripReferenceImage.kt`, `AndroidTransitMap.kt`, `Router.kt`), extracted long functions (`TransitOpeningGeneration.kt`, `CurrentTripEffects.kt`, `CurrentTripUnavailableContent.kt`, `TripReviewStatusViews.kt`, plus focused helpers in planner/review/history/details/mock/backend files), removed two non-null assertions in `backend/src/main/kotlin/transit/Generation.kt`, verified builds/tests, and reported outdated documentation and workspace housekeeping candidates in chat. Removed six non-null assertions from `commonMain`, reducing the total from seven to one.
+- After Prompt 3, the agent committed the code cleanup first as `5b8ed89` (`code_cleanup_separation_of_composables (#97)`), while leaving `App.kt`, `HistoryScreen.kt`, and other pre-existing uncommitted files untouched to avoid mixing unrelated WIP; then updated `.gitignore` for `/main.zip`, `/pr-74.diff`, `/pr72-clean/`, and local Android release identity files in `.release-private/`, removed the unused legacy `app/` template (28 files), updated `README.md`, `docs/MainDesignDoc.md`, `docs/HowToWriteCode_InTheProject.md`, `docs/HowToLog_AI.md`, and `docs/TeamPractices.md`, and explained the exact missing KDoc gaps across `AccountRepository`, `LocationJumpFilter`, `CloudTrips`, `TripNavigation`, and `TripsStore` in chat.
+- After Prompt 4, the agent removed the link to uncommitted `docs/AndroidDistribution.md` from `README.md` so no broken links would land on `main`, committed the housekeeping/doc updates as `3440511`, discovered `fixes_fro_monday_23_nov_sova` had already been squash-merged into `origin/main` in PR #111, created clean branch `refactor/97-code-cleanup-and-docs` off `origin/main` (`610ea1f`) in a temporary worktree, cherry-picked both commits (`2aac1bb`, `67b3a36`) while resolving two small overlaps with `origin/main` (`Generation.kt` and `TransitOpeningGeneration.kt`), ran the full multi-platform Gradle test/build suite, pushed the branch, opened PR #113, and removed the temporary worktree.
+- After Prompt 5, the agent discovered that wrapping `` `Closes #97` `` in inline backticks left GitHub's `closingIssuesReferences` empty, updated PR #113's title to `[AI-Cleanup] Refactor composables, extract long functions, and refresh docs (#97)` and placed unescaped `Closes #97` at the top of the body, and verified via `gh pr view 113 --json closingIssuesReferences` that issue #97 is linked.
+- After Prompt 6, the agent recorded entry `M4-A4` in this decision log and the separate technique log, committed it on `refactor/97-code-cleanup-and-docs`, pushed to origin, and updated PR #113's summary.
+
+**Student decision / how output was used:**
+- The requester explicitly gated implementation behind a readiness check (Prompt 1), authorized the issue #97 refactor and doc audit (Prompt 2), chose which proposed housekeeping/doc fixes to apply and specified keeping the code cleanup in its own prior commit plus a chat-only explanation of the 5-class KDoc follow-up (Prompt 3), authorized committing and opening a PR (Prompt 4), directed adding `[AI-Cleanup]` to the PR header and closing issue #97 in the PR (Prompt 5), and requested logging this chat and updating the PR (Prompt 6).
+- Individual prompt authorship, personal review reasoning for each refactored file, and any manual edits outside this chat are [Not documented].
+
+**Implemented result / evidence:**
+- Branch `refactor/97-code-cleanup-and-docs` (based on `origin/main` `610ea1f`) with PR [#113](https://github.com/NewWaveOwl/RNDTransitMTL/pull/113):
+  - `2aac1bb` — `code_cleanup_separation_of_composables (#97)` (66 files changed, +9381 / -6760; cherry-picked from local `5b8ed89` with `origin/main` conflict resolution in `backend/src/main/kotlin/transit/Generation.kt` and `shared/src/commonMain/kotlin/com/example/rnd_transit_mtl/View/main/TransitOpeningGeneration.kt`).
+  - `67b3a36` — `chore(docs): remove unused app template, ignore local artifacts, and refresh project docs` (34 files changed, +253 / -662; cherry-picked from local `3440511`).
+  - Subsequent AI log commit on `refactor/97-code-cleanup-and-docs` adding `M4-A4` to `docs/milestones/4/AI/ML4-AI-Decision-Log.md` and `docs/milestones/4/AI/ML4-AI-Technique-Log.md`.
+- Pre-existing uncommitted workspace files (release workflow, `AndroidDistribution.md`, `AchievementLauncher`, etc.) remained untouched in the local main working directory.
+
+**Verification:**
+- Pre-commit verification on `fixes_fro_monday_23_nov_sova` (`5b8ed89`): `.\gradlew.bat :shared:jvmTest :shared:testAndroidHostTest :backend:test :androidApp:assembleDebug :desktopApp:classes :shared:compileKotlinJs :shared:compileKotlinWasmJs --console=plain` → `BUILD SUCCESSFUL` (`338` JVM tests, `274` Android host tests, `61` backend tests; `0` failures/errors/skips).
+- Post-`app/` removal compile check: `.\gradlew.bat :shared:compileKotlinJvm :androidApp:compileDebugKotlin --console=plain` → `BUILD SUCCESSFUL in 14s`.
+- PR branch verification on `refactor/97-code-cleanup-and-docs` (`67b3a36`, rebased onto `origin/main` `610ea1f`): `.\gradlew.bat :shared:jvmTest :shared:testAndroidHostTest :backend:test :androidApp:assembleDebug :desktopApp:classes :shared:compileKotlinJs :shared:compileKotlinWasmJs --console=plain` → `BUILD SUCCESSFUL in 3m 5s` (`340` JVM tests, `276` Android host tests, `65` backend tests with `0` failures/errors and `1` skipped opt-in live smoke test; Android debug APK, Desktop, JS, and WasmJS targets built cleanly).
+- GitHub PR verification: `gh pr view 113 --json title,closingIssuesReferences` confirmed title `[AI-Cleanup] Refactor composables, extract long functions, and refresh docs (#97)` and linked closing issue `#97`.
+- Application tests were not rerun for the documentation-only AI log commit. Independent student-run testing or manual device inspection is [Not documented].
+
+**Limitations:**
+- Local conversation ID `0e723272-e84d-42bb-b32d-e91731ad011e` is app-only and not publicly accessible via URL; exact model version, active interaction time, code-impact percentage, and student reflection are [Not documented] / [Student reflection needed].
+- `App.kt` and `HistoryScreen.kt` were excluded from `2aac1bb` to avoid mixing pre-existing uncommitted `AchievementLauncher` edits into PR #113.
+- PR #113 is open and awaiting team review/merge; issue #97 remains open until PR #113 merges.
+
+**Technique record:** [M4-A4](ML4-AI-Technique-Log.md#m4-a4---codebase-maintainability-cleanup-composable-splitting-and-documentation-refresh-97).
+
 ## Reflection
 
 - What AI helped with: tracing persistence and retry behavior, identifying the
@@ -490,5 +614,25 @@ For M4-A2/M4-A3:
 - What AI helped with: implementing the interaction and routing/storage flow,
   preserving unrelated changes, running local checks, comparing rendered UI,
   and explaining the difference between source implementation and live rollout.
+- Personal usefulness, learning, time saved or wasted, assignment-code
+  percentage, and what the student would change: [Student reflection needed].
+
+For M4-A4:
+
+- Observable student decisions: require a read-only confirmation before starting
+  changes, request an outdated-doc audit alongside issue #97, keep the code
+  refactor in its own commit before housekeeping/doc fixes, defer the 5-class
+  KDoc pass to a chat explanation rather than mixing it into the cleanup PR,
+  and enforce the `[AI-Cleanup]` PR header and `Closes #97` link.
+- What AI helped with: auditing multi-composable files and long functions
+  against `docs/HowToWriteCode_InTheProject.md`, splitting UI files and
+  removing `!!` assertions, refreshing outdated project docs, rebasing cleanly
+  onto `origin/main` in an isolated worktree without disturbing local WIP,
+  running multi-platform Gradle verification, and preparing PR #113.
+- Problems and limitations: three compile/warning issues occurred during the
+  initial refactor (`ReviewV3.kt`, `TripReturnFlowContent.kt`,
+  `AndroidTransitMap.kt`) and were fixed before committing; the temporary
+  worktree initially missed gitignored `local.properties`; and backticked
+  `Closes #97` did not link the issue until unescaped.
 - Personal usefulness, learning, time saved or wasted, assignment-code
   percentage, and what the student would change: [Student reflection needed].

@@ -1,7 +1,8 @@
 # Team Practices & Agreements
 
 **Project:** Random Transit App  
-**Date:** 01/10/2026  
+**Original Agreement Date:** 01/10/2026  
+**Last Updated:** 27/11/2026  
 **Team Members:**
 - Caio Nunes
 - Jimmy Rashed
@@ -27,7 +28,7 @@ If, for some reason, even after extensive discussion, the team members have diff
 
 ## 2. Team Roles & Role Rotation Plan
 
-### Roles for This Sprint
+### Initial Sprint 1 Roles
 
 | Role | Team Member | Responsibilities |
 |---|---|---|
@@ -41,9 +42,10 @@ Roles will rotate at the beginning of each major milestone or sprint so that eve
 
 | Milestone / Sprint | Team Leader | Scribe | Timekeeper |
 |---|---|---|---|
-| Sprint 1 | Artiom Sova | Caio Nunes | Jimmy Rashed |
-| Sprint 2 | Jimmy Rashed | Artiom Sova | Caio Nunes |
-| Sprint 3 | Caio Nunes | Jimmy Rashed | Artiom Sova |
+| Sprint 1 (Milestone 1) | Artiom Sova | Caio Nunes | Jimmy Rashed |
+| Sprint 2 (Milestone 2) | Jimmy Rashed | Artiom Sova | Caio Nunes |
+| Sprint 3 (Milestone 3) | Caio Nunes | Jimmy Rashed | Artiom Sova |
+| Sprint 4 (Milestone 4) | Artiom Sova | Jimmy Rashed | Caio Nunes |
 
 ---
 
@@ -81,7 +83,7 @@ AI should not be used for:
 
 Members are expected to use AI responsibly. Any AI-generated code or content must be reviewed and understood by a team member before being included in the project. The team member using the output remains responsible for its correctness.
 
-All significant AI usage will be documented using an AI log (`AI_USAGE.md`).
+All significant AI usage is documented following [HowToLog_AI.md](HowToLog_AI.md), indexed in [docs/AI/README.md](AI/README.md), and stored per milestone under `docs/milestones/<number>/AI/`.
 
 ### Policy Review
 

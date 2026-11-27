@@ -1,18 +1,18 @@
-# TransitRandomizer Greater MontrГ©al Design Document
+# TransitRandomizer Greater Montréal Design Document
 
 **Team:** Jimmy, Caio, Artiom  
 **Project:** RNDTransitMTL  
-**Updated:** 2026-10-27
+**Updated:** 2026-11-25
 
-TransitRandomizer generates achievable, semi-random adventures around Greater MontrГ©al using the user's available time, location, transportation choices, interests, and previous feedback. The user chooses what kind of adventure they want; the application proposes a destination and a practical route instead of requiring a destination in advance.
+TransitRandomizer generates achievable, semi-random adventures around Greater Montréal using the user's available time, location, transportation choices, interests, and previous feedback. The user chooses what kind of adventure they want; the application proposes a destination and a practical route instead of requiring a destination in advance.
 
 This document defines the product concept, screen behavior, generation algorithm, data model, and proposed delivery sequence. It combines the original Word design document with the team's additional feature ideas and the current Figma interface decisions. Planned features below are requirements and proposals, not a claim that they are already implemented.
 
 ## Product purpose
 
-The application helps people answer questions such as вЂњWhere can I explore in the next two hours?вЂќ or вЂњWhat unfamiliar place can I reach using Metro and walking?вЂќ It combines local discovery, route planning, personalization, and controlled randomness.
+The application helps people answer questions such as “Where can I explore in the next two hours?” or “What unfamiliar place can I reach using Metro and walking?” It combines local discovery, route planning, personalization, and controlled randomness.
 
-The intended users include MontrГ©al residents, students seeking inexpensive activities, tourists, pedestrians, cyclists, public-transit users, and groups of friends. A useful adventure should fit the available time, match interests, avoid unnecessary repetition, and remain practical to complete.
+The intended users include Montréal residents, students seeking inexpensive activities, tourists, pedestrians, cyclists, public-transit users, and groups of friends. A useful adventure should fit the available time, match interests, avoid unnecessary repetition, and remain practical to complete.
 
 Walking, bicycle, bus, Metro, train, and REM are planned transportation options. Car support remains an open decision. Several modes may be combined in one adventure. A **trip leg** means a section of the journey, regardless of its mode; walking is a transportation mode rather than a synonym for a leg.
 
@@ -53,7 +53,7 @@ The current design uses the **Figma top navigation**. Profile and History appear
 
 Profile provides the **about app** action, which opens About. Transport modes toggle independently on Main; exact bus numbers and route restrictions belong in detailed Settings. Platform Back returns through the navigation stack.
 
-The target bottom navigation contains Map, Compass, and Together. These destinations share one active trip. Compass and Together destinations remain to be implemented.
+The target bottom navigation contains Map, Compass, and Together. These destinations share one active trip. A demonstration Compass UI (`View/compass/CompassScreen.kt`) is implemented; live compass navigation and the Together destination remain to be implemented.
 
 Use [the colour system](colours.md) for all palette tokens, semantic roles, the blue-to-lime GO gradient, and LINE Seed JP Regular/Bold typography. Shared Material Symbols drawables and the existing team photographs remain in use.
 
@@ -74,11 +74,11 @@ The shared top navigation contains Profile, History, and Settings. The target bo
 
 Use the palette and semantic roles in colours.md.
 ## Trip configuration and proposal alignment
-The initial delivery generates one-way adventures. Required inputs are a valid starting location, positive whole minutes, and at least one supported transport mode. Transit requests additionally include selected zones under the updated main-screen design.
+The planner supports both one-way and round-trip adventures (see [ReturnTrips.md](ReturnTrips.md)). Required inputs are a valid starting location, positive whole minutes (5–360), and at least one supported transport mode. Transit requests additionally include selected zones under the updated main-screen design.
 
-GO requests a proposal. The target preview offers Start Trip, Generate Another, and Edit Trip Settings. Generating a proposal must not itself mark the trip active. The existing sample flow currently starts a trip directly; introducing the preview boundary remains required implementation work.
+GO requests a proposal. The implemented preview (`TripProposalContent`) offers **Start Trip**, **Generate another**, and **Edit settings** without marking the trip active until the user explicitly starts it.
 
-Travel, waiting, transfers, planned visits, and an explicit allowance must fit the available duration. Return journeys and round-trip controls are outside the initial delivery.
+Travel, waiting, transfers, planned visits, and an explicit orientation reserve (`1 min/km`) must fit the available duration. One-way arrival also supports optional **Return Fast** and **Same Way** return routing.
 
 The Milestone 2 Must-Haves include configuration, generation, preview, active-trip handling, persistent history, accounts and information screens, general settings, minimal compass guidance, and shared trip constraints. The AI Level-Ups are live map movement, shake-to-open compass, and group-session creation/joining.
 
@@ -115,12 +115,10 @@ Each screen/view and its private components belong in the corresponding named sc
 Theme definitions remain in ui/theme. Shared scaffold and navigation bars remain in layout; navigation state and destination wiring live in navigation.
 
 The folder migration is implemented, including package/import updates across previews, tests, and target entry points. The complete filename tree is in [the coding guide](HowToWriteCode_InTheProject.md#32-module-and-package-boundaries). Empty future-feature directories contain no implementations. Legacy planner files remain for their previews; shared review media lives in `ui/global_ui_ellements/media/`. Moving a file into ViewModels does not make it a ViewModel; responsibilities must also change.
-## Implementation status
-The main-screen update introduces a draggable sheet, independent transport toggles, zone selection, and a ViewModel for planner selections.
-
-Trip generation, validation feedback, and trip-opening coordination still require extraction from TransitOpeningScreen to complete the planner's MVVM migration.
-
-The bundled map, normalized sample coordinates, and accelerated trip simulation remain prototype behavior. They do not demonstrate live geographic routing, live location tracking, geographic zone enforcement, or durable history storage.
+## Implementation status (Milestone 4)
+- **Implemented:** draggable preferences sheet, independent transport toggles, per-mode ARTM zone selection, one-way and round-trip planning, confirmed map-tap origin selection, real-route Ktor + OTP backend generation with STM/exo realtime feeds, trip proposal preview (`Start Trip` / `Generate another` / `Edit settings`), live Android MapLibre map with GPS tracking, jump filtering, location accuracy diagnostics, opt-in triple-tap logo Debug simulation, Figma arrival celebration/statistics, Fastest/Same-transport return routing, Supabase authentication, persistent account-scoped History/details/reviews with offline outbox recovery, inactivity refresh, and demonstration Compass UI.
+- **Remaining:** extracting the remaining planner generation/origin coordination from `TransitOpeningScreen` into `MainPlannerViewModel`, verified POI/attraction ranking, live sensor-driven Compass navigation, and the Together group feature.
+- **Non-Android fallback:** Desktop and Web hosts without a live map/location adapter retain the bundled sample map and sample generator unless connected to a routing backend.
 
 ## Screen requirements
 
@@ -142,7 +140,7 @@ Collect a valid starting location, positive whole minutes, and at least one supp
 
 Topographic options add target altitude, acceptable elevation gain, and terrain preferences when supported. The optional points-of-interest list can contain places the user would like the generator to include. Required stops and suggested stops should be distinguished so a suggested place does not silently become a hard constraint.
 
-Example request: вЂњI have two hours, I am starting at John Abbott College, I can walk and use public transit, and I want to discover somewhere unusual.вЂќ
+Example request: “I have two hours, I am starting at John Abbott College, I can walk and use public transit, and I want to discover somewhere unusual.”
 
 ### Generated trip preview
 
@@ -164,7 +162,7 @@ Later versions may recalculate when transit is delayed, a place is closed, the u
 
 ### Review trip
 
-Open the review page after an adventure is completed or explicitly ended. Offer an overall **1вЂ“5 star rating** and a short written review. The user may skip either. The proposed star scale should be confirmed during interface design.
+Open the review page after an adventure is completed or explicitly ended. Offer an overall **1–5 star rating** and a short written review. The user may skip either. The proposed star scale should be confirmed during interface design.
 
 Retain the source document's detailed feedback on individual route legs and attractions: single tap selects a leg and opens its information; double tap can like it; dislike is available from the information panel. Leg feedback may cover walking, cycling, transit, streets, parks, waterfronts, viewpoints, and attractions. Distinguish liked and disliked sections visually and with labels.
 
@@ -182,7 +180,7 @@ History records what happened. Favorites record routes or places that the user d
 
 ### Preferences and settings
 
-Transportation preferences include walking, bicycle, bus, Metro, train, and REM; car remains undecided. Adventure categories include popular attractions, hidden places, parks, architecture, food and cafГ©s, historic locations, nature, street art, waterfronts, interesting streets, and random exploration.
+Transportation preferences include walking, bicycle, bus, Metro, train, and REM; car remains undecided. Adventure categories include popular attractions, hidden places, parks, architecture, food and cafés, historic locations, nature, street art, waterfronts, interesting streets, and random exploration.
 
 Restrictions include maximum walking and cycling distances, maximum duration, budget, avoiding highways or stairs, wheelchair accessibility, preferred bicycle infrastructure, indoor/outdoor choices, and late-night preferences. Elevation preferences add altitude and terrain requirements.
 
@@ -192,9 +190,9 @@ General settings include language, units, notifications, location permissions, p
 
 Profile can show username, image, completed-trip count, total distance and exploration time, visited neighbourhoods, and favorite modes, categories, and places. Account details and password controls belong here when authentication is implemented.
 
-About is reached through Profile and introduces Caio, Artiom, and Jimmy using the existing photographs. Keep the provided вЂњWe make stuffвЂќ copy until the team supplies biographies.
+About is reached through Profile and introduces Caio, Artiom, and Jimmy using the existing photographs. Keep the provided “We make stuff” copy until the team supplies biographies.
 
-Optional achievements include visiting ten MontrГ©al neighbourhoods, using every Metro line, completing 100 kilometres, visiting major parks, and completing trips with three transportation methods. Achievements are outside the initial proposed MVP.
+Optional achievements include visiting ten Montréal neighbourhoods, using every Metro line, completing 100 kilometres, visiting major parks, and completing trips with three transportation methods. Achievements are outside the initial proposed MVP.
 
 ### Local group adventures
 
@@ -204,7 +202,7 @@ Joining and leaving a session should be explicit. Keep the group's route underst
 
 As a **nice-to-have extension**, give the group a shared quest pool. Quests might ask members to reach a viewpoint, find public art, or visit selected places. Support cooperative completion or a competitive game inspired by Jet Lag. Scoring, completion evidence, teams, and deadlines remain design decisions.
 
-вЂњLocal multiplayerвЂќ currently means nearby people taking an adventure together. Whether it uses a shared online service, local network, or direct device communication is undecided; offline multiplayer is not yet a requirement.
+“Local multiplayer” currently means nearby people taking an adventure together. Whether it uses a shared online service, local network, or direct device communication is undecided; offline multiplayer is not yet a requirement.
 
 ## Trip generation design
 
@@ -353,16 +351,16 @@ Further possibilities from the source document include real-time replanning, wea
 - Final star scale, review-text length, and treatment of external place ratings.
 - Group connection method, group size, mixed preferences, host departure, and reconnect behavior.
 - Quest rules, scoring, teams, and evidence of completion for optional competitive play.
-- Maybe we should add sort of sorting or filter on user's type of stm pass/ticket + price maybe
+- Optional filtering or sorting by STM fare pass/ticket type and trip cost.
 
 ## Source references
 
-Proposal alignment source supplied for this revision: `E:/CLouD MAIL/RNDTransitMTL_Milestone2_Proposal_Final (1).pdf`. The October 27 main-screen and foundations decisions supersede its older route-expansion and palette descriptions.
+Proposal alignment source supplied for this revision: the team's Milestone 2 proposal (`RNDTransitMTL_Milestone2_Proposal_Final`). The October 27 main-screen and foundations decisions supersede its older route-expansion and palette descriptions.
 
-The base concept, original screen requirements, generator design, and nine core entities come from `TransitRandomizer_MTL_ed (3).docx`, supplied from `E:/CLouD MAIL/TransitRandomizer_MTL_ed (3).docx`. The shake compass, direction-only view, category-led adventures, optional place list, topographic altitude targeting, local group adventures, optional quests, editable history, and stars with a short review incorporate the team's added feature ideas.
+The base concept, original screen requirements, generator design, and nine core entities come from the team's original `TransitRandomizer_MTL` Word specification. The shake compass, direction-only view, category-led adventures, optional place list, topographic altitude targeting, local group adventures, optional quests, editable history, and stars with a short review incorporate the team's added feature ideas.
 
 The original navigation flow is retained as a product-journey reference. The current top-bar layout and additional compass/group features are defined in this document.
 
 ![Original navigation and adventure journey diagram](assets/main-design/navigation-reference.png)
 
-Related project documentation: [navigation implementation](navigation.md), [app colors](colours.md), and [Material Symbols resources](material-symbols.md).
+Related project documentation: [coding guidelines and architecture](HowToWriteCode_InTheProject.md), [app colours](colours.md), [live GPS and debug simulation](RunTripSimulation.md), [one-way, round-trip and return journeys](ReturnTrips.md), and [location accuracy help](LocationAccuracy.md).
