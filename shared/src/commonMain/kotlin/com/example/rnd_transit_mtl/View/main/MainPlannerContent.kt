@@ -1,14 +1,8 @@
 package com.example.rnd_transit_mtl.View.main
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.AnchoredDraggableState
 import androidx.compose.foundation.gestures.DraggableAnchors
 import androidx.compose.foundation.gestures.Orientation
@@ -23,14 +17,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -46,35 +36,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import com.example.rnd_transit_mtl.View.main.components.GOBox
 import com.example.rnd_transit_mtl.View.main.components.GoBoxCompactHeight
+import com.example.rnd_transit_mtl.View.main.components.PlannerDragStripHeight
 import com.example.rnd_transit_mtl.View.main.components.PlannerPreferenceBands
+import com.example.rnd_transit_mtl.View.main.components.PlannerSheetDragHandle
 import com.example.rnd_transit_mtl.View.main.components.PlannerTripTypeBand
 import com.example.rnd_transit_mtl.data.generation.TripGenerationBounds
 import com.example.rnd_transit_mtl.data.location.LocalPlannerLocation
@@ -85,8 +61,6 @@ import com.example.rnd_transit_mtl.model.transport.TransportType
 import com.example.rnd_transit_mtl.model.trip.Place
 import com.example.rnd_transit_mtl.model.trip.TripPoint
 import com.example.rnd_transit_mtl.state.NullableTransportIdSaver
-import com.example.rnd_transit_mtl.ui.global_ui_ellements.location.LocationAccuracyNotice
-import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.LocalTransitMap
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMap
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMapData
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.plannerTripBounds
@@ -102,34 +76,15 @@ import rnd_transit_mtl.shared.generated.resources.Res
 import rnd_transit_mtl.shared.generated.resources.map_sample
 
 // Layout settings — widths/padding in dp; fractions and reference coordinates keep the sheet responsive.
+// Sheet stops live in PlannerSheetGeometry.kt; drag-handle size lives in components/PlannerSheetDragHandle.kt.
 private val PlannerSheetMaxWidth = 620.dp
 private val PlannerGoBoxHorizontalPadding = 24.dp
-private val PlannerOriginFieldHorizontalPadding = 16.dp
-private val PlannerOriginFieldTopPadding = 16.dp
-private val PlannerDragHandleWidth = 42.dp
-private val PlannerDragHandleHeight = 4.dp
-private val PlannerDragStripHeight = 16.dp
 private val PlannerMapTitleClearance = 128.dp
 private const val PlannerReferenceWidth = 412f
-private const val PlannerReferenceViewportHeight = 800f
 private const val PlannerMinimumScale = 0.7f
 private const val PlannerMaximumScale = 1.5f
-private const val PlannerMainSheetTop = 400f
-private const val PlannerRoutesSheetTop = 256f
-private const val PlannerPreferencesSheetTop = 100f
-private const val PlannerShortWindowTopFraction = 0.3f
-private const val PlannerGoCollapsedGap = 10f
-private const val PlannerGoMainGap = 24f
-private const val PlannerGoRoutesGap = 7f
-private const val PlannerGoPreferencesGap = 12f
 
-// Animation settings — larger millisecond values make snapping and handle taps slower.
-private const val PLANNER_SHEET_ANIMATION_DURATION_MILLIS = 300
-private const val PLANNER_ORIGIN_FIELD_ANIMATION_DURATION_MILLIS = 300
-// GO exit timing is shared with navigation/footer transitions: edit ui/global_ui_ellements/transitions/TripTransition.kt.
-
-/** The three Figma layouts plus a bottom stop that exposes the full map. */
-internal enum class PlannerSheetPosition { Main, Routes, Preferences, Collapsed }
+// Animation settings — sheet snap timing lives in PlannerSheetGeometry.kt; GO exit timing lives in TripTransition.kt.
 
 /**
  * Displays a pannable map and four draggable preference positions.
@@ -426,263 +381,4 @@ internal fun MainPlannerContent(
                 .graphicsLayer { alpha = controlsOpacity.value },
         )
     }
-}
-
-/** Coordinates vertical scrolling inside the preferences list with anchored sheet dragging. */
-@Composable
-private fun rememberPlannerSheetNestedScroll(
-    sheet: AnchoredDraggableState<PlannerSheetPosition>,
-    list: LazyListState,
-    enabled: Boolean,
-): NestedScrollConnection {
-    val currentEnabled by rememberUpdatedState(enabled)
-    return remember(sheet, list) {
-        object : NestedScrollConnection {
-            private var movedSheet = false
-
-            private fun consume(delta: Float): Offset {
-                val consumed = sheet.dispatchRawDelta(delta)
-                movedSheet = movedSheet || consumed != 0f
-                return Offset(0f, consumed)
-            }
-
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                if (!currentEnabled || source != NestedScrollSource.UserInput) return Offset.Zero
-                return if (available.y < 0f || !list.canScrollBackward) consume(available.y) else Offset.Zero
-            }
-
-            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset =
-                if (currentEnabled && source == NestedScrollSource.UserInput) consume(available.y) else Offset.Zero
-
-            override suspend fun onPreFling(available: Velocity): Velocity {
-                if (!currentEnabled || !movedSheet) return Velocity.Zero
-                movedSheet = false
-                sheet.settle(tween(PLANNER_SHEET_ANIMATION_DURATION_MILLIS))
-                return available
-            }
-
-            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-                if (!currentEnabled || !movedSheet) return Velocity.Zero
-                movedSheet = false
-                sheet.settle(tween(PLANNER_SHEET_ANIMATION_DURATION_MILLIS))
-                return available
-            }
-        }
-    }
-}
-
-/** Animated starting-point field, origin availability status, and inline accuracy notice. */
-@Composable
-private fun PlannerOriginOverlay(
-    visible: Boolean,
-    scale: Float,
-    originValue: String,
-    originStatus: String?,
-    enabled: Boolean,
-    onEditOrigin: () -> Unit,
-    onMeasuredHeight: (Int) -> Unit,
-) {
-    AnimatedVisibility(
-        visible = visible,
-        enter = slideInVertically(
-            animationSpec = tween(PLANNER_ORIGIN_FIELD_ANIMATION_DURATION_MILLIS),
-            initialOffsetY = { -it },
-        ) + fadeIn(tween(PLANNER_ORIGIN_FIELD_ANIMATION_DURATION_MILLIS)),
-        exit = slideOutVertically(
-            animationSpec = tween(PLANNER_ORIGIN_FIELD_ANIMATION_DURATION_MILLIS),
-            targetOffsetY = { -it },
-        ) + fadeOut(tween(PLANNER_ORIGIN_FIELD_ANIMATION_DURATION_MILLIS)),
-        modifier = Modifier
-            .padding(horizontal = PlannerOriginFieldHorizontalPadding * scale)
-            .offset(y = PlannerOriginFieldTopPadding * scale),
-    ) {
-        Column(Modifier.onSizeChanged { onMeasuredHeight(it.height) }) {
-            TripLabelValueField(
-                label = "Starting point",
-                value = originValue,
-                showLocationIcon = true,
-                modifier = Modifier.clickable(
-                    enabled = enabled,
-                    role = Role.Button,
-                    onClickLabel = "Choose starting point",
-                    onClick = onEditOrigin,
-                ),
-            )
-            if (originStatus != null) {
-                Surface(color = TransitWhite, shape = RoundedCornerShape(4.dp)) {
-                    Text(
-                        originStatus,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        color = TransitComplementary,
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                }
-            }
-            LocationAccuracyNotice(Modifier.padding(top = 8.dp), enabled = enabled)
-        }
-    }
-}
-
-/** Attribution pill positioned above the GO bar when sufficient map viewport is visible. */
-@Composable
-private fun PlannerMapAttributionBadge(
-    goTopPx: Float,
-    density: androidx.compose.ui.unit.Density,
-) {
-    val liveMap = LocalTransitMap.current != null
-    val uriHandler = LocalUriHandler.current
-    Surface(
-        modifier = Modifier
-            .offset { IntOffset(0, (goTopPx - with(density) { 22.dp.toPx() }).roundToInt()) }
-            .padding(start = 8.dp)
-            .then(
-                if (liveMap) Modifier.clickable { uriHandler.openUri("https://openfreemap.org/quick_start/") }
-                else Modifier,
-            ),
-        color = TransitWhite,
-        shape = RoundedCornerShape(4.dp),
-    ) {
-        Text(
-            if (liveMap) "OpenFreeMap" else "© OpenStreetMap contributors · Sample map",
-            color = TransitComplementary,
-            style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.padding(horizontal = 4.dp),
-        )
-    }
-}
-
-/** Tappable, keyboard-navigable, and screen-reader accessible drag handle for the preferences sheet. */
-@Composable
-private fun PlannerSheetDragHandle(
-    currentTarget: PlannerSheetPosition,
-    dragStripHeight: Dp,
-    scale: Float,
-    enabled: Boolean,
-    onMoveSheet: (PlannerSheetPosition) -> Unit,
-) {
-    fun expandSheet() {
-        onMoveSheet(
-            when (currentTarget) {
-                PlannerSheetPosition.Collapsed -> PlannerSheetPosition.Main
-                PlannerSheetPosition.Main -> PlannerSheetPosition.Routes
-                PlannerSheetPosition.Routes -> PlannerSheetPosition.Preferences
-                PlannerSheetPosition.Preferences -> PlannerSheetPosition.Preferences
-            },
-        )
-    }
-
-    fun collapseSheet() {
-        onMoveSheet(
-            when (currentTarget) {
-                PlannerSheetPosition.Collapsed, PlannerSheetPosition.Main -> PlannerSheetPosition.Collapsed
-                PlannerSheetPosition.Routes -> PlannerSheetPosition.Main
-                PlannerSheetPosition.Preferences -> PlannerSheetPosition.Routes
-            },
-        )
-    }
-
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(dragStripHeight)
-            .background(TransitComplementary)
-            .onPreviewKeyEvent { event ->
-                if (!enabled || event.type != KeyEventType.KeyDown) false
-                else when (event.key) {
-                    Key.DirectionUp -> { expandSheet(); true }
-                    Key.DirectionDown -> { collapseSheet(); true }
-                    Key.MoveHome -> { onMoveSheet(PlannerSheetPosition.Collapsed); true }
-                    Key.MoveEnd -> { onMoveSheet(PlannerSheetPosition.Preferences); true }
-                    else -> false
-                }
-            }
-            .clickable(
-                enabled = enabled,
-                role = Role.Button,
-                onClickLabel = "Expand or collapse preferences",
-            ) {
-                onMoveSheet(
-                    when (currentTarget) {
-                        PlannerSheetPosition.Collapsed -> PlannerSheetPosition.Main
-                        PlannerSheetPosition.Main -> PlannerSheetPosition.Routes
-                        PlannerSheetPosition.Routes -> PlannerSheetPosition.Preferences
-                        PlannerSheetPosition.Preferences -> PlannerSheetPosition.Collapsed
-                    },
-                )
-            }
-            .semantics {
-                contentDescription = "Trip preferences"
-                stateDescription = currentTarget.name
-                customActions = listOf(
-                    CustomAccessibilityAction("Expand preferences") {
-                        if (enabled) expandSheet()
-                        enabled
-                    },
-                    CustomAccessibilityAction("Collapse preferences") {
-                        if (enabled) collapseSheet()
-                        enabled
-                    },
-                )
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(
-            Modifier
-                .size(PlannerDragHandleWidth * scale, PlannerDragHandleHeight * scale)
-                .background(TransitWhite, RoundedCornerShape(2.dp)),
-        )
-    }
-}
-
-/** Pixel positions of the sheet stops and GO gaps. */
-internal data class PlannerSheetGeometry(
-    val collapsed: Float,
-    val main: Float,
-    val routes: Float,
-    val preferences: Float,
-    val scalePx: Float,
-) {
-    /**
-     * Interpolates the Figma spacing so GO follows the handle continuously.
-     *
-     * @param offset Current sheet-handle offset in pixels.
-     * @return Vertical gap in pixels between GO and the sheet handle.
-     */
-    fun goGap(offset: Float): Float = if (offset >= main) {
-        val fraction = ((collapsed - offset) / (collapsed - main).coerceAtLeast(1f)).coerceIn(0f, 1f)
-        (PlannerGoCollapsedGap + (PlannerGoMainGap - PlannerGoCollapsedGap) * fraction) * scalePx
-    } else if (offset >= routes) {
-        val fraction = ((offset - routes) / (main - routes)).coerceIn(0f, 1f)
-        (PlannerGoRoutesGap + (PlannerGoMainGap - PlannerGoRoutesGap) * fraction) * scalePx
-    } else {
-        val fraction = ((offset - preferences) / (routes - preferences)).coerceIn(0f, 1f)
-        (PlannerGoPreferencesGap + (PlannerGoRoutesGap - PlannerGoPreferencesGap) * fraction) * scalePx
-    }
-}
-
-/**
- * Fits Figma handle positions below the existing header, preserving usable space on short windows.
- *
- * @param heightPx Available viewport height below the shared header.
- * @param scalePx Pixels per Figma reference unit, including density and responsive width scaling.
- * @return Calculated sheet stop anchors and scale factor.
- */
-internal fun plannerSheetGeometry(heightPx: Float, scalePx: Float): PlannerSheetGeometry {
-    val top = (PlannerPreferencesSheetTop * scalePx).coerceAtMost(heightPx * PlannerShortWindowTopFraction)
-    // Leave the handle visible at the bottom so the preferences can be reopened.
-    val remaining = (heightPx - top).coerceAtLeast(1f)
-    val main = top + remaining * (
-        (PlannerMainSheetTop - PlannerPreferencesSheetTop) /
-            (PlannerReferenceViewportHeight - PlannerPreferencesSheetTop)
-    )
-    return PlannerSheetGeometry(
-        collapsed = (heightPx - PlannerDragStripHeight.value * scalePx).coerceAtLeast(main),
-        main = main,
-        routes = top + remaining * (
-            (PlannerRoutesSheetTop - PlannerPreferencesSheetTop) /
-                (PlannerReferenceViewportHeight - PlannerPreferencesSheetTop)
-        ),
-        preferences = top,
-        scalePx = scalePx,
-    )
 }

@@ -14,8 +14,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.yield
 import kotlin.test.*
 
-/** Checks the supplied screens and their explicit, parent-owned actions. */
-class TripScreensV3Test {
+/** Checks post-trip completion, required review rating, leg feedback, and history/details actions. */
+class PostTripReviewAndHistoryInteractionTest {
     @OptIn(ExperimentalComposeUiApi::class)
     @Test
     fun screensRenderAndReviewRequiresStars() = runBlocking(Dispatchers.Main) {

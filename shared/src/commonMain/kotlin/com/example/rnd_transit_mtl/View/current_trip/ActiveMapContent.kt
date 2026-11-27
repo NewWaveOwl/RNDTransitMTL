@@ -37,22 +37,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.rnd_transit_mtl.data.assets.toSampleMapPoint
 import com.example.rnd_transit_mtl.data.trips.LocalCloudTrips
 import com.example.rnd_transit_mtl.model.geo.GeoPoint
-import com.example.rnd_transit_mtl.model.geo.uncertaintyRing
 import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.model.trip.TripJourneyKind
 import com.example.rnd_transit_mtl.model.trip.compactGuidanceAt
-import com.example.rnd_transit_mtl.model.trip.explorationWaypoints
 import com.example.rnd_transit_mtl.model.trip.guidanceAt
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.location.LocationAccuracyNotice
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.LocalTransitMap
-import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.MockTripMap
-import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMap
-import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMapData
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.rememberAnimatedMapPosition
-import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.toSampleMapLegs
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.transitions.tripPanelEntrance
 import com.example.rnd_transit_mtl.ui.theme.TransitComplementary
 import com.example.rnd_transit_mtl.ui.theme.TransitMain
@@ -440,114 +433,5 @@ private fun rememberSheetNestedScrollConnection(
             override suspend fun onPreFling(available: Velocity): Velocity =
                 if (latestDragEnabled && latestPanelExpansion < 1f) Velocity(0f, available.y) else Velocity.Zero
         }
-    }
-}
-
-/** Renders either the live platform map or the bundled fallback map for an active trip. */
-@Composable
-private fun ActiveMapSurface(
-    liveMap: Boolean,
-    trip: Trip,
-    retainedMapProgress: Float,
-    positionAvailable: Boolean,
-    renderedUserPosition: GeoPoint?,
-    userUncertaintyMeters: Double?,
-    simulationEnabled: Boolean,
-    recenterRequest: Int,
-    followPosition: Boolean,
-    mapInteractive: Boolean,
-    topInset: androidx.compose.ui.unit.Dp,
-    bottomInset: androidx.compose.ui.unit.Dp,
-    onManualCameraMove: () -> Unit,
-) {
-    if (liveMap) {
-        TransitMap(
-            data = TransitMapData(
-                trip = trip,
-                progress = retainedMapProgress.takeIf { positionAvailable },
-                userPosition = renderedUserPosition.takeIf { !simulationEnabled && positionAvailable },
-                userUncertaintyMeters = userUncertaintyMeters.takeIf { !simulationEnabled && positionAvailable },
-                simulatePosition = simulationEnabled,
-                recenterRequest = recenterRequest,
-                followPosition = followPosition,
-                onManualCameraMove = onManualCameraMove,
-                interactive = mapInteractive,
-                topInset = topInset,
-                bottomInset = bottomInset,
-                sharedTripFlow = true,
-                cameraInsetsReady = topInset > 0.dp && bottomInset > 0.dp,
-            ),
-            modifier = Modifier.fillMaxSize(),
-        ) {}
-    } else {
-        // Keep the bundled map's viewport fixed just like Android's shared map.
-        // The panel and directions are overlays, never map-size constraints.
-        MockTripMap(
-            start = trip.origin.toSampleMapPoint(),
-            destination = trip.destination.toSampleMapPoint(),
-            waypoints = trip.explorationWaypoints.map { it.toSampleMapPoint() },
-            legs = trip.toSampleMapLegs(),
-            progress = retainedMapProgress,
-            interactive = mapInteractive,
-            matchPlannerBackground = true,
-            followPosition = followPosition,
-            onManualCameraMove = onManualCameraMove,
-            showControls = false,
-            showPosition = positionAvailable,
-            userPosition = renderedUserPosition?.toSampleMapPoint("Your location")
-                .takeIf { !simulationEnabled && positionAvailable },
-            userUncertaintyRing = remember(renderedUserPosition, userUncertaintyMeters, simulationEnabled) {
-                if (simulationEnabled) emptyList()
-                else renderedUserPosition?.let { point ->
-                    userUncertaintyMeters?.let { radius ->
-                        point.uncertaintyRing(radius).map { it.toSampleMapPoint("Location uncertainty") }
-                    }
-                }.orEmpty()
-            },
-            recenterRequest = recenterRequest,
-            topInset = topInset,
-            bottomInset = bottomInset,
-            modifier = Modifier.fillMaxSize(),
-        )
-    }
-}
-
-/** Displays location-status warnings when tracking is stale, missing, or missing permissions. */
-@Composable
-private fun ActiveMapLocationWarning(
-    locationState: TripLocationState,
-    staleMessage: String?,
-) {
-    when (locationState) {
-        TripLocationState.Stale -> TripWarning(
-            title = "Location is not updating",
-            detail = staleMessage ?: "No fresh location reading for over 30 seconds. Route remains available.",
-        )
-
-        TripLocationState.Missing -> TripWarning(
-            title = "Location unavailable",
-            detail = "Your saved route remains available.",
-        )
-
-        TripLocationState.Sample, TripLocationState.Live -> {
-            if (staleMessage != null) {
-                TripWarning(
-                    title = if (locationState == TripLocationState.Sample) "Location not updating" else "Check your route",
-                    detail = staleMessage,
-                )
-            }
-        }
-
-        TripLocationState.PermissionDenied -> TripWarning(
-            title = "Location permission needed",
-            detail = "Tap recenter to allow location access.",
-        )
-
-        TripLocationState.NotTracking,
-        TripLocationState.Waiting,
-        TripLocationState.LastKnown,
-        TripLocationState.LowAccuracy,
-        TripLocationState.MatchedLowAccuracy,
-        -> Unit
     }
 }

@@ -38,7 +38,14 @@ private val DestinationFlagStrokeWidth = 2.dp
 private val TripDotStrokeWidth = 2.dp
 private val AccuracyRingOutlineWidth = 1.5.dp
 
-/** Renders a circular MapLibre dot marker for a geographic coordinate. */
+/**
+ * Renders a circular MapLibre dot marker layer for a geographic coordinate.
+ *
+ * @param id Unique MapLibre layer identifier for the circle layer.
+ * @param point Geographic coordinate in WGS84 decimal degrees (`latitude`, `longitude`), serialized as GeoJSON `[longitude, latitude]`.
+ * @param color Fill color of the circle marker.
+ * @param radius Circle radius in dp (rendered with a white [TripDotStrokeWidth] outline).
+ */
 @Composable
 internal fun TripDot(
     id: String,
@@ -59,7 +66,12 @@ internal fun TripDot(
     )
 }
 
-/** Draws the translucent yellow GPS uncertainty ring polygon around [point]. */
+/**
+ * Draws the translucent yellow GPS uncertainty ring polygon around [point].
+ *
+ * @param point Centre coordinate in WGS84 decimal degrees (`latitude`, `longitude`).
+ * @param meters Horizontal GPS uncertainty radius in metres; callers pass finite positive values.
+ */
 @Composable
 internal fun AccuracyArea(point: GeoPoint, meters: Double) {
     val ring = remember(point, meters) {
@@ -77,7 +89,13 @@ internal fun AccuracyArea(point: GeoPoint, meters: Double) {
     )
 }
 
-/** Draws the directional orange/blue user pointer overlay at [point]. */
+/**
+ * Draws the directional orange/blue user pointer overlay at [point].
+ *
+ * @receiver MapLibre overlay scope positioning composable markers over the map viewport.
+ * @param point User coordinate in WGS84 decimal degrees (`latitude`, `longitude`).
+ * @param rotation Clockwise screen-space heading rotation in degrees relative to the top of the viewport (`0f` points up).
+ */
 @Composable
 internal fun MapOverlayScope.UserPointer(point: GeoPoint, rotation: Float = 0f) {
     val pointer = painterResource(Res.drawable.map_user_pointer_marker)
@@ -86,7 +104,12 @@ internal fun MapOverlayScope.UserPointer(point: GeoPoint, rotation: Float = 0f) 
     }
 }
 
-/** Draws the starting-point pin overlay at [point]. */
+/**
+ * Draws the starting-point pin overlay at [point].
+ *
+ * @receiver MapLibre overlay scope positioning composable markers over the map viewport.
+ * @param point Starting-point coordinate in WGS84 decimal degrees (`latitude`, `longitude`).
+ */
 @Composable
 internal fun MapOverlayScope.OriginMarker(point: GeoPoint) {
     Image(
@@ -96,7 +119,12 @@ internal fun MapOverlayScope.OriginMarker(point: GeoPoint) {
     )
 }
 
-/** Draws the yellow destination flag marker overlay at [point]. */
+/**
+ * Draws the yellow destination flag marker overlay at [point].
+ *
+ * @receiver MapLibre overlay scope positioning composable markers over the map viewport.
+ * @param point Destination or waypoint coordinate in WGS84 decimal degrees (`latitude`, `longitude`).
+ */
 @Composable
 internal fun MapOverlayScope.DestinationMarker(point: GeoPoint) {
     Canvas(Modifier.placedAt(point.position()).size(DestinationMarkerSize)) {
@@ -116,23 +144,49 @@ internal fun MapOverlayScope.DestinationMarker(point: GeoPoint) {
     }
 }
 
-/** Computes clamped top/bottom camera padding that never exceeds the viewport [height]. */
+/**
+ * Computes clamped top and bottom camera padding so insets never collapse the viewport [height].
+ *
+ * @receiver Map presentation configuration supplying requested `topInset` and `bottomInset` in dp.
+ * @param height Total MapLibre viewport height in dp.
+ * @return Clamped [DpPadding] in dp preserving at least `1.dp` of unobstructed height when [height] allows.
+ */
 internal fun TransitMapData.visibleMapPadding(height: Dp): DpPadding {
     val maxInset = (height - 1.dp).coerceAtLeast(0.dp)
     val top = topInset.coerceIn(0.dp, maxInset)
     return DpPadding(top = top, bottom = bottomInset.coerceIn(0.dp, maxInset - top))
 }
 
-/** Converts a [GeoPoint] to a MapLibre [Position] (`longitude`, `latitude`). */
+/**
+ * Converts a [GeoPoint] to a MapLibre Spatial-K [Position].
+ *
+ * @receiver Geographic coordinate in WGS84 decimal degrees (`latitude`, `longitude`).
+ * @return Spatial-K [Position] ordered `(longitude, latitude)` in decimal degrees.
+ */
 internal fun GeoPoint.position(): Position = Position(longitude, latitude)
 
-/** Serializes a [GeoPoint] as a GeoJSON `[longitude,latitude]` coordinate pair. */
+/**
+ * Formats a [GeoPoint] as a RFC 7946 GeoJSON coordinate pair.
+ *
+ * @receiver Geographic coordinate in WGS84 decimal degrees (`latitude`, `longitude`).
+ * @return GeoJSON coordinate array literal `"[longitude,latitude]"` in decimal degrees.
+ */
 internal fun GeoPoint.coordinates(): String = "[$longitude,$latitude]"
 
-/** Serializes a list of [RouteLeg] geometries into a GeoJSON `MultiLineString`. */
+/**
+ * Serializes the polylines of [legs] into a GeoJSON `MultiLineString`.
+ *
+ * @param legs Ordered route legs whose WGS84 [GeoPoint] geometries (`latitude`, `longitude`) are rendered.
+ * @return RFC 7946 GeoJSON `MultiLineString` object string with `[longitude,latitude]` coordinate pairs.
+ */
 internal fun routeGeoJson(legs: List<RouteLeg>): String = linesGeoJson(legs.map { it.geometry })
 
-/** Serializes coordinate polylines into a GeoJSON `MultiLineString`. */
+/**
+ * Serializes multiple coordinate polylines into a GeoJSON `MultiLineString`.
+ *
+ * @param geometry Polylines of WGS84 [GeoPoint] coordinates (`latitude`, `longitude`).
+ * @return RFC 7946 GeoJSON `MultiLineString` object string with `[longitude,latitude]` coordinate pairs.
+ */
 internal fun linesGeoJson(geometry: List<List<GeoPoint>>): String {
     val lines = geometry.joinToString(",") { line ->
         line.joinToString(",", prefix = "[", postfix = "]") { it.coordinates() }
@@ -143,10 +197,10 @@ internal fun linesGeoJson(geometry: List<List<GeoPoint>>): String {
 /**
  * Interpolates a geographic position along route [segments] at normalized [progress] (`0f..1f`).
  *
- * @param segments Consecutive coordinate pairs forming the route geometry.
- * @param distances Precomputed segment lengths in metres matching [segments].
- * @param progress Fraction along the total route length from `0f` to `1f`.
- * @return Interpolated coordinate, or null when [segments] is empty.
+ * @param segments Consecutive WGS84 [GeoPoint] pairs (`latitude`, `longitude`) forming the route geometry.
+ * @param distances Precomputed segment lengths in metres matching [segments] by index.
+ * @param progress Normalized fraction along the total route length, clamped to `0f..1f`.
+ * @return Interpolated WGS84 [GeoPoint] in decimal degrees, or null when [segments] is empty.
  */
 internal fun positionAlongRoute(
     segments: List<Pair<GeoPoint, GeoPoint>>,

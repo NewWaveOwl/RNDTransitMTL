@@ -32,7 +32,7 @@ import kotlin.test.*
 
 /** Checks source-image picking, camera-only panning, and the Figma permission controls. */
 @OptIn(ExperimentalComposeUiApi::class)
-class PlannerOriginUiTest {
+class OriginSelectionInteractionTest {
     @Test
     fun sheetAccessibilityActionsHideAndRestoreMapControls() = runBlocking(Dispatchers.Main) {
         var edited = 0

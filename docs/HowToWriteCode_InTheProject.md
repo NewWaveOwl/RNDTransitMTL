@@ -83,7 +83,7 @@ private val TransportButtonWidthFraction = 1f // 0.9f uses 90% of its responsive
 private const val PREFERENCE_DROPDOWN_ANIMATION_DURATION_MILLIS = 500
 ```
 
-Current tuning locations: `View/main/MainPlannerContent.kt` for sheet width, GO margins, drag-handle size and sheet motion; `View/main/components/PlannerPreferenceBands.kt` for transport/zone/walking/attraction button widths and dropdown timing; `View/main/components/GOBox.kt` and `View/main/components/ScrollableMinutes.kt` for time selector and GO button dimensions; `View/main/components/IntensityPanel.kt` and `View/main/components/IntensitySlider.kt` for slider sizing and side padding; `View/landing/LandingContent.kt` for landing form width; and `layout/SharedTopBar.kt` for header button widths.
+Current tuning locations: `View/main/MainPlannerContent.kt` for sheet width and GO margins; `View/main/PlannerSheetGeometry.kt` and `View/main/components/PlannerSheetDragHandle.kt` for drag-handle size, stops and sheet motion; `View/main/components/PlannerPreferenceBands.kt` for transport/zone/walking/attraction button widths and dropdown timing; `View/main/components/GOBox.kt` and `View/main/components/ScrollableMinutes.kt` for time selector and GO button dimensions; `View/main/components/IntensityPanel.kt` and `View/main/components/IntensitySlider.kt` for slider sizing and side padding; `View/landing/LandingContent.kt` for landing form width; and `layout/SharedTopBar.kt` for header button widths.
 
 ## 2. Course structure and coverage
 
@@ -182,6 +182,9 @@ rnd_transit_mtl/
 │   │   ├── MainScreen.kt
 │   │   ├── MainPlannerContent.kt
 │   │   ├── OriginSelectionContent.kt
+│   │   ├── PlannerOriginOverlay.kt
+│   │   ├── PlannerMapAttributionBadge.kt
+│   │   ├── PlannerSheetGeometry.kt
 │   │   ├── FigmaOriginMap.kt
 │   │   ├── FigmaRecenterButton.kt
 │   │   ├── ProposalGuard.kt
@@ -195,6 +198,7 @@ rnd_transit_mtl/
 │   │   ├── TripProposalContent.kt
 │   │   ├── components/
 │   │   │   ├── PlannerPreferenceBands.kt
+│   │   │   ├── PlannerSheetDragHandle.kt
 │   │   │   ├── BikeSpeedPanel.kt
 │   │   │   ├── GOBox.kt
 │   │   │   ├── ScrollableMinutes.kt
@@ -213,6 +217,8 @@ rnd_transit_mtl/
 │   │   ├── ActiveMapContent.kt
 │   │   ├── ActiveMapDialogs.kt
 │   │   ├── ActiveMapDirectionsBanner.kt
+│   │   ├── ActiveMapLocationWarning.kt
+│   │   ├── ActiveMapSurface.kt
 │   │   ├── ArrivalCelebration.kt
 │   │   ├── BackAtStartContent.kt
 │   │   ├── CurrentTripScreen.kt
