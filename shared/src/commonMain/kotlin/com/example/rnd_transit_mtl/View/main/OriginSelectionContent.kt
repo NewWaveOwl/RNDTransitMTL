@@ -1,6 +1,5 @@
 package com.example.rnd_transit_mtl.View.main
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -18,8 +17,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -39,6 +36,7 @@ import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
 import com.example.rnd_transit_mtl.model.trip.TripPoint
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.buttons.TripFlowButton
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMap
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.TransitMapData
 import com.example.rnd_transit_mtl.ui.theme.TransitComplementary
@@ -53,8 +51,6 @@ import rnd_transit_mtl.shared.generated.resources.rnd_warning
 private val OriginPanelMaxWidth = 620.dp
 private val OriginPanelHorizontalPadding = 24.dp
 private val OriginPanelSpacing = 16.dp
-private val OriginActionMinimumHeight = 52.dp
-private val OriginActionCornerRadius = 24.dp
 private const val OriginPanelTopFraction = 390f / 716f
 private val OriginPickerPanelMinimumHeight = 280.dp
 private const val OriginPickerMapMinimumFraction = 0.3f
@@ -257,12 +253,12 @@ private fun OriginSelectionSheet(
         )
 
         if (picking) {
-            OriginAction(
+            TripFlowButton(
                 label = "Start here",
                 onClick = onConfirm,
                 enabled = enabled && (origin != null || draftLabel != null),
             )
-            OriginAction(
+            TripFlowButton(
                 label = "Cancel",
                 onClick = onBack,
                 enabled = enabled,
@@ -275,8 +271,8 @@ private fun OriginSelectionSheet(
                 fontSize = 12.sp,
             )
         } else {
-            OriginAction("Choose a point on the map", onChooseMap, enabled)
-            OriginAction(
+            TripFlowButton("Choose a point on the map", onChooseMap, enabled)
+            TripFlowButton(
                 if (hasLiveMap) "Use my location" else "Try current location again",
                 onRetryLocation,
                 enabled,
@@ -292,28 +288,5 @@ private fun OriginSelectionSheet(
         if (!message.isNullOrBlank()) {
             Text(message, color = TransitComplementary, fontSize = 12.sp)
         }
-    }
-}
-
-/** Shared origin action styling; secondary actions use a white surface. */
-@Composable
-private fun OriginAction(
-    label: String,
-    onClick: () -> Unit,
-    enabled: Boolean,
-    secondary: Boolean = false,
-) {
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = Modifier.fillMaxWidth().heightIn(min = OriginActionMinimumHeight),
-        shape = RoundedCornerShape(OriginActionCornerRadius),
-        border = if (secondary) BorderStroke(1.dp, TransitMain) else null,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (secondary) TransitWhite else TransitMain,
-            contentColor = if (secondary) TransitMain else TransitWhite,
-        ),
-    ) {
-        Text(label, fontSize = 14.sp, fontWeight = FontWeight.Bold)
     }
 }

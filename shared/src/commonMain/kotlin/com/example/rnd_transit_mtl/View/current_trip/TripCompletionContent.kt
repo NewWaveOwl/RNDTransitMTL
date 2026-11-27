@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.model.trip.TripCompletionStatistics
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.buttons.TripFlowButton
 import com.example.rnd_transit_mtl.ui.theme.TransitComplementary
 import com.example.rnd_transit_mtl.ui.theme.TransitSelected
 import com.example.rnd_transit_mtl.ui.theme.TransitWhite
@@ -48,7 +49,7 @@ import rnd_transit_mtl.shared.generated.resources.rnd_distance_chevron
 import rnd_transit_mtl.shared.generated.resources.rnd_trip_complete
 
 // Layout settings — exact completion metrics and controls from Figma 371:2239 / 380:2800.
-// Shared action button height is defined in JourneyButton.kt; arrival animation timing in TripJourneySheet.kt.
+// Shared action button height is defined in TripFlowButton.kt; arrival animation timing in TripJourneySheet.kt.
 private val CompletionCheckSize = 48.dp
 private val CompletionIconSize = 24.dp
 private val CompletionMetricGap = 16.dp
@@ -141,12 +142,12 @@ internal fun TripCompletionContent(
         }
         if (returnControls != null) {
             returnControls()
-            JourneyButton("Trip Review", onReview, enabled, secondary = true)
+            TripFlowButton("Trip Review", onReview, enabled, secondary = true)
             Text("Review now to finish the trip without returning.", color = TransitWhite, fontSize = 12.sp)
         } else {
-            JourneyButton("Trip Review", onReview, enabled)
-            JourneyButton("Skip review — view history", onSkipToHistory, enabled, secondary = true)
-            JourneyButton("Plan another adventure", onPlanAnother, enabled, secondary = true)
+            TripFlowButton("Trip Review", onReview, enabled)
+            TripFlowButton("Skip review — view history", onSkipToHistory, enabled, secondary = true)
+            TripFlowButton("Plan another adventure", onPlanAnother, enabled, secondary = true)
         }
     }
 }

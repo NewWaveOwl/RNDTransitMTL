@@ -5,6 +5,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.semantics.*
+import com.example.rnd_transit_mtl.View.current_trip.TripCompletionContent
 import com.example.rnd_transit_mtl.View.history.previews.reviewedHistoryPreviewTrip
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.trip.*
 import com.example.rnd_transit_mtl.ui.theme.RNDTransitTheme
@@ -27,7 +28,7 @@ class PostTripReviewAndHistoryInteractionTest {
         val scene = ImageComposeScene(412, 720) {
             RNDTransitTheme {
                 when (mode) {
-                    0 -> CompleteV3(trip, { events += "review" }, { events += "skip" }, {}, syncPending = true)
+                    0 -> TripCompletionContent(trip, { events += "review" }, { events += "skip" }, {}, syncPending = true)
                     1 -> ReviewV3(trip.title, trip.id.value.takeLast(3), rating, "", { rating = it }, {},
                         { events += "save" }, {}, {}, {}, feedbackEnabled = false)
                     2 -> FeedbackV3(trip.id.value.takeLast(3), "Sample leg", "Preview fixture only", choice,

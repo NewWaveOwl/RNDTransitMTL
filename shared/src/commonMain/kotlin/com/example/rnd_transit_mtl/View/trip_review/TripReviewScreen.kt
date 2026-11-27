@@ -43,8 +43,6 @@ import kotlinx.coroutines.launch
  * @param onReturnToOrigin Returns to the previous destination after an edit review finishes.
  * @param modifier Parent layout constraints.
  * @param registerBackHandler Optional hook connecting the shared top bar back action to discard/close.
- * @param onOpenFeedback Optional callback for per-leg or per-place feedback.
- * @param feedbackAvailable Whether per-leg/place feedback navigation is enabled.
  */
 @Composable
 fun TripReviewScreen(
@@ -55,8 +53,6 @@ fun TripReviewScreen(
     onReturnToOrigin: () -> Boolean,
     modifier: Modifier = Modifier,
     registerBackHandler: RegisterReviewBackHandler? = null,
-    onOpenFeedback: () -> Unit = {},
-    feedbackAvailable: Boolean = false,
 ) {
     val tripsStore = LocalTripsStore.current
     val cloud = LocalCloudTrips.current

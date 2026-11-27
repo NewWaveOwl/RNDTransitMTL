@@ -10,9 +10,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
-import com.example.rnd_transit_mtl.View.current_trip.JourneyButton
 import com.example.rnd_transit_mtl.View.current_trip.TripCompletionContent
 import com.example.rnd_transit_mtl.View.history.previews.reviewedHistoryPreviewTrip
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.buttons.TripFlowButton
 import com.example.rnd_transit_mtl.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -34,7 +34,7 @@ class TripCompletionUiTest {
                     TripCompletionContent(reviewedHistoryPreviewTrip, { reviews++ }, {}, {},
                         modifier = Modifier.size(width.dp, height.dp), returnControls = {
                             Text("Return to starting point", color = TransitWhite)
-                            JourneyButton("Fastest way back", { returns++ }, true)
+                            TripFlowButton("Fastest way back", { returns++ }, true)
                         })
                 }
             }

@@ -54,6 +54,7 @@ import com.example.rnd_transit_mtl.ViewModels.current_trip.ReturnTransportOption
 import com.example.rnd_transit_mtl.ViewModels.current_trip.ReturnTripState
 import com.example.rnd_transit_mtl.model.ids.TransportId
 import com.example.rnd_transit_mtl.model.trip.Trip
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.buttons.TripFlowButton
 import com.example.rnd_transit_mtl.ui.theme.TransitComplementary
 import com.example.rnd_transit_mtl.ui.theme.TransitMain
 import com.example.rnd_transit_mtl.ui.theme.TransitSelected
@@ -213,7 +214,7 @@ private fun ReturnFindingBody(
     )
     ReturnSearchProgress()
     Text("${state.startLabel ?: outbound.destination.label} → ${outbound.origin.label}", color = TransitWhite, fontSize = 12.sp)
-    JourneyButton("Cancel return", onCancel, enabled, secondary = true)
+    TripFlowButton("Cancel return", onCancel, enabled, secondary = true)
 }
 
 /** Body shown once a return route proposal is ready for explicit confirmation. */
@@ -260,8 +261,8 @@ private fun ReturnReadyBody(
     )
     Text("Destination: ${outbound.origin.label}", color = TransitWhite, fontSize = 12.sp)
     if (!errorMessage.isNullOrBlank()) Text(errorMessage, color = TransitWhite, fontSize = 12.sp)
-    JourneyButton("Start return trip", onStart, enabled)
-    JourneyButton("Change return option", onCancel, enabled, secondary = true)
+    TripFlowButton("Start return trip", onStart, enabled)
+    TripFlowButton("Change return option", onCancel, enabled, secondary = true)
 }
 
 /** Body shown when no return route could be found, offering retry and option change. */
@@ -284,12 +285,12 @@ private fun ReturnUnavailableBody(
         color = TransitWhite,
         fontSize = 12.sp,
     )
-    JourneyButton(
+    TripFlowButton(
         if (state.option == ReturnTransportOption.Fastest) "Retry return route" else "Try fastest way back",
         { onFind(ReturnTransportOption.Fastest) },
         enabled,
     )
-    JourneyButton("Change return option", onCancel, enabled, secondary = true)
+    TripFlowButton("Change return option", onCancel, enabled, secondary = true)
 }
 
 /** Figma's split button exposing both Fastest and Same-transport return actions directly. */

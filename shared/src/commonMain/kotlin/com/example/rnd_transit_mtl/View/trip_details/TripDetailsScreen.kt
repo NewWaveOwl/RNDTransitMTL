@@ -15,7 +15,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalUriHandler
 import com.example.rnd_transit_mtl.View.history.formatTripTimestampUtc
 import com.example.rnd_transit_mtl.data.trips.LocalCloudTrips
 import com.example.rnd_transit_mtl.data.trips.tryCloudAction
@@ -48,7 +47,6 @@ fun TripDetailsScreen(
     modifier: Modifier = Modifier,
 ) {
     val tripsStore = LocalTripsStore.current
-    val uriHandler = LocalUriHandler.current
     val cloud = LocalCloudTrips.current
     val scope = rememberCoroutineScope()
     var storedTrip by remember(cloud, tripId) { mutableStateOf<Trip?>(null) }
@@ -190,23 +188,8 @@ fun TripDetailsScreen(
     TripDetailsContent(
         trip = null,
         onReturnToHistory = { if (latestDestinationActive) onReturnToHistory() },
-        onReview = reviewCallback,
-        onOpenImageReference = {
-            if (latestDestinationActive) {
-                val latestTrip = tripsStore.findCompleted(tripId)
-                if (latestTrip == null) {
-                    errorMessage = "This trip is no longer available."
-                } else {
-                    try {
-                        uriHandler.openUri(latestTrip.imageUrl)
-                        errorMessage = null
-                    } catch (_: Exception) {
-                        errorMessage = "The image reference could not be opened. " +
-                            "You can copy its URL from Trip information."
-                    }
-                }
-            }
-        },
+        onReview = null,
+        onOpenImageReference = {},
         actionsEnabled = isDestinationActive,
         errorMessage = errorMessage,
         modifier = modifier,

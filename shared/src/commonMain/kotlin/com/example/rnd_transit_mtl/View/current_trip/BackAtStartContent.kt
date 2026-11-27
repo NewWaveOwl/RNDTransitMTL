@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.rnd_transit_mtl.View.main.TripLabelValueField
 import com.example.rnd_transit_mtl.model.trip.Trip
+import com.example.rnd_transit_mtl.ui.global_ui_ellements.buttons.TripFlowButton
 import com.example.rnd_transit_mtl.ui.theme.TransitWhite
 
 // Layout settings — dp dimensions for the Figma back-at-start completion sheet.
@@ -79,8 +80,8 @@ internal fun BackAtStartContent(
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(BackAtStartActionSpacing)) {
-            JourneyButton("Trip Review", onReview, enabled, modifier = Modifier.weight(1f))
-            JourneyButton(
+            TripFlowButton("Trip Review", onReview, enabled, modifier = Modifier.weight(1f))
+            TripFlowButton(
                 "Skip",
                 onSkip,
                 enabled,
