@@ -2,7 +2,7 @@
 
 **Project:** Random Transit App  
 **Original Agreement Date:** 01/10/2026  
-**Last Updated:** 25/11/2026  
+**Last Updated:** 27/11/2026  
 **Team Members:**
 - Caio Nunes
 - Jimmy Rashed
@@ -45,7 +45,7 @@ Roles will rotate at the beginning of each major milestone or sprint so that eve
 | Sprint 1 (Milestone 1) | Artiom Sova | Caio Nunes | Jimmy Rashed |
 | Sprint 2 (Milestone 2) | Jimmy Rashed | Artiom Sova | Caio Nunes |
 | Sprint 3 (Milestone 3) | Caio Nunes | Jimmy Rashed | Artiom Sova |
-| Sprint 4 (Milestone 4) | [To confirm by team] | [To confirm by team] | [To confirm by team] |
+| Sprint 4 (Milestone 4) | Artiom Sova | Jimmy Rashed | Caio Nunes |
 
 ---
 
