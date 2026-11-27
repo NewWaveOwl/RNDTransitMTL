@@ -121,3 +121,25 @@ confirmed. Git records **Artem Sova** as author of commits `2aac1bb` and
 | Time | Student-estimated active interaction and debugging time [Not documented]. Transcript and commit timestamps are not estimates of total student work time. |
 | Outcome | PR [#113](https://github.com/NewWaveOwl/RNDTransitMTL/pull/113) (`[AI-Cleanup] Refactor composables, extract long functions, and refresh docs (#97)`) is open on `refactor/97-code-cleanup-and-docs` targeting `main` with `Closes #97` verified via GitHub API, plus this ML4 AI log commit. Pre-existing local WIP remained intact. PR review, merge, and issue #97 auto-close remain pending. |
 | Productivity / learning reflection | [Student reflection needed]: usefulness of AI-assisted multi-file refactoring and doc auditing, trust in automated splits, time saved or wasted, and what the student would change next time. |
+
+## M4-A5 - Live groups through the McGill Portal R-PIV pipeline (#88, #89)
+
+**Contributor:** Nunes, Caio Pinheiro (`@CaioNunes56`).
+
+**Date:** 2026-11-27.
+
+**Conversation(s):** Claude Code session; [Conversation link needed].
+
+**Decision record / full prompts:** [M4-A5](ML4-AI-Decision-Log.md#m4-a5---live-groups-through-the-mcgill-portal-r-piv-pipeline-88-89).
+
+| Field | Record |
+| --- | --- |
+| Challenge addressed / context | ML4-02: create/join live groups with a shared trip (#88), then show group details in the trip tab and history (#89), as one backend + frontend slice. |
+| AI(s) used | Claude Code with Claude Opus 5.5. No subagents. |
+| Observable prompting pattern | Reused the requester's own multi-step AI workflow (the McGill Portal R-PIV pipeline): triage → prime (restate + numbered questions with defaults) → plan → approval gate → task-by-task implementation with one commit each → validation → review. The requester answered by question number and overrode defaults where they had a reason. |
+| Techniques deliberately used | [Student reflection needed]. Observable: reusing a prepared workflow, question gates with defaults, design discussion before planning, and a supplied mockup as the UI spec. |
+| Iterations | Five human prompts. Two design changes came from the requester (Realtime; the shared group-trip table, option A). |
+| Debugging / refinement | The agent corrected its own claim that the History row could double as the participation record (owner-only RLS); fixed a missing comma in `TripDto.kt`; renamed PL/pgSQL variables that clashed with column names in the SQL test; and fixed a broken placeholder in a ViewModel test before running it. |
+| Verification | See the decision log: full Gradle suite and lint green; the SQL test, live Realtime and a two-device check have not run yet. |
+| Outcome | #88 implemented on `feature/88-create-join-groups` (local, not pushed); #89 planned. |
+| Productivity / learning reflection | [Student reflection needed]. |

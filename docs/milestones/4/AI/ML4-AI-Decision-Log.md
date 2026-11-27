@@ -12,6 +12,9 @@ milestone records and related trip features; the latest logging request did
 not name a milestone again. M4-A4 covers issue #97 (`ML4-09`), including the
 codebase maintainability review, composable splitting, long-function extraction,
 documentation refresh, PR #113 creation/header update, and this AI log update.
+M4-A5 covers the ML4-02 live group feature: triage, priming and planning of
+#88 and #89, and the implementation of #88, run through the R-PIV pipeline of
+the requester's McGill Portal project (referenced, not copied into this repo).
 
 The source for M4-A1–M4-A3 is the visible Codex conversation logged on
 2026-11-22 (America/Toronto), together with locally verified Git evidence. The
@@ -35,6 +38,7 @@ unchanged.
 | Requester; individual prompt authorship not independently confirmed | ML4-04.S2, issue #93, parent #45 | Issue review, explicitly authorized implementation, regression tests, commit, status clarification, and logging | M4-A1 |
 | Requester; individual prompt authorship not independently confirmed | Issue #94; ML4 placement inferred above | Implement confirmed map origin, refine GO into the settings-sheet drag handle, preserve unrelated changes, test, and commit | M4-A2 |
 | Requester; individual prompt authorship not independently confirmed | Issues #92/#107; ML4 placement inferred above | Implement supplied Figma flow, commit each feature, inspect the resulting UI flow, and document this chat | M4-A3 |
+| Requester; Git user **Nunes, Caio Pinheiro** (`@CaioNunes56`, issue owner) | ML4-02 parent #49: issues #88 (implemented) and #89 (planned) | Pipeline discovery, triage, priming questions, plan writing, schema design discussion, implementation of #88 with tests, and logging | M4-A5 |
 | Requester; individual prompt authorship not independently confirmed | ML4-09, issue #97, PR #113 | Full-codebase maintainability review, composable splitting, function extraction, guideline enforcement, doc cleanup, PR creation/update, and AI logging | M4-A4 |
 
 The implementation commits identify **Artem Sova** as their Git author. The
@@ -48,6 +52,7 @@ attributions, not independent confirmation of the author of every prompt.
 | M4-A1 | 2026-11-22 | Codex; [Conversation link needed] | Review issue #93, preserve failed trip/review input across restarts, test retries, commit, and clarify remaining sign-off | ML4-04.S2 / #93 |
 | M4-A2 | 2026-11-22 | Codex; [Conversation link needed] | GO/settings-sheet drag behavior and map-tap origin confirmation, including the user's correction | #94 |
 | M4-A3 | 2026-11-22 | Codex; [Conversation link needed] | Figma arrival statistics/celebration, optional return, round-trip planning, UI-flow clarification, and this log update | #92 / #107 |
+| M4-A5 | 2026-11-27 | Claude Code (Claude Opus 5.5); [Conversation link needed] | Find and follow the McGill Portal R-PIV pipeline; triage/prime #89 and #88; plan both; implement #88 (Supabase groups, Realtime, Together tab) | ML4-02.S1 / #88, ML4-02.S2 / #89 |
 | M4-A4 | 2026-11-25 | Google Antigravity (`0e723272-e84d-42bb-b32d-e91731ad011e`, local app-only ID); [Conversation link needed] | Codebase maintainability review, composable splitting, function extraction, doc refresh, PR #113 `[AI-Cleanup]` / `Closes #97`, and this log update | ML4-09 / #97 |
 
 ## M4-A1 - Completed and cancelled trip persistence with review recovery
@@ -590,6 +595,125 @@ also add AI logof this chat  (0e723272-e84d-42bb-b32d-e91731ad011e) commit and u
 - PR #113 is open and awaiting team review/merge; issue #97 remains open until PR #113 merges.
 
 **Technique record:** [M4-A4](ML4-AI-Technique-Log.md#m4-a4---codebase-maintainability-cleanup-composable-splitting-and-documentation-refresh-97).
+
+## M4-A5 - Live groups through the McGill Portal R-PIV pipeline (#88, #89)
+
+**Contributor:** Git user **Nunes, Caio Pinheiro**; issues #49, #88 and #89
+name `@CaioNunes56` as owner. Commits on `feature/88-create-join-groups` were
+created by the agent with a `Co-Authored-By: Claude Opus 5.5` trailer.
+
+**Date:** 2026-11-27.
+
+**AI tool / model:** Claude Code (CLI agent), model Claude Opus 5.5. The agent
+read files in this repository and in the requester's McGill Portal project,
+ran Git, GitHub CLI (read-only) and Gradle, wrote code, tests and docs, and
+made local commits. No subagents were used. Nothing was pushed, and no
+migration was applied to the Supabase project.
+
+**Source:** [Conversation link needed].
+
+**Requirement / milestone:** [#49](https://github.com/NewWaveOwl/RNDTransitMTL/issues/49)
+ML4-02 live group trips; [#88](https://github.com/NewWaveOwl/RNDTransitMTL/issues/88)
+ML4-02.S1 create and join groups (implemented);
+[#89](https://github.com/NewWaveOwl/RNDTransitMTL/issues/89) ML4-02.S2 group
+details in the trip tab and history (planned).
+
+**Task/context:** The AI-level group feature. The requester asked the agent to
+reuse the AI workflow from their McGill Portal project
+(`McGillPortal_Project/.claude/skills/`: create-issue → triage → prime →
+plan-feature → execute → validate → code-review → code-review-fix → open-pr →
+reflect, orchestrated by `/dispatch`). The agent adapted it from .NET/Azure
+DevOps to Gradle, GitHub and Supabase and kept its human gates.
+
+**Purpose of AI use:** Find the workflow, triage and prime the issues, write
+reviewable plans, and implement #88 with tests.
+
+**Attachments:** One UI mockup supplied as a Discord image link (prompt 5),
+saved as `docs/mockups/together.png`.
+
+### Full prompt 1
+
+```text
+I am now going to do my AI level featurw which is the group features. Starting with issue 89, implement the feature. Use the pipeline from the McGill portla project I have in my C:\Users\6324313\OneDrive - John Abbott College\S5\Web\McGillPortal_Project\McGillPortal_ProjWeb3.slnx there should be an enbtire AI worflow there with planning and priming etc. can you find it
+```
+
+**AI output summary:** Found the pipeline under `.claude/skills` and
+`.claude/agents`. Triage of #89: blocked by #88 (no group code or tables
+existed on `main`). Restated the problem and asked Q1–Q5 with defaults.
+
+### Full prompt 2
+
+```text
+yea lets do 88, q2. no dont copy it sicne it will only be used for this feature. Make sure to reference it, but since our onversations are logged (or should be loffed according to the rules in this project) it will be logged alr. the rest defaults
+```
+
+**AI output summary:** Branched `feature/88-create-join-groups` from `main`,
+recorded a green baseline (341 JVM / 279 Android host tests), primed #88, and
+asked 88.Q1–Q5 (sync method, shared-trip model, code format, member names, UI scope).
+
+### Full prompt 3
+
+```text
+q1. Since the mpa markers will need it lets do the alternative. q2. Isnt it a better design to have a group trip table and the history can read trips for that table. Each user that partcipated will have an etry in their history that points to the shared group trip. Lets discuss this. The rest default.
+```
+
+**AI output summary:** Agreed that a shared `group_trips` table is the better
+design and explained that per-member state (status, timestamps, edits, review)
+still needs each member's own `trips` row pointing to it. Offered A (route only
+in `group_trips`; `trips` route columns optional for group rows) and B (keep a
+copy) and recommended A.
+
+### Full prompt 4
+
+```text
+A
+```
+
+**AI output summary:** Wrote the plans `docs/milestones/4/plans/88-create-and-join-groups.md`
+and `89-group-details-in-trip-and-history.md`. Corrected its own earlier claim:
+the History row can't double as the participation record, because `trips` is
+owner-only, so a `group_trip_participants` table was added.
+
+### Full prompt 5
+
+```text
+so for the group signup, you can use the https://cdn.discordapp.com/attachments/1544337363302490195/1575990173001584771/image.png?ex=6b0b4ab9&is=6b09f939&hm=47a550e8d8da4b754d34b7f458edd7e9b401df2f7408f38728add4b5b4ddad69 for the main screen in the togetehr tab which is alreayd avaibable in the nav bar. (Make sure the local is up to date with main). For the actve trip and the history for it, just add an extra section for the group info such as who is/was participating and such. So yes 0q2 for 89 is default
+```
+
+**AI output summary:** Confirmed the branch matched `origin/main`, added the
+mockup to the #88 plan, treated the reply as plan approval, and implemented
+#88 task by task (one commit per task).
+
+**Student decision / how output was used:**
+- Do #88 before #89, because #89 depends on it (prompt 2).
+- Don't copy the pipeline into this repo; reference it and rely on the logs (prompt 2).
+- Use Supabase Realtime instead of polling, because #90's map markers need it (prompt 3).
+- Proposed the shared group-trip table themselves, then chose option A (prompts 3–4).
+- Supplied the Together tab design, and scoped #89 to "an extra section" (prompt 5).
+- Everything else took the agent's stated defaults.
+
+**Implemented result / evidence:** Commits `68c67fa` (plans and mockup),
+`c5d649a` (migration `20261127200000_create_groups.sql`, SQL test, README),
+`98938dd` (realtime-kt), `cca25b3` (models), `ee0ed9b` (`Trip.groupTripId`),
+`b114e7f` (trip repository saves group rows as links), `d7a1517`
+(`SupabaseGroupRepository`, Realtime change source), `c33223c`
+(`TripsStore.attachGroupTrip`), `6df1d1f` (`TogetherViewModel`), `f7da32a`
+(Together screen, tab enabled).
+
+**Verification:** Agent-run on `f7da32a`:
+`./gradlew :backend:test :backend:launcher:test :shared:jvmTest :shared:testAndroidHostTest :androidApp:lintDebug`
+→ `BUILD SUCCESSFUL` (379 JVM, 300 Android host, 67 backend with 1 skipped,
+45 launcher; 0 failures). `:androidApp:assembleDebug :desktopApp:classes
+:webApp:compileKotlinJs :webApp:compileKotlinWasmJs` built. **Not run:**
+`supabase/tests/groups.sql` (Docker wasn't running and there is no Supabase CLI),
+the live Realtime subscription, and a two-device manual check.
+
+**Limitations:** The SQL migration and RLS policies are verified only by
+review until `groups.sql` runs. The Realtime adapter has no automated test.
+The migration must be applied to Supabase by the requester before the new app
+version can read History (its read embeds `group_trips`).
+
+**Technique record:** [M4-A5](ML4-AI-Technique-Log.md#m4-a5---live-groups-through-the-mcgill-portal-r-piv-pipeline-88-89).
 
 ## Reflection
 
