@@ -81,6 +81,7 @@ private const val PROPOSAL_DEPARTURE_TICK_INTERVAL_MILLIS = 1_000L
  * @param modifier Parent layout constraints.
  * @param scheduled Whether to display the scheduled/routed duration rather than planned minutes.
  * @param onRename Optional callback updating the proposal name before it becomes an active trip.
+ * @param generationError Failed replacement request; the displayed proposal remains available.
  */
 @Composable
 internal fun TripProposalContent(
@@ -91,6 +92,7 @@ internal fun TripProposalContent(
     modifier: Modifier = Modifier,
     scheduled: Boolean = false,
     onRename: ((String) -> Unit)? = null,
+    generationError: String? = null,
 ) {
     var nameDraft by rememberSaveable(trip.id.value) { mutableStateOf(trip.title) }
     val nowMillis by produceState(
@@ -145,6 +147,11 @@ internal fun TripProposalContent(
                 .padding(ProposalHeaderPadding),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            if (generationError != null) {
+                Surface(shape = RoundedCornerShape(16.dp), color = TransitWhite) {
+                    Text(generationError, color = TransitMain, modifier = Modifier.padding(ProposalSheetPadding))
+                }
+            }
             TripLabelValueField(
                 label = "Starting point",
                 value = trip.origin.label,

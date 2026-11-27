@@ -275,6 +275,7 @@ class BackendTripGeneratorTest {
 
     @Test fun busyActiveAndCooldownResponsesHaveDistinctActionableMessages()=runTest {
         for((status,reason,expected) in listOf(
+            Triple(429,"guest_daily_limit","five trips per day"),
             Triple(503,"capacity","planner is busy"), Triple(429,"capacity","planner is busy"),
             Triple(429,"active","already being generated"), Triple(429,"cooldown","wait 2 seconds")
         )) {

@@ -220,11 +220,13 @@ internal class Generator(private val routes: List<JsonElement>, private val zone
                 currentCoroutineContext().ensureActive()
                 attempts++
                 val routeTimer = TimeSource.Monotonic.markNow()
+                // Later candidates must use the current timetable, not a departure from search start.
+                val departure = now()
                 log("attempt=$attempts otp=start")
                 val body = try {
-                    val initial = route(otpRequest(input, end, start, allowed))
+                    val initial = route(otpRequest(input, end, departure, allowed))
                     val planned = if (input.walkBike) {
-                        walkBikeResponse(initial, input, end, start, zones) { query ->
+                        walkBikeResponse(initial, input, end, departure, zones) { query ->
                             if (attempts >= maxAttempts) emptyPlanningResponse() else {
                                 attempts++
                                 log("attempt=$attempts otp=walk-bike-section")
@@ -255,7 +257,7 @@ internal class Generator(private val routes: List<JsonElement>, private val zone
                 }
                 for (edge in plan.field("edges").items()) {
                     val itinerary = edge.field("node") ?: continue
-                    val travel = elapsed(itinerary, start) ?: continue
+                    val travel = elapsed(itinerary, departure) ?: continue
                     val meters = itinerary.field("legs").items().sumOf { it.field("distance").number() ?: Double.NaN }
                     if (!meters.isFinite() || meters <= 0) continue
                     val buffer = orientationSeconds(meters)
@@ -272,7 +274,7 @@ internal class Generator(private val routes: List<JsonElement>, private val zone
                     if (total <= bestTotal) continue
                     bestTotal = total
                     log("attempt=$attempts accepted totalSeconds=$total")
-                    best = buildSuccessPayload(input, end, start, total, travel, buffer, attempts, body, plan, edge)
+                    best = buildSuccessPayload(input, end, departure, total, travel, buffer, attempts, body, plan, edge)
                     if (total >= input.minutes * 60 * 0.95) return@withTimeoutOrNull best
                 }
             }

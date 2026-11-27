@@ -31,7 +31,7 @@ iOS targets are also included in the project.
 
 ## Plan an adventure
 
-1. Sign in, confirm a starting point, and choose your trip preferences.
+1. Sign in or continue as a guest, confirm a starting point, and choose your trip preferences.
 2. Press **GO**. The app searches for a reachable route close to your available
    time without exceeding it. Selected transport modes are allowed alternatives;
    walking connections are available for transit.
@@ -50,8 +50,9 @@ using the [Android development guide](docs/AndroidDevelopment.md).
 
 The current app requires Android 7.0 / API 24 or newer and internet access for
 sign-in, maps, and trip generation. Remote trip generation requires a running
-configured server and a signed-in account. Guest mode is available for local
-development; it cannot access the authenticated public generation service.
+configured server. Guests use a persisted Supabase anonymous session and can generate
+five successful proposals per Montréal calendar day; signed-in accounts have no daily
+allowance cap. The server's Supabase project must have anonymous sign-ins enabled.
 
 ## Current prototype limits
 

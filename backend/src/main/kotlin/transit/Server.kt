@@ -99,7 +99,8 @@ internal class UserGenerationLimit(private val clockMillis: ()->Long = { System.
 internal class Api(private val generator: Generator, private val authorize: suspend (String?)->String? = { "local-guest" },
     private val logFailure: (String, Throwable)->Unit = { id, error ->
         failureLogger.log(Level.WARNING, "Trip generation failed; requestId=$id", error)
-    }, private val userLimit: UserGenerationLimit = UserGenerationLimit()) {
+    }, private val userLimit: UserGenerationLimit = UserGenerationLimit(),
+    private val ledger: GenerationLedger = GenerationLedger()) {
     private val capacity=Semaphore(4)
     suspend fun handle(contentType: String?, authorization: String?, requestId: String = "generation-${requestSequence.incrementAndGet()}", read: suspend ()->String): Pair<Int,JsonObject> {
         if(!capacity.tryAcquire()) return 503 to obj("status" to "unavailable","reason" to "capacity",
@@ -113,12 +114,19 @@ internal class Api(private val generator: Generator, private val authorize: susp
                 val body=try { json.parseToJsonElement(text) } catch(_: Exception) { throw InputError("Invalid JSON request.") }
                 val input=parseRequest(body)
                 val rejected=userLimit.acquire(user)
+                if (rejected == null) admittedUser=user
+                ledger.retryAfter(user)?.let { seconds ->
+                    return@withTimeout 429 to obj("status" to "rate_limited", "reason" to "guest_daily_limit",
+                        "message" to "Guests can generate five trips per day. Try again after midnight in Montréal or sign in.",
+                        "retryAfterSeconds" to seconds)
+                }
                 if(rejected!=null) return@withTimeout 429 to obj("status" to "rate_limited",
                     "message" to if(rejected.reason=="active") "A trip is already being generated. Wait or cancel it before retrying."
                         else "Too many requests. Try again shortly.",
                     "reason" to rejected.reason,"retryAfterSeconds" to rejected.retryAfterSeconds)
-                admittedUser=user
-                200 to generator.generate(input,requestId)
+                val result = generator.generate(ledger.request(user, input),requestId)
+                withContext(Dispatchers.IO) { ledger.accepted(user, result) }
+                200 to result
             }
         } catch(e: TimeoutCancellationException) { currentCoroutineContext().ensureActive(); return 503 to obj("status" to "unavailable","message" to "Request timed out.") }
         catch(e: CancellationException) { throw e }
@@ -185,17 +193,22 @@ fun main() {
         }
         val generator=Generator(routes,zones,{ body -> upstream.json(endpoint,body) })
         val api=Api(generator, authorize = { token ->
-            if(!authenticated) "local-guest" else if(token?.startsWith("Bearer ")!=true) null else {
+            if(!authenticated) "guest:local" else if(token?.startsWith("Bearer ")!=true) null else {
                 val response=withTimeout(5000) { upstream.request(URI(supabase).resolve("/auth/v1/user").toString(),headers=mapOf("Authorization" to token,"apikey" to key!!)) }
                 if(response.status.value in listOf(401,403)) null else {
                     if(!response.status.isSuccess()) throw ProviderError("Authentication service unavailable.",httpStatus=response.status.value)
                     // This ID comes from the authenticated /user response, never unverified JWT claims.
-                    val user=transit.json.parseToJsonElement(response.bodyAsText()).field("id").text()
+                    val account=transit.json.parseToJsonElement(response.bodyAsText())
+                    val user=account.field("id").text()
                         ?: throw ProviderError("Authentication response omitted user ID.")
-                    java.util.UUID.fromString(user).toString()
+                    val id = java.util.UUID.fromString(user).toString()
+                    val anonymous = (account.field("is_anonymous") as? JsonPrimitive)
+                        ?.takeUnless { it.isString }?.booleanOrNull
+                        ?: throw ProviderError("Authentication response omitted guest eligibility.")
+                    if (anonymous) "guest:$id" else id
                 }
             }
-        })
+        }, ledger = GenerationLedger(Path.of(env("GUEST_QUOTA_FILE", "data/guest-generation-quota.json"))))
         println("Trip generation ready at http://$host:$port (Kotlin/Ktor; random geographic destinations).")
         embeddedServer(CIO,port=port,host=host) { generationRoutes(api) }.start(wait=true)
     }

@@ -3,6 +3,8 @@ package com.example.rnd_transit_mtl.data.generation
 import androidx.compose.runtime.*
 import com.example.rnd_transit_mtl.data.supabase.SupabaseBackend
 import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.auth.Auth
+import io.github.jan.supabase.auth.status.SessionStatus
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.*
@@ -11,10 +13,13 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import kotlinx.serialization.json.*
 import kotlin.time.TimeSource
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** Reuses one cancellable client. Tokens are read at request time after session refresh. */
 @Composable
 internal fun rememberBackendTripGenerator(endpoint: String?): BackendTripGenerator? {
+    val sessionMutex = remember { Mutex() }
     val client = remember(endpoint) {
         if (endpoint.isNullOrBlank()) null else HttpClient {
             install(HttpTimeout) { requestTimeoutMillis = 45_000; socketTimeoutMillis = 45_000; connectTimeoutMillis = 5_000 }
@@ -26,10 +31,11 @@ internal fun rememberBackendTripGenerator(endpoint: String?): BackendTripGenerat
             BackendTripGenerator(post = { body, requestId ->
                 val started = TimeSource.Monotonic.markNow()
                 println("RndTransitGeneration request=$requestId http=start")
+                val token = generationAccessToken(SupabaseBackend.client.auth, sessionMutex)
                 val response = it.post(requireNotNull(endpoint)) {
                     header("X-Request-ID", requestId)
                     contentType(ContentType.Application.Json)
-                    SupabaseBackend.client.auth.currentSessionOrNull()?.accessToken?.let { token -> bearerAuth(token) }
+                    bearerAuth(token)
                     setBody(body)
                 }
                 println("RndTransitGeneration request=$requestId http=${response.status.value} elapsedMs=${started.elapsedNow().inWholeMilliseconds}")
@@ -42,4 +48,18 @@ internal fun rememberBackendTripGenerator(endpoint: String?): BackendTripGenerat
             }, diagnostic = { event -> println("RndTransitGeneration $event") })
         }
     }
+}
+
+/** Restores an identity before creating an anonymous session, serializing concurrent first requests.
+ * @param auth Supabase authentication whose session storage owns guest identity across launches.
+ * @param mutex Shared by generation requests in the application host.
+ */
+internal suspend fun generationAccessToken(auth: Auth, mutex: Mutex): String = mutex.withLock {
+    auth.awaitInitialization()
+    // Never replace an expired identity while the SDK retries its refresh.
+    if (auth.currentSessionOrNull() == null) {
+        check(auth.sessionStatus.value is SessionStatus.NotAuthenticated)
+        auth.signInAnonymously()
+    }
+    requireNotNull(auth.currentSessionOrNull()?.accessToken)
 }

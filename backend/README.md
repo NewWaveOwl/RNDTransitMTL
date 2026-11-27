@@ -22,8 +22,8 @@ PC builds and runs the app on an emulator or phone.
 The phone sends its origin, time, modes, zones and walking pace to Ktor. Ktor chooses
 candidate destinations, OTP calculates routes, and Ktor returns one valid itinerary.
 The app draws its geometry and displays legs, distance and duration. Supabase
-provides account authentication; the public generation API requires the signed-in
-user's session token. OTP and the bridge stay private to the server PC.
+provides account and anonymous guest authentication; the public generation API verifies
+the session token. OTP and the bridge stay private to the server PC.
 
 The server PC, services, tunnel and internet connection must stay running for remote
 trip generation. Android Studio does not start the server. `127.0.0.1` refers to
@@ -63,7 +63,7 @@ the device making the request; it is not the second PC's address from a phone.
 4. For a phone/emulator on another PC, choose Cloudflare or **Microsoft Dev Tunnels (Azure)** in **Tunnel settings**
    and wait for **Tunnel: Connected**. Use its **Public HTTPS** address in the app.
    Public mode requires the same Supabase project URL and publishable key as
-   Android, plus a signed-in user. Do not use a service-role key.
+   Android. Enable anonymous sign-ins in Supabase Auth for guests. Do not use a service-role key.
 
 Use `tunnelMode=quick` for a temporary testing address, or a configured named tunnel
 for a stable hostname. Quick Tunnel addresses change when the tunnel restarts:
@@ -224,9 +224,50 @@ on the app's database; a working routing server alone does not verify persistenc
 Use the [Windows server launcher](launcher/README.md) to run and supervise Ktor,
 OTP and the STM/exo bridge as separate processes. Keep OTP and feed credentials
 private. Configure public HTTPS access through the launcher's tunnel settings;
-public access requires Supabase authentication. Hosted guest access is not implemented.
+public access requires Supabase authentication, including anonymous sessions for guests.
 The phone uses a configured HTTPS `generationEndpoint`.
 
 See [the integration guide](TripGeneration.md) for Android checks,
 protocol details and official API/data references. Live device, feed and tunnel
 checks must be performed against the configured server.
+
+## Guest generation and per-user tracks (#99)
+
+The backend verifies every bearer token through Supabase `/auth/v1/user`. Its returned
+UUID and `is_anonymous` flag determine identity and eligibility; request-body user IDs
+and unverified JWT claims never select an allowance. The client restores its SDK session
+before generation and creates an anonymous session only when unauthenticated. Anonymous
+sessions remain guests in the UI and do not become account-owned trip history.
+
+Guests receive **five successful generated proposals per calendar day in
+America/Toronto**, resetting at local midnight with daylight-saving changes. Generating
+another proposal, a round trip or a return route consumes one allowance on success.
+Invalid input, no route, routing failure, timeout and cancellation before acceptance
+consume none. A successful route committed by the server counts even if the connection
+subsequently drops. Signed-in users have no daily cap. Active-request/cooldown guards,
+the four-request capacity, routing restrictions and 40/45-second timeouts still apply.
+Limit responses are HTTP 429 with `reason=guest_daily_limit` and `Retry-After` seconds
+until Montréal midnight. The app shows the error while keeping the previous proposal
+and its Start Trip action available.
+
+Identity follows the persisted anonymous Supabase session across app launches and token
+refreshes. Signing out, clearing app storage, reinstalling or using another installation
+can create another identity; the policy is per anonymous account, not per physical person
+or IP address. Anonymous sign-in abuse protection remains a Supabase deployment setting.
+Invalid/expired bearer tokens never fall back to a new guest on the backend. Local mode
+without Supabase shares one `guest:local` allowance across callers.
+
+Successful guest counts are atomically stored in `data/guest-generation-quota.json`
+relative to the backend working directory (the launcher uses its persistent home).
+Override with an absolute `GUEST_QUOTA_FILE` if needed. Preserve this private file during
+updates and use one backend process per quota file. Missing files start a fresh ledger;
+unreadable/invalid JSON prevents startup, and persistence failures return an error rather
+than an uncounted proposal. Multiple backend replicas require a shared transactional
+quota store before deployment.
+
+The server independently excludes each verified user's last ten accepted destinations
+from random searches, retaining up to 10,000 recently used identity tracks in memory.
+Fixed-destination return routes are exempt from destination-history exclusions. These
+tracks reset on restart; daily guest counts persist. Each later one-way candidate fetch
+uses a fresh departure timestamp, and the accepted response retains that departure with
+the matching itinerary and estimates. Accepted trip geometry stays unchanged on opening.

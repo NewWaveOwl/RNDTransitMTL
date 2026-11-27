@@ -155,6 +155,7 @@ internal class BackendTripGenerator(
                 error is GenerationHttpFailure -> when(error.status) {
                     401, 403 -> "Sign in again to generate a trip."
                     429 -> when(error.reason) {
+                        "guest_daily_limit" -> "Guests can generate five trips per day. Try again after midnight in Montréal or sign in. Your last trip is still available."
                         "active" -> "A trip is already being generated. Wait for it or cancel it before retrying."
                         "cooldown" -> "Please wait ${error.retryAfterSeconds ?: 3} seconds before generating another trip."
                         "capacity" -> "The trip planner is busy. Try again in ${error.retryAfterSeconds ?: 1} seconds."
