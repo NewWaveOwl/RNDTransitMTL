@@ -30,7 +30,8 @@ internal class SupabaseTripRepository(
 ) : TripRepository {
     private val finalStatuses = listOf("completed", "cancelled")
     private val historyColumns = Columns.raw(
-        "*,review:reviews(overall,quality,interesting,fun,comment,image_url)"
+        "*,review:reviews(overall,quality,interesting,fun,comment,image_url)," +
+            "group_trip:group_trips(${SHARED_ROUTE_FIELDS.joinToString(",")})"
     )
     private val writeJson = Json { encodeDefaults = true }
 
@@ -47,8 +48,10 @@ internal class SupabaseTripRepository(
         val fields = writeJson.encodeToJsonElement(ownedTrip.toDto()).jsonObject
 
         // The DTO includes an embedded review for reads. Reviews are a separate table.
-        val payload = JsonObject((fields - "review").filterNot { (name, value) ->
-            name == "journey" && value == JsonNull
+        // A group trip's route lives once in group_trips; this row only points to it.
+        val excluded = if (ownedTrip.groupTripId == null) setOf("review") else SHARED_ROUTE_FIELDS + "review"
+        val payload = JsonObject((fields - excluded).filterNot { (name, value) ->
+            name in OPTIONAL_NULL_COLUMNS && value == JsonNull
         })
         client.from("trips").upsert(payload) {
             onConflict = "id"
@@ -62,7 +65,8 @@ internal class SupabaseTripRepository(
         // must not prevent acknowledging that insert; only record identity is stable.
         check(stored.id == ownedTrip.id &&
                 stored.ownerId == ownedTrip.ownerId &&
-                stored.createdAt == ownedTrip.createdAt) {
+                stored.createdAt == ownedTrip.createdAt &&
+                stored.groupTripId == ownedTrip.groupTripId) {
             "The trip ID is already associated with a different record."
         }
         return stored
@@ -130,19 +134,50 @@ internal class SupabaseTripRepository(
     }
 
     private fun String.decodeTrips(): List<TripDto> =
-        Json.parseToJsonElement(this).jsonArray.map { element ->
+        Json.parseToJsonElement(this).jsonArray.mapNotNull { element ->
             val row = element.jsonObject
             // The reverse relationship can be represented as an array by PostgREST.
             val embeddedReview = row["review"]
-            val normalized = if (embeddedReview is JsonArray) {
+            val withReview = if (embeddedReview is JsonArray) {
                 check(embeddedReview.size <= 1) { "Multiple reviews for one trip." }
                 JsonObject(row + ("review" to (embeddedReview.singleOrNull() ?: JsonNull)))
             } else {
                 row
             }
-            Json.decodeFromJsonElement<TripDto>(normalized)
+            withSharedRoute(withReview)?.let { Json.decodeFromJsonElement<TripDto>(it) }
         }
+
+    /**
+     * Copies a group trip's shared route onto the member's own row.
+     *
+     * @param row One trips row, possibly with an embedded group_trip object.
+     * @return The row ready for TripDto, or null for a group row whose shared route
+     * this account can no longer read; such a row is left out of History rather than
+     * failing the whole list.
+     */
+    private fun withSharedRoute(row: JsonObject): JsonObject? {
+        val ownFields = JsonObject(row - "group_trip")
+        if (row["group_trip_id"].let { it == null || it == JsonNull }) return ownFields
+        val sharedRoute = row["group_trip"] as? JsonObject ?: return null
+        return JsonObject(ownFields + sharedRoute.filterKeys { it in SHARED_ROUTE_FIELDS })
+    }
 
     private fun TripDto.requireTrip(): Trip =
         checkNotNull(toDomainOrNull()) { "Invalid stored trip: $id" }
+
+    internal companion object {
+        /**
+         * Route columns a group trip stores once in group_trips. A member's trips row for a
+         * group trip leaves them out; reads copy them back from the embedded group trip.
+         */
+        val SHARED_ROUTE_FIELDS: Set<String> = setOf(
+            "origin", "destination", "legs", "planned_minutes", "transports", "routes",
+            "attraction_intensity", "zone_ids", "zones_by_transport", "routed_duration_seconds",
+            "waiting_time_seconds", "walking_preference", "orientation_buffer_seconds",
+            "requested_transport_ids", "journey",
+        )
+
+        /** Newer columns left out of a save when empty, so older schemas still accept solo rows. */
+        private val OPTIONAL_NULL_COLUMNS = setOf("journey", "group_trip_id")
+    }
 }
