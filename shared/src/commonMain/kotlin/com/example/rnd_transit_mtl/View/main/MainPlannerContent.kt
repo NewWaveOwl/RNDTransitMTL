@@ -128,6 +128,8 @@ private const val PlannerMaximumScale = 1.5f
  * @param onTapLiveOrigin Stages a geographic map point for confirmation.
  * @param roundTrip Whether round-trip planning is currently selected.
  * @param onRoundTripChange Requests toggling between one-way and round-trip modes.
+ * @param onRecenter Resolves and confirms a fresh live origin before moving the camera.
+ * @param liveRecenterRequest Incremented when the live origin should be centered, even at the same point.
  */
 @Composable
 internal fun MainPlannerContent(
@@ -166,6 +168,8 @@ internal fun MainPlannerContent(
     onTapLiveOrigin: (GeoPoint) -> Unit = {},
     roundTrip: Boolean = false,
     onRoundTripChange: (Boolean) -> Unit = {},
+    onRecenter: (() -> Unit)? = null,
+    liveRecenterRequest: Int = 0,
 ) {
     val liveLocation = LocalPlannerLocation.current
     // Expansion is presentation state, separate from transport and zone selections.
@@ -247,6 +251,7 @@ internal fun MainPlannerContent(
                 attributionHandledByScreen = true,
                 cameraInsetsReady = !showMapControls || originFieldHeight > 0,
                 browsing = true,
+                recenterRequest = liveRecenterRequest,
                 pin = liveOrigin?.point,
                 centerOnPin = originIsManual,
                 onPick = if (enabled) onTapLiveOrigin else null,
@@ -280,7 +285,11 @@ internal fun MainPlannerContent(
                 val recenterTop = (goTop - (48f + recenterGap) * unitPx).coerceAtLeast(0f)
                 FigmaRecenterButton(
                     enabled = enabled && (origin != null || liveLocation != null),
-                    onClick = { if (liveLocation != null) liveLocation.request() else recenterRequest += 1 },
+                    onClick = {
+                        if (onRecenter != null) onRecenter()
+                        else if (liveLocation != null) liveLocation.request()
+                        else recenterRequest += 1
+                    },
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(end = 16.dp * scale)

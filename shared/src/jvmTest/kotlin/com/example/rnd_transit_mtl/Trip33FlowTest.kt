@@ -104,6 +104,7 @@ class Trip33FlowTest {
         providedLocation: PlannerLocation? = null
     ) : AutoCloseable {
         var outcome by mutableStateOf(initialOutcome)
+        var isActive by mutableStateOf(true)
         var mapData = TransitMapData()
             private set
         private val location = object : PlannerLocation {
@@ -142,7 +143,7 @@ class Trip33FlowTest {
             ) {
                 RNDTransitTheme {
                     TransitOpeningScreen(listOf(TransportType(TransportId("walk"), "Walk", false)), emptyList(),
-                        onOpenCurrentTrip = { true }, sampleOutcome = outcome)
+                        onOpenCurrentTrip = { true }, sampleOutcome = outcome, isDestinationActive = isActive)
                 }
             }
         }
@@ -162,6 +163,12 @@ class Trip33FlowTest {
         fun click(label: String) {
             val node = nodes().first {
                 it.config.getOrNull(SemanticsProperties.Text)?.any { text -> text.text == label } == true
+            }
+            tap(node.boundsInRoot.center)
+        }
+        fun recenter() {
+            val node = nodes().first {
+                it.config.getOrNull(SemanticsProperties.ContentDescription)?.contains("Recenter map on starting point") == true
             }
             tap(node.boundsInRoot.center)
         }
@@ -218,6 +225,124 @@ class Trip33FlowTest {
             host.await("No trip fits these choices")
             assertEquals(fresh.point, requests.single().origin.point)
             assertFalse(host.planner.uiState.value.originIsManual)
+        }
+    }
+
+    private class RecenterLocation : PlannerLocation {
+        override var fix: LocationUpdate.Fix? by mutableStateOf(null)
+        var denied = false
+        override val currentUpdate: LocationUpdate? get() = if (denied) LocationUpdate.PermissionDenied else fix
+        override val containsPoint: (GeoPoint) -> Boolean = { it.latitude < 46.0 }
+        var callback: ((LocationUpdate.Fix?) -> Unit)? = null
+        override fun request(onResult: ((LocationUpdate.Fix?) -> Unit)?) { callback = onResult }
+        fun complete(point: GeoPoint, ageMillis: Long = 0L) {
+            val measured = LocationUpdate.Fix(point, 5.0,
+                timestampEpochMillis = kotlin.time.Clock.System.now().toEpochMilliseconds() - ageMillis)
+            fix = measured
+            assertNotNull(callback).invoke(measured)
+        }
+    }
+
+    @Test
+    fun repeatedRecenterReplacesManualOriginAndRoutesFromTheCameraTarget() = runBlocking(Dispatchers.Main) {
+        val location = RecenterLocation()
+        val requests = mutableListOf<BackendGenerationRequest>()
+        val allowResponse = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val backend = BackendTripGenerator(post = { body, _ ->
+            requests += Json.decodeFromString<BackendGenerationRequest>(body)
+            allowResponse.await()
+            """{"status":"no_trip"}"""
+        })
+        Host(Trip33Sample.Normal, liveMap = true, backend = backend, providedLocation = location).use { host ->
+            host.render()
+            host.planner.setOrigin(Place("Manual pin", GeoPoint(45.5, -73.6)))
+            host.render()
+            for ((index, point) in listOf(GeoPoint(45.51, -73.59), GeoPoint(45.52, -73.58)).withIndex()) {
+                host.recenter()
+                host.render()
+                assertTrue(host.has("Finding your current location…"))
+                host.click("GO")
+                host.render()
+                assertTrue(requests.isEmpty(), "GO must not route from the old pin while recenter is pending")
+                location.complete(point)
+                host.render()
+                assertEquals(point, host.planner.uiState.value.originPlace?.point)
+                assertEquals(point, host.mapData.pin)
+                assertEquals(index + 1, host.mapData.recenterRequest)
+                assertFalse(host.planner.uiState.value.originIsManual)
+            }
+            host.click("GO")
+            host.await("generation request") { requests.size == 1 }
+            assertEquals(requests.single().origin.point, host.mapData.pin)
+            assertEquals(3, host.mapData.recenterRequest, "Loading must preserve the camera request for the routing origin")
+            allowResponse.complete(Unit)
+            host.await("No trip fits these choices")
+            assertEquals(host.planner.uiState.value.originPlace?.point, requests.single().origin.point)
+        }
+    }
+
+    @Test
+    fun failedRecenterExplainsStaleMissingAndUnsupportedFixesWithoutMovingTheOrigin() = runBlocking(Dispatchers.Main) {
+        for (failure in listOf("stale", "future", "missing", "denied", "outside")) {
+            val location = RecenterLocation()
+            Host(Trip33Sample.Normal, liveMap = true, providedLocation = location).use { host ->
+                host.render()
+                val old = Place("Manual pin", GeoPoint(45.5, -73.6))
+                host.planner.setOrigin(old)
+                host.render()
+                host.recenter()
+                host.render()
+                when (failure) {
+                    "denied" -> {
+                        location.denied = true
+                        assertNotNull(location.callback).invoke(null)
+                    }
+                    "future" -> location.complete(GeoPoint(45.51, -73.59), -60_000L)
+                    "missing" -> assertNotNull(location.callback).invoke(null)
+                    "stale" -> location.complete(GeoPoint(45.51, -73.59), 60_000L)
+                    else -> location.complete(GeoPoint(47.0, -73.59))
+                }
+                host.render()
+                assertTrue(host.has(if (failure == "outside") "Outside the supported area. Choose a starting point."
+                    else if (failure == "denied") "Location permission is off. Choose a starting point."
+                    else "Current location unavailable or stale. Try recenter again or choose a starting point."))
+                assertEquals(old, host.planner.uiState.value.originPlace)
+                assertEquals(0, host.mapData.recenterRequest)
+                location.denied = false
+                // A subsequent successful request must recover normally.
+                host.recenter()
+                host.render()
+                location.complete(GeoPoint(45.52, -73.58))
+                host.render()
+                assertEquals(1, host.mapData.recenterRequest)
+                assertFalse(host.planner.uiState.value.originIsManual)
+            }
+        }
+    }
+
+    @Test
+    fun leavingPlannerCancelsRecenterAndIgnoresItsLateCallback() = runBlocking(Dispatchers.Main) {
+        val location = RecenterLocation()
+        Host(Trip33Sample.Normal, liveMap = true, providedLocation = location).use { host ->
+            host.render()
+            val old = Place("Manual pin", GeoPoint(45.5, -73.6))
+            host.planner.setOrigin(old)
+            host.render()
+            host.recenter()
+            host.render()
+            host.isActive = false
+            host.render()
+            location.complete(GeoPoint(45.51, -73.59))
+            host.render()
+            host.isActive = true
+            host.render()
+            assertEquals(old, host.planner.uiState.value.originPlace)
+            assertEquals(0, host.mapData.recenterRequest)
+            host.recenter()
+            host.render()
+            location.complete(GeoPoint(45.52, -73.58))
+            host.render()
+            assertEquals(1, host.mapData.recenterRequest)
         }
     }
 

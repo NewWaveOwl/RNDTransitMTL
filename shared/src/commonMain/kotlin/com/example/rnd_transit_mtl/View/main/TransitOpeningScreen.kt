@@ -32,6 +32,8 @@ import com.example.rnd_transit_mtl.data.generation.TripGenerationBounds
 import com.example.rnd_transit_mtl.data.generation.TripGenerationResult
 import com.example.rnd_transit_mtl.data.location.LocalPlannerLocation
 import com.example.rnd_transit_mtl.data.location.LocationUpdate
+import com.example.rnd_transit_mtl.data.location.awaitFreshFix
+import com.example.rnd_transit_mtl.data.location.LOCATION_FIX_MAX_AGE_MILLIS
 import com.example.rnd_transit_mtl.data.location.PlannerLocation
 import com.example.rnd_transit_mtl.model.geo.GeoPoint
 import com.example.rnd_transit_mtl.model.ids.TripId
@@ -141,6 +143,18 @@ internal fun TransitOpeningScreen(
     var processingAction by remember { mutableStateOf(false) }
     val generationScope = rememberCoroutineScope()
     var generationJob by remember { mutableStateOf<Job?>(null) }
+    var recenterJob by remember { mutableStateOf<Job?>(null) }
+    var recenterPending by remember { mutableStateOf(false) }
+    var recenterStatus by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(planner.originPlace) { recenterStatus = null }
+    var liveRecenterRequest by remember { mutableStateOf(0) }
+
+    LaunchedEffect(isDestinationActive) {
+        if (!isDestinationActive) {
+            recenterJob?.cancel()
+            recenterPending = false
+        }
+    }
 
     // Store a proposal separately. It becomes an active trip only after Start Trip.
     var proposalJson by rememberSaveable { mutableStateOf<String?>(null) }
@@ -243,7 +257,7 @@ internal fun TransitOpeningScreen(
     }
 
     fun canChangeInputs(): Boolean =
-        latestDestinationActive && !processingAction && pendingOpenTripId == null
+        latestDestinationActive && !processingAction && !recenterPending && pendingOpenTripId == null
 
     var defaultOriginStatus by remember { mutableStateOf<String?>(null) }
     AutomaticOriginUpdatesEffect(
@@ -259,7 +273,7 @@ internal fun TransitOpeningScreen(
     }
 
     fun performPrimaryAction() {
-        if (!latestDestinationActive || processingAction || generationJob?.isActive == true || pendingOpenTripId != null) {
+        if (!latestDestinationActive || processingAction || recenterPending || generationJob?.isActive == true || pendingOpenTripId != null) {
             return
         }
         tripsStore.activeTrip?.let { active ->
@@ -311,7 +325,10 @@ internal fun TransitOpeningScreen(
                         transportTypes = transportTypes,
                         completedTripsCount = tripsStore.completedTrips.size,
                         sampleOutcome = sampleOutcome,
-                        onDefaultOriginResolved = plannerViewModel::setDefaultOrigin,
+                        onDefaultOriginResolved = {
+                            plannerViewModel.setDefaultOrigin(it)
+                            liveRecenterRequest += 1
+                        },
                     )
                 ) {
                     is PreparedTripGeneration.Failed -> fail(prepared.kind, prepared.message)
@@ -458,6 +475,7 @@ internal fun TransitOpeningScreen(
 
     if (processingAction && activeState == null && pendingReviewId == null) {
         TripLoadingContent(
+            liveRecenterRequest = liveRecenterRequest,
             origin = planner.origin,
             liveOrigin = planner.originPlace,
             originIsManual = planner.originIsManual,
@@ -668,7 +686,7 @@ internal fun TransitOpeningScreen(
             validationMessage = validationMessage,
             actionLabel = pendingActionLabel ?: actionLabel,
             actionEnabled = isDestinationActive &&
-                !processingAction && generationJob?.isActive != true &&
+                !processingAction && !recenterPending && generationJob?.isActive != true &&
                 pendingOpenTripId == null &&
                 actionHasCallback &&
                 (
@@ -691,7 +709,39 @@ internal fun TransitOpeningScreen(
             origin = planner.origin,
             liveOrigin = planner.originPlace,
             originIsManual = planner.originIsManual,
-            originStatus = defaultOriginStatus,
+            originStatus = if (recenterPending) "Finding your current location…" else recenterStatus ?: defaultOriginStatus,
+            liveRecenterRequest = liveRecenterRequest,
+            onRecenter = if (!liveMap || location == null) null else ({
+                if (canChangeInputs()) {
+                    recenterPending = true
+                    recenterStatus = null
+                    validationMessage = ""
+                    recenterJob = generationScope.launch {
+                        try {
+                            val fix = location.awaitFreshFix()
+                            if (latestDestinationActive && originMode == "planner") {
+                                val now = kotlin.time.Clock.System.now().toEpochMilliseconds()
+                                val fresh = fix?.timestampEpochMillis?.let {
+                                    now - it in 0L..LOCATION_FIX_MAX_AGE_MILLIS
+                                } == true
+                                when {
+                                    !fresh -> recenterStatus = if (location.currentUpdate == LocationUpdate.PermissionDenied) {
+                                        "Location permission is off. Choose a starting point."
+                                    } else "Current location unavailable or stale. Try recenter again or choose a starting point."
+                                    !location.containsPoint(fix.point) -> recenterStatus =
+                                        "Outside the supported area. Choose a starting point."
+                                    else -> {
+                                        plannerViewModel.useCurrentOrigin(Place("Current location", fix.point))
+                                        liveRecenterRequest += 1
+                                    }
+                                }
+                            }
+                        } finally {
+                            recenterPending = false
+                        }
+                    }
+                }
+            }),
             onTapOrigin = { point ->
                 if (canChangeInputs()) {
                     liveDraft = null

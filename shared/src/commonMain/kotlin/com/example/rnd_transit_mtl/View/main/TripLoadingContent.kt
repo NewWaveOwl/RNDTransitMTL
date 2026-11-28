@@ -56,6 +56,7 @@ private const val SEARCH_STATUS_ROTATION_DURATION_MILLIS = 4_000L
  * @param origin Selected sample-map point shown during loading.
  * @param liveOrigin Confirmed geographic origin shown on the live map, when available.
  * @param originIsManual Whether the live map should center directly on [liveOrigin].
+ * @param liveRecenterRequest Carries the confirmed origin camera request through the GO transition.
  */
 @Composable
 internal fun TripLoadingContent(
@@ -66,6 +67,7 @@ internal fun TripLoadingContent(
     origin: TripPoint? = TripPoint("Current location", 0.5f, 0.35f),
     liveOrigin: Place? = null,
     originIsManual: Boolean = true,
+    liveRecenterRequest: Int = 0,
 ) {
     val liveMap = LocalTransitMap.current != null
     Box(modifier.fillMaxSize()) {
@@ -74,6 +76,7 @@ internal fun TripLoadingContent(
                 interactive = false,
                 sharedTripFlow = true,
                 browsing = true,
+                recenterRequest = liveRecenterRequest,
                 pin = liveOrigin?.point,
                 centerOnPin = originIsManual,
             ),
