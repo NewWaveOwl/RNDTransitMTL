@@ -69,8 +69,10 @@ internal class SupabaseAuthRepository(
                 else -> throw error
             }
         }
-        // The SDK can return a user with or without an authenticated session.
-        return auth.currentSessionOrNull() == null
+        // Email confirmation may leave the guest generation session active.
+        // Only a permanent account session means registration signed the user in.
+        val user = auth.currentSessionOrNull()?.user
+        return user == null || user.isAnonymous == true
     }
 
     override suspend fun signOut() {
