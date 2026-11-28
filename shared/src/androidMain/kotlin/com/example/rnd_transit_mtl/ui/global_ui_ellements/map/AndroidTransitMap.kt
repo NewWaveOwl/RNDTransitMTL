@@ -471,6 +471,7 @@ private fun AndroidBrowsingCameraEffects(
     val latestLocalFix by rememberUpdatedState(localFix)
     val hasLocalFix = localFix != null
     var centeredPin by remember { mutableStateOf(confirmedPin.takeIf { savedCamera != null }) }
+    var handledPlannerRecenter by remember { mutableIntStateOf(0) }
     var cameraReady by remember { mutableStateOf(false) }
 
     LaunchedEffect(map) {
@@ -519,15 +520,19 @@ private fun AndroidBrowsingCameraEffects(
         }
     }
 
-    LaunchedEffect(map, cameraReady, styleLoadState, hasLocalFix, session.recenter, data.pickerOpen, data.interactive, confirmedPin) {
+    LaunchedEffect(map, cameraReady, styleLoadState, hasLocalFix, session.recenter, data.recenterRequest, data.pickerOpen, data.interactive, confirmedPin) {
         if (data.pickerOpen) {
             centeredPin = null
             return@LaunchedEffect
         }
-        if (!cameraReady || styleLoadState != StyleLoadState.Ready || !data.interactive) return@LaunchedEffect
+        if (data.recenterRequest == 0) handledPlannerRecenter = 0
+        val plannerRecenter = data.recenterRequest != 0 && data.recenterRequest != handledPlannerRecenter
+        // A GO transition must not cancel centering on its confirmed request origin.
+        if (!cameraReady || styleLoadState != StyleLoadState.Ready || (!data.interactive && !plannerRecenter)) return@LaunchedEffect
         val request = session.recenter
         val recenterOnFix = hasLocalFix && request != 0
-        val targetPin = confirmedPin?.takeIf { it != centeredPin && !recenterOnFix }
+        // The planner confirms the origin and camera target together after a fresh measurement.
+        val targetPin = if (plannerRecenter) data.pin else confirmedPin?.takeIf { it != centeredPin && !recenterOnFix }
         val centeringOnFix = recenterOnFix || (hasLocalFix && session.autoCenterPending)
         if (targetPin == null && !centeringOnFix) return@LaunchedEffect
 
@@ -559,6 +564,7 @@ private fun AndroidBrowsingCameraEffects(
             if (automatic) CameraAnimation.Ease { duration = AUTO_CENTER_EASE_DURATION_MILLIS.milliseconds }
             else CameraAnimation.Ease.Standard,
         )
+        handledPlannerRecenter = data.recenterRequest
         if (session.recenter == request) session.recenter = 0
     }
 }

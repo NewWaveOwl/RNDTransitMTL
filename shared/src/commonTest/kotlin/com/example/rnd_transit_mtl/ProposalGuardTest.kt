@@ -12,6 +12,17 @@ import kotlin.test.*
 import com.example.rnd_transit_mtl.model.trip.TripStatus
 
 class ProposalGuardTest {
+    @Test fun failedReplacementKeepsLastAcceptedPreviewStartable() {
+        val guard = ProposalGuard(TripId("last-valid"))
+        val token = guard.begin()
+        assertFalse(guard.canStart(TripId("last-valid")))
+        assertTrue(guard.complete(token, null))
+        assertTrue(guard.canStart(TripId("last-valid")))
+        val next = guard.begin()
+        assertTrue(guard.complete(next, TripId("replacement")))
+        assertFalse(guard.canStart(TripId("last-valid")))
+        assertTrue(guard.canStart(TripId("replacement")))
+    }
     private fun trip(id: String) = Trip(
         id = TripId(id),
         status = TripStatus.Generated,

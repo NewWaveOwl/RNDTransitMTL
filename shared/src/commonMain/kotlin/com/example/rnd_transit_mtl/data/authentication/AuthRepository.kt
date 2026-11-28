@@ -20,7 +20,7 @@ internal interface AuthRepository {
     val session: Flow<AccountSession>
 
     suspend fun signIn(email: String, password: String)
-    /** True when signup requires email verification before a session exists. */
+    /** True when signup requires email verification before a non-anonymous account session exists. */
     suspend fun signUp(email: String, password: String): Boolean
     suspend fun signUp(email: String, password: String, guestTransferToken: String?): Boolean =
         signUp(email, password)

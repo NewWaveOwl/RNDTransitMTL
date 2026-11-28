@@ -46,11 +46,12 @@ internal class SupabaseAuthRepository(
         }
     }
 
-    private fun UserInfo.toAccountSession() = AccountSession.SignedIn(
-        userId = id,
-        email = email,
-        guestTransferToken = (userMetadata?.get(GUEST_TRANSFER_TOKEN) as? JsonPrimitive)?.content,
-    )
+    private fun UserInfo.toAccountSession(): AccountSession =
+        if (isAnonymous == true) AccountSession.Guest else AccountSession.SignedIn(
+            userId = id,
+            email = email,
+            guestTransferToken = (userMetadata?.get(GUEST_TRANSFER_TOKEN) as? JsonPrimitive)?.content,
+        )
 
     override suspend fun signUp(email: String, password: String): Boolean =
         signUp(email, password, guestTransferToken = null)
@@ -68,8 +69,10 @@ internal class SupabaseAuthRepository(
                 else -> throw error
             }
         }
-        // The SDK can return a user with or without an authenticated session.
-        return auth.currentSessionOrNull() == null
+        // Email confirmation may leave the guest generation session active.
+        // Only a permanent account session means registration signed the user in.
+        val user = auth.currentSessionOrNull()?.user
+        return user == null || user.isAnonymous == true
     }
 
     override suspend fun signOut() {

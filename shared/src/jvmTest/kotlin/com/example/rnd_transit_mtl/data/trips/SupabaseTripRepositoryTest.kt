@@ -3,6 +3,8 @@ package com.example.rnd_transit_mtl.data.trips
 import com.example.rnd_transit_mtl.data.authentication.AccountSession
 import com.example.rnd_transit_mtl.data.authentication.SignupRejected
 import com.example.rnd_transit_mtl.data.authentication.SupabaseAuthRepository
+import com.example.rnd_transit_mtl.data.generation.generationAccessToken
+import kotlinx.coroutines.sync.Mutex
 import com.example.rnd_transit_mtl.data.remote.dto.toDto
 import com.example.rnd_transit_mtl.model.geo.GeoPoint
 import com.example.rnd_transit_mtl.model.ids.TransportId
@@ -155,12 +157,15 @@ class SupabaseTripRepositoryTest {
         val token = "20000000-0000-4000-8000-000000000001"
         val user = """{"id":"owner","aud":"authenticated","email":"$email","user_metadata":{"$GUEST_TRANSFER_TOKEN":"$token"}}"""
         val session = """{"access_token":"test-access","refresh_token":"test-refresh","expires_in":3600,"token_type":"bearer","user":$user}"""
-        for (confirmEmail in listOf(false, true)) {
+        val anonymousUser = """{"id":"guest-owner","aud":"authenticated","is_anonymous":true}"""
+        val anonymousSession = """{"access_token":"guest-access","refresh_token":"guest-refresh","expires_in":3600,"token_type":"bearer","user":$anonymousUser}"""
+        for ((guestGenerated, confirmEmail) in listOf(false to false, false to true, true to false, true to true)) {
             var signupBody = ""
             val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
             server.createContext("/auth/v1/signup") { exchange ->
                 signupBody = exchange.requestBody.bufferedReader().use { it.readText() }
-                val body = (if (confirmEmail) user else session).toByteArray()
+                val isEmailSignup = "email" in Json.parseToJsonElement(signupBody).jsonObject
+                val body = (if (!isEmailSignup) anonymousSession else if (confirmEmail) user else session).toByteArray()
                 exchange.responseHeaders.add("Content-Type", "application/json")
                 exchange.sendResponseHeaders(200, body.size.toLong())
                 exchange.responseBody.use { it.write(body) }
@@ -181,11 +186,20 @@ class SupabaseTripRepositoryTest {
             }
             try {
                 val auth = SupabaseAuthRepository(client.auth)
-                assertEquals(confirmEmail, auth.signUp(email, "guest-password", token))
+                if (guestGenerated) {
+                    assertEquals("guest-access", generationAccessToken(client.auth, Mutex()))
+                    assertEquals(AccountSession.Guest, auth.session.first())
+                }
+                assertEquals(confirmEmail, auth.signUp(email, "guest-password", token),
+                    "Confirmation requirement must ignore a retained anonymous generation session")
                 val data = Json.parseToJsonElement(signupBody).jsonObject.getValue("data").jsonObject
                 assertEquals(token, data.getValue(GUEST_TRANSFER_TOKEN).jsonPrimitive.content)
                 if (confirmEmail) {
                     assertFalse(auth.session.first() is AccountSession.SignedIn)
+                    if (guestGenerated) {
+                        assertEquals("guest-owner", client.auth.currentSessionOrNull()?.user?.id)
+                        assertEquals(AccountSession.Guest, auth.session.first())
+                    }
                     auth.signIn(email, "guest-password")
                 }
                 assertEquals(AccountSession.SignedIn(owner.value, email, token), auth.session.first())
