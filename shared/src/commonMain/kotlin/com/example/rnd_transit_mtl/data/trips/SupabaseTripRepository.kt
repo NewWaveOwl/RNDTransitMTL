@@ -34,6 +34,21 @@ internal class SupabaseTripRepository(
     )
     private val writeJson = Json { encodeDefaults = true }
 
+    override suspend fun importGuestTrips(transfer: GuestTripTransfer) {
+        require(transfer.owner == ownerId.value)
+        require(transfer.trips.all { it.ownerId == null })
+        client.postgrest.rpc(
+            "import_guest_trips",
+            JsonObject(
+                mapOf(
+                    "p_owner" to JsonPrimitive(ownerId.value),
+                    "p_transfer" to JsonPrimitive(transfer.token),
+                    "p_trips" to writeJson.encodeToJsonElement(transfer.trips.map { it.toDto() }),
+                )
+            ),
+        )
+    }
+
     override suspend fun saveFinalTrip(trip: Trip): Trip {
         require(trip.status == TripStatus.Completed ||
                 trip.status == TripStatus.Cancelled) {

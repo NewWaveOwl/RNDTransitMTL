@@ -11,6 +11,11 @@ the repository serializes default values on every save. Existing trips retain
 null metadata and a zero orientation reserve. The migration extends only the
 existing editable-column grants; owner/id protection and row policies remain.
 
+The guest import migration adds `import_guest_trips` for the sign-up flow. It
+commits guest history and reviews with a receipt so a retry can safely
+acknowledge a previously committed import. Apply the migration before releasing
+a client that calls it.
+
 With Supabase CLI installed, check `supabase db push --help`, verify the linked
 project is **RNDTransitMTL**, then apply pending migrations using the CLI's linked
 project mode. Do not apply them to another application's database. Alternatively,
@@ -25,6 +30,10 @@ temporary fixtures inside a transaction, exercises authenticated owner writes,
 legacy defaults, metadata round-trip, constraints, column privileges and owner
 isolation, then rolls everything back. Run with stop-on-error enabled when using
 psql. This test is not a substitute for a PostgREST integration check.
+
+Run `tests/import_guest_trips.sql` against the same disposable database to
+verify atomic rollback, retry receipts, return-journey links, and account
+isolation for guest imports.
 
 On the configured app project, complete and save a trip while signed in, reopen
 it from History, and check its timing and requested transport choices. Repeat

@@ -50,6 +50,11 @@ internal class CloudTrips(
         }
     }
 
+    suspend fun importGuestTrips(transfer: GuestTripTransfer) = mutex.withLock {
+        repository.importGuestTrips(transfer)
+        revision++
+    }
+
     suspend fun flushFinalTrips() = mutex.withLock {
         for (trip in store.pendingFinalTrips()) {
             persistFinalTrip(trip)
