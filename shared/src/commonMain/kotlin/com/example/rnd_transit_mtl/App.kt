@@ -15,6 +15,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
@@ -34,6 +35,7 @@ import com.example.rnd_transit_mtl.data.generation.LocalBackendTripGenerator
 import com.example.rnd_transit_mtl.data.generation.rememberBackendTripGenerator
 import com.example.rnd_transit_mtl.data.trips.CloudTrips
 import com.example.rnd_transit_mtl.data.trips.FinalTripOutbox
+import com.example.rnd_transit_mtl.data.trips.GuestTripTransfers
 import com.example.rnd_transit_mtl.data.trips.LocalCloudTrips
 import com.example.rnd_transit_mtl.data.trips.SupabaseTripRepository
 import com.example.rnd_transit_mtl.data.trips.TripRepository
@@ -59,6 +61,7 @@ import com.example.rnd_transit_mtl.ui.global_ui_ellements.map.LocalSharedTransit
 import com.example.rnd_transit_mtl.ui.theme.RNDTransitTheme
 import com.example.rnd_transit_mtl.ui.global_ui_ellements.debug.DebugModeDialog
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import com.example.rnd_transit_mtl.data.accounts.AccountRepository
 import com.example.rnd_transit_mtl.data.accounts.LocalAccountRepository
 import com.example.rnd_transit_mtl.state.refresh.rememberInactivityRefresh
@@ -135,6 +138,26 @@ internal fun App(
         SessionTripsStores()
     }
 
+    val guestTransfers = remember(tripRepository != null) {
+        tripRepository?.let { GuestTripTransfers() }
+    }
+    val guestStore = remember(guestTransfers, sessionStores) {
+        sessionStores.forIdentity("guest").also { guestTransfers?.restoreGuest(it) }
+    }
+    LaunchedEffect(guestTransfers, guestStore) {
+        if (guestTransfers != null) {
+            snapshotFlow { guestStore.completedTrips + guestStore.cancelledTrips }.collect { history ->
+                guestTransfers.saveGuest(history)
+            }
+        }
+    }
+    val signupAuth = remember(authRepository, guestTransfers, guestStore) {
+        object : AuthRepository by authRepository {
+            override suspend fun signUp(email: String, password: String): Boolean =
+                authRepository.signUp(email, password, guestTransfers?.stage(email, guestStore))
+        }
+    }
+
     var lastSignedIdentity by rememberSaveable {
         mutableStateOf<String?>(null)
     }
@@ -190,7 +213,7 @@ internal fun App(
                 Navigator(backStack)
             }
             val tripsStore = remember(sessionStores, identity) {
-                sessionStores.forIdentity(identity)
+                if (identity == "guest") guestStore else sessionStores.forIdentity(identity)
             }
 
             val owner = (accountSession.value as? AccountSession.SignedIn)
@@ -210,6 +233,31 @@ internal fun App(
 
             val accountRepository = remember(owner) {
                 owner?.let { AccountRepository(UserId(it)) }
+            }
+
+            var transferStatus by remember(owner) { mutableStateOf<String?>(null) }
+            var transferRetry by remember(owner) { mutableStateOf(0) }
+            val signedIn = accountSession.value as? AccountSession.SignedIn
+            LaunchedEffect(signedIn, cloudTrips, transferRetry) {
+                if (signedIn == null || guestTransfers == null || cloudTrips == null) return@LaunchedEffect
+                var retryDelay = 2_000L
+                while (true) {
+                    val transferred = tryCloudAction {
+                        val pending = guestTransfers.forAccount(signedIn, guestStore)
+                        if (pending.isNotEmpty()) transferStatus = "Transferring your guest trips and reviews…"
+                        for (transfer in pending) {
+                            cloudTrips.importGuestTrips(transfer)
+                            guestTransfers.acknowledge(transfer)
+                        }
+                    }
+                    if (transferred) {
+                        transferStatus = null
+                        break
+                    }
+                    transferStatus = "Your guest saves are on this device. Transfer will retry automatically."
+                    delay(retryDelay)
+                    retryDelay = (retryDelay * 2).coerceAtMost(30_000L)
+                }
             }
 
             val inactivityRefresh = rememberInactivityRefresh(identity) {
@@ -256,7 +304,7 @@ internal fun App(
                 LocalCloudTrips provides cloudTrips,
                 LocalTripNavigation provides tripNavigation,
                 LocalNicknameSession provides appNicknameSession,
-                LocalAuthRepository provides authRepository,
+                LocalAuthRepository provides signupAuth,
                 LocalAccountSession provides accountSession.value,
                 LocalAccountRepository provides accountRepository,
             ) {
@@ -285,7 +333,7 @@ internal fun App(
 
                             showAccountScreen -> {
                                 val authViewModel = viewModel {
-                                    AuthViewModel(authRepository)
+                                    AuthViewModel(signupAuth)
                                 }
 
                                 MainLayout(showTopBar = false) {
@@ -335,7 +383,17 @@ internal fun App(
                             )
 
                             // Save status must not reserve a strip below the shared header.
-                            if (cloudTrips != null && pending.isNotEmpty() && saveFailed) {
+                            val guestStatus = transferStatus
+                            if (guestStatus != null) {
+                                Snackbar(
+                                    modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
+                                    action = {
+                                        TextButton(onClick = { transferRetry++ }) { Text("Retry") }
+                                    }
+                                ) {
+                                    Text(guestStatus)
+                                }
+                            } else if (cloudTrips != null && pending.isNotEmpty() && saveFailed) {
                                 Snackbar(
                                     modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
                                     action = {
