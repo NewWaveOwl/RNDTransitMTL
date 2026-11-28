@@ -110,6 +110,46 @@ class SupabaseTripRepositoryTest {
     }
 
     @Test
+    fun acceptedSignupWithTypoIsReplacedByCorrectedEmail() = runTest {
+        val storage = ChunkedTripSettings(PropertiesSettings(Properties()))
+        val saved = pending.copy(ownerId = null)
+        val guest = TripsStore().apply { restoreFinalTrip(saved) }
+        val transfers = GuestTripTransfers(storage)
+        val typo = "jim@gmial.com"
+        val email = "jim@gmail.com"
+        var typoToken = ""
+        var correctedToken = ""
+        assertTrue(transfers.signUp(typo, guest) {
+            typoToken = it
+            true
+        })
+        assertTrue(transfers.signUp(email, guest) {
+            correctedToken = it
+            true
+        })
+
+        val reopened = GuestTripTransfers(storage)
+        val restored = TripsStore().also(reopened::restoreGuest)
+        assertTrue(reopened.forAccount(AccountSession.SignedIn("other-owner", typo, typoToken), restored).isEmpty())
+        val session = AccountSession.SignedIn(owner.value, email, correctedToken)
+        assertEquals(listOf(saved), reopened.forAccount(session, restored).single().trips)
+    }
+
+    @Test
+    fun unreadableGuestJournalAllowsNewSaves() {
+        val storage = ChunkedTripSettings(PropertiesSettings(Properties()))
+        storage.write("transit_guest_trip_transfers", """{"guest":[{}]}""")
+        val transfers = GuestTripTransfers(storage)
+        val guest = TripsStore().also(transfers::restoreGuest)
+        assertTrue(guest.completedTrips.isEmpty())
+
+        val saved = pending.copy(ownerId = null)
+        transfers.saveGuest(listOf(saved))
+        GuestTripTransfers(storage).restoreGuest(guest)
+        assertEquals(saved, guest.findInHistory(saved.id))
+    }
+
+    @Test
     fun signupCarriesTheTransferTokenThroughAuthentication() = runTest {
         val email = "guest@example.com"
         val token = "20000000-0000-4000-8000-000000000001"
@@ -167,11 +207,7 @@ class SupabaseTripRepositoryTest {
         val token = assertNotNull(transfers.stage(email, guest))
         val edited = original.copy(review = TripReview(5, comment = "Edited"))
         val later = original.copy(id = TripId("saved-later"))
-        val reserved = original.copy(id = TripId("reserved"))
-        guest.restoreGuestHistory(listOf(edited, reserved))
-        val otherEmail = "another@example.com"
-        val otherToken = transfers.stage(otherEmail, guest)
-        guest.restoreGuestHistory(listOf(edited, reserved, later))
+        guest.restoreGuestHistory(listOf(edited, later))
 
         val session = AccountSession.SignedIn(owner.value, email, token)
         val claimed = transfers.forAccount(session, guest).single()
@@ -179,10 +215,11 @@ class SupabaseTripRepositoryTest {
 
         val reopened = GuestTripTransfers(storage)
         val restored = TripsStore().also(reopened::restoreGuest)
-        assertTrue(reopened.forAccount(session.copy(userId = "other-owner"), restored).isEmpty())
-        assertEquals(claimed, reopened.forAccount(session, restored).single())
+        val otherEmail = "another@example.com"
+        val otherToken = reopened.stage(otherEmail, restored)
         val otherSession = AccountSession.SignedIn("other-owner", otherEmail, otherToken)
-        assertEquals(listOf(reserved), reopened.forAccount(otherSession, restored).single().trips)
+        assertTrue(reopened.forAccount(otherSession, restored).isEmpty())
+        assertEquals(claimed, reopened.forAccount(session, restored).single())
     }
 
     @Test
@@ -194,9 +231,6 @@ class SupabaseTripRepositoryTest {
         val email = "guest@example.com"
         val token = assertNotNull(transfers.stage(email, guest))
         assertEquals(token, transfers.stage(email, guest))
-        val otherEmail = "another@example.com"
-        val otherToken = transfers.stage(otherEmail, guest)
-        assertTrue(transfers.forAccount(AccountSession.SignedIn("other-owner", otherEmail, otherToken), guest).isEmpty())
         assertEquals(reviewed, guest.findInHistory(reviewed.id))
 
         val restarted = GuestTripTransfers(storage)

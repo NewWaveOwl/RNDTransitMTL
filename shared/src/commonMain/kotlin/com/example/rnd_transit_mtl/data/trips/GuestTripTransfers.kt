@@ -29,7 +29,9 @@ internal class GuestTripTransfers(
         val pending: List<GuestTripTransfer> = emptyList(),
     )
 
-    private var journal = storage.read(KEY)?.let { Json.decodeFromString<Journal>(it) }
+    private var journal = storage.read(KEY)?.let {
+        runCatching { Json.decodeFromString<Journal>(it) }.getOrNull()
+    }
 
     fun restoreGuest(store: TripsStore) {
         journal?.let { store.restoreGuestHistory(it.guest) }
@@ -39,12 +41,7 @@ internal class GuestTripTransfers(
         val current = journal
         if (history == current?.guest.orEmpty()) return
 
-        val savedById = history.associateBy { it.id }
-        val pending = current?.pending.orEmpty().map { transfer ->
-            if (transfer.owner != null) transfer
-            else transfer.copy(trips = transfer.trips.mapNotNull { savedById[it.id] })
-        }
-        write(Journal(history, pending))
+        write(Journal(history, current?.pending.orEmpty()))
     }
 
     suspend fun signUp(email: String, guest: TripsStore, authenticate: suspend (String) -> Boolean): Boolean {
@@ -68,18 +65,15 @@ internal class GuestTripTransfers(
         val history = guest.completedTrips + guest.cancelledTrips
         saveGuest(history)
         pendingSignup(email)?.let { return it.token }
-        val pending = journal?.pending.orEmpty()
-        val reservedIds = reservedTripIds(pending)
-        val trips = history.filter { it.id !in reservedIds }
-
-        val transfer = GuestTripTransfer(Uuid.random().toString(), email.trim().lowercase(), trips)
+        val pending = journal?.pending.orEmpty().filter { it.owner != null }
+        val transfer = GuestTripTransfer(Uuid.random().toString(), email.trim().lowercase(), emptyList())
         write(Journal(history, pending + transfer))
         return transfer.token
     }
 
     private fun pendingSignup(email: String): GuestTripTransfer? {
         val signupEmail = email.trim().lowercase()
-        return journal?.pending?.firstOrNull { it.owner == null && it.signupEmail == signupEmail }
+        return journal?.pending?.lastOrNull { it.owner == null }?.takeIf { it.signupEmail == signupEmail }
     }
 
     private fun reservedTripIds(transfers: List<GuestTripTransfer>): Set<TripId> =
@@ -92,7 +86,7 @@ internal class GuestTripTransfers(
         val signup = session.email?.let(::pendingSignup)
         var pending = current.pending
         if (signup != null && signup.token == session.guestTransferToken) {
-            pending = pending - signup
+            pending = pending.filter { it.owner != null }
             val reservedIds = reservedTripIds(pending)
             val trips = history.filter { it.id !in reservedIds }
             if (trips.isNotEmpty()) pending += signup.copy(owner = session.userId, trips = trips)
