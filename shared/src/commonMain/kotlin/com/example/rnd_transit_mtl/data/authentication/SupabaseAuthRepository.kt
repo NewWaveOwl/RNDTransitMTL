@@ -7,6 +7,7 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.auth.user.UserInfo
+import io.github.jan.supabase.exceptions.RestException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -55,10 +56,17 @@ internal class SupabaseAuthRepository(
         signUp(email, password, guestTransferToken = null)
 
     override suspend fun signUp(email: String, password: String, guestTransferToken: String?): Boolean {
-        auth.signUpWith(Email) {
-            this.email = email.trim()
-            this.password = password
-            data = guestTransferToken?.let { JsonObject(mapOf(GUEST_TRANSFER_TOKEN to JsonPrimitive(it))) }
+        try {
+            auth.signUpWith(Email) {
+                this.email = email.trim()
+                this.password = password
+                data = guestTransferToken?.let { JsonObject(mapOf(GUEST_TRANSFER_TOKEN to JsonPrimitive(it))) }
+            }
+        } catch (error: RestException) {
+            when (error.statusCode) {
+                400, 401, 403, 409, 422, 429 -> throw SignupRejected(error)
+                else -> throw error
+            }
         }
         // The SDK can return a user with or without an authenticated session.
         return auth.currentSessionOrNull() == null

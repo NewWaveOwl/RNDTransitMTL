@@ -14,6 +14,8 @@ internal sealed interface AccountSession {
     ) : AccountSession
 }
 
+internal class SignupRejected(cause: Exception) : Exception(cause.message, cause)
+
 internal interface AuthRepository {
     val session: Flow<AccountSession>
 

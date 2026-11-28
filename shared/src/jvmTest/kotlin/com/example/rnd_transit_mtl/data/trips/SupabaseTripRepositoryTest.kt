@@ -1,6 +1,7 @@
 package com.example.rnd_transit_mtl.data.trips
 
 import com.example.rnd_transit_mtl.data.authentication.AccountSession
+import com.example.rnd_transit_mtl.data.authentication.SignupRejected
 import com.example.rnd_transit_mtl.data.authentication.SupabaseAuthRepository
 import com.example.rnd_transit_mtl.data.remote.dto.toDto
 import com.example.rnd_transit_mtl.model.geo.GeoPoint
@@ -77,9 +78,35 @@ class SupabaseTripRepositoryTest {
     }
 
     @Test
-    fun signupWithNoGuestSavesHasNoTransfer() {
+    fun signupWithNoGuestSavesCanClaimLaterSaves() {
         val transfers = GuestTripTransfers(ChunkedTripSettings(PropertiesSettings(Properties())))
-        assertNull(transfers.stage("guest@example.com", TripsStore()))
+        val guest = TripsStore()
+        val email = "guest@example.com"
+        val token = transfers.stage(email, guest)
+        val saved = pending.copy(ownerId = null)
+        guest.restoreFinalTrip(saved)
+
+        val session = AccountSession.SignedIn(owner.value, email, token)
+        assertEquals(listOf(saved), transfers.forAccount(session, guest).single().trips)
+    }
+
+    @Test
+    fun rejectedSignupReleasesSavesForCorrectedEmail() = runTest {
+        val storage = ChunkedTripSettings(PropertiesSettings(Properties()))
+        val saved = pending.copy(ownerId = null)
+        val guest = TripsStore().apply { restoreFinalTrip(saved) }
+        val transfers = GuestTripTransfers(storage)
+        assertFailsWith<SignupRejected> {
+            transfers.signUp("wrong@example.com", guest) {
+                throw SignupRejected(IllegalArgumentException("Invalid email"))
+            }
+        }
+
+        val reopened = GuestTripTransfers(storage)
+        val email = "guest@example.com"
+        val token = reopened.stage(email, guest)
+        val session = AccountSession.SignedIn(owner.value, email, token)
+        assertEquals(listOf(saved), reopened.forAccount(session, guest).single().trips)
     }
 
     @Test
@@ -139,16 +166,23 @@ class SupabaseTripRepositoryTest {
         val email = "guest@example.com"
         val token = assertNotNull(transfers.stage(email, guest))
         val edited = original.copy(review = TripReview(5, comment = "Edited"))
-        guest.restoreGuestHistory(listOf(edited))
+        val later = original.copy(id = TripId("saved-later"))
+        val reserved = original.copy(id = TripId("reserved"))
+        guest.restoreGuestHistory(listOf(edited, reserved))
+        val otherEmail = "another@example.com"
+        val otherToken = transfers.stage(otherEmail, guest)
+        guest.restoreGuestHistory(listOf(edited, reserved, later))
 
         val session = AccountSession.SignedIn(owner.value, email, token)
         val claimed = transfers.forAccount(session, guest).single()
-        assertEquals(listOf(edited), claimed.trips)
+        assertEquals(listOf(edited, later), claimed.trips)
 
         val reopened = GuestTripTransfers(storage)
         val restored = TripsStore().also(reopened::restoreGuest)
         assertTrue(reopened.forAccount(session.copy(userId = "other-owner"), restored).isEmpty())
         assertEquals(claimed, reopened.forAccount(session, restored).single())
+        val otherSession = AccountSession.SignedIn("other-owner", otherEmail, otherToken)
+        assertEquals(listOf(reserved), reopened.forAccount(otherSession, restored).single().trips)
     }
 
     @Test
@@ -160,7 +194,9 @@ class SupabaseTripRepositoryTest {
         val email = "guest@example.com"
         val token = assertNotNull(transfers.stage(email, guest))
         assertEquals(token, transfers.stage(email, guest))
-        assertNull(transfers.stage("another@example.com", guest))
+        val otherEmail = "another@example.com"
+        val otherToken = transfers.stage(otherEmail, guest)
+        assertTrue(transfers.forAccount(AccountSession.SignedIn("other-owner", otherEmail, otherToken), guest).isEmpty())
         assertEquals(reviewed, guest.findInHistory(reviewed.id))
 
         val restarted = GuestTripTransfers(storage)

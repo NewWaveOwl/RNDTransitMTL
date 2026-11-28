@@ -153,8 +153,12 @@ internal fun App(
     }
     val signupAuth = remember(authRepository, guestTransfers, guestStore) {
         object : AuthRepository by authRepository {
-            override suspend fun signUp(email: String, password: String): Boolean =
-                authRepository.signUp(email, password, guestTransfers?.stage(email, guestStore))
+            override suspend fun signUp(email: String, password: String): Boolean {
+                if (guestTransfers == null) return authRepository.signUp(email, password)
+                return guestTransfers.signUp(email, guestStore) { token ->
+                    authRepository.signUp(email, password, token)
+                }
+            }
         }
     }
 

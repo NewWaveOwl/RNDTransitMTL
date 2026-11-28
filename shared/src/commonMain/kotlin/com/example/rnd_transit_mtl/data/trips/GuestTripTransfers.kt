@@ -1,6 +1,8 @@
 package com.example.rnd_transit_mtl.data.trips
 
 import com.example.rnd_transit_mtl.data.authentication.AccountSession
+import com.example.rnd_transit_mtl.data.authentication.SignupRejected
+import com.example.rnd_transit_mtl.model.ids.TripId
 import com.example.rnd_transit_mtl.model.trip.Trip
 import com.example.rnd_transit_mtl.state.trip.TripsStore
 import kotlinx.serialization.Serializable
@@ -38,49 +40,64 @@ internal class GuestTripTransfers(
         if (history == current?.guest.orEmpty()) return
 
         val savedById = history.associateBy { it.id }
-        val pending = current?.pending.orEmpty().mapNotNull { transfer ->
-            if (transfer.owner != null) return@mapNotNull transfer
-
-            val updatedTrips = transfer.trips.mapNotNull { savedById[it.id] }
-            if (updatedTrips.isEmpty()) null else transfer.copy(trips = updatedTrips)
+        val pending = current?.pending.orEmpty().map { transfer ->
+            if (transfer.owner != null) transfer
+            else transfer.copy(trips = transfer.trips.mapNotNull { savedById[it.id] })
         }
         write(Journal(history, pending))
     }
 
+    suspend fun signUp(email: String, guest: TripsStore, authenticate: suspend (String) -> Boolean): Boolean {
+        val existingSignup = pendingSignup(email)
+        val token = stage(email, guest)
+        try {
+            return authenticate(token)
+        } catch (rejected: SignupRejected) {
+            // A previous attempt may have reached the server.
+            if (existingSignup == null) {
+                val current = checkNotNull(journal)
+                val pending = current.pending.filterNot { it.token == token && it.owner == null }
+                write(current.copy(pending = pending))
+            }
+            throw rejected
+        }
+    }
+
     @OptIn(ExperimentalUuidApi::class)
-    fun stage(email: String, guest: TripsStore): String? {
+    fun stage(email: String, guest: TripsStore): String {
         val history = guest.completedTrips + guest.cancelledTrips
         saveGuest(history)
+        pendingSignup(email)?.let { return it.token }
         val pending = journal?.pending.orEmpty()
-        val signupEmail = email.trim().lowercase()
-        val existingSignup = pending.firstOrNull { it.owner == null && it.signupEmail == signupEmail }
-        val reservedIds = pending.asSequence().flatMap { it.trips.asSequence() }.map { it.id }.toSet()
+        val reservedIds = reservedTripIds(pending)
         val trips = history.filter { it.id !in reservedIds }
-        if (trips.isEmpty()) return existingSignup?.token
 
-        val transfer = existingSignup?.copy(trips = existingSignup.trips + trips)
-            ?: GuestTripTransfer(Uuid.random().toString(), signupEmail, trips)
-        write(Journal(history, pending.filterNot { it == existingSignup } + transfer))
+        val transfer = GuestTripTransfer(Uuid.random().toString(), email.trim().lowercase(), trips)
+        write(Journal(history, pending + transfer))
         return transfer.token
     }
+
+    private fun pendingSignup(email: String): GuestTripTransfer? {
+        val signupEmail = email.trim().lowercase()
+        return journal?.pending?.firstOrNull { it.owner == null && it.signupEmail == signupEmail }
+    }
+
+    private fun reservedTripIds(transfers: List<GuestTripTransfer>): Set<TripId> =
+        transfers.flatMap { it.trips }.map { it.id }.toSet()
 
     fun forAccount(session: AccountSession.SignedIn, guest: TripsStore): List<GuestTripTransfer> {
         val history = guest.completedTrips + guest.cancelledTrips
         saveGuest(history)
         val current = journal ?: return emptyList()
-        val signupEmail = session.email?.trim()?.lowercase()
-        val pending = current.pending.map { transfer ->
-            if (transfer.owner == null && transfer.token == session.guestTransferToken &&
-                transfer.signupEmail == signupEmail
-            ) {
-                transfer.copy(owner = session.userId)
-            } else {
-                transfer
-            }
-        }
-        if (pending != current.pending) {
-            val claimedIds = pending.filter { it.owner == session.userId }
-                .flatMap { it.trips }.map { it.id }.toSet()
+        val signup = session.email?.let(::pendingSignup)
+        var pending = current.pending
+        if (signup != null && signup.token == session.guestTransferToken) {
+            pending = pending - signup
+            val reservedIds = reservedTripIds(pending)
+            val trips = history.filter { it.id !in reservedIds }
+            if (trips.isNotEmpty()) pending += signup.copy(owner = session.userId, trips = trips)
+
+            val claimedIds = trips.map { it.id }.toSet()
             val remaining = history.filter { it.id !in claimedIds }
             write(Journal(remaining, pending))
             guest.restoreGuestHistory(remaining)
