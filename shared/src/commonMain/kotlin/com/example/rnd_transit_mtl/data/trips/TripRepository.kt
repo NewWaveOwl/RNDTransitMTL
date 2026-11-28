@@ -5,6 +5,8 @@ import com.example.rnd_transit_mtl.model.review.TripReview
 import com.example.rnd_transit_mtl.model.trip.Trip
 
 internal interface TripRepository {
+    suspend fun importGuestTrips(transfer: GuestTripTransfer): Unit = error("Guest import is unavailable.")
+
     /** Saves a completed or cancelled trip and returns the stored record. */
     suspend fun saveFinalTrip(trip: Trip): Trip
 

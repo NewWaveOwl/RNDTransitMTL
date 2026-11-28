@@ -9,7 +9,7 @@ import kotlinx.serialization.json.Json
 
 /** Keeps pending final records and unsaved reviews across process exits, scoped to their owner. */
 internal class FinalTripOutbox(providedSettings: Settings? = null) {
-    private val settings by lazy { providedSettings ?: Settings() }
+    private val storage by lazy { ChunkedTripSettings(providedSettings ?: Settings()) }
 
     @Serializable
     private data class Pending(
@@ -48,55 +48,25 @@ internal class FinalTripOutbox(providedSettings: Settings? = null) {
         if (legacy?.owner == owner) {
             val migrated = pending ?: legacy
             write(migrated)
-            clear(KEY)
+            storage.clear(KEY)
             return migrated
         }
         return pending ?: Pending(owner, emptyList())
     }
 
-    private fun readPending(key: String): Pending? {
-        val slot = settings.getIntOrNull(key) ?: return null
-        val prefix = slotPrefix(key, slot)
-        val count = settings.getInt(prefix + "count", 0)
-        val encoded = buildString {
-            repeat(count) { append(settings.getString(prefix + it, "")) }
-        }
-        return runCatching { Json.decodeFromString<Pending>(encoded) }.getOrNull()
-    }
+    private fun readPending(key: String): Pending? =
+        storage.read(key)?.let { runCatching { Json.decodeFromString<Pending>(it) }.getOrNull() }
 
     private fun write(pending: Pending) {
         val key = ownerKey(pending.owner)
         if (pending.trips.isEmpty() && pending.reviews.isEmpty()) {
-            clear(key)
-            return
+            storage.clear(key)
+        } else {
+            storage.write(key, Json.encodeToString(pending))
         }
-
-        // Desktop preferences limit individual values. Switch slots only after all chunks are written.
-        val oldSlot = settings.getInt(key, 0)
-        val slot = 1 - oldSlot
-        val prefix = slotPrefix(key, slot)
-        removeSlot(key, slot)
-        val chunks = Json.encodeToString(pending).chunked(4_000)
-        chunks.forEachIndexed { index, chunk -> settings.putString(prefix + index, chunk) }
-        settings.putInt(prefix + "count", chunks.size)
-        settings.putInt(key, slot)
-        removeSlot(key, oldSlot)
-    }
-
-    private fun clear(key: String) {
-        settings.remove(key)
-        removeSlot(key, 0)
-        removeSlot(key, 1)
-    }
-
-    private fun removeSlot(key: String, slot: Int) {
-        val prefix = slotPrefix(key, slot)
-        settings.keys.filter { it.startsWith(prefix) }.forEach(settings::remove)
     }
 
     private fun ownerKey(owner: String) = "${KEY}_$owner"
-
-    private fun slotPrefix(key: String, slot: Int) = "${key}_${slot}_"
 
     private companion object {
         const val KEY = "transit_pending_final_trips"

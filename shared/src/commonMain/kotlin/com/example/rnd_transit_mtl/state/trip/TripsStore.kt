@@ -70,6 +70,19 @@ class TripsStore private constructor(
         }
     }
 
+    internal fun restoreGuestHistory(history: List<Trip>) {
+        val current = mutableState.value
+        val completed = history.filter { it.status == TripStatus.Completed }
+        val completedIds = completed.map { it.id }.toSet()
+        mutableState.value = current.copy(
+            activeTrip = current.activeTrip?.takeUnless { active -> history.any { it.id == active.trip.id } },
+            completedTrips = completed,
+            cancelledTrips = history.filter { it.status == TripStatus.Cancelled },
+            pendingReviewTripId = current.pendingReviewTripId?.takeIf { it in completedIds },
+            reviewDrafts = current.reviewDrafts.filterKeys { it in completedIds },
+        )
+    }
+
     /** A durable final record supersedes an older active-trip platform snapshot. */
     internal fun restoreFinalTrip(trip: Trip) {
         val current = mutableState.value
